@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"database/sql"
 	"fmt"
 	"io"
 	"log/slog"
@@ -291,4 +292,86 @@ func TestLoadDashboard(t *testing.T) {
 	slices.Sort(wlat)
 	t.Logf("HandleResult latency idle (ms): p50=%.2f p99=%.2f max=%.2f", pct(base, .5), pct(base, .99), pct(base, 1))
 	t.Logf("HandleResult latency during dashboard (ms): p50=%.2f p99=%.2f max=%.2f (n=%d)", pct(wlat, .5), pct(wlat, .99), pct(wlat, 1), len(wlat))
+}
+
+// TestLoadRollup measures the hourly rollup and reads over 30 days of
+// history for N monitors: one day of raw results plus 29 days of rollups.
+func TestLoadRollup(t *testing.T) {
+	n := envInt("LOAD_MONITORS", 5000)
+	_, st := loadHub(t)
+	db := st.DB()
+	ids := make([]int64, n)
+	for i := range n {
+		m := &store.Monitor{Name: fmt.Sprintf("m%05d", i), Type: "http", Target: "http://127.0.0.1/", IntervalSec: 60, Retries: 1, Locations: []string{LocalLocation}}
+		if err := st.CreateMonitor(m); err != nil {
+			t.Fatal(err)
+		}
+		ids[i] = m.ID
+	}
+	hour := store.RollupHour
+	now := time.Now().UnixMilli()
+	now -= now % hour
+	size := func() float64 {
+		var pages, psize int64
+		_ = db.QueryRow(`PRAGMA page_count`).Scan(&pages)
+		_ = db.QueryRow(`PRAGMA page_size`).Scan(&psize)
+		return float64(pages*psize) / 1e6
+	}
+	// 29 days of rollups (what older raw results would have become).
+	tx, _ := db.Begin()
+	stmt, _ := tx.Prepare(`INSERT INTO result_rollups VALUES (?, 'local', ?, 60, 59, 0, 2478, 59, 2478, 59, 30, 80)`)
+	for h := now - 30*24*hour; h < now-24*hour; h += hour {
+		for _, id := range ids {
+			_, _ = stmt.Exec(id, h)
+		}
+	}
+	stmt.Close()
+	_ = tx.Commit()
+	rollupMB := size()
+	// 1 day of raw results.
+	tx, _ = db.Begin()
+	stmt, _ = tx.Prepare(`INSERT INTO results (monitor_id, location, ts, ok, latency_ms) VALUES (?, 'local', ?, 1, 42)`)
+	for k := range 24 * 60 {
+		ts := now - 24*hour + int64(k)*60000
+		for i, id := range ids {
+			_, _ = stmt.Exec(id, ts+int64(i))
+		}
+	}
+	stmt.Close()
+	_ = tx.Commit()
+	t.Logf("29 days of rollups: %.0f MB; with 1 day of raw results: %.0f MB", rollupMB, size())
+
+	// Reload the boundary as a restarted hub would, then roll up the raw day.
+	st2, err := store.Open(filepath.Join(filepath.Dir(dbPath(t, db)), "load.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.Close()
+	t1 := time.Now()
+	hours, err := st2.RollupResults(time.UnixMilli(now).Add(store.RollupLag), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := time.Since(t1)
+	t.Logf("rolled up %d hours (%d results each) in %s, %.2fs per hour", hours, n*60, d.Round(time.Millisecond), d.Seconds()/float64(max(hours, 1)))
+
+	t1 = time.Now()
+	for _, id := range ids {
+		if _, _, err := st2.Uptime(id, now-30*24*hour); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Logf("30-day uptime of all %d monitors: %s", n, time.Since(t1).Round(time.Millisecond))
+	t1 = time.Now()
+	b, err := st2.Buckets(ids[0], now-30*24*hour, now, 8*hour, true)
+	t.Logf("30-day chart of one monitor: %d buckets in %s (err %v)", len(b), time.Since(t1).Round(time.Microsecond), err)
+}
+
+func dbPath(t *testing.T, db *sql.DB) string {
+	var seq int
+	var name, file string
+	if err := db.QueryRow(`PRAGMA database_list`).Scan(&seq, &name, &file); err != nil {
+		t.Fatal(err)
+	}
+	return file
 }

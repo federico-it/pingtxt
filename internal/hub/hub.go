@@ -507,24 +507,39 @@ func (h *Hub) AgentOnline(id int64) bool {
 	return h.agents[id] != nil
 }
 
+// maintenance summarizes raw results into hourly rollups and deletes data
+// past its retention: raw results after RawRetentionDays, hourly rollups
+// after RetentionDays.
 func (h *Hub) maintenance(ctx context.Context) {
-	t := time.NewTicker(time.Hour)
+	t := time.NewTicker(10 * time.Minute)
 	defer t.Stop()
 	for {
-		days := h.generalSettings().RetentionDays
-		if days <= 0 {
-			days = 30
-		}
-		cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour).UnixMilli()
-		if n, err := h.store.PruneResults(cutoff); err != nil {
-			h.log.Error("prune results", "err", err)
-		} else if n > 0 {
-			h.log.Info("pruned old results", "rows", n)
-		}
+		h.compactResults(ctx, time.Now())
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 		}
+	}
+}
+
+func (h *Hub) compactResults(ctx context.Context, now time.Time) {
+	g := h.generalSettings()
+	t0 := time.Now()
+	if n, err := h.store.RollupResults(now, ctx.Done()); err != nil {
+		h.log.Error("roll up results", "err", err)
+	} else if n > 1 {
+		h.log.Info("rolled up results", "hours", n, "took", time.Since(t0).Round(time.Millisecond))
+	}
+	day := 24 * time.Hour
+	if n, err := h.store.PruneResults(now.Add(-time.Duration(g.RawRetentionDays) * day).UnixMilli()); err != nil {
+		h.log.Error("prune results", "err", err)
+	} else if n > 0 {
+		h.log.Info("pruned raw results", "rows", n)
+	}
+	if n, err := h.store.PruneRollups(now.Add(-time.Duration(g.RetentionDays) * day).UnixMilli()); err != nil {
+		h.log.Error("prune rollups", "err", err)
+	} else if n > 0 {
+		h.log.Info("pruned hourly rollups", "rows", n)
 	}
 }

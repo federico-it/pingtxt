@@ -1,9 +1,11 @@
 package store
 
 import (
+	"cmp"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 )
@@ -420,19 +422,43 @@ func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
 	return out, rows.Err()
 }
 
-// Uptime returns the ratio of OK checks since `since` (ms), or -1 without data.
-// Checks taken during maintenance windows are left out.
+// Uptime returns the ratio of OK checks since `since` (ms), or -1 without
+// data, and the average latency of the OK checks. Checks taken during
+// maintenance windows are left out. History older than the raw results comes
+// from the hourly rollups, with hour precision.
 func (s *Store) Uptime(monitorID, since int64) (float64, float64, error) {
-	var total, ok sql.NullInt64
-	var avg sql.NullFloat64
-	err := s.db.QueryRow(`SELECT COUNT(*), SUM(ok), AVG(CASE WHEN ok = 1 THEN latency_ms END) FROM results WHERE monitor_id = ? AND ts >= ? AND maint = 0`, monitorID, since).Scan(&total, &ok, &avg)
+	var total, ok, latN int64
+	var latSum float64
+	w := s.RollupUntil()
+	if since < w {
+		var t, o, n sql.NullInt64
+		var l sql.NullFloat64
+		err := s.db.QueryRow(`SELECT SUM(total), SUM(ok), SUM(up_lat_sum), SUM(up_lat_n) FROM result_rollups
+			WHERE monitor_id = ? AND start >= ? AND start < ?`, monitorID, since-since%RollupHour, w).Scan(&t, &o, &l, &n)
+		if err != nil {
+			return -1, 0, err
+		}
+		total, ok, latSum, latN = t.Int64, o.Int64, l.Float64, n.Int64
+	}
+	var t, o, n sql.NullInt64
+	var l sql.NullFloat64
+	err := s.db.QueryRow(`SELECT COUNT(*), SUM(ok), SUM(CASE WHEN ok = 1 THEN latency_ms END), SUM(ok = 1)
+		FROM results WHERE monitor_id = ? AND ts >= ? AND maint = 0`, monitorID, max(since, w)).Scan(&t, &o, &l, &n)
 	if err != nil {
 		return -1, 0, err
 	}
-	if total.Int64 == 0 {
+	total += t.Int64
+	ok += o.Int64
+	latSum += l.Float64
+	latN += n.Int64
+	if total == 0 {
 		return -1, 0, nil
 	}
-	return float64(ok.Int64) / float64(total.Int64), avg.Float64, nil
+	avg := 0.0
+	if latN > 0 {
+		avg = latSum / float64(latN)
+	}
+	return float64(ok) / float64(total), avg, nil
 }
 
 // Bucket is an aggregated window of results.
@@ -448,38 +474,103 @@ type Bucket struct {
 }
 
 // Buckets aggregates results in [from, to) into fixed windows of `size` ms.
-// When perLocation is true buckets are split by location.
+// When perLocation is true buckets are split by location. History older than
+// the raw results comes from the hourly rollups: each hour falls in the
+// window that contains its start.
 func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bucket, error) {
+	type key struct {
+		idx int64
+		loc string
+	}
+	type agg struct {
+		Bucket
+		latSum float64
+		latN   int
+	}
+	acc := map[key]*agg{}
+	var keys []key
+	read := func(rows *sql.Rows) error {
+		defer rows.Close()
+		for rows.Next() {
+			var k key
+			var b agg
+			var minMs, maxMs float64
+			if err := rows.Scan(&k.idx, &k.loc, &b.Total, &b.OK, &b.Maint, &b.latSum, &b.latN, &minMs, &maxMs); err != nil {
+				return err
+			}
+			a := acc[k]
+			if a == nil {
+				a = &agg{}
+				acc[k] = a
+				keys = append(keys, k)
+			}
+			a.Total += b.Total
+			a.OK += b.OK
+			a.Maint += b.Maint
+			if b.latN > 0 {
+				if a.latN == 0 || minMs < a.MinMs {
+					a.MinMs = minMs
+				}
+				a.MaxMs = max(a.MaxMs, maxMs)
+			}
+			a.latSum += b.latSum
+			a.latN += b.latN
+		}
+		return rows.Err()
+	}
 	loc := `''`
 	if perLocation {
 		loc = `location`
 	}
-	q := `SELECT ((ts - ?) / ?) AS b, ` + loc + ` AS loc, SUM(maint = 0), SUM(ok AND maint = 0), SUM(maint),
-		COALESCE(AVG(CASE WHEN ok = 1 THEN latency_ms END), 0),
+	w := s.RollupUntil()
+	if from < w {
+		rows, err := s.db.Query(`SELECT (MAX(start, ?) - ?) / ? AS b, `+loc+` AS loc, SUM(total), SUM(ok), SUM(maint),
+			SUM(lat_sum), SUM(lat_n), COALESCE(MIN(CASE WHEN lat_n > 0 THEN lat_min END), 0), MAX(lat_max)
+			FROM result_rollups WHERE monitor_id = ? AND start >= ? AND start < ? GROUP BY b, loc`,
+			from, from, size, monitorID, from-from%RollupHour, min(w, to))
+		if err != nil {
+			return nil, err
+		}
+		if err := read(rows); err != nil {
+			return nil, err
+		}
+	}
+	rows, err := s.db.Query(`SELECT ((ts - ?) / ?) AS b, `+loc+` AS loc, SUM(maint = 0), SUM(ok AND maint = 0), SUM(maint),
+		COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(ok = 1),
 		COALESCE(MIN(CASE WHEN ok = 1 THEN latency_ms END), 0),
 		COALESCE(MAX(CASE WHEN ok = 1 THEN latency_ms END), 0)
-		FROM results WHERE monitor_id = ? AND ts >= ? AND ts < ? GROUP BY b, loc ORDER BY b`
-	rows, err := s.db.Query(q, from, size, monitorID, from, to)
+		FROM results WHERE monitor_id = ? AND ts >= ? AND ts < ? GROUP BY b, loc`, from, size, monitorID, max(from, w), to)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := []Bucket{}
-	for rows.Next() {
-		var b Bucket
-		var idx int64
-		if err := rows.Scan(&idx, &b.Location, &b.Total, &b.OK, &b.Maint, &b.AvgMs, &b.MinMs, &b.MaxMs); err != nil {
-			return nil, err
+	if err := read(rows); err != nil {
+		return nil, err
+	}
+	slices.SortFunc(keys, func(a, b key) int {
+		if a.idx != b.idx {
+			return cmp.Compare(a.idx, b.idx)
 		}
-		b.Start = from + idx*size
+		return strings.Compare(a.loc, b.loc)
+	})
+	out := make([]Bucket, 0, len(keys))
+	for _, k := range keys {
+		a := acc[k]
+		b := a.Bucket
+		b.Start = from + k.idx*size
+		b.Location = k.loc
+		if a.latN > 0 {
+			b.AvgMs = a.latSum / float64(a.latN)
+		}
 		out = append(out, b)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
-// PruneResults deletes results older than before. It works in small chunks so
-// that the single database connection is never held for long.
+// PruneResults deletes raw results older than before, but never results that
+// are not summarized in the rollups yet. It works in small chunks so that the
+// single database connection is never held for long.
 func (s *Store) PruneResults(before int64) (int64, error) {
+	before = min(before, s.RollupUntil())
 	var total int64
 	for {
 		res, err := s.db.Exec(`DELETE FROM results WHERE id IN (SELECT id FROM results WHERE ts < ? LIMIT 5000)`, before)
