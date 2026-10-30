@@ -418,12 +418,81 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 	return out, rows.Err()
 }
 
+// PruneResults deletes results older than before. It works in small chunks so
+// that the single database connection is never held for long.
 func (s *Store) PruneResults(before int64) (int64, error) {
-	res, err := s.db.Exec(`DELETE FROM results WHERE ts < ?`, before)
-	if err != nil {
-		return 0, err
+	var total int64
+	for {
+		res, err := s.db.Exec(`DELETE FROM results WHERE id IN (SELECT id FROM results WHERE ts < ? LIMIT 5000)`, before)
+		if err != nil {
+			return total, err
+		}
+		n, _ := res.RowsAffected()
+		total += n
+		if n < 5000 {
+			return total, nil
+		}
 	}
-	return res.RowsAffected()
+}
+
+// InsertResults inserts many results in one transaction.
+func (s *Store) InsertResults(rows []*ResultRow) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare(`INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, r := range rows {
+		res, err := stmt.Exec(r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint))
+		if err != nil {
+			return err
+		}
+		r.ID, _ = res.LastInsertId()
+	}
+	return tx.Commit()
+}
+
+// StatCell aggregates the results of one monitor in one time window.
+type StatCell struct {
+	MonitorID int64
+	Start     int64
+	Total     int // checks outside maintenance
+	OK        int // OK checks outside maintenance
+	Maint     int // checks during maintenance
+	LatSum    float64
+	LatN      int // OK checks
+	UpLatSum  float64
+	UpLatN    int // OK checks outside maintenance
+}
+
+// ResultStats aggregates the results in [from, to) per monitor in windows of
+// `size` ms (aligned to from). One pass over that time range instead of a
+// query per monitor.
+func (s *Store) ResultStats(from, to, size int64) ([]StatCell, error) {
+	rows, err := s.db.Query(`SELECT monitor_id, (ts - ?) / ?, SUM(maint = 0), SUM(ok AND maint = 0), SUM(maint),
+		COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(ok = 1),
+		COALESCE(SUM(CASE WHEN ok = 1 AND maint = 0 THEN latency_ms END), 0), SUM(ok = 1 AND maint = 0)
+		FROM results INDEXED BY results_ts WHERE ts >= ? AND ts < ? GROUP BY 1, 2`, from, size, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []StatCell
+	for rows.Next() {
+		var c StatCell
+		var idx int64
+		if err := rows.Scan(&c.MonitorID, &idx, &c.Total, &c.OK, &c.Maint, &c.LatSum, &c.LatN, &c.UpLatSum, &c.UpLatN); err != nil {
+			return nil, err
+		}
+		c.Start = from + idx*size
+		out = append(out, c)
+	}
+	return out, rows.Err()
 }
 
 // ---------- incidents ----------

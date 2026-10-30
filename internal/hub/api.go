@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -114,7 +115,37 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 		writeErr(w, http.StatusNotFound, "not found")
 	})
 	mux.Handle("/", spaHandler(ui))
-	return securityHeaders(h.customDomains(mux, ui))
+	return securityHeaders(gzipAPI(h.customDomains(mux, ui)))
+}
+
+// gzipWriter marks API responses whose client accepts gzip; writeJSON
+// compresses large bodies for them.
+type gzipWriter struct{ http.ResponseWriter }
+
+func (g gzipWriter) Unwrap() http.ResponseWriter { return g.ResponseWriter }
+
+func gzipAPI(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != protocol.Path &&
+			strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			w = gzipWriter{w}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func acceptsGzip(w http.ResponseWriter) bool {
+	for w != nil {
+		if _, ok := w.(gzipWriter); ok {
+			return true
+		}
+		u, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return false
+		}
+		w = u.Unwrap()
+	}
+	return false
 }
 
 func securityHeaders(next http.Handler) http.Handler {
@@ -144,10 +175,27 @@ func securityHeaders(next http.Handler) http.Handler {
 // ---------- helpers ----------
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		http.Error(w, "encode response", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
+	// Large lists (the dashboard with thousands of monitors is megabytes of
+	// JSON) are compressed when the client accepts it.
+	if len(b) > 8<<10 && w.Header().Get("Content-Encoding") == "" && acceptsGzip(w) {
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Add("Vary", "Accept-Encoding")
+		w.WriteHeader(code)
+		gz, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		_, _ = gz.Write(b)
+		_, _ = gz.Write([]byte{'\n'})
+		_ = gz.Close()
+		return
+	}
 	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
+	_, _ = w.Write(append(b, '\n'))
 }
 
 func writeErr(w http.ResponseWriter, code int, msg string) {
@@ -437,46 +485,26 @@ type bar struct {
 
 const barCount = 48
 
-func (h *Hub) summary(m *store.Monitor) (*monitorSummary, error) {
-	now := time.Now().UnixMilli()
-	day := int64(24 * 3600 * 1000)
-	up, avg, err := h.store.Uptime(m.ID, now-day)
-	if err != nil {
-		return nil, err
-	}
-	s := &monitorSummary{Monitor: m, Uptime24h: up, AvgMs24h: avg}
-	if s.Expiry, err = h.store.ExpiryChecks(m.ID); err != nil {
-		return nil, err
+func (h *Hub) summary(m *store.Monitor, expiry []*store.ExpiryCheck) *monitorSummary {
+	s := &monitorSummary{Monitor: m, Expiry: expiry}
+	if s.Expiry == nil {
+		s.Expiry = []*store.ExpiryCheck{}
 	}
 	if w, end := h.ActiveMaintenance(m.ID); w != nil && !m.Paused {
 		s.Maintenance = &activeMaint{ID: w.ID, Name: w.Name, EndAt: end.UnixMilli()}
 	}
-	if last, err := h.store.RecentResults(m.ID, 1); err == nil && len(last) > 0 {
-		s.Last = last[0]
+	// Bars, uptime and the last result come from the in-memory stats kept by
+	// HandleResult: no query on the results table.
+	h.mu.Lock()
+	st := h.monitors[m.ID]
+	if st != nil && st.stats != nil {
+		s.Bars, s.Uptime24h, s.AvgMs24h = st.stats.bars(time.Now().UnixMilli())
+		s.Last = st.stats.last
+	} else {
+		s.Bars, s.Uptime24h, s.AvgMs24h = (&monStats{}).bars(time.Now().UnixMilli())
 	}
-	size := day / barCount
-	from := now - day
-	from -= from % size
-	buckets, err := h.store.Buckets(m.ID, from, now+size, size, false)
-	if err != nil {
-		return nil, err
-	}
-	byStart := map[int64]store.Bucket{}
-	for _, b := range buckets {
-		byStart[b.Start] = b
-	}
-	for i := 0; i <= barCount; i++ {
-		t := from + int64(i)*size
-		if t > now {
-			break
-		}
-		b := byStart[t]
-		s.Bars = append(s.Bars, bar{T: t, Total: b.Total, OK: b.OK, Maint: b.Maint, AvgMs: b.AvgMs})
-	}
-	if len(s.Bars) > barCount {
-		s.Bars = s.Bars[len(s.Bars)-barCount:]
-	}
-	return s, nil
+	h.mu.Unlock()
+	return s
 }
 
 func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User) {
@@ -485,14 +513,18 @@ func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User
 		h.internalErr(w, err)
 		return
 	}
+	checks, err := h.store.ExpiryChecks(0)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	expiry := map[int64][]*store.ExpiryCheck{}
+	for _, c := range checks {
+		expiry[c.MonitorID] = append(expiry[c.MonitorID], c)
+	}
 	out := make([]*monitorSummary, 0, len(ms))
 	for _, m := range ms {
-		s, err := h.summary(m)
-		if err != nil {
-			h.internalErr(w, err)
-			return
-		}
-		out = append(out, s)
+		out = append(out, h.summary(m, expiry[m.ID]))
 	}
 	writeJSON(w, 200, out)
 }
@@ -586,11 +618,12 @@ func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) 
 		h.internalErr(w, err)
 		return
 	}
-	s, err := h.summary(m)
+	expiry, err := h.store.ExpiryChecks(id)
 	if err != nil {
 		h.internalErr(w, err)
 		return
 	}
+	s := h.summary(m, expiry)
 	now := time.Now().UnixMilli()
 	day := int64(24 * 3600 * 1000)
 	d := &monitorDetail{monitorSummary: s, PushURL: h.pushURL(r, m)}

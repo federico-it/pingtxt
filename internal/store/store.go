@@ -255,3 +255,6 @@ func b2i(b bool) int {
 	}
 	return 0
 }
+
+// DB exposes the handle for tests and tools.
+func (s *Store) DB() *sql.DB { return s.db }
