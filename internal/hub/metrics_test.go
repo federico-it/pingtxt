@@ -22,6 +22,7 @@ func TestMetricsContent(t *testing.T) {
 	r := result(m.ID, true)
 	r.LatencyMs = 250
 	r.StatusCode = 200
+	r.At -= 1000
 	h.HandleResult(LocalLocation, r)
 	h.HandleResult(LocalLocation, result(m.ID, false))
 	now := time.Now()

@@ -341,7 +341,7 @@ func (s *Store) RecentResults(monitorID int64, limit int) ([]*ResultRow, error) 
 func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
 	rows, err := s.db.Query(`SELECT r.id, r.monitor_id, r.location, r.ts, r.ok, r.latency_ms, r.status_code, r.message, r.cert_expiry, r.maint
 		FROM results r JOIN (SELECT location, MAX(ts) AS ts FROM results WHERE monitor_id = ? AND ts > ? GROUP BY location) l
-		ON r.location = l.location AND r.ts = l.ts WHERE r.monitor_id = ?`, monitorID, now()-7*24*3600*1000, monitorID)
+		ON r.location = l.location AND r.ts = l.ts WHERE r.monitor_id = ? ORDER BY r.id DESC`, monitorID, now()-7*24*3600*1000, monitorID)
 	if err != nil {
 		return nil, err
 	}
