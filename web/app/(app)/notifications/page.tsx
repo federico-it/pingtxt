@@ -14,7 +14,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { api, useApi, type Notifier, type NotifierType } from "@/lib/api"
 
-const kinds: Record<NotifierType, { label: string; fields: { key: string; label: string; placeholder: string; secret?: boolean }[] }> = {
+type Field = {
+  key: string
+  label: string
+  placeholder?: string
+  secret?: boolean
+  // writeOnly secrets are never returned by the api: empty keeps the saved value.
+  writeOnly?: boolean
+  options?: { value: string; label: string }[]
+  half?: boolean
+  required?: boolean
+  hint?: string
+}
+
+const kinds: Record<NotifierType, { label: string; fields: Field[] }> = {
   webhook: { label: "webhook (json)", fields: [{ key: "url", label: "url", placeholder: "https://example.com/hooks/pingtxt" }] },
   discord: { label: "discord", fields: [{ key: "url", label: "webhook url", placeholder: "https://discord.com/api/webhooks/...", secret: true }] },
   slack: { label: "slack", fields: [{ key: "url", label: "webhook url", placeholder: "https://hooks.slack.com/services/...", secret: true }] },
@@ -32,7 +45,29 @@ const kinds: Record<NotifierType, { label: string; fields: { key: string; label:
       { key: "token", label: "access token (optional)", placeholder: "tk_...", secret: true },
     ],
   },
+  email: {
+    label: "email (smtp)",
+    fields: [
+      { key: "host", label: "smtp host", placeholder: "smtp.example.com", required: true, half: true },
+      { key: "port", label: "port", placeholder: "587", half: true },
+      {
+        key: "security",
+        label: "security",
+        options: [
+          { value: "starttls", label: "starttls (587)" },
+          { value: "tls", label: "tls (465)" },
+          { value: "none", label: "none (25, local relay)" },
+        ],
+      },
+      { key: "username", label: "username (optional)", placeholder: "alerts@example.com", half: true },
+      { key: "password", label: "password", secret: true, writeOnly: true, half: true },
+      { key: "from", label: "from", placeholder: "pingtxt <alerts@example.com>", required: true },
+      { key: "to", label: "to", placeholder: "ops@example.com, oncall@example.com", required: true, hint: "comma separated" },
+    ],
+  },
 }
+
+const portFor: Record<string, string> = { starttls: "587", tls: "465", none: "25" }
 
 type Draft = { id?: number; name: string; type: NotifierType; config: Record<string, string>; enabled: boolean }
 
@@ -63,6 +98,17 @@ export default function NotificationsPage() {
     }
   }
 
+  async function testDraft() {
+    if (!draft) return
+    const id = toast.loading("sending test...")
+    try {
+      await api("/api/notifiers/test", { method: "POST", body: draft })
+      toast.success("test notification sent", { id })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "error", { id })
+    }
+  }
+
   async function toggle(n: Notifier, enabled: boolean) {
     await api(`/api/notifiers/${n.id}`, { method: "PUT", body: { ...n, enabled } })
     mutate()
@@ -74,6 +120,18 @@ export default function NotificationsPage() {
   }
 
   const kind = draft ? kinds[draft.type] : null
+
+  function setConfig(patch: Record<string, string>) {
+    setDraft((p) => {
+      if (!p) return p
+      const config = { ...p.config, ...patch }
+      // Follow the security mode with the default port unless a custom one is set.
+      if (patch.security && (!p.config.port || p.config.port === portFor[p.config.security ?? "starttls"])) {
+        config.port = portFor[patch.security] ?? ""
+      }
+      return { ...p, config }
+    })
+  }
 
   return (
     <>
@@ -122,14 +180,16 @@ export default function NotificationsPage() {
           <form onSubmit={save} className="grid gap-4">
             <DialogHeader>
               <DialogTitle>{draft?.id ? "edit channel" : "add channel"}</DialogTitle>
-              <DialogDescription>Use &quot;test&quot; after saving to check the configuration.</DialogDescription>
+              <DialogDescription>Use &quot;send test&quot; to check the configuration before saving.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-1.5">
               <Label>type</Label>
               <Select
                 items={Object.entries(kinds).map(([value, k]) => ({ value, label: k.label }))}
                 value={draft?.type}
-                onValueChange={(v) => v && setDraft((p) => p && { ...p, type: v as NotifierType, config: {} })}
+                onValueChange={(v) =>
+                  v && setDraft((p) => p && { ...p, type: v as NotifierType, config: v === "email" ? { security: "starttls", port: "587" } : ({} as Record<string, string>) })
+                }
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -147,24 +207,58 @@ export default function NotificationsPage() {
               <Label htmlFor="n-name">name</Label>
               <Input id="n-name" required value={draft?.name ?? ""} onChange={(e) => setDraft((p) => p && { ...p, name: e.target.value })} placeholder="ops channel" />
             </div>
-            {kind?.fields.map((f) => (
-              <div key={f.key} className="grid gap-1.5">
-                <Label htmlFor={`n-${f.key}`}>{f.label}</Label>
-                <Input
-                  id={`n-${f.key}`}
-                  type={f.secret ? "password" : "text"}
-                  value={draft?.config[f.key] ?? ""}
-                  onChange={(e) => setDraft((p) => p && { ...p, config: { ...p.config, [f.key]: e.target.value } })}
-                  placeholder={f.placeholder}
-                />
-              </div>
-            ))}
+            <div className="grid grid-cols-2 gap-4">
+              {kind?.fields.map((f) => (
+                <NotifierField key={`${draft?.type}-${f.key}`} field={f} config={draft?.config ?? {}} onChange={setConfig} />
+              ))}
+            </div>
             <DialogFooter>
+              <Button type="button" variant="outline" onClick={testDraft}>
+                send test
+              </Button>
               <Button type="submit">save</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+function NotifierField({ field: f, config, onChange }: { field: Field; config: Record<string, string>; onChange: (patch: Record<string, string>) => void }) {
+  const id = `n-${f.key}`
+  const saved = f.writeOnly && config[`${f.key}_set`] === "true"
+  return (
+    <div className={`grid gap-1.5 ${f.half ? "col-span-2 sm:col-span-1" : "col-span-2"}`}>
+      <Label htmlFor={id}>
+        {f.label}
+        {saved && <span className="font-normal text-muted-foreground">(saved, leave empty to keep)</span>}
+      </Label>
+      {f.options ? (
+        <Select items={f.options} value={config[f.key] ?? f.options[0].value} onValueChange={(v) => v && onChange({ [f.key]: v })}>
+          <SelectTrigger id={id} className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {f.options.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Input
+          id={id}
+          type={f.secret ? "password" : "text"}
+          autoComplete={f.secret ? "new-password" : "off"}
+          required={f.required}
+          value={config[f.key] ?? ""}
+          onChange={(e) => onChange({ [f.key]: e.target.value })}
+          placeholder={saved ? "••••••••" : f.placeholder}
+        />
+      )}
+      {f.hint && <p className="text-xs text-muted-foreground">{f.hint}</p>}
+    </div>
   )
 }

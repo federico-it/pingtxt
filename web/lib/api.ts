@@ -115,7 +115,8 @@ export interface Location {
   kind: "local" | "agent"
 }
 
-export type NotifierType = "webhook" | "discord" | "slack" | "telegram" | "ntfy"
+export type NotifierType =
+  "webhook" | "discord" | "slack" | "telegram" | "ntfy" | "email"
 
 export interface Notifier {
   id: number

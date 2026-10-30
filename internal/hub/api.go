@@ -76,6 +76,7 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/notifiers", auth(h.createNotifier))
 	mux.HandleFunc("PUT /api/notifiers/{id}", auth(h.updateNotifier))
 	mux.HandleFunc("DELETE /api/notifiers/{id}", auth(h.deleteNotifier))
+	mux.HandleFunc("POST /api/notifiers/test", auth(h.testDraftNotifier))
 	mux.HandleFunc("POST /api/notifiers/{id}/test", auth(h.testNotifier))
 
 	mux.HandleFunc("GET /api/status-pages", auth(h.listStatusPages))
@@ -883,6 +884,11 @@ func validateNotifier(n *store.Notifier) error {
 		}
 		return nil
 	}
+	if n.Type == "email" {
+		delete(n.Config, "password_set")
+		_, err := parseEmailConfig(n.Config)
+		return err
+	}
 	u, err := url.Parse(n.Config["url"])
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return errors.New("a valid http(s) url is required")
@@ -896,7 +902,40 @@ func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, _ *store.Use
 		h.internalErr(w, err)
 		return
 	}
+	for _, n := range list {
+		maskNotifier(n)
+	}
 	writeJSON(w, 200, list)
+}
+
+// writeOnlyKeys are config values the API accepts but never returns.
+// An empty value on update keeps the stored one.
+var writeOnlyKeys = map[string][]string{"email": {"password"}}
+
+// maskNotifier removes write-only secrets, replacing each with <key>_set.
+func maskNotifier(n *store.Notifier) {
+	for _, k := range writeOnlyKeys[n.Type] {
+		if n.Config[k] != "" {
+			n.Config[k+"_set"] = "true"
+		}
+		delete(n.Config, k)
+	}
+}
+
+// keepSecrets fills empty write-only values of n from the stored channel.
+func (h *Hub) keepSecrets(n *store.Notifier) {
+	if n.ID == 0 || len(writeOnlyKeys[n.Type]) == 0 {
+		return
+	}
+	cur, err := h.store.Notifier(n.ID)
+	if err != nil || cur.Type != n.Type {
+		return
+	}
+	for _, k := range writeOnlyKeys[n.Type] {
+		if n.Config[k] == "" {
+			n.Config[k] = cur.Config[k]
+		}
+	}
 }
 
 func (h *Hub) createNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {
@@ -913,6 +952,7 @@ func (h *Hub) createNotifier(w http.ResponseWriter, r *http.Request, _ *store.Us
 		h.internalErr(w, err)
 		return
 	}
+	maskNotifier(&n)
 	writeJSON(w, 201, n)
 }
 
@@ -932,10 +972,12 @@ func (h *Hub) updateNotifier(w http.ResponseWriter, r *http.Request, _ *store.Us
 		writeErr(w, 400, err.Error())
 		return
 	}
+	h.keepSecrets(&n)
 	if err := h.store.UpdateNotifier(&n); err != nil {
 		h.internalErr(w, err)
 		return
 	}
+	maskNotifier(&n)
 	writeJSON(w, 200, n)
 }
 
@@ -963,6 +1005,30 @@ func (h *Hub) testNotifier(w http.ResponseWriter, r *http.Request, _ *store.User
 		writeErr(w, 404, "notifier not found")
 		return
 	}
+	h.sendTest(w, r, n)
+}
+
+// testDraftNotifier sends a test with an unsaved configuration, so the
+// form can be checked before saving. With an id, empty secrets are taken
+// from that stored channel.
+func (h *Hub) testDraftNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	var n store.Notifier
+	if readJSON(r, &n) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	if n.Name == "" {
+		n.Name = "test"
+	}
+	if err := validateNotifier(&n); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	h.keepSecrets(&n)
+	h.sendTest(w, r, &n)
+}
+
+func (h *Hub) sendTest(w http.ResponseWriter, r *http.Request, n *store.Notifier) {
 	ev := Event{Monitor: "example.com", Target: "https://example.com", Status: StatusDown, Cause: "this is a test notification", At: time.Now().UnixMilli(), Test: true}
 	if err := h.notify.Deliver(r.Context(), n, ev); err != nil {
 		writeErr(w, 502, err.Error())
