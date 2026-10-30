@@ -13,6 +13,7 @@ const nav = [
   { href: "/incidents/", label: "incidents" },
   { href: "/agents/", label: "agents" },
   { href: "/notifications/", label: "notify" },
+  { href: "/status-pages/", label: "status" },
   { href: "/settings/", label: "settings" },
 ]
 

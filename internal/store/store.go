@@ -14,6 +14,9 @@ import (
 // ErrNotFound is returned when a row does not exist.
 var ErrNotFound = errors.New("not found")
 
+// ErrConflict is returned when a unique value is already taken.
+var ErrConflict = errors.New("already exists")
+
 // Store wraps the database handle.
 type Store struct {
 	db *sql.DB
@@ -133,6 +136,24 @@ var migrations = []string{
 		PRIMARY KEY (provider, subject)
 	);
 	CREATE INDEX identities_user ON identities(user_id);`,
+	`CREATE TABLE status_pages (
+		id INTEGER PRIMARY KEY,
+		slug TEXT NOT NULL UNIQUE,
+		title TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		domain TEXT NOT NULL DEFAULT '',
+		published INTEGER NOT NULL DEFAULT 1,
+		show_incidents INTEGER NOT NULL DEFAULT 1,
+		created_at INTEGER NOT NULL
+	);
+	CREATE UNIQUE INDEX status_pages_domain ON status_pages(domain) WHERE domain != '';
+	CREATE TABLE status_page_monitors (
+		page_id INTEGER NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		position INTEGER NOT NULL DEFAULT 0,
+		PRIMARY KEY (page_id, monitor_id)
+	);
+	CREATE INDEX status_page_monitors_monitor ON status_page_monitors(monitor_id);`,
 }
 
 func (s *Store) migrate() error {

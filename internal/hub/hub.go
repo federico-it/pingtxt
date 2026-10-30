@@ -74,6 +74,8 @@ type Hub struct {
 	oidc       oidcDiscovery
 	states     oauthStates
 	httpClient *http.Client
+
+	pages statusPages
 }
 
 // New creates a hub.
@@ -92,6 +94,7 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 	if err := h.loadSettings(); err != nil {
 		log.Error("load settings", "err", err)
 	}
+	h.reloadPageDomains()
 	return h
 }
 

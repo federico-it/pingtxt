@@ -1,0 +1,416 @@
+package hub
+
+import (
+	"errors"
+	"io/fs"
+	"net"
+	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/federico-it/pingtxt/internal/store"
+)
+
+// statusPages holds the custom domain routing table and a short cache of the
+// public page payloads, so a busy status page does not hammer SQLite.
+type statusPages struct {
+	mu      sync.RWMutex
+	domains map[string]string // domain -> slug
+	cache   map[string]cachedPage
+}
+
+type cachedPage struct {
+	at   time.Time
+	page *publicPage
+}
+
+const publicCacheTTL = 15 * time.Second
+
+func (h *Hub) reloadPageDomains() {
+	d, err := h.store.StatusPageDomains()
+	if err != nil {
+		h.log.Error("load status page domains", "err", err)
+		return
+	}
+	h.pages.mu.Lock()
+	h.pages.domains = d
+	h.pages.cache = nil
+	h.pages.mu.Unlock()
+}
+
+// pageSlugForHost returns the slug of the page served on a custom domain.
+func (h *Hub) pageSlugForHost(r *http.Request) string {
+	h.pages.mu.RLock()
+	defer h.pages.mu.RUnlock()
+	if len(h.pages.domains) == 0 {
+		return ""
+	}
+	for _, host := range []string{r.Host, r.Header.Get("X-Forwarded-Host")} {
+		if slug, ok := h.pages.domains[normalizeHost(host)]; ok {
+			return slug
+		}
+	}
+	return ""
+}
+
+func normalizeHost(host string) string {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if i := strings.IndexByte(host, ','); i >= 0 {
+		host = strings.TrimSpace(host[:i])
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return strings.TrimSuffix(host, ".")
+}
+
+// customDomains serves only the public status page on hosts that belong to
+// one: the admin UI and API are not reachable there.
+func (h *Hub) customDomains(next http.Handler, ui fs.FS) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		slug := h.pageSlugForHost(r)
+		if slug == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		p := r.URL.Path
+		switch {
+		case p == "/api/public/status" || p == "/api/public/status/":
+			h.servePublicPage(w, r, slug, true)
+		case p == "/api/health", strings.HasPrefix(p, "/_next/"), p == "/icon.svg":
+			next.ServeHTTP(w, r)
+		case strings.HasPrefix(p, "/api/"), strings.HasPrefix(p, "/download/"), p == "/install-agent.sh":
+			writeErr(w, http.StatusNotFound, "not found")
+		default:
+			if _, err := fs.Stat(ui, "status/index.html"); err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Cache-Control", "no-cache")
+			serveFile(w, r, ui, "status/index.html")
+		}
+	})
+}
+
+// ---------- admin API ----------
+
+var (
+	slugRe   = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$`)
+	domainRe = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$`)
+)
+
+func (h *Hub) validateStatusPage(r *http.Request, p *store.StatusPage) error {
+	p.Slug = strings.ToLower(strings.TrimSpace(p.Slug))
+	p.Title = strings.TrimSpace(p.Title)
+	p.Description = strings.TrimSpace(p.Description)
+	p.Domain = strings.TrimSpace(strings.ToLower(p.Domain))
+	if u, err := url.Parse(p.Domain); err == nil && u.Host != "" {
+		p.Domain = u.Host // pasted as a URL
+	}
+	p.Domain = normalizeHost(p.Domain)
+	if p.Title == "" {
+		return errors.New("title is required")
+	}
+	if len(p.Title) > 100 || len(p.Description) > 1000 {
+		return errors.New("title or description is too long")
+	}
+	if !slugRe.MatchString(p.Slug) {
+		return errors.New("slug must be 1-50 lowercase letters, digits or dashes")
+	}
+	if p.Domain != "" {
+		if !domainRe.MatchString(p.Domain) {
+			return errors.New("domain must be a hostname like status.example.com")
+		}
+		// Pointing a page at the hub's own host would hide the admin UI.
+		own := []string{normalizeHost(r.Host)}
+		if u, err := url.Parse(h.generalSettings().PublicURL); err == nil && u.Host != "" {
+			own = append(own, normalizeHost(u.Host))
+		}
+		for _, o := range own {
+			if p.Domain == o {
+				return errors.New("domain cannot be the address of this pingtxt instance")
+			}
+		}
+	}
+	seen := map[int64]bool{}
+	ids := []int64{}
+	for _, id := range p.MonitorIDs {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		if _, err := h.store.Monitor(id); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	p.MonitorIDs = ids
+	return nil
+}
+
+func (h *Hub) listStatusPages(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	list, err := h.store.ListStatusPages()
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"pages": list, "hub_url": h.hubURL(r)})
+}
+
+func (h *Hub) getStatusPage(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	p, err := h.store.StatusPage(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, "status page not found")
+		return
+	} else if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, p)
+}
+
+func (h *Hub) saveStatusPage(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	var p store.StatusPage
+	if readJSON(r, &p) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	create := r.Method == http.MethodPost
+	if !create {
+		id, ok := pathID(r)
+		if !ok {
+			writeErr(w, 400, "invalid id")
+			return
+		}
+		p.ID = id
+	}
+	if err := h.validateStatusPage(r, &p); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	var err error
+	if create {
+		err = h.store.CreateStatusPage(&p)
+	} else {
+		err = h.store.UpdateStatusPage(&p)
+	}
+	switch {
+	case errors.Is(err, store.ErrConflict):
+		writeErr(w, 409, "slug or domain already used by another status page")
+		return
+	case errors.Is(err, store.ErrNotFound):
+		writeErr(w, 404, "status page not found")
+		return
+	case err != nil:
+		h.internalErr(w, err)
+		return
+	}
+	h.reloadPageDomains()
+	got, err := h.store.StatusPage(p.ID)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	code := 200
+	if create {
+		code = 201
+	}
+	writeJSON(w, code, got)
+}
+
+func (h *Hub) deleteStatusPage(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	if err := h.store.DeleteStatusPage(id); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	h.reloadPageDomains()
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+// ---------- public API ----------
+
+// Overall page states.
+const (
+	PageOperational   = "operational"
+	PageDegraded      = "degraded"
+	PagePartialOutage = "partial_outage"
+	PageMajorOutage   = "major_outage"
+	PageUnknown       = "unknown"
+)
+
+// publicPage is what anonymous visitors see: no targets, no error messages,
+// no locations.
+type publicPage struct {
+	Slug          string           `json:"slug"`
+	Title         string           `json:"title"`
+	Description   string           `json:"description"`
+	Published     bool             `json:"published"`
+	Status        string           `json:"status"`
+	Days          int              `json:"days"`
+	Monitors      []publicMonitor  `json:"monitors"`
+	ShowIncidents bool             `json:"show_incidents"`
+	Incidents     []publicIncident `json:"incidents"`
+	UpdatedAt     int64            `json:"updated_at"`
+}
+
+type publicMonitor struct {
+	ID        int64   `json:"id"`
+	Name      string  `json:"name"`
+	Status    string  `json:"status"`
+	Uptime    float64 `json:"uptime"`
+	Uptime24h float64 `json:"uptime_24h"`
+	Bars      []bar   `json:"bars"`
+}
+
+type publicIncident struct {
+	ID          int64  `json:"id"`
+	MonitorName string `json:"monitor_name"`
+	StartedAt   int64  `json:"started_at"`
+	ResolvedAt  int64  `json:"resolved_at"`
+}
+
+func (h *Hub) publicStatus(w http.ResponseWriter, r *http.Request) {
+	h.servePublicPage(w, r, strings.ToLower(r.PathValue("slug")), false)
+}
+
+func (h *Hub) servePublicPage(w http.ResponseWriter, r *http.Request, slug string, byDomain bool) {
+	notFound := func() { writeErr(w, 404, "status page not found") }
+	if !slugRe.MatchString(slug) {
+		notFound()
+		return
+	}
+	h.pages.mu.RLock()
+	c, ok := h.pages.cache[slug]
+	h.pages.mu.RUnlock()
+	page := c.page
+	if !ok || time.Since(c.at) > publicCacheTTL {
+		sp, err := h.store.StatusPageBySlug(slug)
+		if errors.Is(err, store.ErrNotFound) {
+			notFound()
+			return
+		} else if err != nil {
+			h.internalErr(w, err)
+			return
+		}
+		page, err = h.buildPublicPage(sp)
+		if err != nil {
+			h.internalErr(w, err)
+			return
+		}
+		h.pages.mu.Lock()
+		if h.pages.cache == nil {
+			h.pages.cache = map[string]cachedPage{}
+		}
+		h.pages.cache[slug] = cachedPage{at: time.Now(), page: page}
+		h.pages.mu.Unlock()
+	}
+	// Drafts are visible to logged-in users only (preview from the admin UI).
+	if !page.Published && (byDomain || h.currentUser(r) == nil) {
+		notFound()
+		return
+	}
+	writeJSON(w, 200, page)
+}
+
+// publicDays is how many daily bars a page shows: the retention period,
+// between one week and 90 days.
+func (h *Hub) publicDays() int {
+	return min(max(h.generalSettings().RetentionDays, 7), 90)
+}
+
+func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
+	now := time.Now().UTC()
+	day := int64(24 * 3600 * 1000)
+	days := h.publicDays()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).UnixMilli()
+	from := today - int64(days-1)*day
+	p := &publicPage{
+		Slug: sp.Slug, Title: sp.Title, Description: sp.Description, Published: sp.Published,
+		Days: days, ShowIncidents: sp.ShowIncidents, Monitors: []publicMonitor{}, Incidents: []publicIncident{},
+		UpdatedAt: now.UnixMilli(),
+	}
+	for _, id := range sp.MonitorIDs {
+		m, err := h.store.Monitor(id)
+		if errors.Is(err, store.ErrNotFound) {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		pm := publicMonitor{ID: m.ID, Name: m.Name, Status: m.Status}
+		if pm.Uptime, _, err = h.store.Uptime(m.ID, from); err != nil {
+			return nil, err
+		}
+		if pm.Uptime24h, _, err = h.store.Uptime(m.ID, now.UnixMilli()-day); err != nil {
+			return nil, err
+		}
+		buckets, err := h.store.Buckets(m.ID, from, today+day, day, false)
+		if err != nil {
+			return nil, err
+		}
+		byStart := map[int64]store.Bucket{}
+		for _, b := range buckets {
+			byStart[b.Start] = b
+		}
+		pm.Bars = make([]bar, 0, days)
+		for i := range days {
+			t := from + int64(i)*day
+			b := byStart[t]
+			pm.Bars = append(pm.Bars, bar{T: t, Total: b.Total, OK: b.OK, AvgMs: b.AvgMs})
+		}
+		p.Monitors = append(p.Monitors, pm)
+	}
+	p.Status = overallStatus(p.Monitors)
+	if sp.ShowIncidents {
+		incs, err := h.store.IncidentsSince(sp.MonitorIDs, from, 50)
+		if err != nil {
+			return nil, err
+		}
+		for _, i := range incs {
+			p.Incidents = append(p.Incidents, publicIncident{ID: i.ID, MonitorName: i.MonitorName, StartedAt: i.StartedAt, ResolvedAt: i.ResolvedAt})
+		}
+	}
+	return p, nil
+}
+
+func overallStatus(ms []publicMonitor) string {
+	active, down, degraded, known := 0, 0, 0, 0
+	for _, m := range ms {
+		if m.Status == StatusPaused {
+			continue
+		}
+		active++
+		switch m.Status {
+		case StatusDown:
+			down++
+		case StatusDegraded:
+			degraded++
+		}
+		if m.Status != StatusPending {
+			known++
+		}
+	}
+	switch {
+	case known == 0:
+		return PageUnknown
+	case down > 0 && down == active:
+		return PageMajorOutage
+	case down > 0:
+		return PagePartialOutage
+	case degraded > 0:
+		return PageDegraded
+	default:
+		return PageOperational
+	}
+}
