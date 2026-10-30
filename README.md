@@ -9,7 +9,7 @@ but plain text, monospace, light and dark.
 - Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**.
 - Status across locations: **down** when the majority of online locations fail, **degraded** when only some do.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
-- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy.
+- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
 
 | dark | light |
 | --- | --- |
