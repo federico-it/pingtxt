@@ -33,6 +33,8 @@ const types: {
   label: string
   hint: string
   placeholder: string
+  /** Label of the target field; defaults to "host". */
+  target?: string
 }[] = [
   {
     value: "http",
@@ -63,6 +65,56 @@ const types: {
     label: "dns",
     hint: "resolve a record and optionally match the answer",
     placeholder: "example.com",
+  },
+  {
+    value: "postgres",
+    label: "postgresql",
+    hint: "connect and run a query",
+    placeholder: "postgres://user:password@db.example.com:5432/app",
+    target: "connection url",
+  },
+  {
+    value: "mysql",
+    label: "mysql / mariadb",
+    hint: "connect and run a query",
+    placeholder: "mysql://user:password@db.example.com:3306/app",
+    target: "connection url",
+  },
+  {
+    value: "redis",
+    label: "redis",
+    hint: "authenticate and send PING",
+    placeholder: "redis://:password@cache.example.com:6379/0",
+    target: "connection url",
+  },
+  {
+    value: "mongodb",
+    label: "mongodb",
+    hint: "authenticate (SCRAM) and run ping",
+    placeholder:
+      "mongodb://user:password@db.example.com:27017/?authSource=admin",
+    target: "connection url",
+  },
+  {
+    value: "docker",
+    label: "docker container",
+    hint: "down when the container is not running or unhealthy",
+    placeholder: "my-app-web-1",
+    target: "container name or id",
+  },
+  {
+    value: "grpc",
+    label: "grpc health",
+    hint: "call grpc.health.v1.Health/Check",
+    placeholder: "grpcs://api.example.com:443/my.Service",
+    target: "address",
+  },
+  {
+    value: "smtp",
+    label: "smtp",
+    hint: "read the greeting, EHLO and STARTTLS when offered",
+    placeholder: "smtp://mail.example.com:587",
+    target: "server",
   },
   {
     value: "push",
@@ -204,6 +256,15 @@ export function MonitorForm({
   const isHTTP = m.type === "http" || m.type === "keyword"
   const isHTTPS = isHTTP && m.target.trim().toLowerCase().startsWith("https://")
   const isPush = m.type === "push"
+  const isSQL = m.type === "postgres" || m.type === "mysql"
+  const hasTLS = [
+    "postgres",
+    "mysql",
+    "redis",
+    "mongodb",
+    "grpc",
+    "smtp",
+  ].includes(m.type)
   const ivList = isPush
     ? withValue(pushIntervals, m.interval_sec)
     : withValue(intervals, m.interval_sec)
@@ -289,7 +350,13 @@ export function MonitorForm({
             </p>
           ) : (
             <Field
-              label={isHTTP ? "url" : m.type === "tcp" ? "host:port" : "host"}
+              label={
+                isHTTP
+                  ? "url"
+                  : m.type === "tcp"
+                    ? "host:port"
+                    : (t.target ?? "host")
+              }
               className="sm:col-span-2"
             >
               <Input
@@ -299,6 +366,56 @@ export function MonitorForm({
                 placeholder={t.placeholder}
               />
             </Field>
+          )}
+          {m.type === "docker" && (
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              Checked on the docker engine of each selected location: the hub or
+              agent needs access to /var/run/docker.sock (or DOCKER_HOST). With
+              docker, mount it with -v
+              /var/run/docker.sock:/var/run/docker.sock:ro.
+            </p>
+          )}
+          {m.type === "grpc" && (
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              grpc:// for plaintext, grpcs:// for TLS. The path is the service
+              name to check; leave it out to check the whole server.
+            </p>
+          )}
+          {isSQL && (
+            <>
+              <Field
+                label="query"
+                hint="optional, default SELECT 1"
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  rows={2}
+                  value={m.body}
+                  onChange={(e) => set("body", e.target.value)}
+                  placeholder="SELECT 1"
+                />
+              </Field>
+              <Field
+                label="expected value"
+                hint="optional: first column of the first row must equal this"
+                className="sm:col-span-2"
+              >
+                <Input
+                  value={m.keyword}
+                  onChange={(e) => set("keyword", e.target.value)}
+                  placeholder="1"
+                />
+              </Field>
+            </>
+          )}
+          {hasTLS && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground sm:col-span-2">
+              <Switch
+                checked={m.ignore_tls}
+                onCheckedChange={(v) => set("ignore_tls", v)}
+              />
+              ignore TLS certificate errors
+            </label>
           )}
           {m.type === "keyword" && (
             <>

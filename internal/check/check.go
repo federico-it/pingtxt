@@ -20,11 +20,18 @@ import (
 
 // Supported monitor types.
 const (
-	TypeHTTP    = "http"
-	TypeKeyword = "keyword"
-	TypeTCP     = "tcp"
-	TypePing    = "ping"
-	TypeDNS     = "dns"
+	TypeHTTP     = "http"
+	TypeKeyword  = "keyword"
+	TypeTCP      = "tcp"
+	TypePing     = "ping"
+	TypeDNS      = "dns"
+	TypePostgres = "postgres"
+	TypeMySQL    = "mysql"
+	TypeRedis    = "redis"
+	TypeMongo    = "mongodb"
+	TypeDocker   = "docker"
+	TypeGRPC     = "grpc"
+	TypeSMTP     = "smtp"
 	// TypePush is a heartbeat monitor: the monitored job calls the hub, so
 	// it is never probed and Run does not handle it.
 	TypePush = "push"
@@ -80,6 +87,18 @@ func Run(ctx context.Context, j Job) Result {
 		r = runPing(ctx, j, timeout)
 	case TypeDNS:
 		r = runDNS(ctx, j)
+	case TypePostgres, TypeMySQL:
+		r = runSQL(ctx, j)
+	case TypeRedis:
+		r = runRedis(ctx, j)
+	case TypeMongo:
+		r = runMongo(ctx, j)
+	case TypeDocker:
+		r = runDocker(ctx, j)
+	case TypeGRPC:
+		r = runGRPC(ctx, j, timeout)
+	case TypeSMTP:
+		r = runSMTP(ctx, j)
 	default:
 		r = Result{Message: "unknown monitor type: " + j.Type}
 	}
@@ -303,6 +322,23 @@ func runDNS(ctx context.Context, j Job) Result {
 		}
 	}
 	return Result{OK: true, LatencyMs: lat, Message: msg}
+}
+
+// RedactTarget hides the password of URL targets (database connection
+// strings) for display in notifications and logs.
+func RedactTarget(target string) string {
+	if !strings.Contains(target, "@") || !strings.Contains(target, "://") {
+		return target
+	}
+	u, err := url.Parse(target)
+	if err != nil {
+		return target
+	}
+	if _, ok := u.User.Password(); !ok {
+		return target
+	}
+	u.User = url.UserPassword(u.User.Username(), "xxxxx")
+	return u.String()
 }
 
 // CleanErr shortens common network errors for display.

@@ -1,7 +1,20 @@
 import useSWR, { type SWRConfiguration } from "swr"
 
 export type Status = "pending" | "up" | "down" | "degraded" | "paused" | "maintenance"
-export type MonitorType = "http" | "keyword" | "tcp" | "ping" | "dns" | "push"
+export type MonitorType =
+  | "http"
+  | "keyword"
+  | "tcp"
+  | "ping"
+  | "dns"
+  | "push"
+  | "postgres"
+  | "mysql"
+  | "redis"
+  | "mongodb"
+  | "docker"
+  | "grpc"
+  | "smtp"
 
 export interface Monitor {
   id: number

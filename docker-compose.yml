@@ -9,6 +9,8 @@ services:
       - "8090:8090"
     volumes:
       - ./data:/data
+      # Only for "docker container" monitors on the hub location:
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
     # Public URL, login providers (GitHub, Google, OIDC) and the other settings
     # are configured in the web UI: settings.
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -316,7 +317,19 @@ func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.Us
 
 // ---------- monitors ----------
 
-var validTypes = []string{check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush}
+var validTypes = []string{
+	check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush,
+	check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo, check.TypeDocker, check.TypeGRPC, check.TypeSMTP,
+}
+
+// urlSchemes lists the accepted target URL schemes of URL-based types.
+var urlSchemes = map[string][]string{
+	check.TypePostgres: {"postgres", "postgresql"},
+	check.TypeMySQL:    {"mysql"},
+	check.TypeRedis:    {"redis", "rediss"},
+}
+
+var containerRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 var hostPortRe = regexp.MustCompile(`^[^\s/]+:\d{1,5}$`)
 
 func (h *Hub) validateMonitor(m *store.Monitor) error {
@@ -355,7 +368,40 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 		if strings.ContainsAny(m.Target, " /") {
 			return errors.New("target must be a hostname or IP")
 		}
+	case check.TypeMongo:
+		if _, err := check.ParseMongoURL(m.Target); err != nil {
+			return err
+		}
+	case check.TypePostgres, check.TypeMySQL, check.TypeRedis:
+		u, err := url.Parse(m.Target)
+		if err != nil || !slices.Contains(urlSchemes[m.Type], u.Scheme) || u.Host == "" {
+			return fmt.Errorf("target must be a %s:// URL", urlSchemes[m.Type][0])
+		}
+	case check.TypeDocker:
+		m.Target = strings.TrimPrefix(m.Target, "/")
+		if !containerRe.MatchString(m.Target) {
+			return errors.New("target must be a container name or id")
+		}
+	case check.TypeGRPC:
+		t := m.Target
+		if !strings.Contains(t, "://") {
+			t = "grpc://" + t
+		}
+		u, err := url.Parse(t)
+		if err != nil || (u.Scheme != "grpc" && u.Scheme != "grpcs") || u.Host == "" || u.Port() == "" {
+			return errors.New("target must be grpc://host:port or grpcs://host:port, optionally followed by /service")
+		}
+	case check.TypeSMTP:
+		t := m.Target
+		if !strings.Contains(t, "://") {
+			t = "smtp://" + t
+		}
+		u, err := url.Parse(t)
+		if err != nil || (u.Scheme != "smtp" && u.Scheme != "smtps") || u.Hostname() == "" || strings.Trim(u.Path, "/") != "" {
+			return errors.New("target must be smtp://host[:port] or smtps://host[:port]")
+		}
 	}
+
 	if m.IntervalSec == 0 {
 		m.IntervalSec = 60
 	}

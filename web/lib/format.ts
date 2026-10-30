@@ -48,3 +48,8 @@ export function interval(sec: number): string {
 export function utcDate(ts: number): string {
   return new Date(ts).toISOString().slice(0, 10)
 }
+
+/** Hides the password of connection-string targets (postgres://u:pw@...). */
+export function displayTarget(target: string): string {
+  return target.replace(/^([a-z][a-z0-9+.-]*:\/\/[^/@:]*):[^/@]*@/i, "$1:•••@")
+}

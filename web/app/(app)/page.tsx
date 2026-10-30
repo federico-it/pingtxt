@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useMinute } from "@/hooks/use-now"
 import { useApi, type MonitorSummary, type Status } from "@/lib/api"
-import { ago, interval, ms, pct } from "@/lib/format"
+import { ago, displayTarget, interval, ms, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 const order: Record<Status, number> = {
@@ -45,7 +45,7 @@ export default function MonitorsPage() {
         (m) =>
           !s ||
           m.name.toLowerCase().includes(s) ||
-          m.target.toLowerCase().includes(s) ||
+          displayTarget(m.target).toLowerCase().includes(s) ||
           m.type.includes(s)
       )
       .sort(
@@ -125,7 +125,7 @@ export default function MonitorsPage() {
                   <div className="truncate text-xs text-muted-foreground">
                     {m.type === "push"
                       ? `heartbeat · expected every ${interval(m.interval_sec)}`
-                      : `${m.type} · ${m.target} · every ${interval(m.interval_sec)}`}
+                      : `${m.type} · ${displayTarget(m.target)} · every ${interval(m.interval_sec)}`}
                     {m.locations.length > 1 &&
                       ` · ${m.locations.length} locations`}
                     <ExpiryBadges checks={m.expiry} now={now} />
