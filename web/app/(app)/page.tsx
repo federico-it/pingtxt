@@ -17,10 +17,11 @@ const order: Record<Status, number> = {
   down: 0,
   degraded: 1,
   pending: 2,
-  up: 3,
-  paused: 4,
+  maintenance: 3,
+  up: 4,
+  paused: 5,
 }
-const filters = ["all", "up", "down", "degraded", "paused"] as const
+const filters = ["all", "up", "down", "degraded", "maintenance", "paused"] as const
 
 export default function MonitorsPage() {
   const { data, isLoading } = useApi<MonitorSummary[]>("/api/monitors")

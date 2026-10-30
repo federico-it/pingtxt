@@ -76,6 +76,10 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/monitors/{id}/push-token", auth(h.rotatePushToken))
 	mux.HandleFunc("/api/push/{token}", h.push)
 	mux.HandleFunc("GET /api/incidents", auth(h.listIncidents))
+	mux.HandleFunc("GET /api/maintenances", auth(h.listMaintenances))
+	mux.HandleFunc("POST /api/maintenances", auth(h.createMaintenance))
+	mux.HandleFunc("PUT /api/maintenances/{id}", auth(h.updateMaintenance))
+	mux.HandleFunc("DELETE /api/maintenances/{id}", auth(h.deleteMaintenance))
 
 	mux.HandleFunc("GET /api/locations", auth(h.listLocations))
 	mux.HandleFunc("GET /api/agents", auth(h.listAgents))
@@ -410,12 +414,21 @@ type monitorSummary struct {
 	AvgMs24h  float64          `json:"avg_ms_24h"`
 	Last      *store.ResultRow `json:"last"`
 	Bars      []bar            `json:"bars"`
+	// Maintenance is the window covering the monitor right now, if any.
+	Maintenance *activeMaint `json:"maintenance"`
+}
+
+type activeMaint struct {
+	ID    int64  `json:"id"`
+	Name  string `json:"name"`
+	EndAt int64  `json:"end_at"`
 }
 
 type bar struct {
 	T     int64   `json:"t"`
 	Total int     `json:"total"`
 	OK    int     `json:"ok"`
+	Maint int     `json:"maint"`
 	AvgMs float64 `json:"avg_ms"`
 }
 
@@ -429,6 +442,9 @@ func (h *Hub) summary(m *store.Monitor) (*monitorSummary, error) {
 		return nil, err
 	}
 	s := &monitorSummary{Monitor: m, Uptime24h: up, AvgMs24h: avg}
+	if w, end := h.ActiveMaintenance(m.ID); w != nil && !m.Paused {
+		s.Maintenance = &activeMaint{ID: w.ID, Name: w.Name, EndAt: end.UnixMilli()}
+	}
 	if last, err := h.store.RecentResults(m.ID, 1); err == nil && len(last) > 0 {
 		s.Last = last[0]
 	}
@@ -449,7 +465,7 @@ func (h *Hub) summary(m *store.Monitor) (*monitorSummary, error) {
 			break
 		}
 		b := byStart[t]
-		s.Bars = append(s.Bars, bar{T: t, Total: b.Total, OK: b.OK, AvgMs: b.AvgMs})
+		s.Bars = append(s.Bars, bar{T: t, Total: b.Total, OK: b.OK, Maint: b.Maint, AvgMs: b.AvgMs})
 	}
 	if len(s.Bars) > barCount {
 		s.Bars = s.Bars[len(s.Bars)-barCount:]

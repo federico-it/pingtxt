@@ -129,6 +129,16 @@ function View() {
         )}
       </div>
 
+      {d.maintenance && (
+        <div className="mb-4 border border-dashed border-info/60 px-3 py-2 text-xs text-info">
+          ◇ in maintenance: <span className="text-foreground">{d.maintenance.name}</span> until {datetime(d.maintenance.end_at)}. checks
+          keep running, alerts and incidents are paused.{" "}
+          <Link href="/maintenance/" className="underline underline-offset-4">
+            manage
+          </Link>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 border-y border-dashed py-4 sm:grid-cols-3 lg:grid-cols-6">
         <KV k="status" v={<StatusText status={d.status} />} />
         <KV
@@ -273,6 +283,7 @@ function View() {
                 {ms(r.latency_ms)}
               </span>
               <span className="truncate text-muted-foreground">
+                {r.maint && <span className="text-info">[maint] </span>}
                 {r.message}
               </span>
             </div>

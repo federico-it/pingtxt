@@ -303,11 +303,12 @@ type ResultRow struct {
 	StatusCode int     `json:"status_code"`
 	Message    string  `json:"message"`
 	CertExpiry int64   `json:"cert_expiry"`
+	Maint      bool    `json:"maint"` // taken during a maintenance window
 }
 
 func (s *Store) InsertResult(r *ResultRow) error {
-	res, err := s.db.Exec(`INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry)
+	res, err := s.db.Exec(`INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint))
 	if err != nil {
 		return err
 	}
@@ -317,7 +318,7 @@ func (s *Store) InsertResult(r *ResultRow) error {
 
 // RecentResults returns the newest results of a monitor, newest first.
 func (s *Store) RecentResults(monitorID int64, limit int) ([]*ResultRow, error) {
-	rows, err := s.db.Query(`SELECT id, monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry FROM results WHERE monitor_id = ? ORDER BY ts DESC LIMIT ?`, monitorID, limit)
+	rows, err := s.db.Query(`SELECT id, monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint FROM results WHERE monitor_id = ? ORDER BY ts DESC LIMIT ?`, monitorID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +326,7 @@ func (s *Store) RecentResults(monitorID int64, limit int) ([]*ResultRow, error) 
 	out := []*ResultRow{}
 	for rows.Next() {
 		r := &ResultRow{}
-		if err := rows.Scan(&r.ID, &r.MonitorID, &r.Location, &r.TS, &r.OK, &r.LatencyMs, &r.StatusCode, &r.Message, &r.CertExpiry); err != nil {
+		if err := rows.Scan(&r.ID, &r.MonitorID, &r.Location, &r.TS, &r.OK, &r.LatencyMs, &r.StatusCode, &r.Message, &r.CertExpiry, &r.Maint); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -335,7 +336,7 @@ func (s *Store) RecentResults(monitorID int64, limit int) ([]*ResultRow, error) 
 
 // LatestPerLocation returns the most recent result for each location.
 func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
-	rows, err := s.db.Query(`SELECT r.id, r.monitor_id, r.location, r.ts, r.ok, r.latency_ms, r.status_code, r.message, r.cert_expiry
+	rows, err := s.db.Query(`SELECT r.id, r.monitor_id, r.location, r.ts, r.ok, r.latency_ms, r.status_code, r.message, r.cert_expiry, r.maint
 		FROM results r JOIN (SELECT location, MAX(ts) AS ts FROM results WHERE monitor_id = ? AND ts > ? GROUP BY location) l
 		ON r.location = l.location AND r.ts = l.ts WHERE r.monitor_id = ?`, monitorID, now()-7*24*3600*1000, monitorID)
 	if err != nil {
@@ -346,7 +347,7 @@ func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
 	seen := map[string]bool{}
 	for rows.Next() {
 		r := &ResultRow{}
-		if err := rows.Scan(&r.ID, &r.MonitorID, &r.Location, &r.TS, &r.OK, &r.LatencyMs, &r.StatusCode, &r.Message, &r.CertExpiry); err != nil {
+		if err := rows.Scan(&r.ID, &r.MonitorID, &r.Location, &r.TS, &r.OK, &r.LatencyMs, &r.StatusCode, &r.Message, &r.CertExpiry, &r.Maint); err != nil {
 			return nil, err
 		}
 		if !seen[r.Location] {
@@ -358,10 +359,11 @@ func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
 }
 
 // Uptime returns the ratio of OK checks since `since` (ms), or -1 without data.
+// Checks taken during maintenance windows are left out.
 func (s *Store) Uptime(monitorID, since int64) (float64, float64, error) {
 	var total, ok sql.NullInt64
 	var avg sql.NullFloat64
-	err := s.db.QueryRow(`SELECT COUNT(*), SUM(ok), AVG(CASE WHEN ok = 1 THEN latency_ms END) FROM results WHERE monitor_id = ? AND ts >= ?`, monitorID, since).Scan(&total, &ok, &avg)
+	err := s.db.QueryRow(`SELECT COUNT(*), SUM(ok), AVG(CASE WHEN ok = 1 THEN latency_ms END) FROM results WHERE monitor_id = ? AND ts >= ? AND maint = 0`, monitorID, since).Scan(&total, &ok, &avg)
 	if err != nil {
 		return -1, 0, err
 	}
@@ -375,8 +377,9 @@ func (s *Store) Uptime(monitorID, since int64) (float64, float64, error) {
 type Bucket struct {
 	Start    int64   `json:"t"`
 	Location string  `json:"location,omitempty"`
-	Total    int     `json:"total"`
+	Total    int     `json:"total"` // checks outside maintenance
 	OK       int     `json:"ok"`
+	Maint    int     `json:"maint"` // checks during maintenance
 	AvgMs    float64 `json:"avg_ms"`
 	MinMs    float64 `json:"min_ms"`
 	MaxMs    float64 `json:"max_ms"`
@@ -389,7 +392,7 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 	if perLocation {
 		loc = `location`
 	}
-	q := `SELECT ((ts - ?) / ?) AS b, ` + loc + ` AS loc, COUNT(*), SUM(ok),
+	q := `SELECT ((ts - ?) / ?) AS b, ` + loc + ` AS loc, SUM(maint = 0), SUM(ok AND maint = 0), SUM(maint),
 		COALESCE(AVG(CASE WHEN ok = 1 THEN latency_ms END), 0),
 		COALESCE(MIN(CASE WHEN ok = 1 THEN latency_ms END), 0),
 		COALESCE(MAX(CASE WHEN ok = 1 THEN latency_ms END), 0)
@@ -403,7 +406,7 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 	for rows.Next() {
 		var b Bucket
 		var idx int64
-		if err := rows.Scan(&idx, &b.Location, &b.Total, &b.OK, &b.AvgMs, &b.MinMs, &b.MaxMs); err != nil {
+		if err := rows.Scan(&idx, &b.Location, &b.Total, &b.OK, &b.Maint, &b.AvgMs, &b.MinMs, &b.MaxMs); err != nil {
 			return nil, err
 		}
 		b.Start = from + idx*size

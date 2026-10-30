@@ -12,6 +12,8 @@ but plain text, monospace, light and dark.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
+- **Maintenance windows**, one-off or recurring (daily, weekly, monthly, in any time zone), for some or all monitors:
+  checks keep running but no incidents or alerts are raised, and those checks don't count toward uptime.
 
 | dark | light |
 | --- | --- |
