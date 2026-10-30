@@ -1,6 +1,6 @@
 # pingtxt
 
-Minimal, terminal-flavoured uptime monitoring. Think Uptime Kuma / UptimeRobot / HetrixTools,
+Minimal, terminal-flavoured uptime monitoring. Website and docs: [pingtxt.com](https://pingtxt.com). Think Uptime Kuma / UptimeRobot / HetrixTools,
 but plain text, monospace, light and dark.
 
 - **One container** for the hub: Go API + scheduler + SQLite + the Next.js UI, ~25 MB image.
