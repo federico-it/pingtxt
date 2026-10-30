@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/federico-it/pingtxt/internal/check"
+	"github.com/federico-it/pingtxt/internal/expiry"
 	"github.com/federico-it/pingtxt/internal/protocol"
 	"github.com/federico-it/pingtxt/internal/store"
 )
@@ -61,6 +62,7 @@ type Hub struct {
 	store  *store.Store
 	log    *slog.Logger
 	notify *Notifier
+	expiry expiryChecker
 
 	mu       sync.Mutex
 	agents   map[int64]*agentConn
@@ -89,6 +91,8 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 	}
 	h.general, h.auth = defaultGeneral(cfg), defaultAuth()
 	h.httpClient = &http.Client{Timeout: 15 * time.Second}
+	h.expiry.domains = expiry.NewDomains(h.httpClient)
+	h.expiry.cache = map[string]domainCacheEntry{}
 	if err := h.loadSettings(); err != nil {
 		log.Error("load settings", "err", err)
 	}
@@ -113,6 +117,7 @@ func (h *Hub) Run(ctx context.Context) error {
 		return err
 	}
 	go h.maintenance(ctx)
+	go h.expiryLoop(ctx)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for {

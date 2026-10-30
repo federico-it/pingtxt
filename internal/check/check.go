@@ -302,6 +302,9 @@ func runDNS(ctx context.Context, j Job) Result {
 	return Result{OK: true, LatencyMs: lat, Message: msg}
 }
 
+// CleanErr shortens common network errors for display.
+func CleanErr(err error) string { return cleanErr(err) }
+
 func cleanErr(err error) string {
 	if err == nil {
 		return ""

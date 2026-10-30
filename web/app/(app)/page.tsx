@@ -4,11 +4,13 @@ import Link from "next/link"
 import { useMemo, useState } from "react"
 import { PlusIcon } from "lucide-react"
 
+import { ExpiryBadges } from "@/components/expiry"
 import { Empty, PageHeader } from "@/components/page-header"
 import { StatusGlyph, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useMinute } from "@/hooks/use-now"
 import { useApi, type MonitorSummary, type Status } from "@/lib/api"
 import { ago, interval, ms, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -20,6 +22,7 @@ export default function MonitorsPage() {
   const { data, isLoading } = useApi<MonitorSummary[]>("/api/monitors")
   const [q, setQ] = useState("")
   const [filter, setFilter] = useState<(typeof filters)[number]>("all")
+  const now = useMinute()
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: data?.length ?? 0 }
@@ -98,6 +101,7 @@ export default function MonitorsPage() {
                   <div className="truncate text-xs text-muted-foreground">
                     {m.type} · {m.target} · every {interval(m.interval_sec)}
                     {m.locations.length > 1 && ` · ${m.locations.length} locations`}
+                    <ExpiryBadges checks={m.expiry} now={now} />
                   </div>
                 </div>
               </div>

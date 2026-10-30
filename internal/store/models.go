@@ -182,18 +182,21 @@ type Monitor struct {
 	Headers        map[string]string `json:"headers"`
 	Body           string            `json:"body"`
 	Locations      []string          `json:"locations"`
-	Paused         bool              `json:"paused"`
-	Status         string            `json:"status"`
-	StatusSince    int64             `json:"status_since"`
-	CreatedAt      int64             `json:"created_at"`
+	// Expiry alerts: TLS certificate (https targets) and domain registration.
+	CertExpiryAlert   bool   `json:"cert_expiry_alert"`
+	DomainExpiryAlert bool   `json:"domain_expiry_alert"`
+	Paused            bool   `json:"paused"`
+	Status            string `json:"status"`
+	StatusSince       int64  `json:"status_since"`
+	CreatedAt         int64  `json:"created_at"`
 }
 
-const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, locations, paused, status, status_since, created_at`
+const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at`
 
 func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	m := &Monitor{}
 	var headers, locations string
-	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &locations, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt)
+	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -238,9 +241,9 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 	m.CreatedAt = now()
 	m.Status = "pending"
 	m.StatusSince = m.CreatedAt
-	res, err := s.db.Exec(`INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, locations, paused, status, status_since, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, string(l), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt)
+	res, err := s.db.Exec(`INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt)
 	if err != nil {
 		return err
 	}
@@ -251,8 +254,8 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 func (s *Store) UpdateMonitor(m *Monitor) error {
 	h, _ := json.Marshal(m.Headers)
 	l, _ := json.Marshal(m.Locations)
-	_, err := s.db.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, locations = ? WHERE id = ?`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, string(l), m.ID)
+	_, err := s.db.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ? WHERE id = ?`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), m.ID)
 	return err
 }
 

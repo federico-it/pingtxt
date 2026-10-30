@@ -14,6 +14,20 @@ export function useNow() {
   )
 }
 
+function subscribeMinute(cb: () => void) {
+  const t = setInterval(cb, 60_000)
+  return () => clearInterval(t)
+}
+
+/** Current time in ms, rounded to the minute: for slow-changing labels in long lists. */
+export function useMinute() {
+  return useSyncExternalStore(
+    subscribeMinute,
+    () => Math.floor(Date.now() / 60_000) * 60_000,
+    () => 0
+  )
+}
+
 const noop = () => () => {}
 
 /** True after hydration on the client. */

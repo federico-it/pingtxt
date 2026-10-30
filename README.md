@@ -9,6 +9,10 @@ but plain text, monospace, light and dark.
 - Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**.
 - Status across locations: **down** when the majority of online locations fail, **degraded** when only some do.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
+- **Expiry alerts** for TLS certificates (https monitors) and domain registrations (RDAP, with WHOIS
+  fallback for registries without RDAP such as .it). Thresholds in days are set in settings
+  (default 14/7/3/1 for certificates, 30/14/7/1 for domains): one alert per threshold crossed,
+  one when it expires, one when it is renewed.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy.
 
 | dark | light |
@@ -88,6 +92,7 @@ agents; agents are stateless and reconnect with backoff.
 
 - `cmd/pingtxt` – hub binary. `cmd/pingtxt-agent` – agent binary.
 - `internal/check` – probe implementations, shared by hub and agents.
+- `internal/expiry` – certificate and domain (RDAP / WHOIS) expiry lookups, run by the hub.
 - `internal/hub` – scheduler, status evaluation, incidents, notifications, HTTP API, agent WebSocket.
 - `internal/store` – SQLite (pure Go driver `modernc.org/sqlite`, no CGO).
 - `web/` – Next.js 16 (App Router, static export), shadcn/ui on Base UI, Tailwind 4.
