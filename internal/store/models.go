@@ -400,7 +400,7 @@ func (s *Store) RecentResults(monitorID int64, limit int) ([]*ResultRow, error) 
 func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
 	rows, err := s.db.Query(`SELECT r.id, r.monitor_id, r.location, r.ts, r.ok, r.latency_ms, r.status_code, r.message, r.cert_expiry, r.maint
 		FROM results r JOIN (SELECT location, MAX(ts) AS ts FROM results WHERE monitor_id = ? AND ts > ? GROUP BY location) l
-		ON r.location = l.location AND r.ts = l.ts WHERE r.monitor_id = ?`, monitorID, now()-7*24*3600*1000, monitorID)
+		ON r.location = l.location AND r.ts = l.ts WHERE r.monitor_id = ? ORDER BY r.id DESC`, monitorID, now()-7*24*3600*1000, monitorID)
 	if err != nil {
 		return nil, err
 	}
@@ -527,6 +527,24 @@ func (s *Store) ListIncidents(monitorID int64, limit int) ([]*Incident, error) {
 			return nil, err
 		}
 		out = append(out, i)
+	}
+	return out, rows.Err()
+}
+
+// OpenIncidentMonitors returns the ids of the monitors with an open incident.
+func (s *Store) OpenIncidentMonitors() (map[int64]bool, error) {
+	rows, err := s.db.Query(`SELECT DISTINCT monitor_id FROM incidents WHERE resolved_at = 0`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
 	}
 	return out, rows.Err()
 }

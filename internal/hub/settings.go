@@ -31,6 +31,7 @@ type GeneralSettings struct {
 	RetentionDays   int             `json:"retention_days"`
 	MonitorDefaults MonitorDefaults `json:"monitor_defaults"`
 	Expiry          ExpirySettings  `json:"expiry"`
+	Metrics         MetricsSettings `json:"metrics"`
 }
 
 // ExpirySettings set when certificate and domain expiry alerts are sent:

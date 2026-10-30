@@ -133,6 +133,14 @@ export interface Agent {
   last_seen: number
   created_at: number
   online: boolean
+  /** version differs from the hub's */
+  update_available: boolean
+  /** the connected agent can replace its own binary */
+  self_update: boolean
+  /** why self_update is false (only for online agents) */
+  no_update_reason?: string
+  update_state?: "updating" | "failed"
+  update_error?: string
 }
 
 export interface Location {
@@ -308,6 +316,12 @@ export interface GeneralSettings {
   retention_days: number
   monitor_defaults: MonitorDefaults
   expiry: ExpirySettings
+  metrics: MetricsSettings
+}
+
+export interface MetricsSettings {
+  /** serve /metrics without an API token */
+  public: boolean
 }
 
 export interface ExpirySettings {

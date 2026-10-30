@@ -99,6 +99,8 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("PUT /api/agents/{id}", auth(h.updateAgent))
 	mux.HandleFunc("DELETE /api/agents/{id}", auth(h.deleteAgent))
 	mux.HandleFunc("POST /api/agents/{id}/token", auth(h.rotateAgentToken))
+	mux.HandleFunc("POST /api/agents/{id}/update", auth(h.updateAgentNow))
+	mux.HandleFunc("PUT /api/settings/agent-updates", auth(h.putAgentUpdateSettings))
 
 	mux.HandleFunc("GET /api/notifiers", auth(h.listNotifiers))
 	mux.HandleFunc("POST /api/notifiers", auth(h.createNotifier))
@@ -113,6 +115,8 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("PUT /api/status-pages/{id}", auth(h.saveStatusPage))
 	mux.HandleFunc("DELETE /api/status-pages/{id}", auth(h.deleteStatusPage))
 	mux.HandleFunc("GET /api/public/status/{slug}", h.publicStatus)
+
+	mux.HandleFunc("GET /metrics", h.metrics)
 
 	mux.HandleFunc("GET "+protocol.Path, h.ServeAgent)
 	mux.HandleFunc("GET /install-agent.sh", func(w http.ResponseWriter, r *http.Request) {
@@ -859,6 +863,7 @@ type agentView struct {
 	*store.Agent
 	LocationID string `json:"location_id"`
 	Online     bool   `json:"online"`
+	updateView
 }
 
 func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.User) {
@@ -909,9 +914,12 @@ func (h *Hub) listAgents(w http.ResponseWriter, r *http.Request, _ *store.User) 
 	}
 	out := make([]agentView, 0, len(agents))
 	for _, a := range agents {
-		out = append(out, agentView{Agent: a, LocationID: AgentLocation(a.ID), Online: h.AgentOnline(a.ID)})
+		out = append(out, agentView{Agent: a, LocationID: AgentLocation(a.ID), Online: h.AgentOnline(a.ID), updateView: h.agentUpdateView(a)})
 	}
-	writeJSON(w, 200, map[string]any{"agents": out, "hub_url": h.hubURL(r)})
+	writeJSON(w, 200, map[string]any{
+		"agents": out, "hub_url": h.hubURL(r),
+		"hub_version": h.cfg.Version, "auto_update": h.agentUpdateSettings().AutoUpdate,
+	})
 }
 
 type agentInput struct {
@@ -1172,12 +1180,23 @@ func (h *Hub) sendTest(w http.ResponseWriter, r *http.Request, n *store.Notifier
 
 // ---------- static ----------
 
-var agentFileRe = regexp.MustCompile(`^pingtxt-agent-(linux|darwin|windows)-(amd64|arm64|arm)(\.exe)?$`)
+var agentFileRe = regexp.MustCompile(`^pingtxt-agent-(linux|darwin|windows)-(amd64|arm64|arm)(\.exe)?(\.sha256)?$`)
 
 func (h *Hub) download(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("file")
 	if !agentFileRe.MatchString(name) || h.cfg.AgentDir == "" {
 		http.NotFound(w, r)
+		return
+	}
+	if bin, ok := strings.CutSuffix(name, ".sha256"); ok {
+		// Checksum file in the sha256sum format, used by the install script.
+		sum, err := h.binarySHA256(bin)
+		if err != nil {
+			http.Error(w, "agent binary not bundled in this build", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte(sum + "  " + bin + "\n"))
 		return
 	}
 	p := filepath.Join(h.cfg.AgentDir, name)

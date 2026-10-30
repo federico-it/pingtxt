@@ -22,6 +22,7 @@ but plain text, monospace, light and dark.
   fallback for registries without RDAP such as .it). Thresholds in days are set in settings
   (default 14/7/3/1 for certificates, 30/14/7/1 for domains): one alert per threshold crossed,
   one when it expires, one when it is renewed.
+- **Prometheus** metrics on `/metrics` (status, latency per location, uptime, certificate and domain expiry, agents).
 
 | dark | light |
 | --- | --- |
@@ -88,6 +89,35 @@ curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/monitors
 `GET /api/monitors` accepts `?group=<id>` (or `group=none`) and `?tag=<id>` filters. Groups and tags are managed at
 `/api/groups` and `/api/tags`; `PUT /api/groups/<id>/monitors` with `{"monitor_ids": [...]}` sets a group's members.
 
+### Prometheus
+
+`GET /metrics` serves metrics in the Prometheus text format. It needs an API token (read scope is enough),
+unless **settings → prometheus metrics → public /metrics** is on.
+
+```yaml
+scrape_configs:
+  - job_name: pingtxt
+    scheme: https
+    authorization:
+      credentials: ptk_...
+    static_configs:
+      - targets: ["status.example.com"]
+```
+
+| metric | labels | meaning |
+| --- | --- | --- |
+| `pingtxt_monitor_up` | monitor_id, monitor, type | 1 up or degraded, 0 down (absent while pending, paused, in maintenance) |
+| `pingtxt_monitor_status` | + status | 1 for the current status (up, down, degraded, pending, paused, maintenance) |
+| `pingtxt_monitor_incident_open` | monitor | 1 while an incident is open |
+| `pingtxt_monitor_uptime_ratio` | + window (24h, 7d, 30d) | share of successful checks, maintenance excluded |
+| `pingtxt_monitor_latency_avg_seconds` | + window | average response time of successful checks |
+| `pingtxt_check_up`, `pingtxt_check_latency_seconds`, `pingtxt_check_status_code`, `pingtxt_check_timestamp_seconds` | + location, location_name | last check from each location |
+| `pingtxt_cert_expiry_days`, `pingtxt_domain_expiry_days` (and `_timestamp_seconds`) | + subject | days left before expiry |
+| `pingtxt_agent_connected`, `pingtxt_agent_last_seen_timestamp_seconds` | agent_id, agent, location, location_name, version | agent connectivity |
+| `pingtxt_monitors`, `pingtxt_agents`, `pingtxt_incidents_open`, `pingtxt_info` | | totals and hub version |
+
+The output is cached for 10 seconds.
+
 Put it behind a reverse proxy with TLS (Caddy, Traefik, nginx). WebSocket upgrade must be allowed on `/api/agent/ws`.
 
 ## Status pages
@@ -129,6 +159,33 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
 
 Then tick the new location in any monitor. The hub schedules every check and sends it to the
 agents; agents are stateless and reconnect with backoff.
+
+### Agent updates
+
+The hub bundles agent binaries built with its own version. When you upgrade the hub, agents
+installed with the script update themselves as soon as they reconnect: the hub sends the
+download path and the SHA-256 of the binary for the agent's platform, the agent downloads it
+from the hub, checks the checksum and that the new binary reports the expected version, swaps
+the file and restarts in place. A failed update leaves the old binary running and is shown on
+the agents page.
+
+- **agents → update agents automatically** turns this on or off (on by default). Each outdated
+  agent also gets an **update** button.
+- Agents installed before this feature run as a read-only systemd `DynamicUser`: re-run the
+  install script once. It now installs to `/opt/pingtxt-agent`, owned by a `pingtxt-agent` user.
+- To keep an agent on its current version, start it with `-no-auto-update`
+  (or `PINGTXT_NO_AUTO_UPDATE=1` in `/etc/pingtxt-agent.env`).
+- **Docker agents** never replace their own binary: pull the new image, or let
+  [Watchtower](https://containrrr.dev/watchtower/) (or a similar image updater) do it:
+
+  ```sh
+  docker run -d --name watchtower --restart unless-stopped \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    containrrr/watchtower pingtxt-agent --interval 3600
+  ```
+
+Pushing a `v*` tag publishes a GitHub release with the hub and agent binaries and `SHA256SUMS`,
+plus the Docker images for that tag.
 
 ## Architecture
 

@@ -90,6 +90,9 @@ type Hub struct {
 	httpClient *http.Client
 
 	pages statusPages
+
+	metricsCache metricsCache
+	updates      agentUpdates
 }
 
 // New creates a hub.
