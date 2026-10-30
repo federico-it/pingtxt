@@ -5,6 +5,7 @@ import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 
 import { Confirm } from "@/components/confirm"
+import { GroupToggle, TagToggle, useLabels } from "@/components/labels"
 import { Empty, PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -68,6 +69,8 @@ function newDraft(): Draft {
     description: "",
     all_monitors: false,
     monitor_ids: [],
+    group_ids: [],
+    tag_ids: [],
     kind: "once",
     start_at: start,
     end_at: start + 3600_000,
@@ -100,12 +103,13 @@ export default function MaintenancePage() {
   const zones = useMemo(() => timeZones(), [])
 
   const names = useMemo(() => new Map((monitors.data ?? []).map((m) => [m.id, m.name])), [monitors.data])
+  const { groups, tags, groupById, tagById } = useLabels()
 
   function set<K extends keyof Draft>(k: K, v: Draft[K]) {
     setDraft((p) => p && { ...p, [k]: v })
   }
 
-  function toggle(k: "monitor_ids" | "weekdays" | "month_days", v: number, on: boolean) {
+  function toggle(k: "monitor_ids" | "group_ids" | "tag_ids" | "weekdays" | "month_days", v: number, on: boolean) {
     setDraft((p) => {
       if (!p) return p
       const list = p[k] as number[]
@@ -153,7 +157,11 @@ export default function MaintenancePage() {
 
   function scope(m: Maintenance) {
     if (m.all_monitors) return "all monitors"
-    const list = m.monitor_ids.map((id) => names.get(id)).filter(Boolean) as string[]
+    const list = [
+      ...(m.group_ids ?? []).map((id) => groupById.get(id) && `[${groupById.get(id)!.name}]`),
+      ...(m.tag_ids ?? []).map((id) => tagById.get(id) && `#${tagById.get(id)!.name}`),
+      ...m.monitor_ids.map((id) => names.get(id)),
+    ].filter(Boolean) as string[]
     if (list.length === 0) return "no monitors"
     return list.length <= 3 ? list.join(", ") : `${list.slice(0, 3).join(", ")} +${list.length - 3}`
   }
@@ -197,7 +205,7 @@ export default function MaintenancePage() {
                 </div>
                 {m.description && <div className="truncate text-xs text-muted-foreground">{m.description}</div>}
               </div>
-              <Button variant="ghost" size="xs" onClick={() => setDraft({ ...m })}>
+              <Button variant="ghost" size="xs" onClick={() => setDraft({ ...m, group_ids: m.group_ids ?? [], tag_ids: m.tag_ids ?? [] })}>
                 edit
               </Button>
               <Confirm
@@ -326,6 +334,25 @@ export default function MaintenancePage() {
                     all monitors
                   </label>
                 </div>
+                {!draft.all_monitors && (groups.data?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="mr-1 text-xs text-muted-foreground">groups:</span>
+                    {(groups.data ?? []).map((g) => (
+                      <GroupToggle key={g.id} group={g} on={draft.group_ids.includes(g.id)} onChange={(on) => toggle("group_ids", g.id, on)} />
+                    ))}
+                  </div>
+                )}
+                {!draft.all_monitors && (tags.data?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="mr-1 text-xs text-muted-foreground">tags:</span>
+                    {(tags.data ?? []).map((t) => (
+                      <TagToggle key={t.id} tag={t} on={draft.tag_ids.includes(t.id)} onChange={(on) => toggle("tag_ids", t.id, on)} />
+                    ))}
+                  </div>
+                )}
+                {!draft.all_monitors && (draft.group_ids.length > 0 || draft.tag_ids.length > 0) && (
+                  <p className="text-xs text-muted-foreground">Groups and tags also cover monitors added to them later.</p>
+                )}
                 {!draft.all_monitors && (
                   <div className="grid max-h-48 gap-1 overflow-y-auto sm:grid-cols-2">
                     {(monitors.data ?? []).map((m) => (

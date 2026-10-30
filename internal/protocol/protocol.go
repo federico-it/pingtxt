@@ -11,6 +11,13 @@ const (
 	TypeWelcome = "welcome" // hub -> agent, accepts the hello
 	TypeJob     = "job"     // hub -> agent
 	TypeResult  = "result"  // agent -> hub
+	// TypeUpdate asks the agent to replace its binary with the one the hub
+	// bundles (hub -> agent).
+	TypeUpdate = "update"
+	// TypeUpdateStatus reports a failed self-update (agent -> hub). A
+	// successful update needs no message: the agent reconnects with the new
+	// version.
+	TypeUpdateStatus = "update_status"
 )
 
 // Path is the WebSocket endpoint on the hub.
@@ -23,6 +30,9 @@ type Message struct {
 	Welcome *Welcome      `json:"welcome,omitempty"`
 	Job     *check.Job    `json:"job,omitempty"`
 	Result  *check.Result `json:"result,omitempty"`
+
+	Update       *Update       `json:"update,omitempty"`
+	UpdateStatus *UpdateStatus `json:"update_status,omitempty"`
 }
 
 // Hello is sent by an agent right after connecting.
@@ -31,6 +41,11 @@ type Hello struct {
 	Hostname string `json:"hostname"`
 	OS       string `json:"os"`
 	Arch     string `json:"arch"`
+	// SelfUpdate is true when the agent can replace its own binary.
+	// Agents older than this field never set it.
+	SelfUpdate bool `json:"self_update,omitempty"`
+	// NoUpdateReason says why SelfUpdate is false, e.g. "container".
+	NoUpdateReason string `json:"no_update_reason,omitempty"`
 }
 
 // Welcome confirms the agent identity.
@@ -39,3 +54,26 @@ type Welcome struct {
 	Name     string `json:"name"`
 	Location string `json:"location"`
 }
+
+// Update tells the agent where to download the new binary. Path is relative
+// to the hub URL the agent connects to; SHA256 is the hex digest the
+// download must match.
+type Update struct {
+	Version string `json:"version"`
+	Path    string `json:"path"`
+	SHA256  string `json:"sha256"`
+}
+
+// UpdateStatus reports the outcome of a self-update.
+type UpdateStatus struct {
+	Version string `json:"version"`
+	Error   string `json:"error,omitempty"`
+}
+
+// Reasons an agent cannot update itself.
+const (
+	NoUpdateContainer   = "container"    // runs in a container: update the image
+	NoUpdateDisabled    = "disabled"     // turned off on the agent
+	NoUpdateNotWritable = "not_writable" // the binary or its folder is read-only
+	NoUpdateUnsupported = "unsupported"  // OS not supported
+)

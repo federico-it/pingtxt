@@ -1,7 +1,20 @@
 import useSWR, { type SWRConfiguration } from "swr"
 
 export type Status = "pending" | "up" | "down" | "degraded" | "paused" | "maintenance"
-export type MonitorType = "http" | "keyword" | "tcp" | "ping" | "dns" | "push"
+export type MonitorType =
+  | "http"
+  | "keyword"
+  | "tcp"
+  | "ping"
+  | "dns"
+  | "push"
+  | "postgres"
+  | "mysql"
+  | "redis"
+  | "mongodb"
+  | "docker"
+  | "grpc"
+  | "smtp"
 
 export interface Monitor {
   id: number
@@ -24,6 +37,9 @@ export interface Monitor {
   push_token: string
   grace_sec: number
   locations: string[]
+  /** 0 = no group */
+  group_id: number
+  tag_ids: number[]
   cert_expiry_alert: boolean
   domain_expiry_alert: boolean
   paused: boolean
@@ -130,6 +146,14 @@ export interface Agent {
   last_seen: number
   created_at: number
   online: boolean
+  /** version differs from the hub's */
+  update_available: boolean
+  /** the connected agent can replace its own binary */
+  self_update: boolean
+  /** why self_update is false (only for online agents) */
+  no_update_reason?: string
+  update_state?: "updating" | "failed"
+  update_error?: string
 }
 
 export interface Location {
@@ -147,6 +171,10 @@ export interface Maintenance {
   description: string
   all_monitors: boolean
   monitor_ids: number[]
+  /** every monitor of these groups */
+  group_ids: number[]
+  /** every monitor with one of these tags */
+  tag_ids: number[]
   kind: MaintenanceKind
   start_at: number
   end_at: number
@@ -161,6 +189,25 @@ export interface Maintenance {
   active_end?: number
   next_start?: number
   next_end?: number
+}
+
+export interface Group {
+  id: number
+  name: string
+  description: string
+  monitors: number
+  created_at: number
+}
+
+export const tagColors = ["", "red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "gray"] as const
+export type TagColor = (typeof tagColors)[number]
+
+export interface Tag {
+  id: number
+  name: string
+  color: TagColor
+  monitors: number
+  created_at: number
 }
 
 export type NotifierType =
@@ -282,6 +329,12 @@ export interface GeneralSettings {
   retention_days: number
   monitor_defaults: MonitorDefaults
   expiry: ExpirySettings
+  metrics: MetricsSettings
+}
+
+export interface MetricsSettings {
+  /** serve /metrics without an API token */
+  public: boolean
 }
 
 export interface ExpirySettings {
@@ -332,6 +385,8 @@ export interface StatusPage {
   published: boolean
   show_incidents: boolean
   monitor_ids: number[]
+  /** every monitor of these groups, current and future */
+  group_ids: number[]
   created_at: number
 }
 
@@ -340,6 +395,8 @@ export type PageStatus = "operational" | "degraded" | "partial_outage" | "major_
 export interface PublicMonitor {
   id: number
   name: string
+  /** section title, "" = no section */
+  group: string
   status: Status
   uptime: number
   uptime_24h: number

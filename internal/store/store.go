@@ -214,6 +214,34 @@ var migrations = []string{
 		alerted_days INTEGER NOT NULL DEFAULT -1,
 		PRIMARY KEY (monitor_id, kind)
 	);`,
+	`CREATE TABLE monitor_groups (
+		id INTEGER PRIMARY KEY,
+		name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+		description TEXT NOT NULL DEFAULT '',
+		created_at INTEGER NOT NULL
+	);
+	ALTER TABLE monitors ADD COLUMN group_id INTEGER REFERENCES monitor_groups(id) ON DELETE SET NULL;
+	CREATE INDEX monitors_group ON monitors(group_id);
+	CREATE TABLE tags (
+		id INTEGER PRIMARY KEY,
+		name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+		color TEXT NOT NULL DEFAULT '',
+		created_at INTEGER NOT NULL
+	);
+	CREATE TABLE monitor_tags (
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+		PRIMARY KEY (monitor_id, tag_id)
+	);
+	CREATE INDEX monitor_tags_tag ON monitor_tags(tag_id);
+	ALTER TABLE maintenances ADD COLUMN group_ids TEXT NOT NULL DEFAULT '[]';
+	ALTER TABLE maintenances ADD COLUMN tag_ids TEXT NOT NULL DEFAULT '[]';
+	CREATE TABLE status_page_groups (
+		page_id INTEGER NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		group_id INTEGER NOT NULL REFERENCES monitor_groups(id) ON DELETE CASCADE,
+		position INTEGER NOT NULL DEFAULT 0,
+		PRIMARY KEY (page_id, group_id)
+	);`,
 }
 
 func (s *Store) migrate() error {

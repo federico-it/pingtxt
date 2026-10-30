@@ -14,4 +14,6 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags 
 FROM alpine:3.22
 RUN apk add --no-cache ca-certificates tzdata
 COPY --from=go /out/pingtxt-agent /usr/local/bin/pingtxt-agent
+# Containers are updated by pulling a new image, not by the agent itself.
+ENV PINGTXT_CONTAINER=1
 ENTRYPOINT ["pingtxt-agent"]

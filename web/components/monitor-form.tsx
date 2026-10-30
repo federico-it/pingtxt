@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 
+import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -33,6 +34,8 @@ const types: {
   label: string
   hint: string
   placeholder: string
+  /** Label of the target field; defaults to "host". */
+  target?: string
 }[] = [
   {
     value: "http",
@@ -63,6 +66,56 @@ const types: {
     label: "dns",
     hint: "resolve a record and optionally match the answer",
     placeholder: "example.com",
+  },
+  {
+    value: "postgres",
+    label: "postgresql",
+    hint: "connect and run a query",
+    placeholder: "postgres://user:password@db.example.com:5432/app",
+    target: "connection url",
+  },
+  {
+    value: "mysql",
+    label: "mysql / mariadb",
+    hint: "connect and run a query",
+    placeholder: "mysql://user:password@db.example.com:3306/app",
+    target: "connection url",
+  },
+  {
+    value: "redis",
+    label: "redis",
+    hint: "authenticate and send PING",
+    placeholder: "redis://:password@cache.example.com:6379/0",
+    target: "connection url",
+  },
+  {
+    value: "mongodb",
+    label: "mongodb",
+    hint: "authenticate (SCRAM) and run ping",
+    placeholder:
+      "mongodb://user:password@db.example.com:27017/?authSource=admin",
+    target: "connection url",
+  },
+  {
+    value: "docker",
+    label: "docker container",
+    hint: "down when the container is not running or unhealthy",
+    placeholder: "my-app-web-1",
+    target: "container name or id",
+  },
+  {
+    value: "grpc",
+    label: "grpc health",
+    hint: "call grpc.health.v1.Health/Check",
+    placeholder: "grpcs://api.example.com:443/my.Service",
+    target: "address",
+  },
+  {
+    value: "smtp",
+    label: "smtp",
+    hint: "read the greeting, EHLO and STARTTLS when offered",
+    placeholder: "smtp://mail.example.com:587",
+    target: "server",
   },
   {
     value: "push",
@@ -143,6 +196,8 @@ export const emptyMonitor: MonitorInput = {
   body: "",
   grace_sec: 300,
   locations: ["local"],
+  group_id: 0,
+  tag_ids: [],
   cert_expiry_alert: true,
   domain_expiry_alert: true,
   paused: false,
@@ -197,6 +252,14 @@ export function MonitorForm({
   const locations = useApi<Location[]>("/api/locations", {
     refreshInterval: 15_000,
   })
+  const labels = useLabels()
+  const groupItems = [
+    { value: "0", label: "no group" },
+    ...(labels.groups.data ?? []).map((g) => ({
+      value: String(g.id),
+      label: g.name,
+    })),
+  ]
 
   const set = <K extends keyof MonitorInput>(k: K, v: MonitorInput[K]) =>
     setM((p) => ({ ...p, [k]: v }))
@@ -204,6 +267,15 @@ export function MonitorForm({
   const isHTTP = m.type === "http" || m.type === "keyword"
   const isHTTPS = isHTTP && m.target.trim().toLowerCase().startsWith("https://")
   const isPush = m.type === "push"
+  const isSQL = m.type === "postgres" || m.type === "mysql"
+  const hasTLS = [
+    "postgres",
+    "mysql",
+    "redis",
+    "mongodb",
+    "grpc",
+    "smtp",
+  ].includes(m.type)
   const ivList = isPush
     ? withValue(pushIntervals, m.interval_sec)
     : withValue(intervals, m.interval_sec)
@@ -289,7 +361,13 @@ export function MonitorForm({
             </p>
           ) : (
             <Field
-              label={isHTTP ? "url" : m.type === "tcp" ? "host:port" : "host"}
+              label={
+                isHTTP
+                  ? "url"
+                  : m.type === "tcp"
+                    ? "host:port"
+                    : (t.target ?? "host")
+              }
               className="sm:col-span-2"
             >
               <Input
@@ -299,6 +377,56 @@ export function MonitorForm({
                 placeholder={t.placeholder}
               />
             </Field>
+          )}
+          {m.type === "docker" && (
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              Checked on the docker engine of each selected location: the hub or
+              agent needs access to /var/run/docker.sock (or DOCKER_HOST). With
+              docker, mount it with -v
+              /var/run/docker.sock:/var/run/docker.sock:ro.
+            </p>
+          )}
+          {m.type === "grpc" && (
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              grpc:// for plaintext, grpcs:// for TLS. The path is the service
+              name to check; leave it out to check the whole server.
+            </p>
+          )}
+          {isSQL && (
+            <>
+              <Field
+                label="query"
+                hint="optional, default SELECT 1"
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  rows={2}
+                  value={m.body}
+                  onChange={(e) => set("body", e.target.value)}
+                  placeholder="SELECT 1"
+                />
+              </Field>
+              <Field
+                label="expected value"
+                hint="optional: first column of the first row must equal this"
+                className="sm:col-span-2"
+              >
+                <Input
+                  value={m.keyword}
+                  onChange={(e) => set("keyword", e.target.value)}
+                  placeholder="1"
+                />
+              </Field>
+            </>
+          )}
+          {hasTLS && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground sm:col-span-2">
+              <Switch
+                checked={m.ignore_tls}
+                onCheckedChange={(v) => set("ignore_tls", v)}
+              />
+              ignore TLS certificate errors
+            </label>
           )}
           {m.type === "keyword" && (
             <>
@@ -364,6 +492,43 @@ export function MonitorForm({
               </Field>
             </>
           )}
+        </div>
+      </Section>
+
+      <Section title="group & tags">
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <Field
+            label="group"
+            hint="groups show as sections on the dashboard and status pages"
+          >
+            <Select
+              items={groupItems}
+              value={String(m.group_id ?? 0)}
+              onValueChange={(v) => set("group_id", Number(v ?? 0))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {groupItems.map((g) => (
+                  <SelectItem key={g.value} value={g.value}>
+                    {g.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field
+            label="tags"
+            hint="type a name and press enter to create a tag"
+          >
+            <TagPicker
+              value={m.tag_ids ?? []}
+              onChange={(ids) => set("tag_ids", ids)}
+              tags={labels.tags.data ?? []}
+              onCreated={() => labels.tags.mutate()}
+            />
+          </Field>
         </div>
       </Section>
 
@@ -543,18 +708,32 @@ export function MonitorForm({
       {!isPush && (
         <Section title="expiry alerts">
           <p className="mb-3 text-xs text-muted-foreground">
-            Notify before the TLS certificate or the domain registration expires. Thresholds are set in settings.
+            Notify before the TLS certificate or the domain registration
+            expires. Thresholds are set in settings.
           </p>
           <div className="grid gap-2">
-            <label className={cn("flex items-center gap-2 text-xs", !isHTTPS && "text-muted-foreground")}>
-              <Switch checked={m.cert_expiry_alert} onCheckedChange={(v) => set("cert_expiry_alert", v)} />
+            <label
+              className={cn(
+                "flex items-center gap-2 text-xs",
+                !isHTTPS && "text-muted-foreground"
+              )}
+            >
+              <Switch
+                checked={m.cert_expiry_alert}
+                onCheckedChange={(v) => set("cert_expiry_alert", v)}
+              />
               tls certificate
               {!isHTTPS && <span>(only for https urls)</span>}
             </label>
             <label className="flex items-center gap-2 text-xs">
-              <Switch checked={m.domain_expiry_alert} onCheckedChange={(v) => set("domain_expiry_alert", v)} />
+              <Switch
+                checked={m.domain_expiry_alert}
+                onCheckedChange={(v) => set("domain_expiry_alert", v)}
+              />
               domain registration
-              <span className="text-muted-foreground">(rdap / whois, not for ip addresses)</span>
+              <span className="text-muted-foreground">
+                (rdap / whois, not for ip addresses)
+              </span>
             </label>
           </div>
         </Section>

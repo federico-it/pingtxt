@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -84,12 +85,24 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("PUT /api/maintenances/{id}", auth(h.updateMaintenance))
 	mux.HandleFunc("DELETE /api/maintenances/{id}", auth(h.deleteMaintenance))
 
+	mux.HandleFunc("GET /api/groups", auth(h.listGroups))
+	mux.HandleFunc("POST /api/groups", auth(h.saveGroup))
+	mux.HandleFunc("PUT /api/groups/{id}", auth(h.saveGroup))
+	mux.HandleFunc("DELETE /api/groups/{id}", auth(h.deleteGroup))
+	mux.HandleFunc("PUT /api/groups/{id}/monitors", auth(h.setGroupMonitors))
+	mux.HandleFunc("GET /api/tags", auth(h.listTags))
+	mux.HandleFunc("POST /api/tags", auth(h.saveTag))
+	mux.HandleFunc("PUT /api/tags/{id}", auth(h.saveTag))
+	mux.HandleFunc("DELETE /api/tags/{id}", auth(h.deleteTag))
+
 	mux.HandleFunc("GET /api/locations", auth(h.listLocations))
 	mux.HandleFunc("GET /api/agents", auth(h.listAgents))
 	mux.HandleFunc("POST /api/agents", auth(h.createAgent))
 	mux.HandleFunc("PUT /api/agents/{id}", auth(h.updateAgent))
 	mux.HandleFunc("DELETE /api/agents/{id}", auth(h.deleteAgent))
 	mux.HandleFunc("POST /api/agents/{id}/token", auth(h.rotateAgentToken))
+	mux.HandleFunc("POST /api/agents/{id}/update", auth(h.updateAgentNow))
+	mux.HandleFunc("PUT /api/settings/agent-updates", auth(h.putAgentUpdateSettings))
 
 	mux.HandleFunc("GET /api/notifiers", auth(h.listNotifiers))
 	mux.HandleFunc("POST /api/notifiers", auth(h.createNotifier))
@@ -104,6 +117,8 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("PUT /api/status-pages/{id}", auth(h.saveStatusPage))
 	mux.HandleFunc("DELETE /api/status-pages/{id}", auth(h.deleteStatusPage))
 	mux.HandleFunc("GET /api/public/status/{slug}", h.publicStatus)
+
+	mux.HandleFunc("GET /metrics", h.metrics)
 
 	mux.HandleFunc("GET "+protocol.Path, h.ServeAgent)
 	mux.HandleFunc("GET /install-agent.sh", func(w http.ResponseWriter, r *http.Request) {
@@ -364,7 +379,19 @@ func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.Us
 
 // ---------- monitors ----------
 
-var validTypes = []string{check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush}
+var validTypes = []string{
+	check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush,
+	check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo, check.TypeDocker, check.TypeGRPC, check.TypeSMTP,
+}
+
+// urlSchemes lists the accepted target URL schemes of URL-based types.
+var urlSchemes = map[string][]string{
+	check.TypePostgres: {"postgres", "postgresql"},
+	check.TypeMySQL:    {"mysql"},
+	check.TypeRedis:    {"redis", "rediss"},
+}
+
+var containerRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 var hostPortRe = regexp.MustCompile(`^[^\s/]+:\d{1,5}$`)
 
 func (h *Hub) validateMonitor(m *store.Monitor) error {
@@ -375,6 +402,17 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 	if !slices.Contains(validTypes, m.Type) {
 		return errors.New("invalid type")
+	}
+	if m.GroupID < 0 {
+		m.GroupID = 0
+	}
+	m.TagIDs = cleanIDs(m.TagIDs)
+	var groups []int64
+	if m.GroupID > 0 {
+		groups = []int64{m.GroupID}
+	}
+	if err := h.checkGroupsTags(groups, m.TagIDs); err != nil {
+		return err
 	}
 	if m.Type == check.TypePush {
 		return validatePush(m)
@@ -403,7 +441,40 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 		if strings.ContainsAny(m.Target, " /") {
 			return errors.New("target must be a hostname or IP")
 		}
+	case check.TypeMongo:
+		if _, err := check.ParseMongoURL(m.Target); err != nil {
+			return err
+		}
+	case check.TypePostgres, check.TypeMySQL, check.TypeRedis:
+		u, err := url.Parse(m.Target)
+		if err != nil || !slices.Contains(urlSchemes[m.Type], u.Scheme) || u.Host == "" {
+			return fmt.Errorf("target must be a %s:// URL", urlSchemes[m.Type][0])
+		}
+	case check.TypeDocker:
+		m.Target = strings.TrimPrefix(m.Target, "/")
+		if !containerRe.MatchString(m.Target) {
+			return errors.New("target must be a container name or id")
+		}
+	case check.TypeGRPC:
+		t := m.Target
+		if !strings.Contains(t, "://") {
+			t = "grpc://" + t
+		}
+		u, err := url.Parse(t)
+		if err != nil || (u.Scheme != "grpc" && u.Scheme != "grpcs") || u.Host == "" || u.Port() == "" {
+			return errors.New("target must be grpc://host:port or grpcs://host:port, optionally followed by /service")
+		}
+	case check.TypeSMTP:
+		t := m.Target
+		if !strings.Contains(t, "://") {
+			t = "smtp://" + t
+		}
+		u, err := url.Parse(t)
+		if err != nil || (u.Scheme != "smtp" && u.Scheme != "smtps") || u.Hostname() == "" || strings.Trim(u.Path, "/") != "" {
+			return errors.New("target must be smtp://host[:port] or smtps://host[:port]")
+		}
 	}
+
 	if m.IntervalSec == 0 {
 		m.IntervalSec = 60
 	}
@@ -454,6 +525,7 @@ func validatePush(m *store.Monitor) error {
 		ID: m.ID, Name: m.Name, Type: m.Type, IntervalSec: m.IntervalSec, GraceSec: m.GraceSec,
 		TimeoutMs: 10000, Retries: 1, Method: "GET", Headers: map[string]string{},
 		Locations: []string{PushLocation}, Paused: m.Paused,
+		GroupID: m.GroupID, TagIDs: m.TagIDs,
 	}
 	return nil
 }
@@ -490,7 +562,7 @@ func (h *Hub) summary(m *store.Monitor, expiry []*store.ExpiryCheck) *monitorSum
 	if s.Expiry == nil {
 		s.Expiry = []*store.ExpiryCheck{}
 	}
-	if w, end := h.ActiveMaintenance(m.ID); w != nil && !m.Paused {
+	if w, end := h.ActiveMaintenance(m); w != nil && !m.Paused {
 		s.Maintenance = &activeMaint{ID: w.ID, Name: w.Name, EndAt: end.UnixMilli()}
 	}
 	// Bars, uptime and the last result come from the in-memory stats kept by
@@ -508,6 +580,11 @@ func (h *Hub) summary(m *store.Monitor, expiry []*store.ExpiryCheck) *monitorSum
 }
 
 func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	f, err := parseMonitorFilter(r)
+	if err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
 	ms, err := h.store.ListMonitors()
 	if err != nil {
 		h.internalErr(w, err)
@@ -524,6 +601,9 @@ func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User
 	}
 	out := make([]*monitorSummary, 0, len(ms))
 	for _, m := range ms {
+		if f.active && !f.match(m) {
+			continue
+		}
 		out = append(out, h.summary(m, expiry[m.ID]))
 	}
 	writeJSON(w, 200, out)
@@ -862,6 +942,7 @@ type agentView struct {
 	*store.Agent
 	LocationID string `json:"location_id"`
 	Online     bool   `json:"online"`
+	updateView
 }
 
 func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.User) {
@@ -912,9 +993,12 @@ func (h *Hub) listAgents(w http.ResponseWriter, r *http.Request, _ *store.User) 
 	}
 	out := make([]agentView, 0, len(agents))
 	for _, a := range agents {
-		out = append(out, agentView{Agent: a, LocationID: AgentLocation(a.ID), Online: h.AgentOnline(a.ID)})
+		out = append(out, agentView{Agent: a, LocationID: AgentLocation(a.ID), Online: h.AgentOnline(a.ID), updateView: h.agentUpdateView(a)})
 	}
-	writeJSON(w, 200, map[string]any{"agents": out, "hub_url": h.hubURL(r)})
+	writeJSON(w, 200, map[string]any{
+		"agents": out, "hub_url": h.hubURL(r),
+		"hub_version": h.cfg.Version, "auto_update": h.agentUpdateSettings().AutoUpdate,
+	})
 }
 
 type agentInput struct {
@@ -1175,12 +1259,23 @@ func (h *Hub) sendTest(w http.ResponseWriter, r *http.Request, n *store.Notifier
 
 // ---------- static ----------
 
-var agentFileRe = regexp.MustCompile(`^pingtxt-agent-(linux|darwin|windows)-(amd64|arm64|arm)(\.exe)?$`)
+var agentFileRe = regexp.MustCompile(`^pingtxt-agent-(linux|darwin|windows)-(amd64|arm64|arm)(\.exe)?(\.sha256)?$`)
 
 func (h *Hub) download(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("file")
 	if !agentFileRe.MatchString(name) || h.cfg.AgentDir == "" {
 		http.NotFound(w, r)
+		return
+	}
+	if bin, ok := strings.CutSuffix(name, ".sha256"); ok {
+		// Checksum file in the sha256sum format, used by the install script.
+		sum, err := h.binarySHA256(bin)
+		if err != nil {
+			http.Error(w, "agent binary not bundled in this build", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte(sum + "  " + bin + "\n"))
 		return
 	}
 	p := filepath.Join(h.cfg.AgentDir, name)

@@ -4,20 +4,27 @@ Minimal, terminal-flavoured uptime monitoring. Think Uptime Kuma / UptimeRobot /
 but plain text, monospace, light and dark.
 
 - **One container** for the hub: Go API + scheduler + SQLite + the Next.js UI, ~25 MB image.
-- **Agents** for multi-location checks: a ~7 MB static binary (or Docker image) that only
+- **Agents** for multi-location checks: a ~8 MB static binary (or Docker image) that only
   dials *out* to the hub over WebSocket. No open ports, works behind NAT. Install with one command.
-- Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**, and **heartbeat (push)** monitors for cron jobs and workers.
+- Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**,
+  databases (**PostgreSQL**, **MySQL/MariaDB**, **Redis**, **MongoDB**), **Docker containers**, **gRPC health**, **SMTP**,
+  and **heartbeat (push)** monitors for cron jobs and workers.
 - Status across locations: **down** when the majority of online locations fail, **degraded** when only some do.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
-- **Maintenance windows**, one-off or recurring (daily, weekly, monthly, in any time zone), for some or all monitors:
+- **Groups and tags**: a monitor sits in one group and has any number of colored tags. Filter the dashboard by
+  them, show groups as sections on the dashboard and on status pages, and pick monitors by group or tag in
+  maintenance windows.
+- **Maintenance windows**, one-off or recurring (daily, weekly, monthly, in any time zone), for some or all monitors
+  (or whole groups and tags):
   checks keep running but no incidents or alerts are raised, and those checks don't count toward uptime.
 - **Expiry alerts** for TLS certificates (https monitors) and domain registrations (RDAP, with WHOIS
   fallback for registries without RDAP such as .it). Thresholds in days are set in settings
   (default 14/7/3/1 for certificates, 30/14/7/1 for domains): one alert per threshold crossed,
   one when it expires, one when it is renewed.
+- **Prometheus** metrics on `/metrics` (status, latency per location, uptime, certificate and domain expiry, agents).
 
 | dark | light |
 | --- | --- |
@@ -81,11 +88,45 @@ curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/monitors
 - Tokens can expire after 30, 90 or 365 days, or never. They are shown once and stored hashed.
 - Tokens never reach account endpoints (password, 2FA, tokens, users, instance settings): those need a browser login.
 
+`GET /api/monitors` accepts `?group=<id>` (or `group=none`) and `?tag=<id>` filters. Groups and tags are managed at
+`/api/groups` and `/api/tags`; `PUT /api/groups/<id>/monitors` with `{"monitor_ids": [...]}` sets a group's members.
+
+### Prometheus
+
+`GET /metrics` serves metrics in the Prometheus text format. It needs an API token (read scope is enough),
+unless **settings → prometheus metrics → public /metrics** is on.
+
+```yaml
+scrape_configs:
+  - job_name: pingtxt
+    scheme: https
+    authorization:
+      credentials: ptk_...
+    static_configs:
+      - targets: ["status.example.com"]
+```
+
+| metric | labels | meaning |
+| --- | --- | --- |
+| `pingtxt_monitor_up` | monitor_id, monitor, type | 1 up or degraded, 0 down (absent while pending, paused, in maintenance) |
+| `pingtxt_monitor_status` | + status | 1 for the current status (up, down, degraded, pending, paused, maintenance) |
+| `pingtxt_monitor_incident_open` | monitor | 1 while an incident is open |
+| `pingtxt_monitor_uptime_ratio` | + window (24h, 7d, 30d) | share of successful checks, maintenance excluded |
+| `pingtxt_monitor_latency_avg_seconds` | + window | average response time of successful checks |
+| `pingtxt_check_up`, `pingtxt_check_latency_seconds`, `pingtxt_check_status_code`, `pingtxt_check_timestamp_seconds` | + location, location_name | last check from each location |
+| `pingtxt_cert_expiry_days`, `pingtxt_domain_expiry_days` (and `_timestamp_seconds`) | + subject | days left before expiry |
+| `pingtxt_agent_connected`, `pingtxt_agent_last_seen_timestamp_seconds` | agent_id, agent, location, location_name, version | agent connectivity |
+| `pingtxt_monitors`, `pingtxt_agents`, `pingtxt_incidents_open`, `pingtxt_info` | | totals and hub version |
+
+The output is cached for 10 seconds.
+
 Put it behind a reverse proxy with TLS (Caddy, Traefik, nginx). WebSocket upgrade must be allowed on `/api/agent/ws`.
 
 ## Status pages
 
 Create them under **status** in the web UI: pick the monitors, their order, and whether past incidents are shown.
+You can also add whole **groups**: every monitor of the group is shown, including ones added later, and each group
+is a section with its own status on the page.
 A page is public at `https://<hub>/status/<slug>/`. Visitors only see monitor names, status, uptime and incident
 times, never targets, locations or error messages. Drafts are visible only to logged-in users.
 
@@ -101,6 +142,35 @@ For jobs that run on a schedule (backups, cron, queues) create a monitor of type
 ```
 
 The monitor goes down (incident + notifications) when no call arrives within the **expected period** plus the **grace time**, and back up at the next call. Optional query parameters: `status=down` reports a failed run, `msg=` stores a short note, `ping=` the run time in ms. The URL uses the public URL from settings and can be regenerated from the monitor page.
+
+## Databases, containers, gRPC and SMTP
+
+| type | target | what is checked |
+| --- | --- | --- |
+| postgresql | `postgres://user:pass@host:5432/db?sslmode=disable` | connect and run a query (default `SELECT 1`); optional expected value of the first column |
+| mysql / mariadb | `mysql://user:pass@host:3306/db` (`?tls=true\|false\|skip-verify`) | same as postgresql |
+| redis | `redis://[user]:pass@host:6379/0`, `rediss://` for TLS | `AUTH` + `PING` |
+| mongodb | `mongodb://user:pass@host:27017/?authSource=admin`, `mongodb+srv://` | `hello`, SCRAM-SHA-256/SHA-1 auth, `ping`; shows primary/secondary |
+| docker container | container name or id | down when not running, restarting, paused or `unhealthy` |
+| grpc health | `grpc://host:port[/service]`, `grpcs://` for TLS | `grpc.health.v1.Health/Check` must return `SERVING` |
+| smtp | `smtp://host:25`, `smtp://host:587`, `smtps://host:465` | greeting, `EHLO`, `STARTTLS` when offered (certificate verified) |
+
+Passwords in connection URLs are hidden in the monitor list and in notifications; use a read-only
+database user. Postgres, MySQL and MongoDB TLS default to "use it when the server offers it".
+
+Docker checks talk to the Docker Engine of the location that runs them: the hub or the agent needs
+`/var/run/docker.sock` (or `DOCKER_HOST`). With Docker, add
+`-v /var/run/docker.sock:/var/run/docker.sock:ro` to the hub or agent container. For an agent
+installed with systemd, allow it with `sudo systemctl edit pingtxt-agent`:
+
+```ini
+[Service]
+SupplementaryGroups=docker
+```
+
+Access to the Docker socket is equivalent to root on that machine (`:ro` does not limit the API):
+pingtxt only reads `GET /containers/<name>/json`, but enable it only where you need container checks.
+Agents older than this version report these types as `unknown monitor type`: update them.
 
 ## Add a location (agent)
 
@@ -120,6 +190,33 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
 
 Then tick the new location in any monitor. The hub schedules every check and sends it to the
 agents; agents are stateless and reconnect with backoff.
+
+### Agent updates
+
+The hub bundles agent binaries built with its own version. When you upgrade the hub, agents
+installed with the script update themselves as soon as they reconnect: the hub sends the
+download path and the SHA-256 of the binary for the agent's platform, the agent downloads it
+from the hub, checks the checksum and that the new binary reports the expected version, swaps
+the file and restarts in place. A failed update leaves the old binary running and is shown on
+the agents page.
+
+- **agents → update agents automatically** turns this on or off (on by default). Each outdated
+  agent also gets an **update** button.
+- Agents installed before this feature run as a read-only systemd `DynamicUser`: re-run the
+  install script once. It now installs to `/opt/pingtxt-agent`, owned by a `pingtxt-agent` user.
+- To keep an agent on its current version, start it with `-no-auto-update`
+  (or `PINGTXT_NO_AUTO_UPDATE=1` in `/etc/pingtxt-agent.env`).
+- **Docker agents** never replace their own binary: pull the new image, or let
+  [Watchtower](https://containrrr.dev/watchtower/) (or a similar image updater) do it:
+
+  ```sh
+  docker run -d --name watchtower --restart unless-stopped \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    containrrr/watchtower pingtxt-agent --interval 3600
+  ```
+
+Pushing a `v*` tag publishes a GitHub release with the hub and agent binaries and `SHA256SUMS`,
+plus the Docker images for that tag.
 
 ## Architecture
 

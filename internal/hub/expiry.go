@@ -266,7 +266,7 @@ func (h *Hub) evaluateExpiry(m *store.Monitor, row *store.ExpiryCheck, now time.
 		return nil
 	}
 	return &Event{
-		Kind: kind, MonitorID: m.ID, Monitor: m.Name, Target: m.Target, Status: status,
+		Kind: kind, MonitorID: m.ID, Monitor: m.Name, Target: check.RedactTarget(m.Target), Status: status,
 		At: now.UnixMilli(), Subject: row.Subject, ExpiresAt: row.ExpiresAt, DaysLeft: &days,
 	}
 }
