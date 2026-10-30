@@ -194,12 +194,31 @@ export interface User {
   email: string
   created_at: number
   has_password: boolean
+  two_factor: boolean
   identities: Identity[]
 }
 
 export interface Me {
   user: User
   version: string
+  recovery_codes_left: number
+}
+
+export type TokenScope = "read" | "write"
+
+export interface ApiToken {
+  id: number
+  name: string
+  hint: string
+  scope: TokenScope
+  created_at: number
+  last_used_at: number
+  expires_at: number
+}
+
+export interface LoginResult {
+  two_factor?: boolean
+  challenge?: string
 }
 
 export interface MonitorDefaults {

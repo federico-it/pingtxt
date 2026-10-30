@@ -32,7 +32,8 @@ const sessionCookie = "pingtxt_session"
 // Handler returns the HTTP handler serving the API and the web UI.
 func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux := http.NewServeMux()
-	auth := h.requireAuth
+	auth := h.requireAuth       // session or API token
+	session := h.requireSession // browser session only
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "version": h.cfg.Version})
@@ -40,19 +41,28 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("GET /api/setup", h.getSetup)
 	mux.HandleFunc("POST /api/setup", h.postSetup)
 	mux.HandleFunc("POST /api/auth/login", h.login)
+	mux.HandleFunc("POST /api/auth/login/2fa", h.loginSecondFactor)
 	mux.HandleFunc("POST /api/auth/logout", h.logout)
 	mux.HandleFunc("GET /api/auth/me", auth(h.me))
-	mux.HandleFunc("POST /api/auth/password", auth(h.changePassword))
+	mux.HandleFunc("POST /api/auth/password", session(h.changePassword))
 	mux.HandleFunc("GET /api/auth/options", h.authOptions)
 	mux.HandleFunc("GET /api/auth/oauth/{provider}/start", h.oauthStart)
 	mux.HandleFunc("GET /api/auth/oauth/{provider}/callback", h.oauthCallback)
-	mux.HandleFunc("DELETE /api/auth/identities/{provider}", auth(h.unlinkIdentity))
+	mux.HandleFunc("DELETE /api/auth/identities/{provider}", session(h.unlinkIdentity))
+	mux.HandleFunc("POST /api/auth/2fa/setup", session(h.setupTwoFactor))
+	mux.HandleFunc("POST /api/auth/2fa/enable", session(h.enableTwoFactor))
+	mux.HandleFunc("POST /api/auth/2fa/disable", session(h.disableTwoFactor))
+	mux.HandleFunc("POST /api/auth/2fa/recovery-codes", session(h.regenerateRecoveryCodes))
+	mux.HandleFunc("GET /api/tokens", session(h.listTokens))
+	mux.HandleFunc("POST /api/tokens", session(h.createToken))
+	mux.HandleFunc("DELETE /api/tokens/{id}", session(h.deleteToken))
 
-	mux.HandleFunc("GET /api/settings", auth(h.getSettings))
-	mux.HandleFunc("PUT /api/settings/general", auth(h.putGeneralSettings))
-	mux.HandleFunc("PUT /api/settings/auth", auth(h.putAuthSettings))
-	mux.HandleFunc("GET /api/users", auth(h.listUsers))
-	mux.HandleFunc("DELETE /api/users/{id}", auth(h.deleteUser))
+	mux.HandleFunc("GET /api/settings", session(h.getSettings))
+	mux.HandleFunc("PUT /api/settings/general", session(h.putGeneralSettings))
+	mux.HandleFunc("PUT /api/settings/auth", session(h.putAuthSettings))
+	mux.HandleFunc("GET /api/users", session(h.listUsers))
+	mux.HandleFunc("DELETE /api/users/{id}", session(h.deleteUser))
+	mux.HandleFunc("DELETE /api/users/{id}/2fa", session(h.resetUserTwoFactor))
 
 	mux.HandleFunc("GET /api/overview", auth(h.overview))
 	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
@@ -163,17 +173,6 @@ func (h *Hub) currentUser(r *http.Request) *store.User {
 	return u
 }
 
-func (h *Hub) requireAuth(fn func(http.ResponseWriter, *http.Request, *store.User)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		u := h.currentUser(r)
-		if u == nil {
-			writeErr(w, http.StatusUnauthorized, "unauthorized")
-			return
-		}
-		fn(w, r, u)
-	}
-}
-
 func isHTTPS(r *http.Request) bool {
 	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
@@ -254,6 +253,11 @@ func (h *Hub) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 401, "invalid email or password")
 		return
 	}
+	if h.store.TwoFactorEnabled(u.ID) {
+		// The password is right: ask for the authenticator code before starting a session.
+		writeJSON(w, 200, map[string]any{"two_factor": true, "challenge": h.challenges.put(u.ID)})
+		return
+	}
 	if err := h.startSession(w, r, u); err != nil {
 		h.internalErr(w, err)
 		return
@@ -270,7 +274,7 @@ func (h *Hub) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Hub) me(w http.ResponseWriter, r *http.Request, u *store.User) {
-	writeJSON(w, 200, map[string]any{"user": h.userView(u), "version": h.cfg.Version})
+	writeJSON(w, 200, map[string]any{"user": h.userView(u), "version": h.cfg.Version, "recovery_codes_left": h.store.RecoveryCodesLeft(u.ID)})
 }
 
 func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.User) {
@@ -296,11 +300,7 @@ func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.Us
 		h.internalErr(w, err)
 		return
 	}
-	cur := ""
-	if c, err := r.Cookie(sessionCookie); err == nil {
-		cur = HashToken(c.Value)
-	}
-	_ = h.store.DeleteUserSessions(u.ID, cur)
+	h.logoutOtherSessions(r, u)
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 

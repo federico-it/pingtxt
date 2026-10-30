@@ -11,6 +11,7 @@ but plain text, monospace, light and dark.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
+- Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
 
 | dark | light |
 | --- | --- |
@@ -51,6 +52,28 @@ The generic OpenID Connect option works with Authentik, Keycloak, Authelia, Pock
 - You can turn off password login once a provider works. If you lock yourself out, run
   `pingtxt -enable-password-login` (in Docker: `docker exec pingtxt pingtxt -enable-password-login`, then restart).
 - Set the **public URL** in settings when the hub is behind a reverse proxy, so callback URLs are right.
+
+### Two-factor authentication
+
+In **settings → two-factor authentication** scan the QR code with an authenticator app
+(1Password, Bitwarden, Aegis, Google Authenticator...) and confirm a code. You get 10 single-use
+recovery codes. After that, password logins ask for a code; single sign-on logins rely on the provider's own MFA.
+
+- Lost phone and recovery codes: another user can click **reset 2fa** in **settings → users**, or run
+  `pingtxt -reset-2fa you@example.com` on the server (in Docker: `docker exec pingtxt pingtxt -reset-2fa you@example.com`).
+
+### API tokens
+
+Create personal tokens in **settings → api tokens** and send them as a bearer token:
+
+```sh
+curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/monitors
+```
+
+- **read only** tokens can call `GET` endpoints (monitors, incidents, agents, notifiers).
+  **read + write** tokens can also create, edit, pause and delete.
+- Tokens can expire after 30, 90 or 365 days, or never. They are shown once and stored hashed.
+- Tokens never reach account endpoints (password, 2FA, tokens, users, instance settings): those need a browser login.
 
 Put it behind a reverse proxy with TLS (Caddy, Traefik, nginx). WebSocket upgrade must be allowed on `/api/agent/ws`.
 

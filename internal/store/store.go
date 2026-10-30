@@ -154,6 +154,31 @@ var migrations = []string{
 		PRIMARY KEY (page_id, monitor_id)
 	);
 	CREATE INDEX status_page_monitors_monitor ON status_page_monitors(monitor_id);`,
+	`CREATE TABLE user_totp (
+		user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+		secret TEXT NOT NULL,
+		enabled INTEGER NOT NULL DEFAULT 0,
+		last_step INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL
+	);
+	CREATE TABLE recovery_codes (
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		code_hash TEXT NOT NULL,
+		used_at INTEGER NOT NULL DEFAULT 0,
+		PRIMARY KEY (user_id, code_hash)
+	);
+	CREATE TABLE api_tokens (
+		id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		name TEXT NOT NULL,
+		token_hash TEXT NOT NULL UNIQUE,
+		hint TEXT NOT NULL DEFAULT '',
+		scope TEXT NOT NULL,
+		created_at INTEGER NOT NULL,
+		last_used_at INTEGER NOT NULL DEFAULT 0,
+		expires_at INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX api_tokens_user ON api_tokens(user_id);`,
 }
 
 func (s *Store) migrate() error {
