@@ -151,13 +151,20 @@ export async function api<T = unknown>(
   const res = await fetch(path, {
     method: init?.method ?? "GET",
     credentials: "same-origin",
-    headers: init?.body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers:
+      init?.body !== undefined
+        ? { "Content-Type": "application/json" }
+        : undefined,
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   })
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
   if (!res.ok) {
-    if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth/login")) {
+    if (
+      res.status === 401 &&
+      typeof window !== "undefined" &&
+      !path.startsWith("/api/auth/login")
+    ) {
       const here = window.location.pathname
       // Full reload on purpose: drops all cached data of the old session.
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
@@ -173,4 +180,70 @@ export function useApi<T>(path: string | null, config?: SWRConfiguration<T>) {
     refreshInterval: 10_000,
     ...config,
   })
+}
+
+export interface Identity {
+  provider: string
+  email: string
+  created_at: number
+}
+
+export interface User {
+  id: number
+  email: string
+  created_at: number
+  has_password: boolean
+  identities: Identity[]
+}
+
+export interface Me {
+  user: User
+  version: string
+}
+
+export interface MonitorDefaults {
+  interval_sec: number
+  timeout_ms: number
+  retries: number
+}
+
+export interface GeneralSettings {
+  public_url: string
+  local_name: string
+  local_enabled: boolean
+  retention_days: number
+  monitor_defaults: MonitorDefaults
+}
+
+export type ProviderId = "github" | "google" | "oidc"
+
+export interface ProviderSettings {
+  id: ProviderId
+  label: string
+  enabled: boolean
+  client_id: string
+  client_secret: string
+  client_secret_set: boolean
+  callback_url: string
+  name?: string
+  issuer?: string
+  scopes?: string
+}
+
+export interface AuthSettings {
+  password_login: boolean
+  allow_signup: boolean
+  allowed_domains: string[]
+  providers: ProviderSettings[]
+}
+
+export interface Settings {
+  general: GeneralSettings
+  auth: AuthSettings
+  detected_url: string
+}
+
+export interface AuthOptions {
+  password_login: boolean
+  providers: { id: ProviderId; label: string }[]
 }

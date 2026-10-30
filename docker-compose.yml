@@ -9,11 +9,8 @@ services:
       - "8090:8090"
     volumes:
       - ./data:/data
-    environment:
-      # Public URL used in the agent install commands (recommended behind a reverse proxy).
-      # PINGTXT_PUBLIC_URL: https://status.example.com
-      PINGTXT_LOCAL_NAME: hub
-      PINGTXT_RETENTION_DAYS: 30
+    # Public URL, login providers (GitHub, Google, OIDC) and the other settings
+    # are configured in the web UI: settings.
 
   # Optional: an agent on another machine. Create it in the UI (agents > add agent)
   # and paste the token here.
