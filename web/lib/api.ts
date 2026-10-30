@@ -421,3 +421,76 @@ export interface PublicStatusPage {
 export function statusPageURL(p: Pick<StatusPage, "slug" | "domain">, hubURL: string) {
   return p.domain ? `https://${p.domain}/` : `${hubURL.replace(/\/$/, "")}/status/${p.slug}/`
 }
+
+export type BackupKind = "auto" | "manual" | "pre-import" | "pre-restore" | "upload"
+
+export interface BackupFile {
+  name: string
+  kind: BackupKind
+  size: number
+  created_at: number
+}
+
+export interface BackupSettings {
+  enabled: boolean
+  interval_hours: number
+  keep: number
+}
+
+export interface Backups {
+  settings: BackupSettings
+  backups: BackupFile[]
+  dir: string
+  /** a backup staged to replace the database at the next start */
+  pending_restore: { name: string; staged_at: number } | null
+}
+
+export interface ImportResult {
+  mode: "merge" | "replace"
+  backup?: string
+  created: Record<string, number>
+  updated: Record<string, number>
+  deleted: Record<string, number>
+  skipped: Record<string, number>
+  settings: boolean
+  warnings: string[]
+}
+
+/** Summary of a configuration export file, read in the browser before importing. */
+export interface ConfigFile {
+  format: string
+  version: number
+  hub_version: string
+  exported_at: string
+  secrets: boolean
+  monitors?: unknown[]
+  groups?: unknown[]
+  tags?: unknown[]
+  notifiers?: unknown[]
+  maintenances?: unknown[]
+  status_pages?: unknown[]
+  agents?: unknown[]
+}
+
+/** Sends a raw body (file upload) and parses the JSON answer. */
+export async function apiRaw<T = unknown>(
+  path: string,
+  body: BodyInit,
+  contentType: string
+): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": contentType },
+    body,
+  })
+  const text = await res.text()
+  let data: { error?: string } | null = null
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = null
+  }
+  if (!res.ok) throw new ApiError(res.status, data?.error ?? res.statusText)
+  return data as T
+}

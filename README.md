@@ -25,6 +25,8 @@ but plain text, monospace, light and dark.
   (default 14/7/3/1 for certificates, 30/14/7/1 for domains): one alert per threshold crossed,
   one when it expires, one when it is renewed.
 - **Prometheus** metrics on `/metrics` (status, latency per location, uptime, certificate and domain expiry, agents).
+- **Backups**: full database snapshots on demand or on a schedule (with retention), downloadable and restorable
+  from the UI, plus a **configuration export/import** in JSON to copy monitors and settings between hubs.
 
 | dark | light |
 | --- | --- |
@@ -171,6 +173,49 @@ SupplementaryGroups=docker
 Access to the Docker socket is equivalent to root on that machine (`:ro` does not limit the API):
 pingtxt only reads `GET /containers/<name>/json`, but enable it only where you need container checks.
 Agents older than this version report these types as `unknown monitor type`: update them.
+
+## Backups and configuration export
+
+Settings → **database backups** takes a consistent copy of the whole SQLite database (settings, users,
+secrets, history) while the hub keeps running. Turn on **scheduled backups** to take one every N hours and
+keep the last N. Files live in `<data>/backups` (`/data/backups` in Docker) and can be downloaded or
+uploaded from the same page. A backup is also taken automatically before every configuration import and
+before every restore.
+
+**Restore** replaces the whole database. In the UI pick a backup → *restore*: it is staged and swapped in
+when the hub restarts (`docker restart pingtxt`). From a shell, with the hub stopped:
+
+```sh
+pingtxt -restore /data/backups/pingtxt-auto-20261030-020000.db
+# Docker: docker compose stop pingtxt
+#         docker compose run --rm pingtxt -restore /data/backups/<file>.db
+#         docker compose start pingtxt
+```
+
+The replaced database is kept as `pingtxt-pre-restore-*.db`. Backups from older versions are migrated on
+start; backups from a newer version are refused. To take a backup from cron instead:
+`pingtxt -backup /path/to/file.db` (safe while the hub runs; in Docker `docker exec pingtxt pingtxt -backup /data/backups/x.db`).
+
+Settings → **configuration export** downloads a JSON file with monitors, groups, tags, notification
+channels, maintenance windows, status pages, agents and instance settings — no history and no user
+accounts. Without *include secrets*, passwords, bot tokens, secret webhook URLs (Discord, Slack), login
+client secrets, credential headers and passwords in target URLs are replaced by `[redacted]`, and agent
+and heartbeat tokens are left out. Importing:
+
+- **merge** updates objects with the same name (status pages by slug) and adds the rest; redacted values
+  keep what is stored. **replace** deletes current monitors (with their history), groups, tags, channels,
+  maintenance windows and status pages first. Agents are never deleted.
+- On another hub, channels with redacted secrets are skipped and monitors with redacted credentials are
+  paused; the import result lists what to fill in. Export *with* secrets to move a hub completely: agents
+  keep their tokens and heartbeat URLs stay the same.
+
+The same is available from the API and the CLI:
+
+```sh
+curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/config/export > pingtxt.json   # no secrets with a token
+pingtxt -export-config pingtxt.json [-export-secrets]
+pingtxt -import-config pingtxt.json [-import-mode replace]   # then restart the hub
+```
 
 ## Add a location (agent)
 

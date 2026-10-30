@@ -67,6 +67,18 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("DELETE /api/users/{id}", session(h.deleteUser))
 	mux.HandleFunc("DELETE /api/users/{id}/2fa", session(h.resetUserTwoFactor))
 
+	// Backups and configuration export/import (admin only once roles exist).
+	mux.HandleFunc("GET /api/backups", session(h.listBackups))
+	mux.HandleFunc("POST /api/backups", session(h.createBackup))
+	mux.HandleFunc("POST /api/backups/upload", session(h.uploadBackup))
+	mux.HandleFunc("DELETE /api/backups/restore", session(h.cancelRestore))
+	mux.HandleFunc("GET /api/backups/{name}", session(h.downloadBackup))
+	mux.HandleFunc("DELETE /api/backups/{name}", session(h.deleteBackup))
+	mux.HandleFunc("POST /api/backups/{name}/restore", session(h.stageRestore))
+	mux.HandleFunc("PUT /api/settings/backups", session(h.putBackupSettings))
+	mux.HandleFunc("GET /api/config/export", auth(h.exportConfig)) // secrets only with a session
+	mux.HandleFunc("POST /api/config/import", session(h.importConfig))
+
 	mux.HandleFunc("GET /api/overview", auth(h.overview))
 	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
 	mux.HandleFunc("POST /api/monitors", auth(h.createMonitor))
@@ -172,7 +184,11 @@ func securityHeaders(next http.Handler) http.Handler {
 		// Heartbeats are exempt: they are authenticated by the URL token, not
 		// by the session cookie, and any client must be able to send them.
 		if strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/api/push/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
-			if r.ContentLength != 0 && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			ctype := r.Header.Get("Content-Type")
+			// Backup uploads are raw files. application/octet-stream is not a
+			// CORS "simple" type either, so a cross-site form cannot send it.
+			upload := r.URL.Path == "/api/backups/upload" && strings.HasPrefix(ctype, "application/octet-stream")
+			if r.ContentLength != 0 && !strings.HasPrefix(ctype, "application/json") && !upload {
 				writeErr(w, http.StatusUnsupportedMediaType, "content-type must be application/json")
 				return
 			}
