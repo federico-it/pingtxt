@@ -150,6 +150,29 @@ export function GeneralSettingsForm({
         </div>
       </Section>
 
+      <Section title="prometheus metrics">
+        <div className="grid gap-4">
+          <Field
+            label="public /metrics"
+            hint="off: scrapers need an api token (read scope is enough). on: anyone who can reach the hub can read monitor names and statuses"
+          >
+            <label className="flex h-8 items-center gap-2 text-xs">
+              <Switch
+                checked={g.metrics.public}
+                onCheckedChange={(v) => set("metrics", { public: v })}
+              />
+              {g.metrics.public ? "public" : "api token required"}
+            </label>
+          </Field>
+          <pre className="overflow-x-auto border border-dashed p-3 text-[11px] leading-relaxed text-muted-foreground">
+            {scrapeConfig(
+              settings.general.public_url || settings.detected_url,
+              g.metrics.public
+            )}
+          </pre>
+        </div>
+      </Section>
+
       <Section title="new monitor defaults">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="interval (s)" htmlFor="d_interval">
@@ -197,6 +220,26 @@ export function GeneralSettingsForm({
       </Section>
     </form>
   )
+}
+
+/** Example prometheus.yml job for this hub. */
+function scrapeConfig(hubURL: string, isPublic: boolean): string {
+  let u: URL
+  try {
+    u = new URL(hubURL)
+  } catch {
+    u = new URL("https://pingtxt.example.com")
+  }
+  const lines = [
+    "scrape_configs:",
+    "  - job_name: pingtxt",
+    `    scheme: ${u.protocol.replace(":", "")}`,
+    "    metrics_path: /metrics",
+  ]
+  if (!isPublic)
+    lines.push("    authorization:", "      credentials: ptk_... # api token")
+  lines.push("    static_configs:", `      - targets: ["${u.host}"]`)
+  return lines.join("\n")
 }
 
 /** "30, 14 7" -> [30, 14, 7]: same order and limits as the hub. */

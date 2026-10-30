@@ -18,6 +18,7 @@ but plain text, monospace, light and dark.
   fallback for registries without RDAP such as .it). Thresholds in days are set in settings
   (default 14/7/3/1 for certificates, 30/14/7/1 for domains): one alert per threshold crossed,
   one when it expires, one when it is renewed.
+- **Prometheus** metrics on `/metrics` (status, latency per location, uptime, certificate and domain expiry, agents).
 
 | dark | light |
 | --- | --- |
@@ -80,6 +81,35 @@ curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/monitors
   **read + write** tokens can also create, edit, pause and delete.
 - Tokens can expire after 30, 90 or 365 days, or never. They are shown once and stored hashed.
 - Tokens never reach account endpoints (password, 2FA, tokens, users, instance settings): those need a browser login.
+
+### Prometheus
+
+`GET /metrics` serves metrics in the Prometheus text format. It needs an API token (read scope is enough),
+unless **settings → prometheus metrics → public /metrics** is on.
+
+```yaml
+scrape_configs:
+  - job_name: pingtxt
+    scheme: https
+    authorization:
+      credentials: ptk_...
+    static_configs:
+      - targets: ["status.example.com"]
+```
+
+| metric | labels | meaning |
+| --- | --- | --- |
+| `pingtxt_monitor_up` | monitor_id, monitor, type | 1 up or degraded, 0 down (absent while pending, paused, in maintenance) |
+| `pingtxt_monitor_status` | + status | 1 for the current status (up, down, degraded, pending, paused, maintenance) |
+| `pingtxt_monitor_incident_open` | monitor | 1 while an incident is open |
+| `pingtxt_monitor_uptime_ratio` | + window (24h, 7d, 30d) | share of successful checks, maintenance excluded |
+| `pingtxt_monitor_latency_avg_seconds` | + window | average response time of successful checks |
+| `pingtxt_check_up`, `pingtxt_check_latency_seconds`, `pingtxt_check_status_code`, `pingtxt_check_timestamp_seconds` | + location, location_name | last check from each location |
+| `pingtxt_cert_expiry_days`, `pingtxt_domain_expiry_days` (and `_timestamp_seconds`) | + subject | days left before expiry |
+| `pingtxt_agent_connected`, `pingtxt_agent_last_seen_timestamp_seconds` | agent_id, agent, location, location_name, version | agent connectivity |
+| `pingtxt_monitors`, `pingtxt_agents`, `pingtxt_incidents_open`, `pingtxt_info` | | totals and hub version |
+
+The output is cached for 10 seconds.
 
 Put it behind a reverse proxy with TLS (Caddy, Traefik, nginx). WebSocket upgrade must be allowed on `/api/agent/ws`.
 

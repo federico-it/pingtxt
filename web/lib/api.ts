@@ -290,6 +290,12 @@ export interface GeneralSettings {
   retention_days: number
   monitor_defaults: MonitorDefaults
   expiry: ExpirySettings
+  metrics: MetricsSettings
+}
+
+export interface MetricsSettings {
+  /** serve /metrics without an API token */
+  public: boolean
 }
 
 export interface ExpirySettings {

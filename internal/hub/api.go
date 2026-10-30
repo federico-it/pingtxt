@@ -106,6 +106,8 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("DELETE /api/status-pages/{id}", auth(h.deleteStatusPage))
 	mux.HandleFunc("GET /api/public/status/{slug}", h.publicStatus)
 
+	mux.HandleFunc("GET /metrics", h.metrics)
+
 	mux.HandleFunc("GET "+protocol.Path, h.ServeAgent)
 	mux.HandleFunc("GET /install-agent.sh", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
