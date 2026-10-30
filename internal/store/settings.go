@@ -43,7 +43,7 @@ type Identity struct {
 
 // IdentityUser returns the user linked to provider/subject.
 func (s *Store) IdentityUser(provider, subject string) (*User, error) {
-	return s.scanUser(s.db.QueryRow(`SELECT u.id, u.email, u.password_hash, u.created_at FROM identities i JOIN users u ON u.id = i.user_id WHERE i.provider = ? AND i.subject = ?`, provider, subject))
+	return s.scanUser(s.db.QueryRow(`SELECT u.id, u.email, u.password_hash, u.role, u.created_at FROM identities i JOIN users u ON u.id = i.user_id WHERE i.provider = ? AND i.subject = ?`, provider, subject))
 }
 
 // LinkIdentity links provider/subject to a user, replacing any previous link of that external account.
@@ -81,7 +81,7 @@ func (s *Store) UnlinkIdentity(userID int64, provider string) error {
 
 // ListUsers returns every user, oldest first.
 func (s *Store) ListUsers() ([]*User, error) {
-	rows, err := s.db.Query(`SELECT id, email, password_hash, created_at FROM users ORDER BY id`)
+	rows, err := s.db.Query(`SELECT id, email, password_hash, role, created_at FROM users ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *Store) ListUsers() ([]*User, error) {
 	out := []*User{}
 	for rows.Next() {
 		u := &User{}
-		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, u)

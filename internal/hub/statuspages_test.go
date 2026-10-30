@@ -168,7 +168,7 @@ func TestStatusPageDomainCannotBeHub(t *testing.T) {
 
 func login(t *testing.T, h *Hub, st *store.Store) *http.Cookie {
 	t.Helper()
-	u, err := st.CreateUser("a@b.c", "")
+	u, err := st.CreateUser("a@b.c", "", store.RoleAdmin)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { useNow } from "@/hooks/use-now"
-import { api, useApi, type Maintenance, type MaintenanceKind, type Monitor } from "@/lib/api"
+import { api, useApi, useIsAdmin, type Maintenance, type MaintenanceKind, type Monitor } from "@/lib/api"
 import { datetime, duration } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -96,6 +96,7 @@ function schedule(m: Maintenance) {
 }
 
 export default function MaintenancePage() {
+  const isAdmin = useIsAdmin()
   const { data, mutate } = useApi<Maintenance[]>("/api/maintenances", { refreshInterval: 30_000 })
   const monitors = useApi<Monitor[]>("/api/monitors", { refreshInterval: 0 })
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -178,9 +179,11 @@ export default function MaintenancePage() {
   return (
     <>
       <PageHeader cmd="pingtxt maint ls" title="maintenance">
-        <Button onClick={() => setDraft(newDraft())}>
-          <PlusIcon /> schedule
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setDraft(newDraft())}>
+            <PlusIcon /> schedule
+          </Button>
+        )}
       </PageHeader>
       <p className="-mt-3 mb-6 max-w-2xl text-xs text-muted-foreground">
         During a maintenance window checks keep running but the covered monitors show as maintenance: no incidents are opened and no
@@ -194,7 +197,7 @@ export default function MaintenancePage() {
         <div className="border-t border-dashed">
           {(data ?? []).map((m) => (
             <div key={m.id} className={cn("flex flex-wrap items-center gap-3 border-b border-dashed px-2 py-2.5", m.active && m.enabled && "bg-info/5")}>
-              <Switch checked={m.enabled} onCheckedChange={(v) => setEnabled(m, v)} />
+              <Switch checked={m.enabled} onCheckedChange={(v) => setEnabled(m, v)} disabled={!isAdmin} />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-3">
                   <span className="font-medium">{m.name}</span>
@@ -205,18 +208,22 @@ export default function MaintenancePage() {
                 </div>
                 {m.description && <div className="truncate text-xs text-muted-foreground">{m.description}</div>}
               </div>
-              <Button variant="ghost" size="xs" onClick={() => setDraft({ ...m, group_ids: m.group_ids ?? [], tag_ids: m.tag_ids ?? [] })}>
-                edit
-              </Button>
-              <Confirm
-                title={`delete ${m.name}?`}
-                onConfirm={() => remove(m)}
-                trigger={
-                  <Button variant="ghost" size="xs" className="text-down">
-                    rm
+              {isAdmin && (
+                <>
+                  <Button variant="ghost" size="xs" onClick={() => setDraft({ ...m, group_ids: m.group_ids ?? [], tag_ids: m.tag_ids ?? [] })}>
+                    edit
                   </Button>
-                }
-              />
+                  <Confirm
+                    title={`delete ${m.name}?`}
+                    onConfirm={() => remove(m)}
+                    trigger={
+                      <Button variant="ghost" size="xs" className="text-down">
+                        rm
+                      </Button>
+                    }
+                  />
+                </>
+              )}
             </div>
           ))}
         </div>

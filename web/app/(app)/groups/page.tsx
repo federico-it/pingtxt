@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { api, tagColors, useApi, type Group, type Monitor, type Tag, type TagColor } from "@/lib/api"
+import { api, tagColors, useApi, useIsAdmin, type Group, type Monitor, type Tag, type TagColor } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 type GroupDraft = { id?: number; name: string; description: string; monitor_ids: number[] }
@@ -22,6 +22,7 @@ type TagDraft = { id?: number; name: string; color: TagColor }
 
 export default function GroupsPage() {
   const { groups, tags } = useLabels()
+  const isAdmin = useIsAdmin()
   const monitors = useApi<Monitor[]>("/api/monitors", { refreshInterval: 30_000 })
   const [group, setGroup] = useState<GroupDraft | null>(null)
   const [tag, setTag] = useState<TagDraft | null>(null)
@@ -86,12 +87,16 @@ export default function GroupsPage() {
   return (
     <>
       <PageHeader cmd="pingtxt groups ls" title="groups & tags">
-        <Button variant="outline" onClick={() => setTag({ name: "", color: "" })}>
-          <PlusIcon /> tag
-        </Button>
-        <Button onClick={() => editGroup()}>
-          <PlusIcon /> group
-        </Button>
+        {isAdmin && (
+          <>
+            <Button variant="outline" onClick={() => setTag({ name: "", color: "" })}>
+              <PlusIcon /> tag
+            </Button>
+            <Button onClick={() => editGroup()}>
+              <PlusIcon /> group
+            </Button>
+          </>
+        )}
       </PageHeader>
       <p className="-mt-3 mb-2 max-w-2xl text-xs text-muted-foreground">
         A monitor belongs to at most one group and can have any number of tags. Groups are sections on the dashboard and on status
@@ -126,19 +131,23 @@ export default function GroupsPage() {
                       </div>
                     )}
                   </div>
-                  <Button variant="ghost" size="xs" onClick={() => editGroup(g)}>
-                    edit
-                  </Button>
-                  <Confirm
-                    title={`delete group ${g.name}?`}
-                    description="Its monitors are kept, without a group. The group is removed from maintenance windows and status pages."
-                    onConfirm={() => remove(`/api/groups/${g.id}`)}
-                    trigger={
-                      <Button variant="ghost" size="xs" className="text-down">
-                        rm
+                  {isAdmin && (
+                    <>
+                      <Button variant="ghost" size="xs" onClick={() => editGroup(g)}>
+                        edit
                       </Button>
-                    }
-                  />
+                      <Confirm
+                        title={`delete group ${g.name}?`}
+                        description="Its monitors are kept, without a group. The group is removed from maintenance windows and status pages."
+                        onConfirm={() => remove(`/api/groups/${g.id}`)}
+                        trigger={
+                          <Button variant="ghost" size="xs" className="text-down">
+                            rm
+                          </Button>
+                        }
+                      />
+                    </>
+                  )}
                 </div>
               )
             })}
@@ -157,19 +166,23 @@ export default function GroupsPage() {
                 <span className="flex-1 text-xs text-muted-foreground">
                   {t.monitors} {t.monitors === 1 ? "monitor" : "monitors"}
                 </span>
-                <Button variant="ghost" size="xs" onClick={() => setTag({ id: t.id, name: t.name, color: t.color })}>
-                  edit
-                </Button>
-                <Confirm
-                  title={`delete tag ${t.name}?`}
-                  description="The tag is removed from every monitor and maintenance window."
-                  onConfirm={() => remove(`/api/tags/${t.id}`)}
-                  trigger={
-                    <Button variant="ghost" size="xs" className="text-down">
-                      rm
+                {isAdmin && (
+                  <>
+                    <Button variant="ghost" size="xs" onClick={() => setTag({ id: t.id, name: t.name, color: t.color })}>
+                      edit
                     </Button>
-                  }
-                />
+                    <Confirm
+                      title={`delete tag ${t.name}?`}
+                      description="The tag is removed from every monitor and maintenance window."
+                      onConfirm={() => remove(`/api/tags/${t.id}`)}
+                      trigger={
+                        <Button variant="ghost" size="xs" className="text-down">
+                          rm
+                        </Button>
+                      }
+                    />
+                  </>
+                )}
               </div>
             ))}
           </div>

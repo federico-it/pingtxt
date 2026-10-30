@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { api, useApi, type Notifier, type NotifierType } from "@/lib/api"
+import { api, useApi, useIsAdmin, type Notifier, type NotifierType } from "@/lib/api"
 
 type Field = {
   key: string
@@ -73,6 +73,7 @@ type Draft = { id?: number; name: string; type: NotifierType; config: Record<str
 
 export default function NotificationsPage() {
   const { data, mutate } = useApi<Notifier[]>("/api/notifiers", { refreshInterval: 0 })
+  const isAdmin = useIsAdmin()
   const [draft, setDraft] = useState<Draft | null>(null)
 
   async function save(e: React.FormEvent) {
@@ -136,9 +137,11 @@ export default function NotificationsPage() {
   return (
     <>
       <PageHeader cmd="pingtxt notify ls" title="notifications">
-        <Button onClick={() => setDraft({ name: "", type: "webhook", config: {}, enabled: true })}>
-          <PlusIcon /> add channel
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setDraft({ name: "", type: "webhook", config: {}, enabled: true })}>
+            <PlusIcon /> add channel
+          </Button>
+        )}
       </PageHeader>
       <p className="-mt-3 mb-6 max-w-2xl text-xs text-muted-foreground">
         Every enabled channel receives a message when a monitor goes down and when it recovers.
@@ -150,26 +153,30 @@ export default function NotificationsPage() {
         <div className="border-t border-dashed">
           {(data ?? []).map((n) => (
             <div key={n.id} className="flex flex-wrap items-center gap-3 border-b border-dashed px-2 py-2.5">
-              <Switch checked={n.enabled} onCheckedChange={(v) => toggle(n, v)} />
+              <Switch checked={n.enabled} onCheckedChange={(v) => toggle(n, v)} disabled={!isAdmin} />
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{n.name}</div>
                 <div className="text-xs text-muted-foreground">{kinds[n.type]?.label ?? n.type}</div>
               </div>
-              <Button variant="ghost" size="xs" onClick={() => test(n)}>
-                test
-              </Button>
-              <Button variant="ghost" size="xs" onClick={() => setDraft({ ...n })}>
-                edit
-              </Button>
-              <Confirm
-                title={`delete ${n.name}?`}
-                onConfirm={() => remove(n)}
-                trigger={
-                  <Button variant="ghost" size="xs" className="text-down">
-                    rm
+              {isAdmin && (
+                <>
+                  <Button variant="ghost" size="xs" onClick={() => test(n)}>
+                    test
                   </Button>
-                }
-              />
+                  <Button variant="ghost" size="xs" onClick={() => setDraft({ ...n })}>
+                    edit
+                  </Button>
+                  <Confirm
+                    title={`delete ${n.name}?`}
+                    onConfirm={() => remove(n)}
+                    trigger={
+                      <Button variant="ghost" size="xs" className="text-down">
+                        rm
+                      </Button>
+                    }
+                  />
+                </>
+              )}
             </div>
           ))}
         </div>

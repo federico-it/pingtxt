@@ -18,8 +18,21 @@ type User struct {
 	ID           int64  `json:"id"`
 	Email        string `json:"email"`
 	PasswordHash string `json:"-"`
+	Role         string `json:"role"` // RoleAdmin or RoleViewer
 	CreatedAt    int64  `json:"created_at"`
 }
+
+// User roles: admins change everything, viewers only read.
+const (
+	RoleAdmin  = "admin"
+	RoleViewer = "viewer"
+)
+
+// ValidRole reports whether r is a known role.
+func ValidRole(r string) bool { return r == RoleAdmin || r == RoleViewer }
+
+// IsAdmin reports whether the user can change monitors, settings and users.
+func (u *User) IsAdmin() bool { return u != nil && u.Role == RoleAdmin }
 
 func (s *Store) CountUsers() (int, error) {
 	var n int
@@ -27,9 +40,12 @@ func (s *Store) CountUsers() (int, error) {
 	return n, err
 }
 
-func (s *Store) CreateUser(email, hash string) (*User, error) {
-	u := &User{Email: email, PasswordHash: hash, CreatedAt: now()}
-	res, err := s.db.Exec(`INSERT INTO users (email, password_hash, created_at) VALUES (?, ?, ?)`, u.Email, u.PasswordHash, u.CreatedAt)
+func (s *Store) CreateUser(email, hash, role string) (*User, error) {
+	if !ValidRole(role) {
+		return nil, errors.New("invalid role")
+	}
+	u := &User{Email: email, PasswordHash: hash, Role: role, CreatedAt: now()}
+	res, err := s.db.Exec(`INSERT INTO users (email, password_hash, role, created_at) VALUES (?, ?, ?, ?)`, u.Email, u.PasswordHash, u.Role, u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +55,7 @@ func (s *Store) CreateUser(email, hash string) (*User, error) {
 
 func (s *Store) scanUser(row *sql.Row) (*User, error) {
 	u := &User{}
-	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -47,11 +63,26 @@ func (s *Store) scanUser(row *sql.Row) (*User, error) {
 }
 
 func (s *Store) UserByEmail(email string) (*User, error) {
-	return s.scanUser(s.db.QueryRow(`SELECT id, email, password_hash, created_at FROM users WHERE email = ?`, email))
+	return s.scanUser(s.db.QueryRow(`SELECT id, email, password_hash, role, created_at FROM users WHERE email = ?`, email))
 }
 
 func (s *Store) UserByID(id int64) (*User, error) {
-	return s.scanUser(s.db.QueryRow(`SELECT id, email, password_hash, created_at FROM users WHERE id = ?`, id))
+	return s.scanUser(s.db.QueryRow(`SELECT id, email, password_hash, role, created_at FROM users WHERE id = ?`, id))
+}
+
+// SetUserRole changes the role of a user.
+func (s *Store) SetUserRole(id int64, role string) error {
+	if !ValidRole(role) {
+		return errors.New("invalid role")
+	}
+	res, err := s.db.Exec(`UPDATE users SET role = ? WHERE id = ?`, role, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) UpdatePassword(id int64, hash string) error {
@@ -65,7 +96,7 @@ func (s *Store) CreateSession(tokenHash string, userID int64, expires time.Time)
 }
 
 func (s *Store) SessionUser(tokenHash string) (*User, error) {
-	return s.scanUser(s.db.QueryRow(`SELECT u.id, u.email, u.password_hash, u.created_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?`, tokenHash, now()))
+	return s.scanUser(s.db.QueryRow(`SELECT u.id, u.email, u.password_hash, u.role, u.created_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?`, tokenHash, now()))
 }
 
 func (s *Store) DeleteSession(tokenHash string) error {

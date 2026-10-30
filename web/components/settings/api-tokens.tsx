@@ -16,7 +16,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useNow } from "@/hooks/use-now"
-import { api, useApi, type ApiToken, type TokenScope } from "@/lib/api"
+import {
+  api,
+  useApi,
+  useIsAdmin,
+  type ApiToken,
+  type TokenScope,
+} from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const scopes: { value: TokenScope; label: string }[] = [
@@ -41,6 +47,9 @@ export function ApiTokens() {
   })
   const [name, setName] = useState("")
   const [scope, setScope] = useState<TokenScope>("read")
+  // A token never has more rights than its owner.
+  const isAdmin = useIsAdmin()
+  const allowed = isAdmin ? scopes : scopes.filter((s) => s.value === "read")
   const [expiry, setExpiry] = useState("90")
   const [created, setCreated] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -113,13 +122,15 @@ export function ApiTokens() {
           <Field
             label="access"
             hint={
-              scope === "read"
-                ? "view monitors, incidents, agents"
-                : "also create, edit and delete"
+              !isAdmin
+                ? "your account is read-only: tokens can only read"
+                : scope === "read"
+                  ? "view monitors, incidents, agents"
+                  : "also create, edit and delete"
             }
           >
             <Select
-              items={scopes}
+              items={allowed}
               value={scope}
               onValueChange={(v) => v && setScope(v as TokenScope)}
             >
@@ -127,7 +138,7 @@ export function ApiTokens() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {scopes.map((s) => (
+                {allowed.map((s) => (
                   <SelectItem key={s.value} value={s.value}>
                     {s.label}
                   </SelectItem>

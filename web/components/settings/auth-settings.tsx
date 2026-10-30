@@ -8,10 +8,19 @@ import { Section } from "@/components/page-header"
 import { Field } from "@/components/settings/field"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import {
   api,
+  roles,
   type AuthSettings,
+  type Role,
   type ProviderId,
   type ProviderSettings,
   type Settings,
@@ -103,6 +112,7 @@ export function AuthSettingsForm({
         password_login: a.password_login,
         allow_signup: a.allow_signup,
         allowed_domains: domains.split(/[\s,]+/).filter(Boolean),
+        default_role: a.default_role,
         providers: Object.fromEntries(
           a.providers.map((p) => [
             p.id,
@@ -161,18 +171,43 @@ export function AuthSettingsForm({
             }
           />
           {a.allow_signup && (
-            <Field
-              label="allowed email domains"
-              htmlFor="domains"
-              hint="comma separated, e.g. example.com. empty: any verified email"
-            >
-              <Input
-                id="domains"
-                placeholder="example.com, corp.io"
-                value={domains}
-                onChange={(e) => setDomains(e.target.value)}
-              />
-            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field
+                label="allowed email domains"
+                htmlFor="domains"
+                hint="comma separated, e.g. example.com. empty: any verified email"
+              >
+                <Input
+                  id="domains"
+                  placeholder="example.com, corp.io"
+                  value={domains}
+                  onChange={(e) => setDomains(e.target.value)}
+                />
+              </Field>
+              <Field
+                label="role of new accounts"
+                hint={roles.find((r) => r.value === a.default_role)?.hint}
+              >
+                <Select
+                  items={roles}
+                  value={a.default_role}
+                  onValueChange={(v) =>
+                    v && setA((p) => ({ ...p, default_role: v as Role }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
           )}
         </div>
 

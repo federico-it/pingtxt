@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import { api, useApi, type Overview } from "@/lib/api"
+import { api, useApi, type Me, type Overview } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const nav = [
@@ -21,7 +21,7 @@ const nav = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/"
-  const me = useApi<{ user: { email: string }; version: string }>("/api/auth/me", { refreshInterval: 60_000 })
+  const me = useApi<Me>("/api/auth/me", { refreshInterval: 60_000 })
   const ov = useApi<Overview>(me.data ? "/api/overview" : null)
 
   async function logout() {
@@ -71,6 +71,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
               {down > 0 ? <span className="text-down">{down} down</span> : <span className="text-up">all systems go</span>} ·{" "}
               {maint > 0 && <span className="text-info">{maint} in maintenance · </span>}
               {ov.data.agents_online}/{ov.data.agents} agents
+            </span>
+          )}
+          {me.data.user.role === "viewer" && (
+            <span className="mr-1 border border-dashed px-1.5 text-xs text-muted-foreground" title="your account can only read">
+              read-only
             </span>
           )}
           <ThemeToggle />
