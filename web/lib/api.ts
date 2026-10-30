@@ -115,7 +115,8 @@ export interface Location {
   kind: "local" | "agent"
 }
 
-export type NotifierType = "webhook" | "discord" | "slack" | "telegram" | "ntfy"
+export type NotifierType =
+  "webhook" | "discord" | "slack" | "telegram" | "ntfy" | "email"
 
 export interface Notifier {
   id: number
@@ -265,4 +266,45 @@ export interface Settings {
 export interface AuthOptions {
   password_login: boolean
   providers: { id: ProviderId; label: string }[]
+}
+
+export interface StatusPage {
+  id: number
+  slug: string
+  title: string
+  description: string
+  domain: string
+  published: boolean
+  show_incidents: boolean
+  monitor_ids: number[]
+  created_at: number
+}
+
+export type PageStatus = "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown"
+
+export interface PublicMonitor {
+  id: number
+  name: string
+  status: Status
+  uptime: number
+  uptime_24h: number
+  bars: Bar[]
+}
+
+export interface PublicStatusPage {
+  slug: string
+  title: string
+  description: string
+  published: boolean
+  status: PageStatus
+  days: number
+  monitors: PublicMonitor[]
+  show_incidents: boolean
+  incidents: { id: number; monitor_name: string; started_at: number; resolved_at: number }[]
+  updated_at: number
+}
+
+/** Public address of a status page. */
+export function statusPageURL(p: Pick<StatusPage, "slug" | "domain">, hubURL: string) {
+  return p.domain ? `https://${p.domain}/` : `${hubURL.replace(/\/$/, "")}/status/${p.slug}/`
 }
