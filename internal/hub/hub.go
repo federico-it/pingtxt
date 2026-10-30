@@ -92,6 +92,7 @@ type Hub struct {
 	pages statusPages
 
 	metricsCache metricsCache
+	updates      agentUpdates
 }
 
 // New creates a hub.

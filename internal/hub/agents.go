@@ -22,6 +22,7 @@ import (
 
 type agentConn struct {
 	agent *store.Agent
+	hello protocol.Hello
 	conn  *websocket.Conn
 	out   chan protocol.Message
 	once  sync.Once
@@ -119,7 +120,7 @@ func (h *Hub) ServeAgent(w http.ResponseWriter, r *http.Request) {
 	hl := hello.Hello
 	_ = h.store.TouchAgent(ag.ID, hl.Version, hl.Hostname, hl.OS+"/"+hl.Arch, clientIP(r))
 
-	ac := &agentConn{agent: ag, conn: conn, out: make(chan protocol.Message, 256), done: make(chan struct{})}
+	ac := &agentConn{agent: ag, hello: *hl, conn: conn, out: make(chan protocol.Message, 256), done: make(chan struct{})}
 	h.mu.Lock()
 	if old := h.agents[ag.ID]; old != nil {
 		old.close()
@@ -175,6 +176,8 @@ func (h *Hub) ServeAgent(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	h.agentConnected(ac)
+
 	loc := AgentLocation(ag.ID)
 	for {
 		_, data, err := conn.Read(ctx)
@@ -185,8 +188,12 @@ func (h *Hub) ServeAgent(w http.ResponseWriter, r *http.Request) {
 		if json.Unmarshal(data, &msg) != nil {
 			continue
 		}
-		if msg.Type == protocol.TypeResult && msg.Result != nil {
+		switch {
+		case msg.Type == protocol.TypeResult && msg.Result != nil:
 			h.HandleResult(loc, *msg.Result)
+		case msg.Type == protocol.TypeUpdateStatus && msg.UpdateStatus != nil:
+			h.log.Warn("agent update failed", "agent", ag.Name, "err", msg.UpdateStatus.Error)
+			h.updateFailed(ag.ID, *msg.UpdateStatus)
 		}
 	}
 }
