@@ -472,6 +472,24 @@ func (s *Store) ListIncidents(monitorID int64, limit int) ([]*Incident, error) {
 	return out, rows.Err()
 }
 
+// OpenIncidentMonitors returns the ids of the monitors with an open incident.
+func (s *Store) OpenIncidentMonitors() (map[int64]bool, error) {
+	rows, err := s.db.Query(`SELECT DISTINCT monitor_id FROM incidents WHERE resolved_at = 0`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
 // ---------- notifiers ----------
 
 type Notifier struct {
