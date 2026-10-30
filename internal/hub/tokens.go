@@ -15,6 +15,9 @@ import (
 //   - read:  GET requests only (monitors, incidents, agents, notifiers...)
 //   - write: everything a token can reach, including creating and deleting.
 //
+// A token never has more rights than its owner: the owner's role is checked
+// at every request, so the write token of a user who becomes read-only only reads.
+//
 // Tokens never reach account endpoints (password, 2FA, tokens, users and
 // instance settings): those need a browser session, so a leaked token cannot
 // lock the owner out or mint more tokens.
@@ -66,13 +69,23 @@ func (h *Hub) requireAuth(fn func(http.ResponseWriter, *http.Request, *store.Use
 			writeErr(w, http.StatusUnauthorized, err.Error())
 			return
 		}
-		if tok != nil && tok.Scope != ScopeWrite && r.Method != http.MethodGet && r.Method != http.MethodHead {
-			writeErr(w, http.StatusForbidden, "this token is read-only")
-			return
+		if !readOnlyMethod(r.Method) {
+			if tok != nil && tok.Scope != ScopeWrite {
+				writeErr(w, http.StatusForbidden, "this token is read-only")
+				return
+			}
+			if !u.IsAdmin() {
+				writeErr(w, http.StatusForbidden, errReadOnlyUser)
+				return
+			}
 		}
 		fn(w, r, u)
 	}
 }
+
+const errReadOnlyUser = "your account is read-only, ask an admin for changes"
+
+func readOnlyMethod(m string) bool { return m == http.MethodGet || m == http.MethodHead }
 
 // requireSession accepts only a browser session: used for account and instance settings.
 func (h *Hub) requireSession(fn func(http.ResponseWriter, *http.Request, *store.User)) http.HandlerFunc {
@@ -88,6 +101,17 @@ func (h *Hub) requireSession(fn func(http.ResponseWriter, *http.Request, *store.
 		}
 		fn(w, r, u)
 	}
+}
+
+// requireAdmin accepts only a browser session of an admin: instance settings and users.
+func (h *Hub) requireAdmin(fn func(http.ResponseWriter, *http.Request, *store.User)) http.HandlerFunc {
+	return h.requireSession(func(w http.ResponseWriter, r *http.Request, u *store.User) {
+		if !u.IsAdmin() {
+			writeErr(w, http.StatusForbidden, "only admins can do this")
+			return
+		}
+		fn(w, r, u)
+	})
 }
 
 func (h *Hub) listTokens(w http.ResponseWriter, r *http.Request, u *store.User) {
@@ -116,6 +140,10 @@ func (h *Hub) createToken(w http.ResponseWriter, r *http.Request, u *store.User)
 	}
 	if in.Scope != ScopeRead && in.Scope != ScopeWrite {
 		writeErr(w, 400, "scope must be read or write")
+		return
+	}
+	if in.Scope == ScopeWrite && !u.IsAdmin() {
+		writeErr(w, 400, "read-only users can only create read tokens")
 		return
 	}
 	if in.ExpiresInDays < 0 || in.ExpiresInDays > 3650 {

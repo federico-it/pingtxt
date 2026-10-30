@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/federico-it/pingtxt/internal/store"
 )
 
 // fakeIdP is a minimal OIDC provider.
@@ -166,7 +168,7 @@ func TestOIDCSignup(t *testing.T) {
 	srv := httptest.NewServer(h.Handler(fstest.MapFS{}))
 	defer srv.Close()
 	idp := fakeIdP(t, "user-2", "new@corp.io")
-	st.CreateUser("admin@example.com", "x")
+	st.CreateUser("admin@example.com", "x", store.RoleAdmin)
 	a := defaultAuth()
 	a.Providers["oidc"] = ProviderSettings{Enabled: true, Issuer: idp.URL, ClientID: "cid", ClientSecret: "s"}
 	h.auth = a
@@ -184,8 +186,8 @@ func TestOIDCSignup(t *testing.T) {
 	if loc := newClient(t, srv.URL).oauth("/api/auth/oauth/oidc/start", "good-code"); loc != "/" {
 		t.Fatalf("sign-up failed: %s", loc)
 	}
-	if _, err := st.UserByEmail("new@corp.io"); err != nil {
-		t.Fatal("user not created")
+	if u, err := st.UserByEmail("new@corp.io"); err != nil || u.Role != store.RoleViewer {
+		t.Fatalf("user not created as viewer: %+v %v", u, err)
 	}
 }
 

@@ -266,6 +266,8 @@ var migrations = []string{
 		PRIMARY KEY (monitor_id, start, location)
 	) WITHOUT ROWID;
 	CREATE INDEX result_rollups_start ON result_rollups(start);`,
+	// Existing users keep full access.
+	`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin';`,
 }
 
 func (s *Store) migrate() error {

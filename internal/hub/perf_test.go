@@ -188,7 +188,7 @@ func TestLargeJSONIsGzipped(t *testing.T) {
 		}
 		h.MonitorChanged(m.ID)
 	}
-	handler := gzipAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.listMonitors(w, r, nil) }))
+	handler := gzipAPI(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.listMonitors(w, r, &store.User{Role: store.RoleAdmin}) }))
 	req := httptest.NewRequest("GET", "/api/monitors", nil)
 	req.Header.Set("Accept-Encoding", "gzip, br")
 	rec := httptest.NewRecorder()

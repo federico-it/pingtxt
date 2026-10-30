@@ -37,6 +37,7 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux := http.NewServeMux()
 	auth := h.requireAuth       // session or API token
 	session := h.requireSession // browser session only
+	admin := h.requireAdmin     // browser session of an admin
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "version": h.cfg.Version})
@@ -60,12 +61,14 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/tokens", session(h.createToken))
 	mux.HandleFunc("DELETE /api/tokens/{id}", session(h.deleteToken))
 
-	mux.HandleFunc("GET /api/settings", session(h.getSettings))
-	mux.HandleFunc("PUT /api/settings/general", session(h.putGeneralSettings))
-	mux.HandleFunc("PUT /api/settings/auth", session(h.putAuthSettings))
-	mux.HandleFunc("GET /api/users", session(h.listUsers))
-	mux.HandleFunc("DELETE /api/users/{id}", session(h.deleteUser))
-	mux.HandleFunc("DELETE /api/users/{id}/2fa", session(h.resetUserTwoFactor))
+	mux.HandleFunc("GET /api/settings", admin(h.getSettings))
+	mux.HandleFunc("PUT /api/settings/general", admin(h.putGeneralSettings))
+	mux.HandleFunc("PUT /api/settings/auth", admin(h.putAuthSettings))
+	mux.HandleFunc("GET /api/users", admin(h.listUsers))
+	mux.HandleFunc("POST /api/users", admin(h.createUser))
+	mux.HandleFunc("PUT /api/users/{id}", admin(h.updateUser))
+	mux.HandleFunc("DELETE /api/users/{id}", admin(h.deleteUser))
+	mux.HandleFunc("DELETE /api/users/{id}/2fa", admin(h.resetUserTwoFactor))
 
 	mux.HandleFunc("GET /api/overview", auth(h.overview))
 	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
@@ -298,7 +301,7 @@ func (h *Hub) postSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte(c.Password), bcrypt.DefaultCost)
-	u, err := h.store.CreateUser(c.Email, string(hash))
+	u, err := h.store.CreateUser(c.Email, string(hash), store.RoleAdmin)
 	if err != nil {
 		h.internalErr(w, err)
 		return
@@ -579,7 +582,7 @@ func (h *Hub) summary(m *store.Monitor, expiry []*store.ExpiryCheck) *monitorSum
 	return s
 }
 
-func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User) {
+func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, u *store.User) {
 	f, err := parseMonitorFilter(r)
 	if err != nil {
 		writeErr(w, 400, err.Error())
@@ -603,6 +606,9 @@ func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User
 	for _, m := range ms {
 		if f.active && !f.match(m) {
 			continue
+		}
+		if !u.IsAdmin() {
+			redactMonitor(m)
 		}
 		out = append(out, h.summary(m, expiry[m.ID]))
 	}
@@ -684,7 +690,7 @@ type locationStatus struct {
 	Last   *store.ResultRow `json:"last"`
 }
 
-func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) {
+func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, u *store.User) {
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, 400, "invalid id")
@@ -702,6 +708,9 @@ func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) 
 	if err != nil {
 		h.internalErr(w, err)
 		return
+	}
+	if !u.IsAdmin() {
+		redactMonitor(m)
 	}
 	s := h.summary(m, expiry)
 	now := time.Now().UnixMilli()
@@ -1116,7 +1125,7 @@ func validateNotifier(n *store.Notifier) error {
 	return nil
 }
 
-func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, _ *store.User) {
+func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, u *store.User) {
 	list, err := h.store.ListNotifiers()
 	if err != nil {
 		h.internalErr(w, err)
@@ -1124,6 +1133,9 @@ func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, _ *store.Use
 	}
 	for _, n := range list {
 		maskNotifier(n)
+		if !u.IsAdmin() {
+			redactNotifier(n)
+		}
 	}
 	writeJSON(w, 200, list)
 }
