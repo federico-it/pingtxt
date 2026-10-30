@@ -1,0 +1,1026 @@
+package hub
+
+import (
+	"encoding/json"
+	"errors"
+	"io/fs"
+	"net/http"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
+	_ "embed"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/federico-it/pingtxt/internal/check"
+	"github.com/federico-it/pingtxt/internal/protocol"
+	"github.com/federico-it/pingtxt/internal/store"
+)
+
+//go:embed install-agent.sh
+var installScript []byte
+
+const sessionCookie = "pingtxt_session"
+
+// Handler returns the HTTP handler serving the API and the web UI.
+func (h *Hub) Handler(ui fs.FS) http.Handler {
+	mux := http.NewServeMux()
+	auth := h.requireAuth
+
+	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]any{"ok": true, "version": h.cfg.Version})
+	})
+	mux.HandleFunc("GET /api/setup", h.getSetup)
+	mux.HandleFunc("POST /api/setup", h.postSetup)
+	mux.HandleFunc("POST /api/auth/login", h.login)
+	mux.HandleFunc("POST /api/auth/logout", h.logout)
+	mux.HandleFunc("GET /api/auth/me", auth(h.me))
+	mux.HandleFunc("POST /api/auth/password", auth(h.changePassword))
+
+	mux.HandleFunc("GET /api/overview", auth(h.overview))
+	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
+	mux.HandleFunc("POST /api/monitors", auth(h.createMonitor))
+	mux.HandleFunc("GET /api/monitors/{id}", auth(h.getMonitor))
+	mux.HandleFunc("PUT /api/monitors/{id}", auth(h.updateMonitor))
+	mux.HandleFunc("DELETE /api/monitors/{id}", auth(h.deleteMonitor))
+	mux.HandleFunc("POST /api/monitors/{id}/pause", auth(h.pauseMonitor))
+	mux.HandleFunc("GET /api/monitors/{id}/series", auth(h.monitorSeries))
+	mux.HandleFunc("GET /api/monitors/{id}/results", auth(h.monitorResults))
+	mux.HandleFunc("GET /api/incidents", auth(h.listIncidents))
+
+	mux.HandleFunc("GET /api/locations", auth(h.listLocations))
+	mux.HandleFunc("GET /api/agents", auth(h.listAgents))
+	mux.HandleFunc("POST /api/agents", auth(h.createAgent))
+	mux.HandleFunc("PUT /api/agents/{id}", auth(h.updateAgent))
+	mux.HandleFunc("DELETE /api/agents/{id}", auth(h.deleteAgent))
+	mux.HandleFunc("POST /api/agents/{id}/token", auth(h.rotateAgentToken))
+
+	mux.HandleFunc("GET /api/notifiers", auth(h.listNotifiers))
+	mux.HandleFunc("POST /api/notifiers", auth(h.createNotifier))
+	mux.HandleFunc("PUT /api/notifiers/{id}", auth(h.updateNotifier))
+	mux.HandleFunc("DELETE /api/notifiers/{id}", auth(h.deleteNotifier))
+	mux.HandleFunc("POST /api/notifiers/{id}/test", auth(h.testNotifier))
+
+	mux.HandleFunc("GET "+protocol.Path, h.ServeAgent)
+	mux.HandleFunc("GET /install-agent.sh", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
+		w.Write(installScript)
+	})
+	mux.HandleFunc("GET /download/{file}", h.download)
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		writeErr(w, http.StatusNotFound, "not found")
+	})
+	mux.Handle("/", spaHandler(ui))
+	return securityHeaders(mux)
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "same-origin")
+		// Mutating API calls must be JSON: blocks cross-site form posts (CSRF).
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+			if r.ContentLength != 0 && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+				writeErr(w, http.StatusUnsupportedMediaType, "content-type must be application/json")
+				return
+			}
+			if o := r.Header.Get("Origin"); o != "" {
+				if u, err := url.Parse(o); err != nil || u.Host != r.Host {
+					writeErr(w, http.StatusForbidden, "cross-origin request")
+					return
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// ---------- helpers ----------
+
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeErr(w http.ResponseWriter, code int, msg string) {
+	writeJSON(w, code, map[string]string{"error": msg})
+}
+
+func readJSON(r *http.Request, v any) error {
+	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20))
+	return dec.Decode(v)
+}
+
+func pathID(r *http.Request) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	return id, err == nil && id > 0
+}
+
+func (h *Hub) internalErr(w http.ResponseWriter, err error) {
+	h.log.Error("api error", "err", err)
+	writeErr(w, 500, "internal error")
+}
+
+// ---------- auth ----------
+
+func (h *Hub) currentUser(r *http.Request) *store.User {
+	c, err := r.Cookie(sessionCookie)
+	if err != nil || c.Value == "" {
+		return nil
+	}
+	u, err := h.store.SessionUser(HashToken(c.Value))
+	if err != nil {
+		return nil
+	}
+	return u
+}
+
+func (h *Hub) requireAuth(fn func(http.ResponseWriter, *http.Request, *store.User)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		u := h.currentUser(r)
+		if u == nil {
+			writeErr(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		fn(w, r, u)
+	}
+}
+
+func isHTTPS(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+func (h *Hub) startSession(w http.ResponseWriter, r *http.Request, u *store.User) error {
+	token, hash := NewToken("s_")
+	exp := time.Now().Add(30 * 24 * time.Hour)
+	if err := h.store.CreateSession(hash, u.ID, exp); err != nil {
+		return err
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name: sessionCookie, Value: token, Path: "/", Expires: exp,
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: isHTTPS(r),
+	})
+	return nil
+}
+
+func (h *Hub) getSetup(w http.ResponseWriter, r *http.Request) {
+	n, err := h.store.CountUsers()
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"needs_setup": n == 0, "version": h.cfg.Version})
+}
+
+type credentials struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func (h *Hub) postSetup(w http.ResponseWriter, r *http.Request) {
+	var c credentials
+	if readJSON(r, &c) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	c.Email = strings.ToLower(strings.TrimSpace(c.Email))
+	if !strings.Contains(c.Email, "@") || len(c.Password) < 8 {
+		writeErr(w, 400, "valid email and a password of at least 8 characters are required")
+		return
+	}
+	n, err := h.store.CountUsers()
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	if n > 0 {
+		writeErr(w, 409, "already configured")
+		return
+	}
+	hash, _ := bcrypt.GenerateFromPassword([]byte(c.Password), bcrypt.DefaultCost)
+	u, err := h.store.CreateUser(c.Email, string(hash))
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	if err := h.startSession(w, r, u); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 201, u)
+}
+
+func (h *Hub) login(w http.ResponseWriter, r *http.Request) {
+	var c credentials
+	if readJSON(r, &c) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	u, err := h.store.UserByEmail(strings.ToLower(strings.TrimSpace(c.Email)))
+	if err != nil || bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(c.Password)) != nil {
+		time.Sleep(400 * time.Millisecond)
+		writeErr(w, 401, "invalid email or password")
+		return
+	}
+	if err := h.startSession(w, r, u); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, u)
+}
+
+func (h *Hub) logout(w http.ResponseWriter, r *http.Request) {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		_ = h.store.DeleteSession(HashToken(c.Value))
+	}
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+func (h *Hub) me(w http.ResponseWriter, r *http.Request, u *store.User) {
+	writeJSON(w, 200, map[string]any{"user": u, "version": h.cfg.Version})
+}
+
+func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.User) {
+	var b struct {
+		Current string `json:"current"`
+		New     string `json:"new"`
+	}
+	if readJSON(r, &b) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(b.Current)) != nil {
+		writeErr(w, 400, "current password is wrong")
+		return
+	}
+	if len(b.New) < 8 {
+		writeErr(w, 400, "password must be at least 8 characters")
+		return
+	}
+	hash, _ := bcrypt.GenerateFromPassword([]byte(b.New), bcrypt.DefaultCost)
+	if err := h.store.UpdatePassword(u.ID, string(hash)); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	cur := ""
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		cur = HashToken(c.Value)
+	}
+	_ = h.store.DeleteUserSessions(u.ID, cur)
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+// ---------- monitors ----------
+
+var validTypes = []string{check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS}
+var hostPortRe = regexp.MustCompile(`^[^\s/]+:\d{1,5}$`)
+
+func (h *Hub) validateMonitor(m *store.Monitor) error {
+	m.Name = strings.TrimSpace(m.Name)
+	m.Target = strings.TrimSpace(m.Target)
+	if m.Name == "" {
+		return errors.New("name is required")
+	}
+	if !slices.Contains(validTypes, m.Type) {
+		return errors.New("invalid type")
+	}
+	if m.Target == "" {
+		return errors.New("target is required")
+	}
+	switch m.Type {
+	case check.TypeHTTP, check.TypeKeyword:
+		u, err := url.Parse(m.Target)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return errors.New("target must be an http(s) URL")
+		}
+		if m.Type == check.TypeKeyword && m.Keyword == "" {
+			return errors.New("keyword is required")
+		}
+		if m.Method == "" {
+			m.Method = "GET"
+		}
+		m.Method = strings.ToUpper(m.Method)
+	case check.TypeTCP:
+		if !hostPortRe.MatchString(m.Target) {
+			return errors.New("target must be host:port")
+		}
+	case check.TypePing, check.TypeDNS:
+		if strings.ContainsAny(m.Target, " /") {
+			return errors.New("target must be a hostname or IP")
+		}
+	}
+	if m.IntervalSec == 0 {
+		m.IntervalSec = 60
+	}
+	if m.IntervalSec < 10 || m.IntervalSec > 86400 {
+		return errors.New("interval must be between 10s and 24h")
+	}
+	if m.TimeoutMs == 0 {
+		m.TimeoutMs = 10000
+	}
+	m.TimeoutMs = min(max(m.TimeoutMs, 500), 60000)
+	m.Retries = min(max(m.Retries, 1), 10)
+	if m.Headers == nil {
+		m.Headers = map[string]string{}
+	}
+	locs := []string{}
+	for _, l := range m.Locations {
+		if l == LocalLocation {
+			locs = append(locs, l)
+			continue
+		}
+		if id, ok := parseAgentLocation(l); ok {
+			if _, err := h.store.Agent(id); err == nil {
+				locs = append(locs, l)
+			}
+		}
+	}
+	slices.Sort(locs)
+	m.Locations = slices.Compact(locs)
+	if len(m.Locations) == 0 {
+		m.Locations = []string{LocalLocation}
+	}
+	return nil
+}
+
+type monitorSummary struct {
+	*store.Monitor
+	Uptime24h float64          `json:"uptime_24h"`
+	AvgMs24h  float64          `json:"avg_ms_24h"`
+	Last      *store.ResultRow `json:"last"`
+	Bars      []bar            `json:"bars"`
+}
+
+type bar struct {
+	T     int64   `json:"t"`
+	Total int     `json:"total"`
+	OK    int     `json:"ok"`
+	AvgMs float64 `json:"avg_ms"`
+}
+
+const barCount = 48
+
+func (h *Hub) summary(m *store.Monitor) (*monitorSummary, error) {
+	now := time.Now().UnixMilli()
+	day := int64(24 * 3600 * 1000)
+	up, avg, err := h.store.Uptime(m.ID, now-day)
+	if err != nil {
+		return nil, err
+	}
+	s := &monitorSummary{Monitor: m, Uptime24h: up, AvgMs24h: avg}
+	if last, err := h.store.RecentResults(m.ID, 1); err == nil && len(last) > 0 {
+		s.Last = last[0]
+	}
+	size := day / barCount
+	from := now - day
+	from -= from % size
+	buckets, err := h.store.Buckets(m.ID, from, now+size, size, false)
+	if err != nil {
+		return nil, err
+	}
+	byStart := map[int64]store.Bucket{}
+	for _, b := range buckets {
+		byStart[b.Start] = b
+	}
+	for i := 0; i <= barCount; i++ {
+		t := from + int64(i)*size
+		if t > now {
+			break
+		}
+		b := byStart[t]
+		s.Bars = append(s.Bars, bar{T: t, Total: b.Total, OK: b.OK, AvgMs: b.AvgMs})
+	}
+	if len(s.Bars) > barCount {
+		s.Bars = s.Bars[len(s.Bars)-barCount:]
+	}
+	return s, nil
+}
+
+func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	ms, err := h.store.ListMonitors()
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	out := make([]*monitorSummary, 0, len(ms))
+	for _, m := range ms {
+		s, err := h.summary(m)
+		if err != nil {
+			h.internalErr(w, err)
+			return
+		}
+		out = append(out, s)
+	}
+	writeJSON(w, 200, out)
+}
+
+func (h *Hub) overview(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	ms, err := h.store.ListMonitors()
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	counts := map[string]int{}
+	for _, m := range ms {
+		counts[m.Status]++
+	}
+	agents, _ := h.store.ListAgents()
+	online := 0
+	for _, a := range agents {
+		if h.AgentOnline(a.ID) {
+			online++
+		}
+	}
+	open, _ := h.store.ListIncidents(0, 200)
+	active := 0
+	for _, i := range open {
+		if i.ResolvedAt == 0 {
+			active++
+		}
+	}
+	writeJSON(w, 200, map[string]any{
+		"monitors": len(ms), "status": counts,
+		"agents": len(agents), "agents_online": online,
+		"open_incidents": active, "version": h.cfg.Version,
+	})
+}
+
+func (h *Hub) createMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	var m store.Monitor
+	if readJSON(r, &m) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	if err := h.validateMonitor(&m); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	paused := m.Paused
+	m.Paused = false
+	if err := h.store.CreateMonitor(&m); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	if paused {
+		_ = h.store.SetMonitorPaused(m.ID, true)
+	}
+	h.MonitorChanged(m.ID)
+	got, _ := h.store.Monitor(m.ID)
+	writeJSON(w, 201, got)
+}
+
+type monitorDetail struct {
+	*monitorSummary
+	Uptime7d  float64          `json:"uptime_7d"`
+	Uptime30d float64          `json:"uptime_30d"`
+	Locations []locationStatus `json:"location_status"`
+}
+
+type locationStatus struct {
+	ID     string           `json:"id"`
+	Name   string           `json:"name"`
+	Online bool             `json:"online"`
+	Last   *store.ResultRow `json:"last"`
+}
+
+func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	m, err := h.store.Monitor(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, "monitor not found")
+		return
+	} else if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	s, err := h.summary(m)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	now := time.Now().UnixMilli()
+	day := int64(24 * 3600 * 1000)
+	d := &monitorDetail{monitorSummary: s}
+	d.Uptime7d, _, _ = h.store.Uptime(id, now-7*day)
+	d.Uptime30d, _, _ = h.store.Uptime(id, now-30*day)
+	latest, _ := h.store.LatestPerLocation(id)
+	byLoc := map[string]*store.ResultRow{}
+	for _, r := range latest {
+		byLoc[r.Location] = r
+	}
+	names := h.locationNames()
+	for _, l := range h.locationsOf(m) {
+		d.Locations = append(d.Locations, locationStatus{ID: l, Name: nameOr(names, l), Online: h.locationOnline(l), Last: byLoc[l]})
+	}
+	writeJSON(w, 200, d)
+}
+
+func nameOr(names map[string]string, id string) string {
+	if n, ok := names[id]; ok {
+		return n
+	}
+	return id
+}
+
+func (h *Hub) locationOnline(loc string) bool {
+	if loc == LocalLocation {
+		return !h.cfg.DisableLocal
+	}
+	if id, ok := parseAgentLocation(loc); ok {
+		return h.AgentOnline(id)
+	}
+	return false
+}
+
+func (h *Hub) locationNames() map[string]string {
+	names := map[string]string{LocalLocation: h.cfg.LocalName}
+	agents, _ := h.store.ListAgents()
+	for _, a := range agents {
+		n := a.Name
+		if a.Location != "" {
+			n = a.Location
+		}
+		names[AgentLocation(a.ID)] = n
+	}
+	return names
+}
+
+func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	if _, err := h.store.Monitor(id); err != nil {
+		writeErr(w, 404, "monitor not found")
+		return
+	}
+	var m store.Monitor
+	if readJSON(r, &m) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	m.ID = id
+	if err := h.validateMonitor(&m); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	if err := h.store.UpdateMonitor(&m); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	h.MonitorChanged(id)
+	got, _ := h.store.Monitor(id)
+	writeJSON(w, 200, got)
+}
+
+func (h *Hub) deleteMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	if err := h.store.DeleteMonitor(id); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	h.MonitorChanged(id)
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+func (h *Hub) pauseMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	var b struct {
+		Paused bool `json:"paused"`
+	}
+	if readJSON(r, &b) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	if err := h.store.SetMonitorPaused(id, b.Paused); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	if b.Paused {
+		_ = h.store.ResolveIncident(id, time.Now().UnixMilli())
+	}
+	h.MonitorChanged(id)
+	got, err := h.store.Monitor(id)
+	if err != nil {
+		writeErr(w, 404, "monitor not found")
+		return
+	}
+	writeJSON(w, 200, got)
+}
+
+var ranges = map[string]time.Duration{
+	"1h": time.Hour, "6h": 6 * time.Hour, "24h": 24 * time.Hour,
+	"7d": 7 * 24 * time.Hour, "30d": 30 * 24 * time.Hour,
+}
+
+func (h *Hub) monitorSeries(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	rng, ok := ranges[r.URL.Query().Get("range")]
+	if !ok {
+		rng = 24 * time.Hour
+	}
+	now := time.Now().UnixMilli()
+	size := rng.Milliseconds() / 90
+	from := now - rng.Milliseconds()
+	from -= from % size
+	buckets, err := h.store.Buckets(id, from, now+1, size, true)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	names := h.locationNames()
+	seen := map[string]bool{}
+	locs := []map[string]string{}
+	for _, b := range buckets {
+		if !seen[b.Location] {
+			seen[b.Location] = true
+			locs = append(locs, map[string]string{"id": b.Location, "name": nameOr(names, b.Location)})
+		}
+	}
+	slices.SortFunc(locs, func(a, b map[string]string) int { return strings.Compare(a["name"], b["name"]) })
+	writeJSON(w, 200, map[string]any{"from": from, "to": now, "size": size, "locations": locs, "buckets": buckets})
+}
+
+func (h *Hub) monitorResults(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 500 {
+		limit = 50
+	}
+	rows, err := h.store.RecentResults(id, limit)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"results": rows, "locations": h.locationNames()})
+}
+
+func (h *Hub) listIncidents(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	mid, _ := strconv.ParseInt(r.URL.Query().Get("monitor"), 10, 64)
+	list, err := h.store.ListIncidents(mid, 100)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, list)
+}
+
+// ---------- agents ----------
+
+type agentView struct {
+	*store.Agent
+	LocationID string `json:"location_id"`
+	Online     bool   `json:"online"`
+}
+
+func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	out := []map[string]any{}
+	if !h.cfg.DisableLocal {
+		out = append(out, map[string]any{"id": LocalLocation, "name": h.cfg.LocalName, "online": true, "kind": "local"})
+	}
+	agents, err := h.store.ListAgents()
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	for _, a := range agents {
+		n := a.Name
+		if a.Location != "" {
+			n = a.Location
+		}
+		out = append(out, map[string]any{"id": AgentLocation(a.ID), "name": n, "online": h.AgentOnline(a.ID), "kind": "agent"})
+	}
+	writeJSON(w, 200, out)
+}
+
+func (h *Hub) hubURL(r *http.Request) string {
+	if h.cfg.PublicURL != "" {
+		return strings.TrimRight(h.cfg.PublicURL, "/")
+	}
+	scheme := "http"
+	if isHTTPS(r) {
+		scheme = "https"
+	}
+	host := r.Host
+	if fh := r.Header.Get("X-Forwarded-Host"); fh != "" {
+		host = fh
+	}
+	return scheme + "://" + host
+}
+
+func (h *Hub) listAgents(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	agents, err := h.store.ListAgents()
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	out := make([]agentView, 0, len(agents))
+	for _, a := range agents {
+		out = append(out, agentView{Agent: a, LocationID: AgentLocation(a.ID), Online: h.AgentOnline(a.ID)})
+	}
+	writeJSON(w, 200, map[string]any{"agents": out, "hub_url": h.hubURL(r)})
+}
+
+type agentInput struct {
+	Name     string `json:"name"`
+	Location string `json:"location"`
+}
+
+func (h *Hub) createAgent(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	var in agentInput
+	if readJSON(r, &in) != nil || strings.TrimSpace(in.Name) == "" {
+		writeErr(w, 400, "name is required")
+		return
+	}
+	token, hash := NewToken("pt_")
+	a, err := h.store.CreateAgent(strings.TrimSpace(in.Name), strings.TrimSpace(in.Location), hash)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 201, map[string]any{"agent": agentView{Agent: a, LocationID: AgentLocation(a.ID)}, "token": token, "hub_url": h.hubURL(r)})
+}
+
+func (h *Hub) updateAgent(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	var in agentInput
+	if readJSON(r, &in) != nil || strings.TrimSpace(in.Name) == "" {
+		writeErr(w, 400, "name is required")
+		return
+	}
+	if err := h.store.UpdateAgent(id, strings.TrimSpace(in.Name), strings.TrimSpace(in.Location)); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+func (h *Hub) deleteAgent(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	if err := h.store.DeleteAgent(id); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	h.DisconnectAgent(id)
+	// Remove the location from monitors that used it.
+	loc := AgentLocation(id)
+	ms, _ := h.store.ListMonitors()
+	for _, m := range ms {
+		if i := slices.Index(m.Locations, loc); i >= 0 {
+			m.Locations = slices.Delete(m.Locations, i, i+1)
+			if len(m.Locations) == 0 {
+				m.Locations = []string{LocalLocation}
+			}
+			_ = h.store.UpdateMonitor(m)
+			h.MonitorChanged(m.ID)
+		}
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+func (h *Hub) rotateAgentToken(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	if _, err := h.store.Agent(id); err != nil {
+		writeErr(w, 404, "agent not found")
+		return
+	}
+	token, hash := NewToken("pt_")
+	if err := h.store.SetAgentToken(id, hash); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	h.DisconnectAgent(id)
+	writeJSON(w, 200, map[string]any{"token": token, "hub_url": h.hubURL(r)})
+}
+
+// ---------- notifiers ----------
+
+func validateNotifier(n *store.Notifier) error {
+	n.Name = strings.TrimSpace(n.Name)
+	if n.Name == "" {
+		return errors.New("name is required")
+	}
+	if !slices.Contains(NotifierTypes, n.Type) {
+		return errors.New("invalid type")
+	}
+	if n.Config == nil {
+		n.Config = map[string]string{}
+	}
+	if n.Type == "telegram" {
+		if n.Config["bot_token"] == "" || n.Config["chat_id"] == "" {
+			return errors.New("bot token and chat id are required")
+		}
+		return nil
+	}
+	u, err := url.Parse(n.Config["url"])
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return errors.New("a valid http(s) url is required")
+	}
+	return nil
+}
+
+func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	list, err := h.store.ListNotifiers()
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, list)
+}
+
+func (h *Hub) createNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	var n store.Notifier
+	if readJSON(r, &n) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	if err := validateNotifier(&n); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	if err := h.store.CreateNotifier(&n); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 201, n)
+}
+
+func (h *Hub) updateNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	var n store.Notifier
+	if readJSON(r, &n) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	n.ID = id
+	if err := validateNotifier(&n); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	if err := h.store.UpdateNotifier(&n); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, n)
+}
+
+func (h *Hub) deleteNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	if err := h.store.DeleteNotifier(id); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+func (h *Hub) testNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	n, err := h.store.Notifier(id)
+	if err != nil {
+		writeErr(w, 404, "notifier not found")
+		return
+	}
+	ev := Event{Monitor: "example.com", Target: "https://example.com", Status: StatusDown, Cause: "this is a test notification", At: time.Now().UnixMilli(), Test: true}
+	if err := h.notify.Deliver(r.Context(), n, ev); err != nil {
+		writeErr(w, 502, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+
+// ---------- static ----------
+
+var agentFileRe = regexp.MustCompile(`^pingtxt-agent-(linux|darwin|windows)-(amd64|arm64|arm)(\.exe)?$`)
+
+func (h *Hub) download(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("file")
+	if !agentFileRe.MatchString(name) || h.cfg.AgentDir == "" {
+		http.NotFound(w, r)
+		return
+	}
+	p := filepath.Join(h.cfg.AgentDir, name)
+	if _, err := os.Stat(p); err != nil {
+		http.Error(w, "agent binary not bundled in this build", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	http.ServeFile(w, r, p)
+}
+
+// spaHandler serves the Next.js static export.
+func spaHandler(ui fs.FS) http.Handler {
+	fileServer := http.FileServerFS(ui)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+		if p == "" {
+			p = "index.html"
+		}
+		try := []string{p, p + "/index.html", p + ".html"}
+		for _, t := range try {
+			if st, err := fs.Stat(ui, t); err == nil && !st.IsDir() {
+				if strings.HasPrefix(p, "_next/static/") {
+					w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				} else if strings.HasSuffix(t, ".html") {
+					w.Header().Set("Cache-Control", "no-cache")
+				}
+				r2 := r.Clone(r.Context())
+				r2.URL.Path = "/" + t
+				if strings.HasSuffix(t, "index.html") {
+					// FileServer redirects */index.html; serve the content directly.
+					serveFile(w, r2, ui, t)
+					return
+				}
+				fileServer.ServeHTTP(w, r2)
+				return
+			}
+		}
+		if b, err := fs.ReadFile(ui, "404.html"); err == nil {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusNotFound)
+			w.Write(b)
+			return
+		}
+		if _, err := fs.Stat(ui, "index.html"); err != nil {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.Write([]byte("pingtxt: web UI not built. Run `make web` or use the Docker image.\n"))
+			return
+		}
+		http.NotFound(w, r)
+	})
+}
+
+func serveFile(w http.ResponseWriter, r *http.Request, ui fs.FS, name string) {
+	f, err := ui.Open(name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	st, _ := f.Stat()
+	rs, ok := f.(interface {
+		Read([]byte) (int, error)
+		Seek(int64, int) (int64, error)
+	})
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	http.ServeContent(w, r, name, st.ModTime(), rs)
+}
