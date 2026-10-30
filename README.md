@@ -121,6 +121,33 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
 Then tick the new location in any monitor. The hub schedules every check and sends it to the
 agents; agents are stateless and reconnect with backoff.
 
+### Agent updates
+
+The hub bundles agent binaries built with its own version. When you upgrade the hub, agents
+installed with the script update themselves as soon as they reconnect: the hub sends the
+download path and the SHA-256 of the binary for the agent's platform, the agent downloads it
+from the hub, checks the checksum and that the new binary reports the expected version, swaps
+the file and restarts in place. A failed update leaves the old binary running and is shown on
+the agents page.
+
+- **agents → update agents automatically** turns this on or off (on by default). Each outdated
+  agent also gets an **update** button.
+- Agents installed before this feature run as a read-only systemd `DynamicUser`: re-run the
+  install script once. It now installs to `/opt/pingtxt-agent`, owned by a `pingtxt-agent` user.
+- To keep an agent on its current version, start it with `-no-auto-update`
+  (or `PINGTXT_NO_AUTO_UPDATE=1` in `/etc/pingtxt-agent.env`).
+- **Docker agents** never replace their own binary: pull the new image, or let
+  [Watchtower](https://containrrr.dev/watchtower/) (or a similar image updater) do it:
+
+  ```sh
+  docker run -d --name watchtower --restart unless-stopped \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    containrrr/watchtower pingtxt-agent --interval 3600
+  ```
+
+Pushing a `v*` tag publishes a GitHub release with the hub and agent binaries and `SHA256SUMS`,
+plus the Docker images for that tag.
+
 ## Architecture
 
 ```
