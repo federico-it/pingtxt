@@ -118,14 +118,19 @@ var notifierSecrets = map[string][]string{
 }
 
 var (
-	// scheme://user:password@ in a target (database URLs, http basic auth).
-	urlPasswordRe = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9+.-]*://[^:/@?#]*:)([^@/?#]*)@`)
 	// Request headers whose value is a credential.
 	secretHeaderRe = regexp.MustCompile(`(?i)auth|token|key|secret|cookie|session|passw`)
 )
 
-func redactTargetPassword(t string) string {
-	return urlPasswordRe.ReplaceAllString(t, "${1}"+redactedPassword+"@")
+// exportTarget hides the password in a target for an export without secrets.
+// It matches the same URLs and DSNs as redactTarget (read-only users), with a
+// marker that import recognizes.
+func exportTarget(t string) string {
+	re := credentialsInDSN
+	if strings.Contains(t, "://") {
+		re = credentialsInURL
+	}
+	return re.ReplaceAllString(t, "${1}"+redactedPassword+"@")
 }
 
 // ExportConfig builds the configuration document.
@@ -198,7 +203,7 @@ func (h *Hub) ExportConfig(secrets bool) (*ConfigDoc, error) {
 		if secrets {
 			c.PushToken = m.PushToken
 		} else {
-			c.Target = redactTargetPassword(m.Target)
+			c.Target = exportTarget(m.Target)
 			hdr := make(map[string]string, len(m.Headers))
 			for k, v := range m.Headers {
 				if secretHeaderRe.MatchString(k) && v != "" {
@@ -644,7 +649,7 @@ func (im *importer) importMonitors(old []*store.Monitor) error {
 		prev := match(old, &m)
 		redacted := false
 		if strings.Contains(m.Target, redactedPassword) {
-			if prev != nil && prev.Target != "" && redactTargetPassword(prev.Target) == m.Target {
+			if prev != nil && prev.Target != "" && exportTarget(prev.Target) == m.Target {
 				m.Target = prev.Target
 			} else {
 				redacted = true
