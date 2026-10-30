@@ -9,6 +9,7 @@ import { Confirm } from "@/components/confirm"
 import { ExpiryTable } from "@/components/expiry"
 import { PushInfo } from "@/components/push-info"
 import { LatencyChart } from "@/components/latency-chart"
+import { TagList, useLabels } from "@/components/labels"
 import { KV, PageHeader, Section } from "@/components/page-header"
 import { OkText, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
@@ -41,6 +42,7 @@ function View() {
   const now = useNow()
   const [range, setRange] = useState<(typeof ranges)[number]>("24h")
   const m = useApi<MonitorDetail>(id ? `/api/monitors/${id}` : null)
+  const { groupById, tagById } = useLabels()
   const series = useApi<Series>(
     id ? `/api/monitors/${id}/series?range=${range}` : null,
     { refreshInterval: 30_000 }
@@ -123,6 +125,16 @@ function View() {
           </>
         )}
       </div>
+      {(groupById.has(d.group_id) || (d.tag_ids?.length ?? 0) > 0) && (
+        <div className="-mt-4 mb-6 flex flex-wrap items-center gap-2 text-xs">
+          {groupById.has(d.group_id) && (
+            <Link href="/groups/" className="text-muted-foreground hover:text-foreground">
+              [{groupById.get(d.group_id)!.name}]
+            </Link>
+          )}
+          <TagList ids={d.tag_ids} tagById={tagById} />
+        </div>
+      )}
 
       {d.maintenance && (
         <div className="mb-4 border border-dashed border-info/60 px-3 py-2 text-xs text-info">

@@ -12,6 +12,7 @@ const nav = [
   { href: "/", label: "monitors", match: (p: string) => p === "/" || p.startsWith("/monitors") },
   { href: "/incidents/", label: "incidents" },
   { href: "/maintenance/", label: "maint" },
+  { href: "/groups/", label: "groups" },
   { href: "/agents/", label: "agents" },
   { href: "/notifications/", label: "notify" },
   { href: "/status-pages/", label: "status" },

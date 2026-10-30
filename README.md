@@ -12,7 +12,11 @@ but plain text, monospace, light and dark.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
-- **Maintenance windows**, one-off or recurring (daily, weekly, monthly, in any time zone), for some or all monitors:
+- **Groups and tags**: a monitor sits in one group and has any number of colored tags. Filter the dashboard by
+  them, show groups as sections on the dashboard and on status pages, and pick monitors by group or tag in
+  maintenance windows.
+- **Maintenance windows**, one-off or recurring (daily, weekly, monthly, in any time zone), for some or all monitors
+  (or whole groups and tags):
   checks keep running but no incidents or alerts are raised, and those checks don't count toward uptime.
 - **Expiry alerts** for TLS certificates (https monitors) and domain registrations (RDAP, with WHOIS
   fallback for registries without RDAP such as .it). Thresholds in days are set in settings
@@ -82,6 +86,9 @@ curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/monitors
 - Tokens can expire after 30, 90 or 365 days, or never. They are shown once and stored hashed.
 - Tokens never reach account endpoints (password, 2FA, tokens, users, instance settings): those need a browser login.
 
+`GET /api/monitors` accepts `?group=<id>` (or `group=none`) and `?tag=<id>` filters. Groups and tags are managed at
+`/api/groups` and `/api/tags`; `PUT /api/groups/<id>/monitors` with `{"monitor_ids": [...]}` sets a group's members.
+
 ### Prometheus
 
 `GET /metrics` serves metrics in the Prometheus text format. It needs an API token (read scope is enough),
@@ -116,6 +123,8 @@ Put it behind a reverse proxy with TLS (Caddy, Traefik, nginx). WebSocket upgrad
 ## Status pages
 
 Create them under **status** in the web UI: pick the monitors, their order, and whether past incidents are shown.
+You can also add whole **groups**: every monitor of the group is shown, including ones added later, and each group
+is a section with its own status on the page.
 A page is public at `https://<hub>/status/<slug>/`. Visitors only see monitor names, status, uptime and incident
 times, never targets, locations or error messages. Drafts are visible only to logged-in users.
 
