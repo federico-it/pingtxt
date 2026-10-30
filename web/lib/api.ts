@@ -1,7 +1,7 @@
 import useSWR, { type SWRConfiguration } from "swr"
 
 export type Status = "pending" | "up" | "down" | "degraded" | "paused" | "maintenance"
-export type MonitorType = "http" | "keyword" | "tcp" | "ping" | "dns"
+export type MonitorType = "http" | "keyword" | "tcp" | "ping" | "dns" | "push"
 
 export interface Monitor {
   id: number
@@ -21,6 +21,8 @@ export interface Monitor {
   ignore_tls: boolean
   headers: Record<string, string>
   body: string
+  push_token: string
+  grace_sec: number
   locations: string[]
   paused: boolean
   status: Status
@@ -68,6 +70,7 @@ export interface MonitorDetail extends MonitorSummary {
   uptime_7d: number
   uptime_30d: number
   location_status: LocationStatus[]
+  push_url?: string
 }
 
 export interface Bucket {
@@ -143,7 +146,8 @@ export interface Maintenance {
   next_end?: number
 }
 
-export type NotifierType = "webhook" | "discord" | "slack" | "telegram" | "ntfy"
+export type NotifierType =
+  "webhook" | "discord" | "slack" | "telegram" | "ntfy" | "email"
 
 export interface Notifier {
   id: number
@@ -221,12 +225,31 @@ export interface User {
   email: string
   created_at: number
   has_password: boolean
+  two_factor: boolean
   identities: Identity[]
 }
 
 export interface Me {
   user: User
   version: string
+  recovery_codes_left: number
+}
+
+export type TokenScope = "read" | "write"
+
+export interface ApiToken {
+  id: number
+  name: string
+  hint: string
+  scope: TokenScope
+  created_at: number
+  last_used_at: number
+  expires_at: number
+}
+
+export interface LoginResult {
+  two_factor?: boolean
+  challenge?: string
 }
 
 export interface MonitorDefaults {
@@ -274,4 +297,45 @@ export interface Settings {
 export interface AuthOptions {
   password_login: boolean
   providers: { id: ProviderId; label: string }[]
+}
+
+export interface StatusPage {
+  id: number
+  slug: string
+  title: string
+  description: string
+  domain: string
+  published: boolean
+  show_incidents: boolean
+  monitor_ids: number[]
+  created_at: number
+}
+
+export type PageStatus = "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown"
+
+export interface PublicMonitor {
+  id: number
+  name: string
+  status: Status
+  uptime: number
+  uptime_24h: number
+  bars: Bar[]
+}
+
+export interface PublicStatusPage {
+  slug: string
+  title: string
+  description: string
+  published: boolean
+  status: PageStatus
+  days: number
+  monitors: PublicMonitor[]
+  show_incidents: boolean
+  incidents: { id: number; monitor_name: string; started_at: number; resolved_at: number }[]
+  updated_at: number
+}
+
+/** Public address of a status page. */
+export function statusPageURL(p: Pick<StatusPage, "slug" | "domain">, hubURL: string) {
+  return p.domain ? `https://${p.domain}/` : `${hubURL.replace(/\/$/, "")}/status/${p.slug}/`
 }

@@ -5,8 +5,10 @@ import { useTheme } from "next-themes"
 import { toast } from "sonner"
 
 import { PageHeader, Section } from "@/components/page-header"
+import { ApiTokens } from "@/components/settings/api-tokens"
 import { AuthSettingsForm } from "@/components/settings/auth-settings"
 import { GeneralSettingsForm } from "@/components/settings/general-settings"
+import { TwoFactor } from "@/components/settings/two-factor"
 import { UsersList } from "@/components/settings/users"
 import { Confirm } from "@/components/confirm"
 import { Button } from "@/components/ui/button"
@@ -72,6 +74,14 @@ export default function SettingsPage() {
               }}
             />
           )}
+        </Section>
+
+        <Section title="two-factor authentication">
+          {me.data && <TwoFactor me={me.data} onChange={() => me.mutate()} />}
+        </Section>
+
+        <Section title="api tokens">
+          <ApiTokens />
         </Section>
 
         {settings.data && (

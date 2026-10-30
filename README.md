@@ -6,10 +6,12 @@ but plain text, monospace, light and dark.
 - **One container** for the hub: Go API + scheduler + SQLite + the Next.js UI, ~25 MB image.
 - **Agents** for multi-location checks: a ~7 MB static binary (or Docker image) that only
   dials *out* to the hub over WebSocket. No open ports, works behind NAT. Install with one command.
-- Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**.
+- Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**, and **heartbeat (push)** monitors for cron jobs and workers.
 - Status across locations: **down** when the majority of online locations fail, **degraded** when only some do.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
-- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy.
+- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
+- Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
+- Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
 - **Maintenance windows**, one-off or recurring (daily, weekly, monthly, in any time zone), for some or all monitors:
   checks keep running but no incidents or alerts are raised, and those checks don't count toward uptime.
 
@@ -53,7 +55,48 @@ The generic OpenID Connect option works with Authentik, Keycloak, Authelia, Pock
   `pingtxt -enable-password-login` (in Docker: `docker exec pingtxt pingtxt -enable-password-login`, then restart).
 - Set the **public URL** in settings when the hub is behind a reverse proxy, so callback URLs are right.
 
+### Two-factor authentication
+
+In **settings → two-factor authentication** scan the QR code with an authenticator app
+(1Password, Bitwarden, Aegis, Google Authenticator...) and confirm a code. You get 10 single-use
+recovery codes. After that, password logins ask for a code; single sign-on logins rely on the provider's own MFA.
+
+- Lost phone and recovery codes: another user can click **reset 2fa** in **settings → users**, or run
+  `pingtxt -reset-2fa you@example.com` on the server (in Docker: `docker exec pingtxt pingtxt -reset-2fa you@example.com`).
+
+### API tokens
+
+Create personal tokens in **settings → api tokens** and send them as a bearer token:
+
+```sh
+curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/monitors
+```
+
+- **read only** tokens can call `GET` endpoints (monitors, incidents, agents, notifiers).
+  **read + write** tokens can also create, edit, pause and delete.
+- Tokens can expire after 30, 90 or 365 days, or never. They are shown once and stored hashed.
+- Tokens never reach account endpoints (password, 2FA, tokens, users, instance settings): those need a browser login.
+
 Put it behind a reverse proxy with TLS (Caddy, Traefik, nginx). WebSocket upgrade must be allowed on `/api/agent/ws`.
+
+## Status pages
+
+Create them under **status** in the web UI: pick the monitors, their order, and whether past incidents are shown.
+A page is public at `https://<hub>/status/<slug>/`. Visitors only see monitor names, status, uptime and incident
+times, never targets, locations or error messages. Drafts are visible only to logged-in users.
+
+For a **custom domain** (e.g. `status.example.com`), set it on the page, point its DNS at the hub and route the host
+to pingtxt in your reverse proxy (with its own TLS certificate). On that host pingtxt serves only the status page at
+`/`; the admin UI and API are not reachable there. The history covers the retention period, up to 90 days.
+## Heartbeat monitors (cron jobs)
+
+For jobs that run on a schedule (backups, cron, queues) create a monitor of type **heartbeat (push)**. It gets a secret URL; the job calls it at the end of every run, with any HTTP method:
+
+```sh
+0 3 * * * /usr/local/bin/backup.sh && curl -fsS -m 10 --retry 3 https://pingtxt.example.com/api/push/<token> >/dev/null
+```
+
+The monitor goes down (incident + notifications) when no call arrives within the **expected period** plus the **grace time**, and back up at the next call. Optional query parameters: `status=down` reports a failed run, `msg=` stores a short note, `ping=` the run time in ms. The URL uses the public URL from settings and can be regenerated from the monitor page.
 
 ## Add a location (agent)
 

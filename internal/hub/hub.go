@@ -53,9 +53,12 @@ type locState struct {
 }
 
 type monState struct {
-	m    *store.Monitor
-	next time.Time
-	locs map[string]*locState
+	m *store.Monitor
+	// next is the time of the next probe. For push monitors it is the
+	// deadline for the next heartbeat.
+	next     time.Time
+	locs     map[string]*locState
+	lastPing time.Time // push monitors only
 
 	real     string // status computed from the checks, ignoring maintenance
 	inMaint  bool   // a maintenance window currently covers the monitor
@@ -81,7 +84,10 @@ type Hub struct {
 
 	oidc       oidcDiscovery
 	states     oauthStates
+	challenges challenges
 	httpClient *http.Client
+
+	pages statusPages
 }
 
 // New creates a hub.
@@ -100,6 +106,7 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 	if err := h.loadSettings(); err != nil {
 		log.Error("load settings", "err", err)
 	}
+	h.reloadPageDomains()
 	return h
 }
 
@@ -149,7 +156,12 @@ func (h *Hub) reloadAll() error {
 	defer h.mu.Unlock()
 	for i, m := range ms {
 		// Spread the first run over a few seconds to avoid a thundering herd.
-		h.monitors[m.ID] = &monState{m: m, next: time.Now().Add(time.Duration(i%10) * 500 * time.Millisecond), locs: map[string]*locState{}, incident: open[m.ID]}
+		next := time.Now().Add(time.Duration(i%10) * 500 * time.Millisecond)
+		if m.Type == check.TypePush {
+			// Give jobs a full period after a restart before calling them late.
+			next = time.Now().Add(pushWindow(m))
+		}
+		h.monitors[m.ID] = &monState{m: m, next: next, locs: map[string]*locState{}, incident: open[m.ID]}
 	}
 	return nil
 }
@@ -163,9 +175,13 @@ func (h *Hub) MonitorChanged(id int64) {
 		delete(h.monitors, id)
 		return
 	}
+	next := time.Now()
+	if m.Type == check.TypePush {
+		next = next.Add(pushWindow(m))
+	}
 	if st, ok := h.monitors[id]; ok {
 		st.m = m
-		st.next = time.Now()
+		st.next = next
 		// Drop states of locations no longer assigned.
 		keep := map[string]bool{}
 		for _, l := range h.locationsOf(m) {
@@ -185,10 +201,13 @@ func (h *Hub) MonitorChanged(id int64) {
 		st.inMaint = false
 		return
 	}
-	h.monitors[id] = &monState{m: m, next: time.Now(), locs: map[string]*locState{}}
+	h.monitors[id] = &monState{m: m, next: next, locs: map[string]*locState{}}
 }
 
 func (h *Hub) locationsOf(m *store.Monitor) []string {
+	if m.Type == check.TypePush {
+		return []string{PushLocation}
+	}
 	if len(m.Locations) == 0 {
 		return []string{LocalLocation}
 	}
@@ -222,9 +241,14 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 		job check.Job
 	}
 	var work []dispatch
+	var missed []check.Result
 	h.mu.Lock()
 	for _, st := range h.monitors {
 		if st.m.Paused || now.Before(st.next) {
+			continue
+		}
+		if st.m.Type == check.TypePush {
+			missed = append(missed, missedHeartbeat(st, now))
 			continue
 		}
 		iv := time.Duration(max(st.m.IntervalSec, 10)) * time.Second
@@ -236,6 +260,9 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 	}
 	h.mu.Unlock()
 
+	for _, r := range missed {
+		h.HandleResult(PushLocation, r)
+	}
 	for _, w := range work {
 		if w.loc == LocalLocation {
 			if !h.localEnabled() {
@@ -379,16 +406,19 @@ func (h *Hub) raise(m *store.Monitor, alert, cause string, at int64) {
 	switch alert {
 	case StatusDown:
 		_ = h.store.OpenIncident(m.ID, at, cause)
-		h.notify.Send(Event{MonitorID: m.ID, Monitor: m.Name, Target: m.Target, Status: StatusDown, Cause: cause, At: at})
+		h.notify.Send(Event{MonitorID: m.ID, Monitor: m.Name, Target: eventTarget(m), Status: StatusDown, Cause: cause, At: at})
 	case StatusUp:
 		_ = h.store.ResolveIncident(m.ID, at)
-		h.notify.Send(Event{MonitorID: m.ID, Monitor: m.Name, Target: m.Target, Status: StatusUp, At: at})
+		h.notify.Send(Event{MonitorID: m.ID, Monitor: m.Name, Target: eventTarget(m), Status: StatusUp, At: at})
 	}
 }
 
 func (h *Hub) locationNameLocked(loc string) string {
 	if loc == LocalLocation {
 		return h.localName()
+	}
+	if loc == PushLocation {
+		return pushLocationName
 	}
 	if id, ok := parseAgentLocation(loc); ok {
 		if ac := h.agents[id]; ac != nil {

@@ -14,6 +14,7 @@ const nav = [
   { href: "/maintenance/", label: "maint" },
   { href: "/agents/", label: "agents" },
   { href: "/notifications/", label: "notify" },
+  { href: "/status-pages/", label: "status" },
   { href: "/settings/", label: "settings" },
 ]
 

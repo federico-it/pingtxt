@@ -32,7 +32,8 @@ const sessionCookie = "pingtxt_session"
 // Handler returns the HTTP handler serving the API and the web UI.
 func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux := http.NewServeMux()
-	auth := h.requireAuth
+	auth := h.requireAuth       // session or API token
+	session := h.requireSession // browser session only
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "version": h.cfg.Version})
@@ -40,19 +41,28 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("GET /api/setup", h.getSetup)
 	mux.HandleFunc("POST /api/setup", h.postSetup)
 	mux.HandleFunc("POST /api/auth/login", h.login)
+	mux.HandleFunc("POST /api/auth/login/2fa", h.loginSecondFactor)
 	mux.HandleFunc("POST /api/auth/logout", h.logout)
 	mux.HandleFunc("GET /api/auth/me", auth(h.me))
-	mux.HandleFunc("POST /api/auth/password", auth(h.changePassword))
+	mux.HandleFunc("POST /api/auth/password", session(h.changePassword))
 	mux.HandleFunc("GET /api/auth/options", h.authOptions)
 	mux.HandleFunc("GET /api/auth/oauth/{provider}/start", h.oauthStart)
 	mux.HandleFunc("GET /api/auth/oauth/{provider}/callback", h.oauthCallback)
-	mux.HandleFunc("DELETE /api/auth/identities/{provider}", auth(h.unlinkIdentity))
+	mux.HandleFunc("DELETE /api/auth/identities/{provider}", session(h.unlinkIdentity))
+	mux.HandleFunc("POST /api/auth/2fa/setup", session(h.setupTwoFactor))
+	mux.HandleFunc("POST /api/auth/2fa/enable", session(h.enableTwoFactor))
+	mux.HandleFunc("POST /api/auth/2fa/disable", session(h.disableTwoFactor))
+	mux.HandleFunc("POST /api/auth/2fa/recovery-codes", session(h.regenerateRecoveryCodes))
+	mux.HandleFunc("GET /api/tokens", session(h.listTokens))
+	mux.HandleFunc("POST /api/tokens", session(h.createToken))
+	mux.HandleFunc("DELETE /api/tokens/{id}", session(h.deleteToken))
 
-	mux.HandleFunc("GET /api/settings", auth(h.getSettings))
-	mux.HandleFunc("PUT /api/settings/general", auth(h.putGeneralSettings))
-	mux.HandleFunc("PUT /api/settings/auth", auth(h.putAuthSettings))
-	mux.HandleFunc("GET /api/users", auth(h.listUsers))
-	mux.HandleFunc("DELETE /api/users/{id}", auth(h.deleteUser))
+	mux.HandleFunc("GET /api/settings", session(h.getSettings))
+	mux.HandleFunc("PUT /api/settings/general", session(h.putGeneralSettings))
+	mux.HandleFunc("PUT /api/settings/auth", session(h.putAuthSettings))
+	mux.HandleFunc("GET /api/users", session(h.listUsers))
+	mux.HandleFunc("DELETE /api/users/{id}", session(h.deleteUser))
+	mux.HandleFunc("DELETE /api/users/{id}/2fa", session(h.resetUserTwoFactor))
 
 	mux.HandleFunc("GET /api/overview", auth(h.overview))
 	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
@@ -63,6 +73,8 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/monitors/{id}/pause", auth(h.pauseMonitor))
 	mux.HandleFunc("GET /api/monitors/{id}/series", auth(h.monitorSeries))
 	mux.HandleFunc("GET /api/monitors/{id}/results", auth(h.monitorResults))
+	mux.HandleFunc("POST /api/monitors/{id}/push-token", auth(h.rotatePushToken))
+	mux.HandleFunc("/api/push/{token}", h.push)
 	mux.HandleFunc("GET /api/incidents", auth(h.listIncidents))
 	mux.HandleFunc("GET /api/maintenances", auth(h.listMaintenances))
 	mux.HandleFunc("POST /api/maintenances", auth(h.createMaintenance))
@@ -80,7 +92,15 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/notifiers", auth(h.createNotifier))
 	mux.HandleFunc("PUT /api/notifiers/{id}", auth(h.updateNotifier))
 	mux.HandleFunc("DELETE /api/notifiers/{id}", auth(h.deleteNotifier))
+	mux.HandleFunc("POST /api/notifiers/test", auth(h.testDraftNotifier))
 	mux.HandleFunc("POST /api/notifiers/{id}/test", auth(h.testNotifier))
+
+	mux.HandleFunc("GET /api/status-pages", auth(h.listStatusPages))
+	mux.HandleFunc("POST /api/status-pages", auth(h.saveStatusPage))
+	mux.HandleFunc("GET /api/status-pages/{id}", auth(h.getStatusPage))
+	mux.HandleFunc("PUT /api/status-pages/{id}", auth(h.saveStatusPage))
+	mux.HandleFunc("DELETE /api/status-pages/{id}", auth(h.deleteStatusPage))
+	mux.HandleFunc("GET /api/public/status/{slug}", h.publicStatus)
 
 	mux.HandleFunc("GET "+protocol.Path, h.ServeAgent)
 	mux.HandleFunc("GET /install-agent.sh", func(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +112,7 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 		writeErr(w, http.StatusNotFound, "not found")
 	})
 	mux.Handle("/", spaHandler(ui))
-	return securityHeaders(mux)
+	return securityHeaders(h.customDomains(mux, ui))
 }
 
 func securityHeaders(next http.Handler) http.Handler {
@@ -101,7 +121,9 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
 		// Mutating API calls must be JSON: blocks cross-site form posts (CSRF).
-		if strings.HasPrefix(r.URL.Path, "/api/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+		// Heartbeats are exempt: they are authenticated by the URL token, not
+		// by the session cookie, and any client must be able to send them.
+		if strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/api/push/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
 			if r.ContentLength != 0 && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 				writeErr(w, http.StatusUnsupportedMediaType, "content-type must be application/json")
 				return
@@ -157,17 +179,6 @@ func (h *Hub) currentUser(r *http.Request) *store.User {
 		return nil
 	}
 	return u
-}
-
-func (h *Hub) requireAuth(fn func(http.ResponseWriter, *http.Request, *store.User)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		u := h.currentUser(r)
-		if u == nil {
-			writeErr(w, http.StatusUnauthorized, "unauthorized")
-			return
-		}
-		fn(w, r, u)
-	}
 }
 
 func isHTTPS(r *http.Request) bool {
@@ -250,6 +261,11 @@ func (h *Hub) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 401, "invalid email or password")
 		return
 	}
+	if h.store.TwoFactorEnabled(u.ID) {
+		// The password is right: ask for the authenticator code before starting a session.
+		writeJSON(w, 200, map[string]any{"two_factor": true, "challenge": h.challenges.put(u.ID)})
+		return
+	}
 	if err := h.startSession(w, r, u); err != nil {
 		h.internalErr(w, err)
 		return
@@ -266,7 +282,7 @@ func (h *Hub) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Hub) me(w http.ResponseWriter, r *http.Request, u *store.User) {
-	writeJSON(w, 200, map[string]any{"user": h.userView(u), "version": h.cfg.Version})
+	writeJSON(w, 200, map[string]any{"user": h.userView(u), "version": h.cfg.Version, "recovery_codes_left": h.store.RecoveryCodesLeft(u.ID)})
 }
 
 func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.User) {
@@ -292,17 +308,13 @@ func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.Us
 		h.internalErr(w, err)
 		return
 	}
-	cur := ""
-	if c, err := r.Cookie(sessionCookie); err == nil {
-		cur = HashToken(c.Value)
-	}
-	_ = h.store.DeleteUserSessions(u.ID, cur)
+	h.logoutOtherSessions(r, u)
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
 // ---------- monitors ----------
 
-var validTypes = []string{check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS}
+var validTypes = []string{check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush}
 var hostPortRe = regexp.MustCompile(`^[^\s/]+:\d{1,5}$`)
 
 func (h *Hub) validateMonitor(m *store.Monitor) error {
@@ -313,6 +325,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 	if !slices.Contains(validTypes, m.Type) {
 		return errors.New("invalid type")
+	}
+	if m.Type == check.TypePush {
+		return validatePush(m)
 	}
 	if m.Target == "" {
 		return errors.New("target is required")
@@ -369,6 +384,26 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	m.Locations = slices.Compact(locs)
 	if len(m.Locations) == 0 {
 		m.Locations = []string{LocalLocation}
+	}
+	return nil
+}
+
+// validatePush normalizes a heartbeat monitor: it has no target and no
+// probe settings, only a period and a grace time.
+func validatePush(m *store.Monitor) error {
+	if m.IntervalSec == 0 {
+		m.IntervalSec = 3600
+	}
+	if m.IntervalSec < 10 || m.IntervalSec > maxPushIntervalSec {
+		return errors.New("period must be between 10s and 7 days")
+	}
+	if m.GraceSec < 0 || m.GraceSec > maxPushGraceSec {
+		return errors.New("grace period must be between 0 and 24h")
+	}
+	*m = store.Monitor{
+		ID: m.ID, Name: m.Name, Type: m.Type, IntervalSec: m.IntervalSec, GraceSec: m.GraceSec,
+		TimeoutMs: 10000, Retries: 1, Method: "GET", Headers: map[string]string{},
+		Locations: []string{PushLocation}, Paused: m.Paused,
 	}
 	return nil
 }
@@ -499,6 +534,10 @@ func (h *Hub) createMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 	}
 	paused := m.Paused
 	m.Paused = false
+	m.PushToken = ""
+	if m.Type == check.TypePush {
+		m.PushToken = newPushToken()
+	}
 	if err := h.store.CreateMonitor(&m); err != nil {
 		h.internalErr(w, err)
 		return
@@ -516,6 +555,7 @@ type monitorDetail struct {
 	Uptime7d  float64          `json:"uptime_7d"`
 	Uptime30d float64          `json:"uptime_30d"`
 	Locations []locationStatus `json:"location_status"`
+	PushURL   string           `json:"push_url,omitempty"`
 }
 
 type locationStatus struct {
@@ -546,7 +586,7 @@ func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) 
 	}
 	now := time.Now().UnixMilli()
 	day := int64(24 * 3600 * 1000)
-	d := &monitorDetail{monitorSummary: s}
+	d := &monitorDetail{monitorSummary: s, PushURL: h.pushURL(r, m)}
 	d.Uptime7d, _, _ = h.store.Uptime(id, now-7*day)
 	d.Uptime30d, _, _ = h.store.Uptime(id, now-30*day)
 	latest, _ := h.store.LatestPerLocation(id)
@@ -572,6 +612,9 @@ func (h *Hub) locationOnline(loc string) bool {
 	if loc == LocalLocation {
 		return h.localEnabled()
 	}
+	if loc == PushLocation {
+		return true
+	}
 	if id, ok := parseAgentLocation(loc); ok {
 		return h.AgentOnline(id)
 	}
@@ -579,7 +622,7 @@ func (h *Hub) locationOnline(loc string) bool {
 }
 
 func (h *Hub) locationNames() map[string]string {
-	names := map[string]string{LocalLocation: h.localName()}
+	names := map[string]string{LocalLocation: h.localName(), PushLocation: pushLocationName}
 	agents, _ := h.store.ListAgents()
 	for _, a := range agents {
 		n := a.Name
@@ -597,7 +640,8 @@ func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 		writeErr(w, 400, "invalid id")
 		return
 	}
-	if _, err := h.store.Monitor(id); err != nil {
+	prev, err := h.store.Monitor(id)
+	if err != nil {
 		writeErr(w, 404, "monitor not found")
 		return
 	}
@@ -612,6 +656,17 @@ func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 		return
 	}
 	if err := h.store.UpdateMonitor(&m); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	// Keep the push URL across edits; create one when switching to push.
+	switch {
+	case m.Type == check.TypePush && prev.PushToken == "":
+		err = h.store.SetPushToken(id, newPushToken())
+	case m.Type != check.TypePush && prev.PushToken != "":
+		err = h.store.SetPushToken(id, "")
+	}
+	if err != nil {
 		h.internalErr(w, err)
 		return
 	}
@@ -892,6 +947,11 @@ func validateNotifier(n *store.Notifier) error {
 		}
 		return nil
 	}
+	if n.Type == "email" {
+		delete(n.Config, "password_set")
+		_, err := parseEmailConfig(n.Config)
+		return err
+	}
 	u, err := url.Parse(n.Config["url"])
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return errors.New("a valid http(s) url is required")
@@ -905,7 +965,40 @@ func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, _ *store.Use
 		h.internalErr(w, err)
 		return
 	}
+	for _, n := range list {
+		maskNotifier(n)
+	}
 	writeJSON(w, 200, list)
+}
+
+// writeOnlyKeys are config values the API accepts but never returns.
+// An empty value on update keeps the stored one.
+var writeOnlyKeys = map[string][]string{"email": {"password"}}
+
+// maskNotifier removes write-only secrets, replacing each with <key>_set.
+func maskNotifier(n *store.Notifier) {
+	for _, k := range writeOnlyKeys[n.Type] {
+		if n.Config[k] != "" {
+			n.Config[k+"_set"] = "true"
+		}
+		delete(n.Config, k)
+	}
+}
+
+// keepSecrets fills empty write-only values of n from the stored channel.
+func (h *Hub) keepSecrets(n *store.Notifier) {
+	if n.ID == 0 || len(writeOnlyKeys[n.Type]) == 0 {
+		return
+	}
+	cur, err := h.store.Notifier(n.ID)
+	if err != nil || cur.Type != n.Type {
+		return
+	}
+	for _, k := range writeOnlyKeys[n.Type] {
+		if n.Config[k] == "" {
+			n.Config[k] = cur.Config[k]
+		}
+	}
 }
 
 func (h *Hub) createNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {
@@ -922,6 +1015,7 @@ func (h *Hub) createNotifier(w http.ResponseWriter, r *http.Request, _ *store.Us
 		h.internalErr(w, err)
 		return
 	}
+	maskNotifier(&n)
 	writeJSON(w, 201, n)
 }
 
@@ -941,10 +1035,12 @@ func (h *Hub) updateNotifier(w http.ResponseWriter, r *http.Request, _ *store.Us
 		writeErr(w, 400, err.Error())
 		return
 	}
+	h.keepSecrets(&n)
 	if err := h.store.UpdateNotifier(&n); err != nil {
 		h.internalErr(w, err)
 		return
 	}
+	maskNotifier(&n)
 	writeJSON(w, 200, n)
 }
 
@@ -972,6 +1068,30 @@ func (h *Hub) testNotifier(w http.ResponseWriter, r *http.Request, _ *store.User
 		writeErr(w, 404, "notifier not found")
 		return
 	}
+	h.sendTest(w, r, n)
+}
+
+// testDraftNotifier sends a test with an unsaved configuration, so the
+// form can be checked before saving. With an id, empty secrets are taken
+// from that stored channel.
+func (h *Hub) testDraftNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	var n store.Notifier
+	if readJSON(r, &n) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	if n.Name == "" {
+		n.Name = "test"
+	}
+	if err := validateNotifier(&n); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	h.keepSecrets(&n)
+	h.sendTest(w, r, &n)
+}
+
+func (h *Hub) sendTest(w http.ResponseWriter, r *http.Request, n *store.Notifier) {
 	ev := Event{Monitor: "example.com", Target: "https://example.com", Status: StatusDown, Cause: "this is a test notification", At: time.Now().UnixMilli(), Test: true}
 	if err := h.notify.Deliver(r.Context(), n, ev); err != nil {
 		writeErr(w, 502, err.Error())
@@ -1023,6 +1143,14 @@ func spaHandler(ui fs.FS) http.Handler {
 					return
 				}
 				fileServer.ServeHTTP(w, r2)
+				return
+			}
+		}
+		// Public status pages: /status/<slug>/ is rendered by status/index.html.
+		if strings.HasPrefix(p, "status/") {
+			if _, err := fs.Stat(ui, "status/index.html"); err == nil {
+				w.Header().Set("Cache-Control", "no-cache")
+				serveFile(w, r, ui, "status/index.html")
 				return
 			}
 		}
