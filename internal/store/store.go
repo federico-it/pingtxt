@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	_ "modernc.org/sqlite"
 )
@@ -20,6 +21,9 @@ var ErrConflict = errors.New("already exists")
 // Store wraps the database handle.
 type Store struct {
 	db *sql.DB
+
+	rmu         sync.RWMutex
+	rollupUntil int64 // results before this are summarized in result_rollups
 }
 
 // Open opens (and migrates) the database at path.
@@ -37,6 +41,10 @@ func Open(path string) (*Store, error) {
 	db.SetMaxOpenConns(1) // SQLite: one writer, avoids SQLITE_BUSY
 	s := &Store{db: db}
 	if err := s.migrate(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := s.loadRollupUntil(); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -242,6 +250,22 @@ var migrations = []string{
 		position INTEGER NOT NULL DEFAULT 0,
 		PRIMARY KEY (page_id, group_id)
 	);`,
+	`CREATE TABLE result_rollups (
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		location TEXT NOT NULL,
+		start INTEGER NOT NULL,
+		total INTEGER NOT NULL,
+		ok INTEGER NOT NULL,
+		maint INTEGER NOT NULL,
+		lat_sum REAL NOT NULL,
+		lat_n INTEGER NOT NULL,
+		up_lat_sum REAL NOT NULL,
+		up_lat_n INTEGER NOT NULL,
+		lat_min REAL NOT NULL,
+		lat_max REAL NOT NULL,
+		PRIMARY KEY (monitor_id, start, location)
+	) WITHOUT ROWID;
+	CREATE INDEX result_rollups_start ON result_rollups(start);`,
 }
 
 func (s *Store) migrate() error {
@@ -283,3 +307,6 @@ func b2i(b bool) int {
 	}
 	return 0
 }
+
+// DB exposes the handle for tests and tools.
+func (s *Store) DB() *sql.DB { return s.db }

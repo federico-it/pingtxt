@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/federico-it/pingtxt/internal/check"
@@ -64,6 +65,9 @@ type monState struct {
 	real     string // status computed from the checks, ignoring maintenance
 	inMaint  bool   // a maintenance window currently covers the monitor
 	incident bool   // an incident is open (alerted as down)
+
+	busy  bool      // a local check is queued or running
+	stats *monStats // last 24h of results, for the dashboard
 }
 
 // Hub is the central server.
@@ -78,7 +82,13 @@ type Hub struct {
 	agents   map[int64]*agentConn
 	monitors map[int64]*monState
 	maints   []*store.Maintenance
-	localSem chan struct{}
+	// warmUntil is when the monitors were loaded: older results are added to
+	// the dashboard stats from the database by warmStats.
+	warmUntil int64
+
+	localQueue chan check.Job
+	skipped    atomic.Int64                 // local checks skipped: previous still running or pool full
+	writer     atomic.Pointer[resultWriter] // batches result inserts while Run is active
 
 	smu     sync.RWMutex
 	general GeneralSettings
@@ -98,13 +108,13 @@ type Hub struct {
 // New creates a hub.
 func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 	h := &Hub{
-		cfg:      cfg,
-		store:    st,
-		log:      log,
-		notify:   NewNotifier(st, log),
-		agents:   map[int64]*agentConn{},
-		monitors: map[int64]*monState{},
-		localSem: make(chan struct{}, 64),
+		cfg:        cfg,
+		store:      st,
+		log:        log,
+		notify:     NewNotifier(st, log),
+		agents:     map[int64]*agentConn{},
+		monitors:   map[int64]*monState{},
+		localQueue: make(chan check.Job, localQueueSize),
 	}
 	h.general, h.auth = defaultGeneral(cfg), defaultAuth()
 	h.httpClient = &http.Client{Timeout: 15 * time.Second}
@@ -134,6 +144,18 @@ func (h *Hub) Run(ctx context.Context) error {
 	if err := h.reloadAll(); err != nil {
 		return err
 	}
+	w := newResultWriter(h.store, h.log)
+	h.writer.Store(w)
+	go w.run()
+	defer func() {
+		// Stop the writer after the scheduler, flushing what is queued.
+		h.writer.Store(nil)
+		w.stop()
+	}()
+	go h.warmStats()
+	for range localWorkers {
+		go h.localWorker(ctx)
+	}
 	go h.maintenance(ctx)
 	go h.expiryLoop(ctx)
 	t := time.NewTicker(time.Second)
@@ -160,16 +182,17 @@ func (h *Hub) reloadAll() error {
 	for _, m := range ms {
 		open[m.ID], _ = h.store.HasOpenIncident(m.ID)
 	}
+	now := time.Now()
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for i, m := range ms {
-		// Spread the first run over a few seconds to avoid a thundering herd.
-		next := time.Now().Add(time.Duration(i%10) * 500 * time.Millisecond)
+	h.warmUntil = now.UnixMilli()
+	for _, m := range ms {
+		next := now.Add(firstRunOffset(m))
 		if m.Type == check.TypePush {
 			// Give jobs a full period after a restart before calling them late.
-			next = time.Now().Add(pushWindow(m))
+			next = now.Add(pushWindow(m))
 		}
-		h.monitors[m.ID] = &monState{m: m, next: next, locs: map[string]*locState{}, incident: open[m.ID]}
+		h.monitors[m.ID] = &monState{m: m, next: next, locs: map[string]*locState{}, incident: open[m.ID], stats: &monStats{since: h.warmUntil}}
 	}
 	return nil
 }
@@ -209,7 +232,7 @@ func (h *Hub) MonitorChanged(id int64) {
 		st.inMaint = false
 		return
 	}
-	h.monitors[id] = &monState{m: m, next: next, locs: map[string]*locState{}}
+	h.monitors[id] = &monState{m: m, next: next, locs: map[string]*locState{}, stats: &monStats{}}
 }
 
 func (h *Hub) locationsOf(m *store.Monitor) []string {
@@ -260,9 +283,23 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 			continue
 		}
 		iv := time.Duration(max(st.m.IntervalSec, 10)) * time.Second
-		st.next = now.Add(iv)
+		// Keep the monitor on its own slot instead of drifting by the tick
+		// delay; if it fell behind (paused, skipped), restart from now.
+		st.next = st.next.Add(iv)
+		if !st.next.After(now) {
+			st.next = now.Add(iv)
+		}
 		job := jobFor(st.m)
 		for _, loc := range h.locationsOf(st.m) {
+			if loc == LocalLocation {
+				if st.busy {
+					// The previous local check has not finished yet: skip
+					// this round instead of piling up checks.
+					h.skipped.Add(1)
+					continue
+				}
+				st.busy = true
+			}
 			work = append(work, dispatch{loc, job})
 		}
 	}
@@ -274,9 +311,16 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 	for _, w := range work {
 		if w.loc == LocalLocation {
 			if !h.localEnabled() {
+				h.setIdle(w.job.MonitorID)
 				continue
 			}
-			go h.runLocal(ctx, w.job)
+			select {
+			case h.localQueue <- w.job:
+			default:
+				// All workers are busy and the queue is full.
+				h.skipped.Add(1)
+				h.setIdle(w.job.MonitorID)
+			}
 			continue
 		}
 		id, ok := parseAgentLocation(w.loc)
@@ -294,15 +338,29 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 	}
 }
 
-func (h *Hub) runLocal(ctx context.Context, job check.Job) {
-	select {
-	case h.localSem <- struct{}{}:
-	case <-ctx.Done():
-		return
+// localWorker runs checks for the hub's built-in location. A fixed pool of
+// workers bounds the number of checks (and goroutines) in flight.
+func (h *Hub) localWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case job := <-h.localQueue:
+			r := check.Run(ctx, job)
+			if ctx.Err() == nil {
+				h.HandleResult(LocalLocation, r)
+			}
+			h.setIdle(job.MonitorID)
+		}
 	}
-	defer func() { <-h.localSem }()
-	r := check.Run(ctx, job)
-	h.HandleResult(LocalLocation, r)
+}
+
+func (h *Hub) setIdle(id int64) {
+	h.mu.Lock()
+	if st := h.monitors[id]; st != nil {
+		st.busy = false
+	}
+	h.mu.Unlock()
 }
 
 // HandleResult stores a result and re-evaluates the monitor status.
@@ -376,12 +434,18 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	since := m.StatusSince
 	name := m.Name
 	alert := h.alertLocked(st)
-	h.mu.Unlock()
-
-	if err := h.store.InsertResult(&store.ResultRow{
+	row := &store.ResultRow{
 		MonitorID: r.MonitorID, Location: loc, TS: r.At, OK: r.OK, LatencyMs: r.LatencyMs,
 		StatusCode: r.StatusCode, Message: r.Message, CertExpiry: r.CertExpiry, Maint: inMaint,
-	}); err != nil {
+	}
+	if st.stats != nil {
+		st.stats.add(row)
+	}
+	h.mu.Unlock()
+
+	if w := h.writer.Load(); w != nil {
+		w.add(row)
+	} else if err := h.store.InsertResult(row); err != nil {
 		h.log.Error("insert result", "err", err)
 	}
 	if changed {
@@ -443,24 +507,39 @@ func (h *Hub) AgentOnline(id int64) bool {
 	return h.agents[id] != nil
 }
 
+// maintenance summarizes raw results into hourly rollups and deletes data
+// past its retention: raw results after RawRetentionDays, hourly rollups
+// after RetentionDays.
 func (h *Hub) maintenance(ctx context.Context) {
-	t := time.NewTicker(time.Hour)
+	t := time.NewTicker(10 * time.Minute)
 	defer t.Stop()
 	for {
-		days := h.generalSettings().RetentionDays
-		if days <= 0 {
-			days = 30
-		}
-		cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour).UnixMilli()
-		if n, err := h.store.PruneResults(cutoff); err != nil {
-			h.log.Error("prune results", "err", err)
-		} else if n > 0 {
-			h.log.Info("pruned old results", "rows", n)
-		}
+		h.compactResults(ctx, time.Now())
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 		}
+	}
+}
+
+func (h *Hub) compactResults(ctx context.Context, now time.Time) {
+	g := h.generalSettings()
+	t0 := time.Now()
+	if n, err := h.store.RollupResults(now, ctx.Done()); err != nil {
+		h.log.Error("roll up results", "err", err)
+	} else if n > 1 {
+		h.log.Info("rolled up results", "hours", n, "took", time.Since(t0).Round(time.Millisecond))
+	}
+	day := 24 * time.Hour
+	if n, err := h.store.PruneResults(now.Add(-time.Duration(g.RawRetentionDays) * day).UnixMilli()); err != nil {
+		h.log.Error("prune results", "err", err)
+	} else if n > 0 {
+		h.log.Info("pruned raw results", "rows", n)
+	}
+	if n, err := h.store.PruneRollups(now.Add(-time.Duration(g.RetentionDays) * day).UnixMilli()); err != nil {
+		h.log.Error("prune rollups", "err", err)
+	} else if n > 0 {
+		h.log.Info("pruned hourly rollups", "rows", n)
 	}
 }

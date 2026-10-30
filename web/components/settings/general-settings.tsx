@@ -99,9 +99,9 @@ export function GeneralSettingsForm({
             </label>
           </Field>
           <Field
-            label="keep check results (days)"
+            label="keep history (days)"
             htmlFor="retention"
-            hint="older raw results are deleted every hour"
+            hint="hourly summaries for uptime, charts and status pages"
           >
             <Input
               id="retention"
@@ -110,6 +110,22 @@ export function GeneralSettingsForm({
               max={3650}
               value={g.retention_days}
               onChange={(e) => set("retention_days", Number(e.target.value))}
+            />
+          </Field>
+          <Field
+            label="keep every check (days)"
+            htmlFor="raw_retention"
+            hint="single results, at least 2 days. older ones live on in the hourly history"
+          >
+            <Input
+              id="raw_retention"
+              type="number"
+              min={2}
+              max={3650}
+              value={g.raw_retention_days}
+              onChange={(e) =>
+                set("raw_retention_days", Number(e.target.value))
+              }
             />
           </Field>
         </div>

@@ -327,6 +327,7 @@ export interface GeneralSettings {
   local_name: string
   local_enabled: boolean
   retention_days: number
+  raw_retention_days: number
   monitor_defaults: MonitorDefaults
   expiry: ExpirySettings
   metrics: MetricsSettings

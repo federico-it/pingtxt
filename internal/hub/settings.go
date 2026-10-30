@@ -25,13 +25,14 @@ type MonitorDefaults struct {
 
 // GeneralSettings are instance settings editable from the web UI.
 type GeneralSettings struct {
-	PublicURL       string          `json:"public_url"`
-	LocalName       string          `json:"local_name"`
-	LocalEnabled    bool            `json:"local_enabled"`
-	RetentionDays   int             `json:"retention_days"`
-	MonitorDefaults MonitorDefaults `json:"monitor_defaults"`
-	Expiry          ExpirySettings  `json:"expiry"`
-	Metrics         MetricsSettings `json:"metrics"`
+	PublicURL        string          `json:"public_url"`
+	LocalName        string          `json:"local_name"`
+	LocalEnabled     bool            `json:"local_enabled"`
+	RetentionDays    int             `json:"retention_days"`     // hourly history
+	RawRetentionDays int             `json:"raw_retention_days"` // every single check
+	MonitorDefaults  MonitorDefaults `json:"monitor_defaults"`
+	Expiry           ExpirySettings  `json:"expiry"`
+	Metrics          MetricsSettings `json:"metrics"`
 }
 
 // ExpirySettings set when certificate and domain expiry alerts are sent:
@@ -119,6 +120,11 @@ func (g *GeneralSettings) normalize() {
 		g.RetentionDays = 30
 	}
 	g.RetentionDays = min(g.RetentionDays, 3650)
+	// Raw results back the 24h dashboard and detail views: at least 2 days.
+	if g.RawRetentionDays <= 0 {
+		g.RawRetentionDays = 3
+	}
+	g.RawRetentionDays = min(max(g.RawRetentionDays, 2), max(g.RetentionDays, 2))
 	d := &g.MonitorDefaults
 	if d.IntervalSec == 0 {
 		d.IntervalSec = 60
