@@ -73,6 +73,8 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/monitors/{id}/pause", auth(h.pauseMonitor))
 	mux.HandleFunc("GET /api/monitors/{id}/series", auth(h.monitorSeries))
 	mux.HandleFunc("GET /api/monitors/{id}/results", auth(h.monitorResults))
+	mux.HandleFunc("POST /api/monitors/{id}/push-token", auth(h.rotatePushToken))
+	mux.HandleFunc("/api/push/{token}", h.push)
 	mux.HandleFunc("GET /api/incidents", auth(h.listIncidents))
 
 	mux.HandleFunc("GET /api/locations", auth(h.listLocations))
@@ -115,7 +117,9 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "same-origin")
 		// Mutating API calls must be JSON: blocks cross-site form posts (CSRF).
-		if strings.HasPrefix(r.URL.Path, "/api/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+		// Heartbeats are exempt: they are authenticated by the URL token, not
+		// by the session cookie, and any client must be able to send them.
+		if strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/api/push/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
 			if r.ContentLength != 0 && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 				writeErr(w, http.StatusUnsupportedMediaType, "content-type must be application/json")
 				return
@@ -306,7 +310,7 @@ func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.Us
 
 // ---------- monitors ----------
 
-var validTypes = []string{check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS}
+var validTypes = []string{check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush}
 var hostPortRe = regexp.MustCompile(`^[^\s/]+:\d{1,5}$`)
 
 func (h *Hub) validateMonitor(m *store.Monitor) error {
@@ -317,6 +321,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 	if !slices.Contains(validTypes, m.Type) {
 		return errors.New("invalid type")
+	}
+	if m.Type == check.TypePush {
+		return validatePush(m)
 	}
 	if m.Target == "" {
 		return errors.New("target is required")
@@ -373,6 +380,26 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	m.Locations = slices.Compact(locs)
 	if len(m.Locations) == 0 {
 		m.Locations = []string{LocalLocation}
+	}
+	return nil
+}
+
+// validatePush normalizes a heartbeat monitor: it has no target and no
+// probe settings, only a period and a grace time.
+func validatePush(m *store.Monitor) error {
+	if m.IntervalSec == 0 {
+		m.IntervalSec = 3600
+	}
+	if m.IntervalSec < 10 || m.IntervalSec > maxPushIntervalSec {
+		return errors.New("period must be between 10s and 7 days")
+	}
+	if m.GraceSec < 0 || m.GraceSec > maxPushGraceSec {
+		return errors.New("grace period must be between 0 and 24h")
+	}
+	*m = store.Monitor{
+		ID: m.ID, Name: m.Name, Type: m.Type, IntervalSec: m.IntervalSec, GraceSec: m.GraceSec,
+		TimeoutMs: 10000, Retries: 1, Method: "GET", Headers: map[string]string{},
+		Locations: []string{PushLocation}, Paused: m.Paused,
 	}
 	return nil
 }
@@ -491,6 +518,10 @@ func (h *Hub) createMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 	}
 	paused := m.Paused
 	m.Paused = false
+	m.PushToken = ""
+	if m.Type == check.TypePush {
+		m.PushToken = newPushToken()
+	}
 	if err := h.store.CreateMonitor(&m); err != nil {
 		h.internalErr(w, err)
 		return
@@ -508,6 +539,7 @@ type monitorDetail struct {
 	Uptime7d  float64          `json:"uptime_7d"`
 	Uptime30d float64          `json:"uptime_30d"`
 	Locations []locationStatus `json:"location_status"`
+	PushURL   string           `json:"push_url,omitempty"`
 }
 
 type locationStatus struct {
@@ -538,7 +570,7 @@ func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) 
 	}
 	now := time.Now().UnixMilli()
 	day := int64(24 * 3600 * 1000)
-	d := &monitorDetail{monitorSummary: s}
+	d := &monitorDetail{monitorSummary: s, PushURL: h.pushURL(r, m)}
 	d.Uptime7d, _, _ = h.store.Uptime(id, now-7*day)
 	d.Uptime30d, _, _ = h.store.Uptime(id, now-30*day)
 	latest, _ := h.store.LatestPerLocation(id)
@@ -564,6 +596,9 @@ func (h *Hub) locationOnline(loc string) bool {
 	if loc == LocalLocation {
 		return h.localEnabled()
 	}
+	if loc == PushLocation {
+		return true
+	}
 	if id, ok := parseAgentLocation(loc); ok {
 		return h.AgentOnline(id)
 	}
@@ -571,7 +606,7 @@ func (h *Hub) locationOnline(loc string) bool {
 }
 
 func (h *Hub) locationNames() map[string]string {
-	names := map[string]string{LocalLocation: h.localName()}
+	names := map[string]string{LocalLocation: h.localName(), PushLocation: pushLocationName}
 	agents, _ := h.store.ListAgents()
 	for _, a := range agents {
 		n := a.Name
@@ -589,7 +624,8 @@ func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 		writeErr(w, 400, "invalid id")
 		return
 	}
-	if _, err := h.store.Monitor(id); err != nil {
+	prev, err := h.store.Monitor(id)
+	if err != nil {
 		writeErr(w, 404, "monitor not found")
 		return
 	}
@@ -604,6 +640,17 @@ func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 		return
 	}
 	if err := h.store.UpdateMonitor(&m); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	// Keep the push URL across edits; create one when switching to push.
+	switch {
+	case m.Type == check.TypePush && prev.PushToken == "":
+		err = h.store.SetPushToken(id, newPushToken())
+	case m.Type != check.TypePush && prev.PushToken != "":
+		err = h.store.SetPushToken(id, "")
+	}
+	if err != nil {
 		h.internalErr(w, err)
 		return
 	}

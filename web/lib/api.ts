@@ -1,7 +1,7 @@
 import useSWR, { type SWRConfiguration } from "swr"
 
 export type Status = "pending" | "up" | "down" | "degraded" | "paused"
-export type MonitorType = "http" | "keyword" | "tcp" | "ping" | "dns"
+export type MonitorType = "http" | "keyword" | "tcp" | "ping" | "dns" | "push"
 
 export interface Monitor {
   id: number
@@ -21,6 +21,8 @@ export interface Monitor {
   ignore_tls: boolean
   headers: Record<string, string>
   body: string
+  push_token: string
+  grace_sec: number
   locations: string[]
   paused: boolean
   status: Status
@@ -65,6 +67,7 @@ export interface MonitorDetail extends MonitorSummary {
   uptime_7d: number
   uptime_30d: number
   location_status: LocationStatus[]
+  push_url?: string
 }
 
 export interface Bucket {

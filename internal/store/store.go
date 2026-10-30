@@ -179,6 +179,9 @@ var migrations = []string{
 		expires_at INTEGER NOT NULL DEFAULT 0
 	);
 	CREATE INDEX api_tokens_user ON api_tokens(user_id);`,
+	`ALTER TABLE monitors ADD COLUMN push_token TEXT NOT NULL DEFAULT '';
+	ALTER TABLE monitors ADD COLUMN grace_sec INTEGER NOT NULL DEFAULT 0;
+	CREATE UNIQUE INDEX monitors_push_token ON monitors(push_token) WHERE push_token != '';`,
 }
 
 func (s *Store) migrate() error {

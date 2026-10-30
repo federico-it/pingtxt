@@ -6,7 +6,7 @@ but plain text, monospace, light and dark.
 - **One container** for the hub: Go API + scheduler + SQLite + the Next.js UI, ~25 MB image.
 - **Agents** for multi-location checks: a ~7 MB static binary (or Docker image) that only
   dials *out* to the hub over WebSocket. No open ports, works behind NAT. Install with one command.
-- Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**.
+- Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**, and **heartbeat (push)** monitors for cron jobs and workers.
 - Status across locations: **down** when the majority of online locations fail, **degraded** when only some do.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
@@ -86,6 +86,15 @@ times, never targets, locations or error messages. Drafts are visible only to lo
 For a **custom domain** (e.g. `status.example.com`), set it on the page, point its DNS at the hub and route the host
 to pingtxt in your reverse proxy (with its own TLS certificate). On that host pingtxt serves only the status page at
 `/`; the admin UI and API are not reachable there. The history covers the retention period, up to 90 days.
+## Heartbeat monitors (cron jobs)
+
+For jobs that run on a schedule (backups, cron, queues) create a monitor of type **heartbeat (push)**. It gets a secret URL; the job calls it at the end of every run, with any HTTP method:
+
+```sh
+0 3 * * * /usr/local/bin/backup.sh && curl -fsS -m 10 --retry 3 https://pingtxt.example.com/api/push/<token> >/dev/null
+```
+
+The monitor goes down (incident + notifications) when no call arrives within the **expected period** plus the **grace time**, and back up at the next call. Optional query parameters: `status=down` reports a failed run, `msg=` stores a short note, `ping=` the run time in ms. The URL uses the public URL from settings and can be regenerated from the monitor page.
 
 ## Add a location (agent)
 
