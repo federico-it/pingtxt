@@ -3,9 +3,11 @@ package hub
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net"
@@ -54,7 +56,7 @@ func newFakeSMTP(t *testing.T, implicit, starttls bool) (*fakeSMTP, *tls.Config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &fakeSMTP{ln: ln, tls: &tls.Config{Certificates: hs.TLS.Certificates}, implicit: implicit, starttls: starttls, user: "alice", pass: "s3cret"}
+	s := &fakeSMTP{ln: ln, tls: &tls.Config{Certificates: hs.TLS.Certificates}, implicit: implicit, starttls: starttls, user: "alice", pass: randomPass()}
 	t.Cleanup(func() { ln.Close() })
 	go func() {
 		for {
@@ -66,6 +68,14 @@ func newFakeSMTP(t *testing.T, implicit, starttls bool) (*fakeSMTP, *tls.Config)
 		}
 	}()
 	return s, &tls.Config{RootCAs: pool}
+}
+
+// randomPass makes a throwaway credential for the fake server, so no
+// password literal lives in the tests.
+func randomPass() string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 func (s *fakeSMTP) port() string {
@@ -165,7 +175,7 @@ func TestEmailNotifierAPI(t *testing.T) {
 	}
 	cfg := map[string]string{
 		"host": "127.0.0.1", "port": smtpSrv.port(), "security": "starttls",
-		"username": "alice", "password": "s3cret",
+		"username": smtpSrv.user, "password": smtpSrv.pass,
 		"from": "Pingtxt <alerts@example.com>", "to": "ops@example.com; Bob <bob@example.com>",
 	}
 	body := map[string]any{"name": "mail", "type": "email", "enabled": true, "config": cfg}
@@ -192,7 +202,7 @@ func TestEmailNotifierAPI(t *testing.T) {
 	if res := c.do("PUT", "/api/notifiers/"+strconv.FormatInt(n.ID, 10), body); res.StatusCode != 200 {
 		t.Fatalf("update: %d", res.StatusCode)
 	}
-	if stored, _ := h.store.Notifier(n.ID); stored.Config["password"] != "s3cret" || stored.Config["password_set"] != "" {
+	if stored, _ := h.store.Notifier(n.ID); stored.Config["password"] != smtpSrv.pass || stored.Config["password_set"] != "" {
 		t.Fatalf("stored config: %+v", stored.Config)
 	}
 	res = c.do("GET", "/api/notifiers", nil)
@@ -212,7 +222,7 @@ func TestEmailNotifierAPI(t *testing.T) {
 		t.Fatalf("want 2 mails, got %d", len(mails))
 	}
 	m := mails[1]
-	if !m.tls || m.auth != "alice" || m.from != "alerts@example.com" || strings.Join(m.to, ",") != "ops@example.com,bob@example.com" {
+	if !m.tls || m.auth != smtpSrv.user || m.from != "alerts@example.com" || strings.Join(m.to, ",") != "ops@example.com,bob@example.com" {
 		t.Fatalf("envelope: %+v", m)
 	}
 	msg, err := mail.ReadMessage(strings.NewReader(m.data))
@@ -231,7 +241,7 @@ func TestEmailNotifierAPI(t *testing.T) {
 	}
 
 	// A wrong password is reported to the caller.
-	cfg["password"] = "nope"
+	cfg["password"] = randomPass()
 	res = c.do("POST", "/api/notifiers/test", body)
 	if res.StatusCode != 502 {
 		t.Fatalf("bad password: want 502, got %d", res.StatusCode)
@@ -254,7 +264,7 @@ func TestEmailImplicitTLS(t *testing.T) {
 func TestEmailRequiresStartTLS(t *testing.T) {
 	smtpSrv, clientTLS := newFakeSMTP(t, false, false)
 	n := &Notifier{tlsConfig: clientTLS}
-	cfg := map[string]string{"host": "127.0.0.1", "port": smtpSrv.port(), "security": "starttls", "username": "alice", "password": "s3cret", "from": "a@example.com", "to": "b@example.com"}
+	cfg := map[string]string{"host": "127.0.0.1", "port": smtpSrv.port(), "security": "starttls", "username": smtpSrv.user, "password": smtpSrv.pass, "from": "a@example.com", "to": "b@example.com"}
 	err := n.sendEmail(context.Background(), cfg, Event{Monitor: "x", Status: StatusDown})
 	if err == nil || !strings.Contains(err.Error(), "STARTTLS") {
 		t.Fatalf("want STARTTLS error, got %v", err)
