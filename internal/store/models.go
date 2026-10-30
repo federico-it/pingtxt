@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -184,6 +185,8 @@ type Monitor struct {
 	PushToken      string            `json:"push_token"`
 	GraceSec       int               `json:"grace_sec"`
 	Locations      []string          `json:"locations"`
+	GroupID        int64             `json:"group_id"` // 0 = no group
+	TagIDs         []int64           `json:"tag_ids"`
 	// Expiry alerts: TLS certificate (https targets) and domain registration.
 	CertExpiryAlert   bool   `json:"cert_expiry_alert"`
 	DomainExpiryAlert bool   `json:"domain_expiry_alert"`
@@ -193,18 +196,21 @@ type Monitor struct {
 	CreatedAt         int64  `json:"created_at"`
 }
 
-const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at`
+const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id`
 
 func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	m := &Monitor{}
 	var headers, locations string
-	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt)
+	var group sql.NullInt64
+	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
+	m.GroupID = group.Int64
+	m.TagIDs = []int64{}
 	_ = json.Unmarshal([]byte(headers), &m.Headers)
 	_ = json.Unmarshal([]byte(locations), &m.Locations)
 	if m.Headers == nil {
@@ -217,24 +223,58 @@ func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 }
 
 func (s *Store) ListMonitors() ([]*Monitor, error) {
-	rows, err := s.db.Query(`SELECT ` + monitorCols + ` FROM monitors ORDER BY name COLLATE NOCASE`)
+	return s.listMonitorsWhere(``)
+}
+
+func (s *Store) listMonitorsWhere(where string, args ...any) ([]*Monitor, error) {
+	rows, err := s.db.Query(`SELECT `+monitorCols+` FROM monitors `+where+` ORDER BY name COLLATE NOCASE`, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	out := []*Monitor{}
 	for rows.Next() {
 		m, err := scanMonitor(rows)
 		if err != nil {
+			rows.Close()
 			return nil, err
 		}
 		out = append(out, m)
 	}
-	return out, rows.Err()
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Loaded after closing the cursor: the pool has a single connection.
+	tags, err := s.monitorTags()
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range out {
+		if t := tags[m.ID]; t != nil {
+			m.TagIDs = t
+		}
+	}
+	return out, nil
+}
+
+// MonitorsInGroups returns the monitors of the given groups, by name.
+func (s *Store) MonitorsInGroups(groupIDs []int64) ([]*Monitor, error) {
+	if len(groupIDs) == 0 {
+		return []*Monitor{}, nil
+	}
+	args := make([]any, len(groupIDs))
+	for i, id := range groupIDs {
+		args[i] = id
+	}
+	return s.listMonitorsWhere(`WHERE group_id IN (?`+strings.Repeat(`, ?`, len(groupIDs)-1)+`)`, args...)
 }
 
 func (s *Store) Monitor(id int64) (*Monitor, error) {
-	return scanMonitor(s.db.QueryRow(`SELECT `+monitorCols+` FROM monitors WHERE id = ?`, id))
+	m, err := scanMonitor(s.db.QueryRow(`SELECT `+monitorCols+` FROM monitors WHERE id = ?`, id))
+	if err != nil {
+		return nil, err
+	}
+	return m, s.loadMonitorTags(m)
 }
 
 func (s *Store) CreateMonitor(m *Monitor) error {
@@ -243,22 +283,41 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 	m.CreatedAt = now()
 	m.Status = "pending"
 	m.StatusSince = m.CreatedAt
-	res, err := s.db.Exec(`INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(`INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt, nullID(m.GroupID))
 	if err != nil {
 		return err
 	}
 	m.ID, _ = res.LastInsertId()
-	return nil
+	if err := setMonitorTags(tx, m.ID, m.TagIDs); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) UpdateMonitor(m *Monitor) error {
 	h, _ := json.Marshal(m.Headers)
 	l, _ := json.Marshal(m.Locations)
-	_, err := s.db.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ? WHERE id = ?`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), m.ID)
-	return err
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ?, group_id = ? WHERE id = ?`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), nullID(m.GroupID), m.ID)
+	if err != nil {
+		return err
+	}
+	if err := setMonitorTags(tx, m.ID, m.TagIDs); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // MonitorByPushToken returns the push monitor owning a heartbeat token.

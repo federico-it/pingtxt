@@ -147,6 +147,18 @@ func (h *Hub) validateStatusPage(r *http.Request, p *store.StatusPage) error {
 		}
 	}
 	p.MonitorIDs = ids
+	gseen := map[int64]bool{}
+	gids := []int64{}
+	for _, id := range p.GroupIDs {
+		if gseen[id] {
+			continue
+		}
+		gseen[id] = true
+		if _, err := h.store.Group(id); err == nil {
+			gids = append(gids, id)
+		}
+	}
+	p.GroupIDs = gids
 	return nil
 }
 
@@ -268,6 +280,7 @@ type publicPage struct {
 type publicMonitor struct {
 	ID        int64   `json:"id"`
 	Name      string  `json:"name"`
+	Group     string  `json:"group"` // section title, "" = no section
 	Status    string  `json:"status"`
 	Uptime    float64 `json:"uptime"`
 	Uptime24h float64 `json:"uptime_24h"`
@@ -341,14 +354,15 @@ func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
 		Days: days, ShowIncidents: sp.ShowIncidents, Monitors: []publicMonitor{}, Incidents: []publicIncident{},
 		UpdatedAt: now.UnixMilli(),
 	}
-	for _, id := range sp.MonitorIDs {
-		m, err := h.store.Monitor(id)
-		if errors.Is(err, store.ErrNotFound) {
-			continue
-		} else if err != nil {
-			return nil, err
-		}
-		pm := publicMonitor{ID: m.ID, Name: m.Name, Status: m.Status}
+	ms, err := h.pageMonitors(sp)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int64, 0, len(ms))
+	for _, e := range ms {
+		m := e.m
+		ids = append(ids, m.ID)
+		pm := publicMonitor{ID: m.ID, Name: m.Name, Group: e.group, Status: m.Status}
 		if pm.Uptime, _, err = h.store.Uptime(m.ID, from); err != nil {
 			return nil, err
 		}
@@ -373,7 +387,7 @@ func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
 	}
 	p.Status = overallStatus(p.Monitors)
 	if sp.ShowIncidents {
-		incs, err := h.store.IncidentsSince(sp.MonitorIDs, from, 50)
+		incs, err := h.store.IncidentsSince(ids, from, 50)
 		if err != nil {
 			return nil, err
 		}
@@ -382,6 +396,63 @@ func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
 		}
 	}
 	return p, nil
+}
+
+type pageMonitor struct {
+	m     *store.Monitor
+	group string
+}
+
+// pageMonitors lists what a status page shows, in sections: monitors picked
+// one by one keep their order and sit under their group's title (if any);
+// the groups picked as a whole follow, each with all its monitors by name.
+// A section is never split: a later monitor of an earlier section joins it.
+func (h *Hub) pageMonitors(sp *store.StatusPage) ([]pageMonitor, error) {
+	groups, err := h.store.ListGroups()
+	if err != nil {
+		return nil, err
+	}
+	names := map[int64]string{}
+	for _, g := range groups {
+		names[g.ID] = g.Name
+	}
+	var order []string
+	sections := map[string][]pageMonitor{}
+	seen := map[int64]bool{}
+	add := func(m *store.Monitor) {
+		if seen[m.ID] {
+			return
+		}
+		seen[m.ID] = true
+		g := names[m.GroupID]
+		if _, ok := sections[g]; !ok {
+			order = append(order, g)
+		}
+		sections[g] = append(sections[g], pageMonitor{m: m, group: g})
+	}
+	for _, id := range sp.MonitorIDs {
+		m, err := h.store.Monitor(id)
+		if errors.Is(err, store.ErrNotFound) {
+			continue
+		} else if err != nil {
+			return nil, err
+		}
+		add(m)
+	}
+	for _, gid := range sp.GroupIDs {
+		ms, err := h.store.MonitorsInGroups([]int64{gid})
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range ms {
+			add(m)
+		}
+	}
+	out := []pageMonitor{}
+	for _, g := range order {
+		out = append(out, sections[g]...)
+	}
+	return out, nil
 }
 
 func overallStatus(ms []publicMonitor) string {

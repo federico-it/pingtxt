@@ -83,6 +83,16 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("PUT /api/maintenances/{id}", auth(h.updateMaintenance))
 	mux.HandleFunc("DELETE /api/maintenances/{id}", auth(h.deleteMaintenance))
 
+	mux.HandleFunc("GET /api/groups", auth(h.listGroups))
+	mux.HandleFunc("POST /api/groups", auth(h.saveGroup))
+	mux.HandleFunc("PUT /api/groups/{id}", auth(h.saveGroup))
+	mux.HandleFunc("DELETE /api/groups/{id}", auth(h.deleteGroup))
+	mux.HandleFunc("PUT /api/groups/{id}/monitors", auth(h.setGroupMonitors))
+	mux.HandleFunc("GET /api/tags", auth(h.listTags))
+	mux.HandleFunc("POST /api/tags", auth(h.saveTag))
+	mux.HandleFunc("PUT /api/tags/{id}", auth(h.saveTag))
+	mux.HandleFunc("DELETE /api/tags/{id}", auth(h.deleteTag))
+
 	mux.HandleFunc("GET /api/locations", auth(h.listLocations))
 	mux.HandleFunc("GET /api/agents", auth(h.listAgents))
 	mux.HandleFunc("POST /api/agents", auth(h.createAgent))
@@ -328,6 +338,17 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	if !slices.Contains(validTypes, m.Type) {
 		return errors.New("invalid type")
 	}
+	if m.GroupID < 0 {
+		m.GroupID = 0
+	}
+	m.TagIDs = cleanIDs(m.TagIDs)
+	var groups []int64
+	if m.GroupID > 0 {
+		groups = []int64{m.GroupID}
+	}
+	if err := h.checkGroupsTags(groups, m.TagIDs); err != nil {
+		return err
+	}
 	if m.Type == check.TypePush {
 		return validatePush(m)
 	}
@@ -406,6 +427,7 @@ func validatePush(m *store.Monitor) error {
 		ID: m.ID, Name: m.Name, Type: m.Type, IntervalSec: m.IntervalSec, GraceSec: m.GraceSec,
 		TimeoutMs: 10000, Retries: 1, Method: "GET", Headers: map[string]string{},
 		Locations: []string{PushLocation}, Paused: m.Paused,
+		GroupID: m.GroupID, TagIDs: m.TagIDs,
 	}
 	return nil
 }
@@ -448,7 +470,7 @@ func (h *Hub) summary(m *store.Monitor) (*monitorSummary, error) {
 	if s.Expiry, err = h.store.ExpiryChecks(m.ID); err != nil {
 		return nil, err
 	}
-	if w, end := h.ActiveMaintenance(m.ID); w != nil && !m.Paused {
+	if w, end := h.ActiveMaintenance(m); w != nil && !m.Paused {
 		s.Maintenance = &activeMaint{ID: w.ID, Name: w.Name, EndAt: end.UnixMilli()}
 	}
 	if last, err := h.store.RecentResults(m.ID, 1); err == nil && len(last) > 0 {
@@ -480,6 +502,11 @@ func (h *Hub) summary(m *store.Monitor) (*monitorSummary, error) {
 }
 
 func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	f, err := parseMonitorFilter(r)
+	if err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
 	ms, err := h.store.ListMonitors()
 	if err != nil {
 		h.internalErr(w, err)
@@ -487,6 +514,9 @@ func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User
 	}
 	out := make([]*monitorSummary, 0, len(ms))
 	for _, m := range ms {
+		if f.active && !f.match(m) {
+			continue
+		}
 		s, err := h.summary(m)
 		if err != nil {
 			h.internalErr(w, err)

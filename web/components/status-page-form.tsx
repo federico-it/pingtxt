@@ -5,6 +5,7 @@ import { useMemo, useState } from "react"
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 
+import { GroupToggle, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
 import { Field } from "@/components/settings/field"
 import { StatusGlyph } from "@/components/status"
@@ -25,6 +26,7 @@ const empty: Draft = {
   published: true,
   show_incidents: true,
   monitor_ids: [],
+  group_ids: [],
 }
 
 function slugify(s: string) {
@@ -41,25 +43,27 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   const router = useRouter()
   const mounted = useMounted()
   const monitors = useApi<Monitor[]>("/api/monitors", { refreshInterval: 0 })
-  const [d, setD] = useState<Draft>(initial ?? empty)
+  const [d, setD] = useState<Draft>(initial ? { ...initial, group_ids: initial.group_ids ?? [] } : empty)
+  const { groups, groupById } = useLabels()
   const [slugTouched, setSlugTouched] = useState(!!initial)
   const [busy, setBusy] = useState(false)
 
   const byId = useMemo(() => new Map((monitors.data ?? []).map((m) => [m.id, m])), [monitors.data])
-  const available = (monitors.data ?? []).filter((m) => !d.monitor_ids.includes(m.id))
+  // Monitors of a picked group are on the page already.
+  const available = (monitors.data ?? []).filter((m) => !d.monitor_ids.includes(m.id) && !d.group_ids.includes(m.group_id))
   const origin = mounted ? window.location.origin : ""
 
   function set<K extends keyof Draft>(k: K, v: Draft[K]) {
     setD((p) => ({ ...p, [k]: v }))
   }
 
-  function move(i: number, by: number) {
+  function move(k: "monitor_ids" | "group_ids", i: number, by: number) {
     setD((p) => {
-      const ids = [...p.monitor_ids]
+      const ids = [...p[k]]
       const j = i + by
       if (j < 0 || j >= ids.length) return p
       ;[ids[i], ids[j]] = [ids[j], ids[i]]
-      return { ...p, monitor_ids: ids }
+      return { ...p, [k]: ids }
     })
   }
 
@@ -149,9 +153,58 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         </label>
       </div>
 
+      {(groups.data?.length ?? 0) > 0 && (
+        <Section title={`groups on this page (${d.group_ids.length})`}>
+          <p className="mb-2 text-xs text-muted-foreground">
+            A group adds all its monitors, also the ones added later. Each group is a section with its name; monitors picked one by
+            one come first, in their own order.
+          </p>
+          {d.group_ids.length > 0 && (
+            <div className="mb-2 border-t border-dashed">
+              {d.group_ids.map((id, i) => {
+                const g = groupById.get(id)
+                return (
+                  <div key={id} className="flex items-center gap-2 border-b border-dashed px-2 py-1.5">
+                    <span className="w-5 text-right text-xs text-muted-foreground">{i + 1}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      [{g?.name ?? `#${id}`}] <span className="text-xs text-muted-foreground">{g?.monitors ?? 0} monitors</span>
+                    </span>
+                    <Button type="button" variant="ghost" size="icon-xs" aria-label="move up" disabled={i === 0} onClick={() => move("group_ids", i, -1)}>
+                      <ArrowUpIcon />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="move down"
+                      disabled={i === d.group_ids.length - 1}
+                      onClick={() => move("group_ids", i, 1)}
+                    >
+                      <ArrowDownIcon />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon-xs" aria-label="remove" onClick={() => set("group_ids", d.group_ids.filter((x) => x !== id))}>
+                      <XIcon />
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-1.5">
+            {(groups.data ?? [])
+              .filter((g) => !d.group_ids.includes(g.id))
+              .map((g) => (
+                <GroupToggle key={g.id} group={g} on={false} onChange={() => set("group_ids", [...d.group_ids, g.id])} />
+              ))}
+          </div>
+        </Section>
+      )}
+
       <Section title={`monitors on this page (${d.monitor_ids.length})`}>
         {d.monitor_ids.length === 0 ? (
-          <div className="border border-dashed p-4 text-center text-muted-foreground">pick monitors from the list below.</div>
+          <div className="border border-dashed p-4 text-center text-muted-foreground">
+            {d.group_ids.length > 0 ? "only the groups above. add single monitors from the list below." : "pick monitors from the list below."}
+          </div>
         ) : (
           <div className="border-t border-dashed">
             {d.monitor_ids.map((id, i) => {
@@ -160,8 +213,11 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
                 <div key={id} className="flex items-center gap-2 border-b border-dashed px-2 py-1.5">
                   <span className="w-5 text-right text-xs text-muted-foreground">{i + 1}</span>
                   {m && <StatusGlyph status={m.status} />}
-                  <span className="min-w-0 flex-1 truncate">{m?.name ?? `#${id}`}</span>
-                  <Button type="button" variant="ghost" size="icon-xs" aria-label="move up" disabled={i === 0} onClick={() => move(i, -1)}>
+                  <span className="min-w-0 flex-1 truncate">
+                    {m?.name ?? `#${id}`}
+                    {m && groupById.get(m.group_id) && <span className="ml-2 text-xs text-muted-foreground">[{groupById.get(m.group_id)!.name}]</span>}
+                  </span>
+                  <Button type="button" variant="ghost" size="icon-xs" aria-label="move up" disabled={i === 0} onClick={() => move("monitor_ids", i, -1)}>
                     <ArrowUpIcon />
                   </Button>
                   <Button
@@ -170,7 +226,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
                     size="icon-xs"
                     aria-label="move down"
                     disabled={i === d.monitor_ids.length - 1}
-                    onClick={() => move(i, 1)}
+                    onClick={() => move("monitor_ids", i, 1)}
                   >
                     <ArrowDownIcon />
                   </Button>

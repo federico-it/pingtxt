@@ -24,6 +24,9 @@ export interface Monitor {
   push_token: string
   grace_sec: number
   locations: string[]
+  /** 0 = no group */
+  group_id: number
+  tag_ids: number[]
   cert_expiry_alert: boolean
   domain_expiry_alert: boolean
   paused: boolean
@@ -147,6 +150,10 @@ export interface Maintenance {
   description: string
   all_monitors: boolean
   monitor_ids: number[]
+  /** every monitor of these groups */
+  group_ids: number[]
+  /** every monitor with one of these tags */
+  tag_ids: number[]
   kind: MaintenanceKind
   start_at: number
   end_at: number
@@ -161,6 +168,25 @@ export interface Maintenance {
   active_end?: number
   next_start?: number
   next_end?: number
+}
+
+export interface Group {
+  id: number
+  name: string
+  description: string
+  monitors: number
+  created_at: number
+}
+
+export const tagColors = ["", "red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "gray"] as const
+export type TagColor = (typeof tagColors)[number]
+
+export interface Tag {
+  id: number
+  name: string
+  color: TagColor
+  monitors: number
+  created_at: number
 }
 
 export type NotifierType =
@@ -332,6 +358,8 @@ export interface StatusPage {
   published: boolean
   show_incidents: boolean
   monitor_ids: number[]
+  /** every monitor of these groups, current and future */
+  group_ids: number[]
   created_at: number
 }
 
@@ -340,6 +368,8 @@ export type PageStatus = "operational" | "degraded" | "partial_outage" | "major_
 export interface PublicMonitor {
   id: number
   name: string
+  /** section title, "" = no section */
+  group: string
   status: Status
   uptime: number
   uptime_24h: number
