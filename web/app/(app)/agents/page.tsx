@@ -14,12 +14,13 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { api, useApi, type Agent } from "@/lib/api"
+import { api, useApi, useIsAdmin, type Agent } from "@/lib/api"
 import { ago } from "@/lib/format"
 
 type AgentsResp = { agents: Agent[]; hub_url: string; hub_version: string; auto_update: boolean }
 
 export default function AgentsPage() {
+  const isAdmin = useIsAdmin()
   const { data, mutate } = useApi<AgentsResp>("/api/agents", {
     // Poll while an update runs so the new version shows up on its own.
     refreshInterval: (d) => (d?.agents.some((a) => a.update_state === "updating") ? 2000 : 15000),
@@ -80,9 +81,11 @@ export default function AgentsPage() {
   return (
     <>
       <PageHeader cmd="pingtxt agents ls" title="agents">
-        <Button onClick={() => setEdit({ name: "", location: "" })}>
-          <PlusIcon /> add agent
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setEdit({ name: "", location: "" })}>
+            <PlusIcon /> add agent
+          </Button>
+        )}
       </PageHeader>
       <p className="-mt-3 mb-6 max-w-2xl text-xs text-muted-foreground">
         Agents are tiny probes you run anywhere (VPS, home lab, another cloud region) to check your monitors from more
@@ -92,7 +95,7 @@ export default function AgentsPage() {
       {data && (
         <div className="mb-6 flex max-w-2xl flex-wrap items-start gap-x-6 gap-y-2 border border-border px-3 py-2 text-xs">
           <label className="flex items-center gap-2">
-            <Switch checked={data.auto_update} onCheckedChange={setAutoUpdate} />
+            <Switch checked={data.auto_update} onCheckedChange={setAutoUpdate} disabled={!isAdmin} />
             <span>update agents automatically</span>
           </label>
           <span className="text-muted-foreground">
@@ -134,35 +137,39 @@ export default function AgentsPage() {
                 </TableCell>
                 <TableCell className="text-right text-muted-foreground">{a.online ? "now" : ago(a.last_seen)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap">
-                  {a.online && a.update_available && a.self_update && a.update_state !== "updating" && (
-                    <Button variant="ghost" size="xs" onClick={() => updateNow(a)}>
-                      update
-                    </Button>
+                  {isAdmin && (
+                    <>
+                      {a.online && a.update_available && a.self_update && a.update_state !== "updating" && (
+                        <Button variant="ghost" size="xs" onClick={() => updateNow(a)}>
+                          update
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="xs" onClick={() => setEdit({ id: a.id, name: a.name, location: a.location })}>
+                        edit
+                      </Button>
+                      <Confirm
+                        title={`rotate token of ${a.name}?`}
+                        description="The current token stops working immediately and the agent disconnects. You will get new install commands."
+                        action="rotate"
+                        onConfirm={() => rotate(a)}
+                        trigger={
+                          <Button variant="ghost" size="xs">
+                            token
+                          </Button>
+                        }
+                      />
+                      <Confirm
+                        title={`delete ${a.name}?`}
+                        description="The agent is disconnected and removed from all monitors. Past results are kept."
+                        onConfirm={() => remove(a)}
+                        trigger={
+                          <Button variant="ghost" size="xs" className="text-down">
+                            rm
+                          </Button>
+                        }
+                      />
+                    </>
                   )}
-                  <Button variant="ghost" size="xs" onClick={() => setEdit({ id: a.id, name: a.name, location: a.location })}>
-                    edit
-                  </Button>
-                  <Confirm
-                    title={`rotate token of ${a.name}?`}
-                    description="The current token stops working immediately and the agent disconnects. You will get new install commands."
-                    action="rotate"
-                    onConfirm={() => rotate(a)}
-                    trigger={
-                      <Button variant="ghost" size="xs">
-                        token
-                      </Button>
-                    }
-                  />
-                  <Confirm
-                    title={`delete ${a.name}?`}
-                    description="The agent is disconnected and removed from all monitors. Past results are kept."
-                    onConfirm={() => remove(a)}
-                    trigger={
-                      <Button variant="ghost" size="xs" className="text-down">
-                        rm
-                      </Button>
-                    }
-                  />
                 </TableCell>
               </TableRow>
             ))}

@@ -25,6 +25,7 @@ import {
 import {
   api,
   useApi,
+  useIsAdmin,
   type Incident,
   type MonitorDetail,
   type ResultRow,
@@ -42,6 +43,7 @@ function View() {
   const now = useNow()
   const [range, setRange] = useState<(typeof ranges)[number]>("24h")
   const m = useApi<MonitorDetail>(id ? `/api/monitors/${id}` : null)
+  const isAdmin = useIsAdmin()
   const { groupById, tagById } = useLabels()
   const series = useApi<Series>(
     id ? `/api/monitors/${id}/series?range=${range}` : null,
@@ -87,27 +89,31 @@ function View() {
   return (
     <>
       <PageHeader cmd={`pingtxt monitors show ${id}`} title={d.name}>
-        <Button variant="outline" size="sm" onClick={togglePause}>
-          {d.paused ? "resume" : "pause"}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          render={<Link href={`/monitors/edit/?id=${id}`} />}
-          nativeButton={false}
-        >
-          edit
-        </Button>
-        <Confirm
-          title={`delete ${d.name}?`}
-          description="All results and incidents of this monitor will be deleted."
-          onConfirm={remove}
-          trigger={
-            <Button variant="destructive" size="sm">
-              delete
+        {isAdmin && (
+          <>
+            <Button variant="outline" size="sm" onClick={togglePause}>
+              {d.paused ? "resume" : "pause"}
             </Button>
-          }
-        />
+            <Button
+              variant="outline"
+              size="sm"
+              render={<Link href={`/monitors/edit/?id=${id}`} />}
+              nativeButton={false}
+            >
+              edit
+            </Button>
+            <Confirm
+              title={`delete ${d.name}?`}
+              description="All results and incidents of this monitor will be deleted."
+              onConfirm={remove}
+              trigger={
+                <Button variant="destructive" size="sm">
+                  delete
+                </Button>
+              }
+            />
+          </>
+        )}
       </PageHeader>
 
       <div className="-mt-4 mb-6 truncate text-xs text-muted-foreground">

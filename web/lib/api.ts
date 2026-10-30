@@ -278,15 +278,32 @@ export function useApi<T>(path: string | null, config?: SWRConfiguration<T>) {
   })
 }
 
+/**
+ * True when the logged-in user can change things (admin role), false for
+ * read-only users, undefined while loading.
+ */
+export function useIsAdmin(): boolean | undefined {
+  const me = useApi<Me>("/api/auth/me", { refreshInterval: 60_000 })
+  return me.data ? me.data.user.role === "admin" : undefined
+}
+
 export interface Identity {
   provider: string
   email: string
   created_at: number
 }
 
+export type Role = "admin" | "viewer"
+
+export const roles: { value: Role; label: string; hint: string }[] = [
+  { value: "admin", label: "admin", hint: "changes monitors, settings and users" },
+  { value: "viewer", label: "read-only", hint: "sees everything but secrets, changes nothing" },
+]
+
 export interface User {
   id: number
   email: string
+  role: Role
   created_at: number
   has_password: boolean
   two_factor: boolean
@@ -363,6 +380,7 @@ export interface AuthSettings {
   password_login: boolean
   allow_signup: boolean
   allowed_domains: string[]
+  default_role: Role
   providers: ProviderSettings[]
 }
 

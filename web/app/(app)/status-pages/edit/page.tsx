@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
 
+import { AdminOnly } from "@/components/admin-only"
 import { PageHeader } from "@/components/page-header"
 import { StatusPageForm } from "@/components/status-page-form"
 import { useApi, type StatusPage } from "@/lib/api"
@@ -30,8 +31,10 @@ function Edit() {
 
 export default function EditStatusPage() {
   return (
-    <Suspense>
-      <Edit />
-    </Suspense>
+    <AdminOnly>
+      <Suspense>
+        <Edit />
+      </Suspense>
+    </AdminOnly>
   )
 }
