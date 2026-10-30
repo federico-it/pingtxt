@@ -38,6 +38,7 @@ export function datetime(ts: number): string {
 }
 
 export function interval(sec: number): string {
+  if (sec >= 86400 && sec % 86400 === 0) return sec / 86400 + "d"
   if (sec % 3600 === 0) return sec / 3600 + "h"
   if (sec % 60 === 0) return sec / 60 + "m"
   return sec + "s"

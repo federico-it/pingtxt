@@ -181,6 +181,8 @@ type Monitor struct {
 	IgnoreTLS      bool              `json:"ignore_tls"`
 	Headers        map[string]string `json:"headers"`
 	Body           string            `json:"body"`
+	PushToken      string            `json:"push_token"`
+	GraceSec       int               `json:"grace_sec"`
 	Locations      []string          `json:"locations"`
 	Paused         bool              `json:"paused"`
 	Status         string            `json:"status"`
@@ -188,12 +190,12 @@ type Monitor struct {
 	CreatedAt      int64             `json:"created_at"`
 }
 
-const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, locations, paused, status, status_since, created_at`
+const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, paused, status, status_since, created_at`
 
 func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	m := &Monitor{}
 	var headers, locations string
-	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &locations, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt)
+	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -238,9 +240,9 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 	m.CreatedAt = now()
 	m.Status = "pending"
 	m.StatusSince = m.CreatedAt
-	res, err := s.db.Exec(`INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, locations, paused, status, status_since, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, string(l), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt)
+	res, err := s.db.Exec(`INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, paused, status, status_since, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt)
 	if err != nil {
 		return err
 	}
@@ -251,8 +253,22 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 func (s *Store) UpdateMonitor(m *Monitor) error {
 	h, _ := json.Marshal(m.Headers)
 	l, _ := json.Marshal(m.Locations)
-	_, err := s.db.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, locations = ? WHERE id = ?`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, string(l), m.ID)
+	_, err := s.db.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ? WHERE id = ?`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), m.ID)
+	return err
+}
+
+// MonitorByPushToken returns the push monitor owning a heartbeat token.
+func (s *Store) MonitorByPushToken(token string) (*Monitor, error) {
+	if token == "" {
+		return nil, ErrNotFound
+	}
+	return scanMonitor(s.db.QueryRow(`SELECT `+monitorCols+` FROM monitors WHERE push_token = ?`, token))
+}
+
+// SetPushToken sets the heartbeat token of a monitor ("" removes it).
+func (s *Store) SetPushToken(id int64, token string) error {
+	_, err := s.db.Exec(`UPDATE monitors SET push_token = ? WHERE id = ?`, token, id)
 	return err
 }
 

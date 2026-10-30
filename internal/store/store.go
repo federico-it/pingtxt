@@ -133,6 +133,9 @@ var migrations = []string{
 		PRIMARY KEY (provider, subject)
 	);
 	CREATE INDEX identities_user ON identities(user_id);`,
+	`ALTER TABLE monitors ADD COLUMN push_token TEXT NOT NULL DEFAULT '';
+	ALTER TABLE monitors ADD COLUMN grace_sec INTEGER NOT NULL DEFAULT 0;
+	CREATE UNIQUE INDEX monitors_push_token ON monitors(push_token) WHERE push_token != '';`,
 }
 
 func (s *Store) migrate() error {
