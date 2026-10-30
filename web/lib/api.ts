@@ -24,6 +24,8 @@ export interface Monitor {
   push_token: string
   grace_sec: number
   locations: string[]
+  cert_expiry_alert: boolean
+  domain_expiry_alert: boolean
   paused: boolean
   status: Status
   status_since: number
@@ -51,11 +53,26 @@ export interface Bar {
   avg_ms: number
 }
 
+export interface ExpiryCheck {
+  monitor_id: number
+  kind: "cert" | "domain"
+  /** host name (cert) or registrable domain */
+  subject: string
+  /** unix ms, 0 = unknown */
+  expires_at: number
+  /** certificate issuer or registrar */
+  issuer: string
+  source: "tls" | "rdap" | "whois" | ""
+  error: string
+  checked_at: number
+}
+
 export interface MonitorSummary extends Monitor {
   uptime_24h: number
   avg_ms_24h: number
   last: ResultRow | null
   bars: Bar[]
+  expiry: ExpiryCheck[]
   maintenance: { id: number; name: string; end_at: number } | null
 }
 
@@ -264,6 +281,13 @@ export interface GeneralSettings {
   local_enabled: boolean
   retention_days: number
   monitor_defaults: MonitorDefaults
+  expiry: ExpirySettings
+}
+
+export interface ExpirySettings {
+  /** days before expiry when an alert is sent; empty = off */
+  cert_days: number[]
+  domain_days: number[]
 }
 
 export type ProviderId = "github" | "google" | "oidc"

@@ -200,6 +200,20 @@ var migrations = []string{
 		created_at INTEGER NOT NULL
 	);
 	ALTER TABLE results ADD COLUMN maint INTEGER NOT NULL DEFAULT 0;`,
+	`ALTER TABLE monitors ADD COLUMN cert_expiry_alert INTEGER NOT NULL DEFAULT 1;
+	ALTER TABLE monitors ADD COLUMN domain_expiry_alert INTEGER NOT NULL DEFAULT 1;
+	CREATE TABLE expiry_checks (
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		kind TEXT NOT NULL,
+		subject TEXT NOT NULL DEFAULT '',
+		expires_at INTEGER NOT NULL DEFAULT 0,
+		issuer TEXT NOT NULL DEFAULT '',
+		source TEXT NOT NULL DEFAULT '',
+		error TEXT NOT NULL DEFAULT '',
+		checked_at INTEGER NOT NULL DEFAULT 0,
+		alerted_days INTEGER NOT NULL DEFAULT -1,
+		PRIMARY KEY (monitor_id, kind)
+	);`,
 }
 
 func (s *Store) migrate() error {

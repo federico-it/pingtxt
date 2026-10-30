@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -75,6 +76,7 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("GET /api/monitors/{id}/results", auth(h.monitorResults))
 	mux.HandleFunc("POST /api/monitors/{id}/push-token", auth(h.rotatePushToken))
 	mux.HandleFunc("/api/push/{token}", h.push)
+	mux.HandleFunc("POST /api/monitors/{id}/expiry", auth(h.checkMonitorExpiry))
 	mux.HandleFunc("GET /api/incidents", auth(h.listIncidents))
 	mux.HandleFunc("GET /api/maintenances", auth(h.listMaintenances))
 	mux.HandleFunc("POST /api/maintenances", auth(h.createMaintenance))
@@ -410,10 +412,11 @@ func validatePush(m *store.Monitor) error {
 
 type monitorSummary struct {
 	*store.Monitor
-	Uptime24h float64          `json:"uptime_24h"`
-	AvgMs24h  float64          `json:"avg_ms_24h"`
-	Last      *store.ResultRow `json:"last"`
-	Bars      []bar            `json:"bars"`
+	Uptime24h float64              `json:"uptime_24h"`
+	AvgMs24h  float64              `json:"avg_ms_24h"`
+	Last      *store.ResultRow     `json:"last"`
+	Bars      []bar                `json:"bars"`
+	Expiry    []*store.ExpiryCheck `json:"expiry"`
 	// Maintenance is the window covering the monitor right now, if any.
 	Maintenance *activeMaint `json:"maintenance"`
 }
@@ -442,6 +445,9 @@ func (h *Hub) summary(m *store.Monitor) (*monitorSummary, error) {
 		return nil, err
 	}
 	s := &monitorSummary{Monitor: m, Uptime24h: up, AvgMs24h: avg}
+	if s.Expiry, err = h.store.ExpiryChecks(m.ID); err != nil {
+		return nil, err
+	}
 	if w, end := h.ActiveMaintenance(m.ID); w != nil && !m.Paused {
 		s.Maintenance = &activeMaint{ID: w.ID, Name: w.Name, EndAt: end.UnixMilli()}
 	}
@@ -546,6 +552,7 @@ func (h *Hub) createMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 		_ = h.store.SetMonitorPaused(m.ID, true)
 	}
 	h.MonitorChanged(m.ID)
+	h.expirySoon(m.ID)
 	got, _ := h.store.Monitor(m.ID)
 	writeJSON(w, 201, got)
 }
@@ -671,8 +678,41 @@ func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 		return
 	}
 	h.MonitorChanged(id)
+	h.expirySoon(id)
 	got, _ := h.store.Monitor(id)
 	writeJSON(w, 200, got)
+}
+
+// expirySoon looks up the expiry dates of a new or edited monitor in the
+// background, so they show up without waiting for the next pass.
+func (h *Hub) expirySoon(id int64) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		h.expiry.run.Lock()
+		defer h.expiry.run.Unlock()
+		h.checkExpiries(ctx, id, false)
+	}()
+}
+
+// checkMonitorExpiry looks up the certificate and domain expiry now.
+func (h *Hub) checkMonitorExpiry(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	if _, err := h.store.Monitor(id); err != nil {
+		writeErr(w, 404, "monitor not found")
+		return
+	}
+	h.CheckExpiryNow(r.Context(), id)
+	checks, err := h.store.ExpiryChecks(id)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, checks)
 }
 
 func (h *Hub) deleteMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) {

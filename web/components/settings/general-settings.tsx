@@ -23,6 +23,14 @@ export function GeneralSettingsForm({
     setG((p) => ({ ...p, [k]: v }))
   const setDef = (k: keyof GeneralSettings["monitor_defaults"], v: number) =>
     setG((p) => ({ ...p, monitor_defaults: { ...p.monitor_defaults, [k]: v } }))
+  const [certDays, setCertDays] = useState(
+    settings.general.expiry.cert_days.join(", ")
+  )
+  const [domainDays, setDomainDays] = useState(
+    settings.general.expiry.domain_days.join(", ")
+  )
+  const setExpiry = (k: keyof GeneralSettings["expiry"], text: string) =>
+    setG((p) => ({ ...p, expiry: { ...p.expiry, [k]: parseDays(text) } }))
   const dirty = JSON.stringify(g) !== JSON.stringify(settings.general)
 
   async function save(e: React.FormEvent) {
@@ -107,6 +115,41 @@ export function GeneralSettingsForm({
         </div>
       </Section>
 
+      <Section title="expiry alerts">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="tls certificate (days before)"
+            htmlFor="cert_days"
+            hint="one alert as each threshold is crossed, plus one when it expires. empty: off"
+          >
+            <Input
+              id="cert_days"
+              placeholder="14, 7, 3, 1"
+              value={certDays}
+              onChange={(e) => {
+                setCertDays(e.target.value)
+                setExpiry("cert_days", e.target.value)
+              }}
+            />
+          </Field>
+          <Field
+            label="domain registration (days before)"
+            htmlFor="domain_days"
+            hint="looked up with rdap, or whois where rdap is missing (e.g. .it)"
+          >
+            <Input
+              id="domain_days"
+              placeholder="30, 14, 7, 1"
+              value={domainDays}
+              onChange={(e) => {
+                setDomainDays(e.target.value)
+                setExpiry("domain_days", e.target.value)
+              }}
+            />
+          </Field>
+        </div>
+      </Section>
+
       <Section title="new monitor defaults">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="interval (s)" htmlFor="d_interval">
@@ -154,4 +197,13 @@ export function GeneralSettingsForm({
       </Section>
     </form>
   )
+}
+
+/** "30, 14 7" -> [30, 14, 7]: same order and limits as the hub. */
+function parseDays(text: string): number[] {
+  const days = text
+    .split(/[\s,;]+/)
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 365)
+  return [...new Set(days)].sort((a, b) => b - a).slice(0, 8)
 }

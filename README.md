@@ -14,6 +14,10 @@ but plain text, monospace, light and dark.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
 - **Maintenance windows**, one-off or recurring (daily, weekly, monthly, in any time zone), for some or all monitors:
   checks keep running but no incidents or alerts are raised, and those checks don't count toward uptime.
+- **Expiry alerts** for TLS certificates (https monitors) and domain registrations (RDAP, with WHOIS
+  fallback for registries without RDAP such as .it). Thresholds in days are set in settings
+  (default 14/7/3/1 for certificates, 30/14/7/1 for domains): one alert per threshold crossed,
+  one when it expires, one when it is renewed.
 
 | dark | light |
 | --- | --- |
@@ -133,6 +137,7 @@ agents; agents are stateless and reconnect with backoff.
 
 - `cmd/pingtxt` – hub binary. `cmd/pingtxt-agent` – agent binary.
 - `internal/check` – probe implementations, shared by hub and agents.
+- `internal/expiry` – certificate and domain (RDAP / WHOIS) expiry lookups, run by the hub.
 - `internal/hub` – scheduler, status evaluation, incidents, notifications, HTTP API, agent WebSocket.
 - `internal/store` – SQLite (pure Go driver `modernc.org/sqlite`, no CGO).
 - `web/` – Next.js 16 (App Router, static export), shadcn/ui on Base UI, Tailwind 4.

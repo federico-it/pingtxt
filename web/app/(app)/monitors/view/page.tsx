@@ -6,6 +6,7 @@ import { Suspense, useState } from "react"
 import { toast } from "sonner"
 
 import { Confirm } from "@/components/confirm"
+import { ExpiryTable } from "@/components/expiry"
 import { PushInfo } from "@/components/push-info"
 import { LatencyChart } from "@/components/latency-chart"
 import { KV, PageHeader, Section } from "@/components/page-header"
@@ -34,11 +35,6 @@ import { cn } from "@/lib/utils"
 
 const ranges = ["1h", "6h", "24h", "7d", "30d"] as const
 
-function certDays(r: ResultRow | null | undefined, now: number) {
-  if (!r?.cert_expiry || !now) return null
-  return Math.floor((r.cert_expiry * 1000 - now) / 86400000)
-}
-
 function View() {
   const router = useRouter()
   const id = Number(useSearchParams().get("id"))
@@ -66,7 +62,6 @@ function View() {
       </div>
     )
   const d = m.data
-  const days = certDays(d.last, now)
 
   async function togglePause() {
     try {
@@ -148,22 +143,7 @@ function View() {
         <KV k="uptime 24h" v={pct(d.uptime_24h)} />
         <KV k="uptime 7d" v={pct(d.uptime_7d)} />
         <KV k="uptime 30d" v={pct(d.uptime_30d)} />
-        <KV
-          k={days !== null ? "tls cert" : "avg 24h"}
-          v={
-            days !== null ? (
-              <span
-                className={cn(
-                  days < 7 ? "text-down" : days < 21 ? "text-warn" : ""
-                )}
-              >
-                {days}d left
-              </span>
-            ) : (
-              ms(d.avg_ms_24h)
-            )
-          }
-        />
+        <KV k="avg 24h" v={ms(d.avg_ms_24h)} />
       </div>
 
       {d.type === "push" && d.push_url && (
@@ -173,6 +153,12 @@ function View() {
       <Section title="last 24h">
         <UptimeBars bars={d.bars} height="h-8" />
       </Section>
+
+      {d.expiry.length > 0 && (
+        <Section title="expiry">
+          <ExpiryTable monitorId={id} checks={d.expiry} now={now} onChange={() => m.mutate()} />
+        </Section>
+      )}
 
       <Section
         title={d.type === "push" ? "run time (from ?ping=)" : "response time"}

@@ -93,6 +93,10 @@ func emailSubject(e Event) string {
 	if e.Test {
 		prefix = "[test] "
 	}
+	if e.Kind == KindCert || e.Kind == KindDomain {
+		// e.g. "[pingtxt] example.com certificate expiring"
+		return prefix + "[pingtxt] " + strings.TrimPrefix(e.Title(), "pingtxt: ")
+	}
 	return fmt.Sprintf("%s[pingtxt] %s is %s", prefix, e.Monitor, strings.ToUpper(e.Status))
 }
 

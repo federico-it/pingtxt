@@ -20,15 +20,52 @@ import (
 // Notifier types.
 var NotifierTypes = []string{"webhook", "discord", "slack", "telegram", "ntfy", "email"}
 
+// Event kinds. Status events have an empty kind for compatibility.
+const (
+	KindStatus = ""
+	KindCert   = "cert_expiry"
+	KindDomain = "domain_expiry"
+)
+
+// Expiry event statuses.
+const (
+	ExpiryExpiring = "expiring"
+	ExpiryExpired  = "expired"
+	ExpiryRenewed  = "renewed"
+)
+
 // Event is a status change sent to notification channels.
 type Event struct {
+	Kind      string `json:"kind,omitempty"` // "", "cert_expiry" or "domain_expiry"
 	MonitorID int64  `json:"monitor_id"`
 	Monitor   string `json:"monitor"`
 	Target    string `json:"target"`
-	Status    string `json:"status"` // "down" or "up"
+	Status    string `json:"status"` // "down"/"up", or "expiring"/"expired"/"renewed" for expiry events
 	Cause     string `json:"cause,omitempty"`
 	At        int64  `json:"at"`
 	Test      bool   `json:"test,omitempty"`
+	// Expiry events only.
+	Subject   string `json:"subject,omitempty"`    // host name or domain
+	ExpiresAt int64  `json:"expires_at,omitempty"` // unix ms
+	DaysLeft  *int   `json:"days_left,omitempty"`
+}
+
+// Alert reports whether the event is bad news (sent with high priority).
+func (e Event) Alert() bool {
+	return e.Status == StatusDown || e.Status == ExpiryExpiring || e.Status == ExpiryExpired
+}
+
+// Title is a one-line summary, used as subject or title by channels that have one.
+func (e Event) Title() string {
+	switch e.Kind {
+	case KindCert, KindDomain:
+		what := "certificate"
+		if e.Kind == KindDomain {
+			what = "domain"
+		}
+		return fmt.Sprintf("pingtxt: %s %s %s", e.Subject, what, e.Status)
+	}
+	return "pingtxt: " + e.Monitor + " " + strings.ToUpper(e.Status)
 }
 
 func (e Event) Text() string {
@@ -36,6 +73,9 @@ func (e Event) Text() string {
 	prefix := ""
 	if e.Test {
 		prefix = "[test] "
+	}
+	if e.Kind == KindCert || e.Kind == KindDomain {
+		return prefix + e.expiryText()
 	}
 	if e.Status == StatusDown {
 		s := fmt.Sprintf("%s[DOWN] %s (%s) at %s", prefix, e.Monitor, e.Target, ts)
@@ -45,6 +85,35 @@ func (e Event) Text() string {
 		return s
 	}
 	return fmt.Sprintf("%s[UP] %s (%s) is back up at %s", prefix, e.Monitor, e.Target, ts)
+}
+
+func (e Event) expiryText() string {
+	tag, what := "CERT", "TLS certificate"
+	if e.Kind == KindDomain {
+		tag, what = "DOMAIN", "domain registration"
+	}
+	date := time.UnixMilli(e.ExpiresAt).UTC().Format("2006-01-02")
+	days := 0
+	if e.DaysLeft != nil {
+		days = *e.DaysLeft
+	}
+	var s string
+	switch e.Status {
+	case ExpiryExpired:
+		s = fmt.Sprintf("[%s EXPIRED] %s: %s expired on %s", tag, e.Subject, what, date)
+	case ExpiryRenewed:
+		s = fmt.Sprintf("[%s OK] %s: %s renewed, now valid until %s", tag, e.Subject, what, date)
+	default:
+		s = fmt.Sprintf("[%s] %s: %s expires in %s (%s)", tag, e.Subject, what, plural(days, "day"), date)
+	}
+	return s + "\n> monitor " + e.Monitor + " (" + e.Target + ")"
+}
+
+func plural(n int, unit string) string {
+	if n == 1 {
+		return "1 " + unit
+	}
+	return fmt.Sprintf("%d %ss", n, unit)
 }
 
 // Notifier dispatches events to the configured channels.
@@ -97,11 +166,15 @@ func (n *Notifier) Deliver(ctx context.Context, nt *store.Notifier, e Event) err
 		u := "https://api.telegram.org/bot" + url.PathEscape(c["bot_token"]) + "/sendMessage"
 		return n.post(ctx, u, "application/json", mustJSON(map[string]string{"chat_id": c["chat_id"], "text": text}), nil)
 	case "ntfy":
-		hdr := map[string]string{"Title": "pingtxt: " + e.Monitor + " " + strings.ToUpper(e.Status)}
-		if e.Status == StatusDown {
+		hdr := map[string]string{"Title": e.Title()}
+		switch {
+		case e.Status == StatusDown || e.Status == ExpiryExpired:
 			hdr["Priority"] = "high"
 			hdr["Tags"] = "red_circle"
-		} else {
+		case e.Alert():
+			hdr["Priority"] = "high"
+			hdr["Tags"] = "warning"
+		default:
 			hdr["Tags"] = "green_circle"
 		}
 		if c["token"] != "" {

@@ -30,6 +30,38 @@ type GeneralSettings struct {
 	LocalEnabled    bool            `json:"local_enabled"`
 	RetentionDays   int             `json:"retention_days"`
 	MonitorDefaults MonitorDefaults `json:"monitor_defaults"`
+	Expiry          ExpirySettings  `json:"expiry"`
+}
+
+// ExpirySettings set when certificate and domain expiry alerts are sent:
+// one alert when the days left cross each threshold. An empty list turns
+// that kind of alert off.
+type ExpirySettings struct {
+	CertDays   []int `json:"cert_days"`
+	DomainDays []int `json:"domain_days"`
+}
+
+var (
+	defaultCertDays   = []int{14, 7, 3, 1}
+	defaultDomainDays = []int{30, 14, 7, 1}
+)
+
+// normalizeDays sorts thresholds from the largest, drops duplicates and
+// out-of-range values. nil (never set) means the defaults.
+func normalizeDays(in, def []int) []int {
+	if in == nil {
+		return slices.Clone(def)
+	}
+	out := []int{}
+	for _, d := range in {
+		if d >= 1 && d <= 365 {
+			out = append(out, d)
+		}
+	}
+	slices.Sort(out)
+	slices.Reverse(out)
+	out = slices.Compact(out)
+	return out[:min(len(out), 8)]
 }
 
 // ProviderSettings configure one OAuth / OIDC login provider.
@@ -96,6 +128,8 @@ func (g *GeneralSettings) normalize() {
 	}
 	d.TimeoutMs = min(max(d.TimeoutMs, 500), 60000)
 	d.Retries = min(max(d.Retries, 1), 10)
+	g.Expiry.CertDays = normalizeDays(g.Expiry.CertDays, defaultCertDays)
+	g.Expiry.DomainDays = normalizeDays(g.Expiry.DomainDays, defaultDomainDays)
 }
 
 func (g *GeneralSettings) validate() error {

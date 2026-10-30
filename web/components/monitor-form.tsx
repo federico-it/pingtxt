@@ -143,6 +143,8 @@ export const emptyMonitor: MonitorInput = {
   body: "",
   grace_sec: 300,
   locations: ["local"],
+  cert_expiry_alert: true,
+  domain_expiry_alert: true,
   paused: false,
 }
 
@@ -200,6 +202,7 @@ export function MonitorForm({
     setM((p) => ({ ...p, [k]: v }))
   const t = types.find((x) => x.value === m.type) ?? types[0]
   const isHTTP = m.type === "http" || m.type === "keyword"
+  const isHTTPS = isHTTP && m.target.trim().toLowerCase().startsWith("https://")
   const isPush = m.type === "push"
   const ivList = isPush
     ? withValue(pushIntervals, m.interval_sec)
@@ -532,6 +535,26 @@ export function MonitorForm({
                 onCheckedChange={(v) => set("ignore_tls", v)}
               />
               ignore TLS certificate errors
+            </label>
+          </div>
+        </Section>
+      )}
+
+      {!isPush && (
+        <Section title="expiry alerts">
+          <p className="mb-3 text-xs text-muted-foreground">
+            Notify before the TLS certificate or the domain registration expires. Thresholds are set in settings.
+          </p>
+          <div className="grid gap-2">
+            <label className={cn("flex items-center gap-2 text-xs", !isHTTPS && "text-muted-foreground")}>
+              <Switch checked={m.cert_expiry_alert} onCheckedChange={(v) => set("cert_expiry_alert", v)} />
+              tls certificate
+              {!isHTTPS && <span>(only for https urls)</span>}
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <Switch checked={m.domain_expiry_alert} onCheckedChange={(v) => set("domain_expiry_alert", v)} />
+              domain registration
+              <span className="text-muted-foreground">(rdap / whois, not for ip addresses)</span>
             </label>
           </div>
         </Section>

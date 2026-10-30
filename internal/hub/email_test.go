@@ -301,3 +301,10 @@ func TestEmailConfigValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestEmailSubjectExpiry(t *testing.T) {
+	e := Event{Kind: KindCert, Monitor: "site", Subject: "example.com", Status: ExpiryExpiring}
+	if got, want := emailSubject(e), "[pingtxt] example.com certificate "+ExpiryExpiring; got != want {
+		t.Fatalf("subject = %q, want %q", got, want)
+	}
+}
