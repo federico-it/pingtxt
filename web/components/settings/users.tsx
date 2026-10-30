@@ -19,11 +19,22 @@ export function UsersList({ meId }: { meId: number }) {
     }
   }
 
+  async function resetTwoFactor(u: User) {
+    try {
+      await api(`/api/users/${u.id}/2fa`, { method: "DELETE" })
+      toast.success(`two-factor turned off for ${u.email}`)
+      mutate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "error")
+    }
+  }
+
   return (
     <div className="divide-y divide-dashed border border-dashed">
       {data?.map((u) => {
         const methods = [
           u.has_password && "password",
+          u.two_factor && "2fa",
           ...u.identities.map((i) => i.provider),
         ]
           .filter(Boolean)
@@ -42,16 +53,31 @@ export function UsersList({ meId }: { meId: number }) {
               </span>
             </div>
             {u.id !== meId && (
-              <Confirm
-                trigger={
-                  <Button size="xs" variant="ghost">
-                    delete
-                  </Button>
-                }
-                title={`delete ${u.email}?`}
-                description="The user is logged out and can no longer log in."
-                onConfirm={() => remove(u)}
-              />
+              <div className="flex gap-1">
+                {u.two_factor && (
+                  <Confirm
+                    trigger={
+                      <Button size="xs" variant="ghost">
+                        reset 2fa
+                      </Button>
+                    }
+                    title={`turn off two-factor for ${u.email}?`}
+                    description="Use this when they lost their phone and recovery codes. They are logged out and can set it up again."
+                    action="reset"
+                    onConfirm={() => resetTwoFactor(u)}
+                  />
+                )}
+                <Confirm
+                  trigger={
+                    <Button size="xs" variant="ghost">
+                      delete
+                    </Button>
+                  }
+                  title={`delete ${u.email}?`}
+                  description="The user is logged out and can no longer log in."
+                  onConfirm={() => remove(u)}
+                />
+              </div>
             )}
           </div>
         )

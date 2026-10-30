@@ -43,3 +43,8 @@ export function interval(sec: number): string {
   if (sec % 60 === 0) return sec / 60 + "m"
   return sec + "s"
 }
+
+/** Calendar day of a UTC day bucket. */
+export function utcDate(ts: number): string {
+  return new Date(ts).toISOString().slice(0, 10)
+}
