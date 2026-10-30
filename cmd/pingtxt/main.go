@@ -32,6 +32,7 @@ func env(key, def string) string {
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 	enablePassword := flag.Bool("enable-password-login", false, "turn password login back on (if single sign-on is broken) and exit")
+	resetTwoFactor := flag.String("reset-2fa", "", "turn two-factor authentication off for the user with this email and exit")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(version)
@@ -67,6 +68,16 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("password login enabled. Restart the hub if it is running.")
+		return
+	}
+
+	if *resetTwoFactor != "" {
+		h := hub.New(cfg, st, log)
+		if err := h.ResetTwoFactor(*resetTwoFactor); err != nil {
+			log.Error("reset two-factor", "err", err)
+			os.Exit(1)
+		}
+		fmt.Println("two-factor authentication turned off for " + *resetTwoFactor + ".")
 		return
 	}
 

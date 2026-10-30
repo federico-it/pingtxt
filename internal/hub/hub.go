@@ -73,6 +73,7 @@ type Hub struct {
 
 	oidc       oidcDiscovery
 	states     oauthStates
+	challenges challenges
 	httpClient *http.Client
 }
 
