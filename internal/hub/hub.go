@@ -103,6 +103,9 @@ type Hub struct {
 
 	metricsCache metricsCache
 	updates      agentUpdates
+
+	backupMu sync.Mutex // one snapshot at a time
+	importMu sync.Mutex // one configuration import at a time
 }
 
 // New creates a hub.
@@ -158,6 +161,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	}
 	go h.maintenance(ctx)
 	go h.expiryLoop(ctx)
+	go h.backupLoop(ctx)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for {

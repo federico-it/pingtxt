@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { PageHeader, Section } from "@/components/page-header"
 import { ApiTokens } from "@/components/settings/api-tokens"
 import { AuthSettingsForm } from "@/components/settings/auth-settings"
+import { ConfigTransfer, DatabaseBackups } from "@/components/settings/backups"
 import { GeneralSettingsForm } from "@/components/settings/general-settings"
 import { TwoFactor } from "@/components/settings/two-factor"
 import { UsersList } from "@/components/settings/users"
@@ -110,6 +111,18 @@ export default function SettingsPage() {
           <Section title="users">
             <UsersList meId={me.data.user.id} />
           </Section>
+        )}
+
+        {isAdmin && (
+          <>
+            <ConfigTransfer
+              onImported={() => {
+                settings.mutate()
+                options.mutate()
+              }}
+            />
+            <DatabaseBackups />
+          </>
         )}
 
         <Section title="about">

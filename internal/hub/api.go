@@ -70,6 +70,18 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("DELETE /api/users/{id}", admin(h.deleteUser))
 	mux.HandleFunc("DELETE /api/users/{id}/2fa", admin(h.resetUserTwoFactor))
 
+	// Backups and configuration export/import: admins only.
+	mux.HandleFunc("GET /api/backups", admin(h.listBackups))
+	mux.HandleFunc("POST /api/backups", admin(h.createBackup))
+	mux.HandleFunc("POST /api/backups/upload", admin(h.uploadBackup))
+	mux.HandleFunc("DELETE /api/backups/restore", admin(h.cancelRestore))
+	mux.HandleFunc("GET /api/backups/{name}", admin(h.downloadBackup))
+	mux.HandleFunc("DELETE /api/backups/{name}", admin(h.deleteBackup))
+	mux.HandleFunc("POST /api/backups/{name}/restore", admin(h.stageRestore))
+	mux.HandleFunc("PUT /api/settings/backups", admin(h.putBackupSettings))
+	mux.HandleFunc("GET /api/config/export", auth(h.exportConfig)) // secrets only with a session
+	mux.HandleFunc("POST /api/config/import", admin(h.importConfig))
+
 	mux.HandleFunc("GET /api/overview", auth(h.overview))
 	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
 	mux.HandleFunc("POST /api/monitors", auth(h.createMonitor))
@@ -175,7 +187,11 @@ func securityHeaders(next http.Handler) http.Handler {
 		// Heartbeats are exempt: they are authenticated by the URL token, not
 		// by the session cookie, and any client must be able to send them.
 		if strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/api/push/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
-			if r.ContentLength != 0 && !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			ctype := r.Header.Get("Content-Type")
+			// Backup uploads are raw files. application/octet-stream is not a
+			// CORS "simple" type either, so a cross-site form cannot send it.
+			upload := r.URL.Path == "/api/backups/upload" && strings.HasPrefix(ctype, "application/octet-stream")
+			if r.ContentLength != 0 && !strings.HasPrefix(ctype, "application/json") && !upload {
 				writeErr(w, http.StatusUnsupportedMediaType, "content-type must be application/json")
 				return
 			}

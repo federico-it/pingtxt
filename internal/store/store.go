@@ -20,7 +20,8 @@ var ErrConflict = errors.New("already exists")
 
 // Store wraps the database handle.
 type Store struct {
-	db *sql.DB
+	db   *sql.DB
+	path string
 
 	rmu         sync.RWMutex
 	rollupUntil int64 // results before this are summarized in result_rollups
@@ -39,7 +40,7 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1) // SQLite: one writer, avoids SQLITE_BUSY
-	s := &Store{db: db}
+	s := &Store{db: db, path: path}
 	if err := s.migrate(); err != nil {
 		db.Close()
 		return nil, err

@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -35,6 +36,12 @@ func main() {
 	enablePassword := flag.Bool("enable-password-login", false, "turn password login back on (if single sign-on is broken) and exit")
 	resetTwoFactor := flag.String("reset-2fa", "", "turn two-factor authentication off for the user with this email and exit")
 	makeAdmin := flag.String("make-admin", "", "give the admin role to the user with this email and exit")
+	backupTo := flag.String("backup", "", "write a consistent copy of the database to this file and exit (safe while the hub runs)")
+	restoreFrom := flag.String("restore", "", "replace the database with this backup file and exit (stop the hub first)")
+	exportTo := flag.String("export-config", "", "write the configuration as JSON to this file (- for stdout) and exit")
+	exportSecrets := flag.Bool("export-secrets", false, "with -export-config: include passwords, tokens and secret webhook URLs")
+	importFrom := flag.String("import-config", "", "apply a configuration JSON file and exit (restart the hub afterwards)")
+	importMode := flag.String("import-mode", "merge", "with -import-config: merge (update by name, add the rest) or replace (delete current monitors first)")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(version)
@@ -56,7 +63,37 @@ func main() {
 		Version:       version,
 	}
 
-	st, err := store.Open(filepath.Join(cfg.DataDir, "pingtxt.db"))
+	dbPath := filepath.Join(cfg.DataDir, "pingtxt.db")
+
+	if *restoreFrom != "" {
+		kept, err := store.Restore(dbPath, *restoreFrom, hub.BackupDir(cfg.DataDir))
+		if err != nil {
+			log.Error("restore", "err", err)
+			os.Exit(1)
+		}
+		if kept != "" {
+			fmt.Println("previous database saved as " + kept)
+		}
+		fmt.Println("database restored from " + *restoreFrom + ". Start the hub.")
+		return
+	}
+	if *backupTo != "" {
+		if err := store.SnapshotFile(dbPath, *backupTo); err != nil {
+			log.Error("backup", "err", err)
+			os.Exit(1)
+		}
+		fmt.Println("backup written to " + *backupTo)
+		return
+	}
+
+	// A restore chosen in the web UI is applied before opening the database.
+	if kept, err := hub.ApplyPendingRestore(dbPath, cfg.DataDir); err != nil {
+		log.Error("restore staged backup failed, starting with the current database", "err", err)
+	} else if kept != "" {
+		log.Info("restored staged backup", "previous_database", kept)
+	}
+
+	st, err := store.Open(dbPath)
 	if err != nil {
 		log.Error("open database", "err", err)
 		os.Exit(1)
@@ -90,6 +127,53 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println(*makeAdmin + " is now an admin.")
+		return
+	}
+
+	if *exportTo != "" {
+		h := hub.New(cfg, st, log)
+		doc, err := h.ExportConfig(*exportSecrets)
+		if err != nil {
+			log.Error("export config", "err", err)
+			os.Exit(1)
+		}
+		b, _ := json.MarshalIndent(doc, "", "  ")
+		b = append(b, '\n')
+		if *exportTo == "-" {
+			os.Stdout.Write(b)
+		} else if err := os.WriteFile(*exportTo, b, 0o600); err != nil {
+			log.Error("export config", "err", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	if *importFrom != "" {
+		if *importMode != "merge" && *importMode != "replace" {
+			log.Error("-import-mode must be merge or replace")
+			os.Exit(1)
+		}
+		b, err := os.ReadFile(*importFrom)
+		if err != nil {
+			log.Error("import config", "err", err)
+			os.Exit(1)
+		}
+		doc, err := hub.ParseConfig(b)
+		if err != nil {
+			log.Error("import config", "err", err)
+			os.Exit(1)
+		}
+		h := hub.New(cfg, st, log)
+		res, err := h.ImportConfig(doc, hub.ImportOptions{Replace: *importMode == "replace", Settings: true, Backup: true})
+		if res != nil {
+			out, _ := json.MarshalIndent(res, "", "  ")
+			fmt.Println(string(out))
+		}
+		if err != nil {
+			log.Error("import config", "err", err)
+			os.Exit(1)
+		}
+		fmt.Println("configuration imported. Restart the hub if it is running.")
 		return
 	}
 
