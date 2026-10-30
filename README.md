@@ -26,14 +26,30 @@ docker run -d --name pingtxt --restart unless-stopped \
 or `docker compose up -d` with the [docker-compose.yml](docker-compose.yml) in this repo.
 Open `http://localhost:8090`, create the admin account, add monitors.
 
+Everything else is configured from the web UI under **settings** and stored in the database:
+public URL, built-in location, retention, defaults for new monitors, users and login.
+Only a few env vars are read at startup:
+
 | env | default | |
 | --- | --- | --- |
 | `PINGTXT_ADDR` | `:8090` | listen address |
 | `PINGTXT_DATA` | `/data` | SQLite database directory |
-| `PINGTXT_PUBLIC_URL` | from request | public URL used in the agent install commands |
-| `PINGTXT_RETENTION_DAYS` | `30` | how long raw check results are kept |
-| `PINGTXT_LOCAL_NAME` | `hub` | label of the built-in location |
-| `PINGTXT_DISABLE_LOCAL` | `false` | run checks only from agents |
+
+`PINGTXT_PUBLIC_URL`, `PINGTXT_RETENTION_DAYS`, `PINGTXT_LOCAL_NAME` and `PINGTXT_DISABLE_LOCAL`
+still work, but only seed the settings on the first start. After that, change them in the UI.
+
+### Single sign-on (GitHub, Google, OpenID Connect)
+
+In **settings → authentication** turn on a provider, paste the client id and secret, and register
+the callback URL shown there (`<public url>/api/auth/oauth/<provider>/callback`) at the provider.
+The generic OpenID Connect option works with Authentik, Keycloak, Authelia, Pocket ID, Zitadel, Okta, Entra ID and others.
+
+- A provider login is matched to an existing user by verified email, then linked. Users can also
+  connect accounts from **settings → account**.
+- Turn on *create accounts on first single sign-on* to let new people in, optionally limited to some email domains.
+- You can turn off password login once a provider works. If you lock yourself out, run
+  `pingtxt -enable-password-login` (in Docker: `docker exec pingtxt pingtxt -enable-password-login`, then restart).
+- Set the **public URL** in settings when the hub is behind a reverse proxy, so callback URLs are right.
 
 Put it behind a reverse proxy with TLS (Caddy, Traefik, nginx). WebSocket upgrade must be allowed on `/api/agent/ws`.
 

@@ -120,6 +120,19 @@ var migrations = []string{
 		enabled INTEGER NOT NULL DEFAULT 1,
 		created_at INTEGER NOT NULL
 	);`,
+	`CREATE TABLE settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	);
+	CREATE TABLE identities (
+		provider TEXT NOT NULL,
+		subject TEXT NOT NULL,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		email TEXT NOT NULL DEFAULT '',
+		created_at INTEGER NOT NULL,
+		PRIMARY KEY (provider, subject)
+	);
+	CREATE INDEX identities_user ON identities(user_id);`,
 }
 
 func (s *Store) migrate() error {

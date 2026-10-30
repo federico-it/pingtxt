@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,7 +29,9 @@ const (
 	StatusPaused   = "paused"
 )
 
-// Config holds runtime settings.
+// Config holds startup settings. PublicURL, LocalName, RetentionDays and
+// DisableLocal only seed the database on first start: afterwards they are
+// edited from the web UI (settings page).
 type Config struct {
 	Addr          string
 	DataDir       string
@@ -63,11 +66,19 @@ type Hub struct {
 	agents   map[int64]*agentConn
 	monitors map[int64]*monState
 	localSem chan struct{}
+
+	smu     sync.RWMutex
+	general GeneralSettings
+	auth    AuthSettings
+
+	oidc       oidcDiscovery
+	states     oauthStates
+	httpClient *http.Client
 }
 
 // New creates a hub.
 func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
-	return &Hub{
+	h := &Hub{
 		cfg:      cfg,
 		store:    st,
 		log:      log,
@@ -76,6 +87,12 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 		monitors: map[int64]*monState{},
 		localSem: make(chan struct{}, 64),
 	}
+	h.general, h.auth = defaultGeneral(cfg), defaultAuth()
+	h.httpClient = &http.Client{Timeout: 15 * time.Second}
+	if err := h.loadSettings(); err != nil {
+		log.Error("load settings", "err", err)
+	}
+	return h
 }
 
 // AgentLocation returns the location id for an agent.
@@ -201,7 +218,7 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 
 	for _, w := range work {
 		if w.loc == LocalLocation {
-			if h.cfg.DisableLocal {
+			if !h.localEnabled() {
 				continue
 			}
 			go h.runLocal(ctx, w.job)
@@ -323,7 +340,7 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 
 func (h *Hub) locationNameLocked(loc string) string {
 	if loc == LocalLocation {
-		return h.cfg.LocalName
+		return h.localName()
 	}
 	if id, ok := parseAgentLocation(loc); ok {
 		if ac := h.agents[id]; ac != nil {
@@ -344,7 +361,7 @@ func (h *Hub) maintenance(ctx context.Context) {
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()
 	for {
-		days := h.cfg.RetentionDays
+		days := h.generalSettings().RetentionDays
 		if days <= 0 {
 			days = 30
 		}

@@ -43,6 +43,16 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/auth/logout", h.logout)
 	mux.HandleFunc("GET /api/auth/me", auth(h.me))
 	mux.HandleFunc("POST /api/auth/password", auth(h.changePassword))
+	mux.HandleFunc("GET /api/auth/options", h.authOptions)
+	mux.HandleFunc("GET /api/auth/oauth/{provider}/start", h.oauthStart)
+	mux.HandleFunc("GET /api/auth/oauth/{provider}/callback", h.oauthCallback)
+	mux.HandleFunc("DELETE /api/auth/identities/{provider}", auth(h.unlinkIdentity))
+
+	mux.HandleFunc("GET /api/settings", auth(h.getSettings))
+	mux.HandleFunc("PUT /api/settings/general", auth(h.putGeneralSettings))
+	mux.HandleFunc("PUT /api/settings/auth", auth(h.putAuthSettings))
+	mux.HandleFunc("GET /api/users", auth(h.listUsers))
+	mux.HandleFunc("DELETE /api/users/{id}", auth(h.deleteUser))
 
 	mux.HandleFunc("GET /api/overview", auth(h.overview))
 	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
@@ -226,8 +236,12 @@ func (h *Hub) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "invalid body")
 		return
 	}
+	if a := h.authSettings(); !a.passwordLoginAllowed() {
+		writeErr(w, 403, "password login is disabled, use single sign-on")
+		return
+	}
 	u, err := h.store.UserByEmail(strings.ToLower(strings.TrimSpace(c.Email)))
-	if err != nil || bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(c.Password)) != nil {
+	if err != nil || u.PasswordHash == "" || bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(c.Password)) != nil {
 		time.Sleep(400 * time.Millisecond)
 		writeErr(w, 401, "invalid email or password")
 		return
@@ -248,7 +262,7 @@ func (h *Hub) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Hub) me(w http.ResponseWriter, r *http.Request, u *store.User) {
-	writeJSON(w, 200, map[string]any{"user": u, "version": h.cfg.Version})
+	writeJSON(w, 200, map[string]any{"user": h.userView(u), "version": h.cfg.Version})
 }
 
 func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.User) {
@@ -260,7 +274,8 @@ func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.Us
 		writeErr(w, 400, "invalid body")
 		return
 	}
-	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(b.Current)) != nil {
+	// Accounts created through single sign-on have no password yet: let them set one.
+	if u.PasswordHash != "" && bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(b.Current)) != nil {
 		writeErr(w, 400, "current password is wrong")
 		return
 	}
@@ -539,7 +554,7 @@ func nameOr(names map[string]string, id string) string {
 
 func (h *Hub) locationOnline(loc string) bool {
 	if loc == LocalLocation {
-		return !h.cfg.DisableLocal
+		return h.localEnabled()
 	}
 	if id, ok := parseAgentLocation(loc); ok {
 		return h.AgentOnline(id)
@@ -548,7 +563,7 @@ func (h *Hub) locationOnline(loc string) bool {
 }
 
 func (h *Hub) locationNames() map[string]string {
-	names := map[string]string{LocalLocation: h.cfg.LocalName}
+	names := map[string]string{LocalLocation: h.localName()}
 	agents, _ := h.store.ListAgents()
 	for _, a := range agents {
 		n := a.Name
@@ -707,8 +722,8 @@ type agentView struct {
 
 func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	out := []map[string]any{}
-	if !h.cfg.DisableLocal {
-		out = append(out, map[string]any{"id": LocalLocation, "name": h.cfg.LocalName, "online": true, "kind": "local"})
+	if h.localEnabled() {
+		out = append(out, map[string]any{"id": LocalLocation, "name": h.localName(), "online": true, "kind": "local"})
 	}
 	agents, err := h.store.ListAgents()
 	if err != nil {
@@ -725,10 +740,15 @@ func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.Use
 	writeJSON(w, 200, out)
 }
 
+// hubURL is the public URL of the hub: the configured one, or guessed from the request.
 func (h *Hub) hubURL(r *http.Request) string {
-	if h.cfg.PublicURL != "" {
-		return strings.TrimRight(h.cfg.PublicURL, "/")
+	if u := h.generalSettings().PublicURL; u != "" {
+		return u
 	}
+	return requestURL(r)
+}
+
+func requestURL(r *http.Request) string {
 	scheme := "http"
 	if isHTTPS(r) {
 		scheme = "https"

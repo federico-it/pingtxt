@@ -31,6 +31,7 @@ func env(key, def string) string {
 
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
+	enablePassword := flag.Bool("enable-password-login", false, "turn password login back on (if single sign-on is broken) and exit")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(version)
@@ -39,6 +40,8 @@ func main() {
 
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	retention, _ := strconv.Atoi(env("PINGTXT_RETENTION_DAYS", "30"))
+	// Only the address, data dir and agent dir are read at every start. The other
+	// values seed the database on first start; then they are edited in the web UI.
 	cfg := hub.Config{
 		Addr:          env("PINGTXT_ADDR", ":8090"),
 		DataDir:       env("PINGTXT_DATA", "./data"),
@@ -56,6 +59,16 @@ func main() {
 		os.Exit(1)
 	}
 	defer st.Close()
+
+	if *enablePassword {
+		h := hub.New(cfg, st, log)
+		if err := h.EnablePasswordLogin(); err != nil {
+			log.Error("enable password login", "err", err)
+			os.Exit(1)
+		}
+		fmt.Println("password login enabled. Restart the hub if it is running.")
+		return
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
