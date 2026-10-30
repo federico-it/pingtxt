@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 
+import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -195,6 +196,8 @@ export const emptyMonitor: MonitorInput = {
   body: "",
   grace_sec: 300,
   locations: ["local"],
+  group_id: 0,
+  tag_ids: [],
   cert_expiry_alert: true,
   domain_expiry_alert: true,
   paused: false,
@@ -249,6 +252,14 @@ export function MonitorForm({
   const locations = useApi<Location[]>("/api/locations", {
     refreshInterval: 15_000,
   })
+  const labels = useLabels()
+  const groupItems = [
+    { value: "0", label: "no group" },
+    ...(labels.groups.data ?? []).map((g) => ({
+      value: String(g.id),
+      label: g.name,
+    })),
+  ]
 
   const set = <K extends keyof MonitorInput>(k: K, v: MonitorInput[K]) =>
     setM((p) => ({ ...p, [k]: v }))
@@ -484,6 +495,43 @@ export function MonitorForm({
         </div>
       </Section>
 
+      <Section title="group & tags">
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <Field
+            label="group"
+            hint="groups show as sections on the dashboard and status pages"
+          >
+            <Select
+              items={groupItems}
+              value={String(m.group_id ?? 0)}
+              onValueChange={(v) => set("group_id", Number(v ?? 0))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {groupItems.map((g) => (
+                  <SelectItem key={g.value} value={g.value}>
+                    {g.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field
+            label="tags"
+            hint="type a name and press enter to create a tag"
+          >
+            <TagPicker
+              value={m.tag_ids ?? []}
+              onChange={(ids) => set("tag_ids", ids)}
+              tags={labels.tags.data ?? []}
+              onCreated={() => labels.tags.mutate()}
+            />
+          </Field>
+        </div>
+      </Section>
+
       <Section title="schedule">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field
@@ -660,18 +708,32 @@ export function MonitorForm({
       {!isPush && (
         <Section title="expiry alerts">
           <p className="mb-3 text-xs text-muted-foreground">
-            Notify before the TLS certificate or the domain registration expires. Thresholds are set in settings.
+            Notify before the TLS certificate or the domain registration
+            expires. Thresholds are set in settings.
           </p>
           <div className="grid gap-2">
-            <label className={cn("flex items-center gap-2 text-xs", !isHTTPS && "text-muted-foreground")}>
-              <Switch checked={m.cert_expiry_alert} onCheckedChange={(v) => set("cert_expiry_alert", v)} />
+            <label
+              className={cn(
+                "flex items-center gap-2 text-xs",
+                !isHTTPS && "text-muted-foreground"
+              )}
+            >
+              <Switch
+                checked={m.cert_expiry_alert}
+                onCheckedChange={(v) => set("cert_expiry_alert", v)}
+              />
               tls certificate
               {!isHTTPS && <span>(only for https urls)</span>}
             </label>
             <label className="flex items-center gap-2 text-xs">
-              <Switch checked={m.domain_expiry_alert} onCheckedChange={(v) => set("domain_expiry_alert", v)} />
+              <Switch
+                checked={m.domain_expiry_alert}
+                onCheckedChange={(v) => set("domain_expiry_alert", v)}
+              />
               domain registration
-              <span className="text-muted-foreground">(rdap / whois, not for ip addresses)</span>
+              <span className="text-muted-foreground">
+                (rdap / whois, not for ip addresses)
+              </span>
             </label>
           </div>
         </Section>

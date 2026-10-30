@@ -34,6 +34,8 @@ type Maintenance struct {
 	Description string  `json:"description"`
 	AllMonitors bool    `json:"all_monitors"`
 	MonitorIDs  []int64 `json:"monitor_ids"`
+	GroupIDs    []int64 `json:"group_ids"` // every monitor of these groups
+	TagIDs      []int64 `json:"tag_ids"`   // every monitor with one of these tags
 	Kind        string  `json:"kind"`
 	StartAt     int64   `json:"start_at"`
 	EndAt       int64   `json:"end_at"`
@@ -46,9 +48,21 @@ type Maintenance struct {
 	CreatedAt   int64   `json:"created_at"`
 }
 
-// Covers reports whether the window applies to a monitor.
-func (m *Maintenance) Covers(monitorID int64) bool {
-	return m.AllMonitors || slices.Contains(m.MonitorIDs, monitorID)
+// Covers reports whether the window applies to a monitor: picked directly,
+// through its group or through one of its tags.
+func (m *Maintenance) Covers(mon *Monitor) bool {
+	if m.AllMonitors || slices.Contains(m.MonitorIDs, mon.ID) {
+		return true
+	}
+	if mon.GroupID != 0 && slices.Contains(m.GroupIDs, mon.GroupID) {
+		return true
+	}
+	for _, t := range mon.TagIDs {
+		if slices.Contains(m.TagIDs, t) {
+			return true
+		}
+	}
+	return false
 }
 
 var tzCache sync.Map
@@ -169,12 +183,12 @@ func (m *Maintenance) NextAfter(t time.Time) (start, end time.Time, ok bool) {
 	return
 }
 
-const maintCols = `id, name, description, all_monitors, monitor_ids, kind, start_at, end_at, start_time, duration_min, weekdays, month_days, timezone, enabled, created_at`
+const maintCols = `id, name, description, all_monitors, monitor_ids, kind, start_at, end_at, start_time, duration_min, weekdays, month_days, timezone, enabled, created_at, group_ids, tag_ids`
 
 func scanMaintenance(sc interface{ Scan(...any) error }) (*Maintenance, error) {
 	m := &Maintenance{}
-	var ids, wd, md string
-	err := sc.Scan(&m.ID, &m.Name, &m.Description, &m.AllMonitors, &ids, &m.Kind, &m.StartAt, &m.EndAt, &m.StartTime, &m.DurationMin, &wd, &md, &m.Timezone, &m.Enabled, &m.CreatedAt)
+	var ids, wd, md, gids, tids string
+	err := sc.Scan(&m.ID, &m.Name, &m.Description, &m.AllMonitors, &ids, &m.Kind, &m.StartAt, &m.EndAt, &m.StartTime, &m.DurationMin, &wd, &md, &m.Timezone, &m.Enabled, &m.CreatedAt, &gids, &tids)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -184,8 +198,16 @@ func scanMaintenance(sc interface{ Scan(...any) error }) (*Maintenance, error) {
 	_ = json.Unmarshal([]byte(ids), &m.MonitorIDs)
 	_ = json.Unmarshal([]byte(wd), &m.Weekdays)
 	_ = json.Unmarshal([]byte(md), &m.MonthDays)
+	_ = json.Unmarshal([]byte(gids), &m.GroupIDs)
+	_ = json.Unmarshal([]byte(tids), &m.TagIDs)
 	if m.MonitorIDs == nil {
 		m.MonitorIDs = []int64{}
+	}
+	if m.GroupIDs == nil {
+		m.GroupIDs = []int64{}
+	}
+	if m.TagIDs == nil {
+		m.TagIDs = []int64{}
 	}
 	if m.Weekdays == nil {
 		m.Weekdays = []int{}
@@ -217,19 +239,19 @@ func (s *Store) Maintenance(id int64) (*Maintenance, error) {
 	return scanMaintenance(s.db.QueryRow(`SELECT `+maintCols+` FROM maintenances WHERE id = ?`, id))
 }
 
-func maintJSON(m *Maintenance) (ids, wd, md string) {
-	a, _ := json.Marshal(m.MonitorIDs)
-	b, _ := json.Marshal(m.Weekdays)
-	c, _ := json.Marshal(m.MonthDays)
-	return string(a), string(b), string(c)
+func jsonIDs[T any](v []T) string {
+	if v == nil {
+		return "[]"
+	}
+	b, _ := json.Marshal(v)
+	return string(b)
 }
 
 func (s *Store) CreateMaintenance(m *Maintenance) error {
-	ids, wd, md := maintJSON(m)
 	m.CreatedAt = now()
-	res, err := s.db.Exec(`INSERT INTO maintenances (name, description, all_monitors, monitor_ids, kind, start_at, end_at, start_time, duration_min, weekdays, month_days, timezone, enabled, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.Name, m.Description, b2i(m.AllMonitors), ids, m.Kind, m.StartAt, m.EndAt, m.StartTime, m.DurationMin, wd, md, m.Timezone, b2i(m.Enabled), m.CreatedAt)
+	res, err := s.db.Exec(`INSERT INTO maintenances (name, description, all_monitors, monitor_ids, kind, start_at, end_at, start_time, duration_min, weekdays, month_days, timezone, enabled, created_at, group_ids, tag_ids)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.Name, m.Description, b2i(m.AllMonitors), jsonIDs(m.MonitorIDs), m.Kind, m.StartAt, m.EndAt, m.StartTime, m.DurationMin, jsonIDs(m.Weekdays), jsonIDs(m.MonthDays), m.Timezone, b2i(m.Enabled), m.CreatedAt, jsonIDs(m.GroupIDs), jsonIDs(m.TagIDs))
 	if err != nil {
 		return err
 	}
@@ -238,9 +260,8 @@ func (s *Store) CreateMaintenance(m *Maintenance) error {
 }
 
 func (s *Store) UpdateMaintenance(m *Maintenance) error {
-	ids, wd, md := maintJSON(m)
-	_, err := s.db.Exec(`UPDATE maintenances SET name = ?, description = ?, all_monitors = ?, monitor_ids = ?, kind = ?, start_at = ?, end_at = ?, start_time = ?, duration_min = ?, weekdays = ?, month_days = ?, timezone = ?, enabled = ? WHERE id = ?`,
-		m.Name, m.Description, b2i(m.AllMonitors), ids, m.Kind, m.StartAt, m.EndAt, m.StartTime, m.DurationMin, wd, md, m.Timezone, b2i(m.Enabled), m.ID)
+	_, err := s.db.Exec(`UPDATE maintenances SET name = ?, description = ?, all_monitors = ?, monitor_ids = ?, kind = ?, start_at = ?, end_at = ?, start_time = ?, duration_min = ?, weekdays = ?, month_days = ?, timezone = ?, enabled = ?, group_ids = ?, tag_ids = ? WHERE id = ?`,
+		m.Name, m.Description, b2i(m.AllMonitors), jsonIDs(m.MonitorIDs), m.Kind, m.StartAt, m.EndAt, m.StartTime, m.DurationMin, jsonIDs(m.Weekdays), jsonIDs(m.MonthDays), m.Timezone, b2i(m.Enabled), jsonIDs(m.GroupIDs), jsonIDs(m.TagIDs), m.ID)
 	return err
 }
 

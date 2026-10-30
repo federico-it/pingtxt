@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useSyncExternalStore } from "react"
+import { Fragment, useEffect, useSyncExternalStore } from "react"
 import useSWR from "swr"
 
 import { Section } from "@/components/page-header"
@@ -108,15 +108,18 @@ export default function PublicStatusPage() {
             <div className="border border-dashed p-8 text-center text-muted-foreground">nothing to show yet.</div>
           ) : (
             <div className="border-t border-dashed">
-              {data.monitors.map((m) => (
-                <div key={m.id} className="grid gap-2 border-b border-dashed px-2 py-3">
+              {data.monitors.map((m, i) => (
+                <Fragment key={m.id}>
+                  {m.group && m.group !== data.monitors[i - 1]?.group && <GroupHeader page={data} name={m.group} />}
+                  <div className={cn("grid gap-2 border-b border-dashed px-2 py-3", m.group && "pl-4")}>
                   <div className="flex items-center gap-3">
                     <span className="min-w-0 flex-1 truncate font-medium">{m.name}</span>
                     <span className="text-xs text-muted-foreground">{pct(m.uptime)}</span>
                     <StatusText status={m.status} className="w-24 justify-end text-xs" />
                   </div>
-                  <UptimeBars bars={m.bars} daily height="h-7" />
-                </div>
+                    <UptimeBars bars={m.bars} daily height="h-7" />
+                  </div>
+                </Fragment>
               ))}
               <div className="flex justify-between px-2 pt-1.5 text-[11px] text-muted-foreground">
                 <span>{data.days} days ago</span>
@@ -153,6 +156,24 @@ export default function PublicStatusPage() {
         </span>
         <span>refreshes every minute</span>
       </footer>
+    </div>
+  )
+}
+
+/** Section title of a group, with the state of its worst monitor. */
+function GroupHeader({ page, name }: { page: PublicStatusPage; name: string }) {
+  const ms = page.monitors.filter((m) => m.group === name && m.status !== "paused")
+  const down = ms.filter((m) => m.status === "down").length
+  const degraded = ms.filter((m) => m.status === "degraded").length
+  let text = ""
+  let cls = "text-muted-foreground"
+  if (down > 0) [text, cls] = [down === ms.length ? "outage" : `${down}/${ms.length} down`, "text-down"]
+  else if (degraded > 0) [text, cls] = ["degraded", "text-warn"]
+  else if (ms.some((m) => m.status === "up")) [text, cls] = ["operational", "text-up"]
+  return (
+    <div className="flex items-center gap-3 border-b border-dashed bg-muted/40 px-2 py-1.5 text-xs">
+      <span className="font-medium uppercase">{name}</span>
+      <span className={cn("ml-auto", cls)}>{text}</span>
     </div>
   )
 }

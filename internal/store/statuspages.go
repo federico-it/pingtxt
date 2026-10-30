@@ -16,7 +16,9 @@ type StatusPage struct {
 	Published     bool    `json:"published"`
 	ShowIncidents bool    `json:"show_incidents"`
 	MonitorIDs    []int64 `json:"monitor_ids"`
-	CreatedAt     int64   `json:"created_at"`
+	// GroupIDs adds every monitor of these groups, current and future.
+	GroupIDs  []int64 `json:"group_ids"`
+	CreatedAt int64   `json:"created_at"`
 }
 
 const statusPageCols = `id, slug, title, description, domain, published, show_incidents, created_at`
@@ -44,7 +46,24 @@ func (s *Store) loadPageMonitors(p *StatusPage) error {
 		}
 		p.MonitorIDs = append(p.MonitorIDs, id)
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+	grows, err := s.db.Query(`SELECT group_id FROM status_page_groups WHERE page_id = ? ORDER BY position, group_id`, p.ID)
+	if err != nil {
+		return err
+	}
+	defer grows.Close()
+	p.GroupIDs = []int64{}
+	for grows.Next() {
+		var id int64
+		if err := grows.Scan(&id); err != nil {
+			return err
+		}
+		p.GroupIDs = append(p.GroupIDs, id)
+	}
+	return grows.Err()
 }
 
 func (s *Store) ListStatusPages() ([]*StatusPage, error) {
@@ -104,12 +123,20 @@ func uniqueErr(err error) error {
 	return err
 }
 
-func setPageMonitors(tx *sql.Tx, pageID int64, ids []int64) error {
-	if _, err := tx.Exec(`DELETE FROM status_page_monitors WHERE page_id = ?`, pageID); err != nil {
+func setPageMonitors(tx *sql.Tx, p *StatusPage) error {
+	if _, err := tx.Exec(`DELETE FROM status_page_monitors WHERE page_id = ?`, p.ID); err != nil {
 		return err
 	}
-	for i, id := range ids {
-		if _, err := tx.Exec(`INSERT INTO status_page_monitors (page_id, monitor_id, position) VALUES (?, ?, ?)`, pageID, id, i); err != nil {
+	for i, id := range p.MonitorIDs {
+		if _, err := tx.Exec(`INSERT INTO status_page_monitors (page_id, monitor_id, position) VALUES (?, ?, ?)`, p.ID, id, i); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(`DELETE FROM status_page_groups WHERE page_id = ?`, p.ID); err != nil {
+		return err
+	}
+	for i, id := range p.GroupIDs {
+		if _, err := tx.Exec(`INSERT INTO status_page_groups (page_id, group_id, position) VALUES (?, ?, ?)`, p.ID, id, i); err != nil {
 			return err
 		}
 	}
@@ -129,7 +156,7 @@ func (s *Store) CreateStatusPage(p *StatusPage) error {
 		return uniqueErr(err)
 	}
 	p.ID, _ = res.LastInsertId()
-	if err := setPageMonitors(tx, p.ID, p.MonitorIDs); err != nil {
+	if err := setPageMonitors(tx, p); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -149,7 +176,7 @@ func (s *Store) UpdateStatusPage(p *StatusPage) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	if err := setPageMonitors(tx, p.ID, p.MonitorIDs); err != nil {
+	if err := setPageMonitors(tx, p); err != nil {
 		return err
 	}
 	return tx.Commit()

@@ -23,11 +23,11 @@ func (h *Hub) MaintenancesChanged() error {
 }
 
 // activeMaintLocked returns the window covering a monitor at t, if any.
-func (h *Hub) activeMaintLocked(monitorID int64, t time.Time) (*store.Maintenance, time.Time) {
+func (h *Hub) activeMaintLocked(m *store.Monitor, t time.Time) (*store.Maintenance, time.Time) {
 	var best *store.Maintenance
 	var bestEnd time.Time
 	for _, w := range h.maints {
-		if !w.Covers(monitorID) {
+		if !w.Covers(m) {
 			continue
 		}
 		// With overlapping windows report the one that lasts longest.
@@ -39,10 +39,10 @@ func (h *Hub) activeMaintLocked(monitorID int64, t time.Time) (*store.Maintenanc
 }
 
 // ActiveMaintenance returns the window covering a monitor now, if any.
-func (h *Hub) ActiveMaintenance(monitorID int64) (*store.Maintenance, time.Time) {
+func (h *Hub) ActiveMaintenance(m *store.Monitor) (*store.Maintenance, time.Time) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.activeMaintLocked(monitorID, time.Now())
+	return h.activeMaintLocked(m, time.Now())
 }
 
 // maintTick switches monitors in and out of maintenance at window bounds,
@@ -60,7 +60,7 @@ func (h *Hub) maintTick(now time.Time) {
 		if st.m.Paused {
 			continue
 		}
-		w, _ := h.activeMaintLocked(st.m.ID, now)
+		w, _ := h.activeMaintLocked(st.m, now)
 		active := w != nil
 		stale := !active && st.m.Status == StatusMaintenance // e.g. after a restart
 		if active == st.inMaint && !stale {
@@ -120,21 +120,20 @@ func (h *Hub) validateMaintenance(m *store.Maintenance) error {
 	if !slices.Contains(maintKinds, m.Kind) {
 		return errors.New("invalid kind")
 	}
-	if m.MonitorIDs == nil {
-		m.MonitorIDs = []int64{}
-	}
-	slices.Sort(m.MonitorIDs)
-	m.MonitorIDs = slices.Compact(m.MonitorIDs)
+	m.MonitorIDs, m.GroupIDs, m.TagIDs = cleanIDs(m.MonitorIDs), cleanIDs(m.GroupIDs), cleanIDs(m.TagIDs)
 	if m.AllMonitors {
-		m.MonitorIDs = []int64{}
+		m.MonitorIDs, m.GroupIDs, m.TagIDs = []int64{}, []int64{}, []int64{}
 	} else {
-		if len(m.MonitorIDs) == 0 {
-			return errors.New("select at least one monitor")
+		if len(m.MonitorIDs)+len(m.GroupIDs)+len(m.TagIDs) == 0 {
+			return errors.New("select at least one monitor, group or tag")
 		}
 		for _, id := range m.MonitorIDs {
 			if _, err := h.store.Monitor(id); err != nil {
 				return errors.New("unknown monitor")
 			}
+		}
+		if err := h.checkGroupsTags(m.GroupIDs, m.TagIDs); err != nil {
+			return err
 		}
 	}
 	if m.Timezone == "" {

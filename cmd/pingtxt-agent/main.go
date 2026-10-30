@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -33,6 +34,7 @@ func main() {
 	hubURL := flag.String("hub", os.Getenv("PINGTXT_HUB"), "hub URL (env PINGTXT_HUB)")
 	token := flag.String("token", os.Getenv("PINGTXT_TOKEN"), "agent token (env PINGTXT_TOKEN)")
 	concurrency := flag.Int("concurrency", 32, "max parallel checks")
+	noUpdate := flag.Bool("no-auto-update", envBool("PINGTXT_NO_AUTO_UPDATE"), "never replace this binary when the hub asks (env PINGTXT_NO_AUTO_UPDATE)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 	if *showVersion {
@@ -50,13 +52,29 @@ func main() {
 		os.Exit(2)
 	}
 
+	exe, noUpdateReason := selfUpdateSupport(*noUpdate)
+	ag := &agent{
+		log: log, wsURL: wsURL, httpURL: toHTTP(wsURL), token: *token, concurrency: *concurrency,
+		exe: exe, noUpdateReason: noUpdateReason,
+		client: &http.Client{Timeout: 10 * time.Minute},
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	backoff := time.Second
 	for ctx.Err() == nil {
 		start := time.Now()
-		err := session(ctx, log, wsURL, *token, *concurrency)
+		err := ag.session(ctx)
+		if errors.Is(err, errRestart) {
+			stop()
+			log.Info("restarting with the new version")
+			err := restart(exe)
+			// Exec only returns on failure. The new binary is already in
+			// place, so exiting lets the service manager start it.
+			log.Error("restart failed", "err", err)
+			os.Exit(1)
+		}
 		if ctx.Err() != nil {
 			break
 		}
@@ -87,9 +105,42 @@ func toWS(u string) (string, error) {
 	return "", fmt.Errorf("URL must start with http:// or https://: %q", u)
 }
 
-func session(ctx context.Context, log *slog.Logger, wsURL, token string, concurrency int) error {
+// toHTTP turns the WebSocket URL back into the hub's base http(s) URL.
+func toHTTP(wsURL string) string {
+	u := strings.TrimSuffix(wsURL, protocol.Path)
+	if rest, ok := strings.CutPrefix(u, "wss://"); ok {
+		return "https://" + rest
+	}
+	return "http://" + strings.TrimPrefix(u, "ws://")
+}
+
+func envBool(k string) bool {
+	switch strings.ToLower(os.Getenv(k)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// errRestart ends a session after the binary was replaced.
+var errRestart = errors.New("restart for update")
+
+type agent struct {
+	log         *slog.Logger
+	wsURL       string
+	httpURL     string
+	token       string
+	concurrency int
+	client      *http.Client
+
+	exe            string // path of this binary, empty when it cannot self-update
+	noUpdateReason string
+}
+
+func (a *agent) session(ctx context.Context) error {
+	log, token, concurrency := a.log, a.token, a.concurrency
 	dctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	conn, resp, err := websocket.Dial(dctx, wsURL, &websocket.DialOptions{
+	conn, resp, err := websocket.Dial(dctx, a.wsURL, &websocket.DialOptions{
 		HTTPHeader: http.Header{"Authorization": {"Bearer " + token}, "User-Agent": {"pingtxt-agent/" + version}},
 	})
 	cancel()
@@ -105,6 +156,7 @@ func session(ctx context.Context, log *slog.Logger, wsURL, token string, concurr
 	host, _ := os.Hostname()
 	if err := wsjson.Write(ctx, conn, protocol.Message{Type: protocol.TypeHello, Hello: &protocol.Hello{
 		Version: version, Hostname: host, OS: runtime.GOOS, Arch: runtime.GOARCH,
+		SelfUpdate: a.exe != "", NoUpdateReason: a.noUpdateReason,
 	}}); err != nil {
 		return err
 	}
@@ -112,7 +164,10 @@ func session(ctx context.Context, log *slog.Logger, wsURL, token string, concurr
 	sctx, scancel := context.WithCancel(ctx)
 	defer scancel()
 	results := make(chan check.Result, 256)
+	statuses := make(chan protocol.UpdateStatus, 1)
 	sem := make(chan struct{}, max(concurrency, 1))
+	updating := false
+	updated := make(chan error, 1)
 
 	go func() {
 		for {
@@ -127,14 +182,57 @@ func session(ctx context.Context, log *slog.Logger, wsURL, token string, concurr
 					scancel()
 					return
 				}
+			case st := <-statuses:
+				wctx, c := context.WithTimeout(sctx, 10*time.Second)
+				err := wsjson.Write(wctx, conn, protocol.Message{Type: protocol.TypeUpdateStatus, UpdateStatus: &st})
+				c()
+				if err != nil {
+					scancel()
+					return
+				}
+			}
+		}
+	}()
+
+	type frame struct {
+		data []byte
+		err  error
+	}
+	frames := make(chan frame)
+	go func() {
+		for {
+			_, data, err := conn.Read(sctx)
+			select {
+			case frames <- frame{data, err}:
+			case <-sctx.Done():
+				return
+			}
+			if err != nil {
+				return
 			}
 		}
 	}()
 
 	for {
-		_, data, err := conn.Read(sctx)
-		if err != nil {
-			return err
+		var data []byte
+		select {
+		case err := <-updated:
+			updating = false
+			if err == nil {
+				conn.Close(websocket.StatusNormalClosure, "updating")
+				return errRestart
+			}
+			log.Error("update failed", "err", err)
+			select {
+			case statuses <- protocol.UpdateStatus{Version: version, Error: err.Error()}:
+			default:
+			}
+			continue
+		case f := <-frames:
+			if f.err != nil {
+				return f.err
+			}
+			data = f.data
 		}
 		var msg protocol.Message
 		if json.Unmarshal(data, &msg) != nil {
@@ -164,6 +262,21 @@ func session(ctx context.Context, log *slog.Logger, wsURL, token string, concurr
 				case <-sctx.Done():
 				}
 			}()
+		case protocol.TypeUpdate:
+			u := msg.Update
+			if u == nil || updating || u.Version == version {
+				continue
+			}
+			if a.exe == "" {
+				select {
+				case statuses <- protocol.UpdateStatus{Version: version, Error: "self-update not available: " + a.noUpdateReason}:
+				default:
+				}
+				continue
+			}
+			updating = true
+			log.Info("updating agent", "from", version, "to", u.Version)
+			go func() { updated <- downloadUpdate(sctx, a.client, a.httpURL, a.exe, *u) }()
 		}
 	}
 }
