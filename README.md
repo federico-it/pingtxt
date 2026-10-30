@@ -10,6 +10,7 @@ but plain text, monospace, light and dark.
 - Status across locations: **down** when the majority of online locations fail, **degraded** when only some do.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
+- Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
 
 | dark | light |
 | --- | --- |
@@ -52,6 +53,16 @@ The generic OpenID Connect option works with Authentik, Keycloak, Authelia, Pock
 - Set the **public URL** in settings when the hub is behind a reverse proxy, so callback URLs are right.
 
 Put it behind a reverse proxy with TLS (Caddy, Traefik, nginx). WebSocket upgrade must be allowed on `/api/agent/ws`.
+
+## Status pages
+
+Create them under **status** in the web UI: pick the monitors, their order, and whether past incidents are shown.
+A page is public at `https://<hub>/status/<slug>/`. Visitors only see monitor names, status, uptime and incident
+times, never targets, locations or error messages. Drafts are visible only to logged-in users.
+
+For a **custom domain** (e.g. `status.example.com`), set it on the page, point its DNS at the hub and route the host
+to pingtxt in your reverse proxy (with its own TLS certificate). On that host pingtxt serves only the status page at
+`/`; the admin UI and API are not reachable there. The history covers the retention period, up to 90 days.
 
 ## Add a location (agent)
 

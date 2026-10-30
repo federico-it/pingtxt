@@ -79,6 +79,13 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/notifiers/test", auth(h.testDraftNotifier))
 	mux.HandleFunc("POST /api/notifiers/{id}/test", auth(h.testNotifier))
 
+	mux.HandleFunc("GET /api/status-pages", auth(h.listStatusPages))
+	mux.HandleFunc("POST /api/status-pages", auth(h.saveStatusPage))
+	mux.HandleFunc("GET /api/status-pages/{id}", auth(h.getStatusPage))
+	mux.HandleFunc("PUT /api/status-pages/{id}", auth(h.saveStatusPage))
+	mux.HandleFunc("DELETE /api/status-pages/{id}", auth(h.deleteStatusPage))
+	mux.HandleFunc("GET /api/public/status/{slug}", h.publicStatus)
+
 	mux.HandleFunc("GET "+protocol.Path, h.ServeAgent)
 	mux.HandleFunc("GET /install-agent.sh", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/x-shellscript; charset=utf-8")
@@ -89,7 +96,7 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 		writeErr(w, http.StatusNotFound, "not found")
 	})
 	mux.Handle("/", spaHandler(ui))
-	return securityHeaders(mux)
+	return securityHeaders(h.customDomains(mux, ui))
 }
 
 func securityHeaders(next http.Handler) http.Handler {
@@ -1073,6 +1080,14 @@ func spaHandler(ui fs.FS) http.Handler {
 					return
 				}
 				fileServer.ServeHTTP(w, r2)
+				return
+			}
+		}
+		// Public status pages: /status/<slug>/ is rendered by status/index.html.
+		if strings.HasPrefix(p, "status/") {
+			if _, err := fs.Stat(ui, "status/index.html"); err == nil {
+				w.Header().Set("Cache-Control", "no-cache")
+				serveFile(w, r, ui, "status/index.html")
 				return
 			}
 		}
