@@ -1,0 +1,26 @@
+# Hub (API + web UI + built-in probe) in a single container.
+services:
+  pingtxt:
+    image: ghcr.io/federico-it/pingtxt:latest
+    # build: .
+    container_name: pingtxt
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./data:/data
+    environment:
+      # Public URL used in the agent install commands (recommended behind a reverse proxy).
+      # PINGTXT_PUBLIC_URL: https://status.example.com
+      PINGTXT_LOCAL_NAME: hub
+      PINGTXT_RETENTION_DAYS: 30
+
+  # Optional: an agent on another machine. Create it in the UI (agents > add agent)
+  # and paste the token here.
+  # pingtxt-agent:
+  #   image: ghcr.io/federico-it/pingtxt-agent:latest
+  #   restart: unless-stopped
+  #   cap_add: [NET_RAW]
+  #   environment:
+  #     PINGTXT_HUB: https://status.example.com
+  #     PINGTXT_TOKEN: pt_xxx

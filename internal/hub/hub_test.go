@@ -1,0 +1,108 @@
+package hub
+
+import (
+	"io"
+	"log/slog"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/federico-it/pingtxt/internal/check"
+	"github.com/federico-it/pingtxt/internal/store"
+)
+
+func newTestHub(t *testing.T) (*Hub, *store.Store) {
+	t.Helper()
+	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	h := New(Config{LocalName: "hub"}, st, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err := h.reloadAll(); err != nil {
+		t.Fatal(err)
+	}
+	return h, st
+}
+
+func result(id int64, ok bool) check.Result {
+	return check.Result{MonitorID: id, OK: ok, LatencyMs: 1, At: time.Now().UnixMilli()}
+}
+
+func status(t *testing.T, st *store.Store, id int64) string {
+	t.Helper()
+	m, err := st.Monitor(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m.Status
+}
+
+func TestRetriesAndIncidents(t *testing.T) {
+	h, st := newTestHub(t)
+	m := &store.Monitor{Name: "m", Type: "http", Target: "http://x", IntervalSec: 60, Retries: 2, Locations: []string{LocalLocation}}
+	if err := st.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	h.MonitorChanged(m.ID)
+
+	h.HandleResult(LocalLocation, result(m.ID, true))
+	if s := status(t, st, m.ID); s != StatusUp {
+		t.Fatalf("want up, got %s", s)
+	}
+	h.HandleResult(LocalLocation, result(m.ID, false))
+	if s := status(t, st, m.ID); s != StatusUp {
+		t.Fatalf("one failure with retries=2 should stay up, got %s", s)
+	}
+	h.HandleResult(LocalLocation, result(m.ID, false))
+	if s := status(t, st, m.ID); s != StatusDown {
+		t.Fatalf("want down, got %s", s)
+	}
+	inc, _ := st.ListIncidents(m.ID, 10)
+	if len(inc) != 1 || inc[0].ResolvedAt != 0 {
+		t.Fatalf("want 1 open incident, got %+v", inc)
+	}
+	h.HandleResult(LocalLocation, result(m.ID, true))
+	if s := status(t, st, m.ID); s != StatusUp {
+		t.Fatalf("want up after recovery, got %s", s)
+	}
+	inc, _ = st.ListIncidents(m.ID, 10)
+	if inc[0].ResolvedAt == 0 {
+		t.Fatal("incident should be resolved")
+	}
+}
+
+func TestMajorityAcrossLocations(t *testing.T) {
+	h, st := newTestHub(t)
+	var locs []string
+	for _, n := range []string{"a", "b"} {
+		a, err := st.CreateAgent(n, n, n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.agents[a.ID] = &agentConn{agent: a, done: make(chan struct{})}
+		locs = append(locs, AgentLocation(a.ID))
+	}
+	m := &store.Monitor{Name: "m", Type: "http", Target: "http://x", IntervalSec: 60, Retries: 1, Locations: append(locs, LocalLocation)}
+	if err := st.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	h.MonitorChanged(m.ID)
+
+	h.HandleResult(LocalLocation, result(m.ID, true))
+	h.HandleResult(locs[0], result(m.ID, true))
+	h.HandleResult(locs[1], result(m.ID, false))
+	if s := status(t, st, m.ID); s != StatusDegraded {
+		t.Fatalf("1/3 failing: want degraded, got %s", s)
+	}
+	h.HandleResult(locs[0], result(m.ID, false))
+	if s := status(t, st, m.ID); s != StatusDown {
+		t.Fatalf("2/3 failing: want down, got %s", s)
+	}
+	// Results from a location not assigned to the monitor are ignored.
+	h.HandleResult("agent:999", result(m.ID, true))
+	rows, _ := st.RecentResults(m.ID, 100)
+	if len(rows) != 4 {
+		t.Fatalf("want 4 stored results, got %d", len(rows))
+	}
+}

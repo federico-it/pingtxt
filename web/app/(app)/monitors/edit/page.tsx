@@ -1,0 +1,29 @@
+"use client"
+
+import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
+
+import { MonitorForm } from "@/components/monitor-form"
+import { PageHeader } from "@/components/page-header"
+import { useApi, type MonitorDetail } from "@/lib/api"
+
+function Edit() {
+  const id = Number(useSearchParams().get("id"))
+  const { data, error } = useApi<MonitorDetail>(id ? `/api/monitors/${id}` : null, { refreshInterval: 0, revalidateOnFocus: false })
+  if (error) return <div className="text-down">! {error.message}</div>
+  if (!data) return <div className="text-muted-foreground">loading<span className="cursor-blink">_</span></div>
+  return (
+    <>
+      <PageHeader cmd={`pingtxt monitors edit ${id}`} title={`edit: ${data.name}`} />
+      <MonitorForm initial={data} id={id} />
+    </>
+  )
+}
+
+export default function EditMonitorPage() {
+  return (
+    <Suspense>
+      <Edit />
+    </Suspense>
+  )
+}

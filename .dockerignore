@@ -1,0 +1,8 @@
+.git
+dist
+data
+web/node_modules
+web/.next
+web/out
+internal/ui/dist/*
+!internal/ui/dist/.gitkeep
