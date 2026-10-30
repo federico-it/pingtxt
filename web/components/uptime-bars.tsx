@@ -4,7 +4,7 @@ import { datetime, ms, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 function barClass(b: Bar) {
-  if (b.total === 0) return "bg-muted"
+  if (b.total === 0) return b.maint ? "bg-info" : "bg-muted"
   const r = b.ok / b.total
   if (r >= 0.999) return "bg-up"
   if (r >= 0.9) return "bg-warn"
@@ -22,8 +22,13 @@ export function UptimeBars({ bars, className, height = "h-5" }: { bars: Bar[]; c
           <TooltipContent className="font-mono text-xs">
             <div>{datetime(b.t)}</div>
             <div>
-              {b.total === 0 ? "no data" : `${pct(b.ok / b.total)} · ${b.ok}/${b.total} ok · avg ${ms(b.avg_ms)}`}
+              {b.total === 0
+                ? b.maint
+                  ? "maintenance"
+                  : "no data"
+                : `${pct(b.ok / b.total)} · ${b.ok}/${b.total} ok · avg ${ms(b.avg_ms)}`}
             </div>
+            {b.total > 0 && b.maint > 0 && <div className="text-info">+ {b.maint} checks in maintenance</div>}
           </TooltipContent>
         </Tooltip>
       ))}

@@ -80,6 +80,16 @@ function View() {
         {d.type} · <span className="text-foreground">{d.target}</span> · every {interval(d.interval_sec)} · timeout {d.timeout_ms}ms · retries {d.retries}
       </div>
 
+      {d.maintenance && (
+        <div className="mb-4 border border-dashed border-info/60 px-3 py-2 text-xs text-info">
+          ◇ in maintenance: <span className="text-foreground">{d.maintenance.name}</span> until {datetime(d.maintenance.end_at)}. checks
+          keep running, alerts and incidents are paused.{" "}
+          <Link href="/maintenance/" className="underline underline-offset-4">
+            manage
+          </Link>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 border-y border-dashed py-4 sm:grid-cols-3 lg:grid-cols-6">
         <KV k="status" v={<StatusText status={d.status} />} />
         <KV k="for" v={d.status_since ? duration(now - d.status_since) : "--"} />
@@ -175,7 +185,10 @@ function View() {
                 <OkText ok={r.ok} />
               </span>
               <span className="w-16 shrink-0 text-right">{ms(r.latency_ms)}</span>
-              <span className="truncate text-muted-foreground">{r.message}</span>
+              <span className="truncate text-muted-foreground">
+                {r.maint && <span className="text-info">[maint] </span>}
+                {r.message}
+              </span>
             </div>
           ))}
           {results.data?.results.length === 0 && <span className="text-muted-foreground">waiting for the first check...</span>}

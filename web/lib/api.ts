@@ -1,6 +1,6 @@
 import useSWR, { type SWRConfiguration } from "swr"
 
-export type Status = "pending" | "up" | "down" | "degraded" | "paused"
+export type Status = "pending" | "up" | "down" | "degraded" | "paused" | "maintenance"
 export type MonitorType = "http" | "keyword" | "tcp" | "ping" | "dns"
 
 export interface Monitor {
@@ -38,12 +38,14 @@ export interface ResultRow {
   status_code: number
   message: string
   cert_expiry: number
+  maint: boolean
 }
 
 export interface Bar {
   t: number
   total: number
   ok: number
+  maint: number
   avg_ms: number
 }
 
@@ -52,6 +54,7 @@ export interface MonitorSummary extends Monitor {
   avg_ms_24h: number
   last: ResultRow | null
   bars: Bar[]
+  maintenance: { id: number; name: string; end_at: number } | null
 }
 
 export interface LocationStatus {
@@ -72,6 +75,7 @@ export interface Bucket {
   location: string
   total: number
   ok: number
+  maint: number
   avg_ms: number
   min_ms: number
   max_ms: number
@@ -113,6 +117,30 @@ export interface Location {
   name: string
   online: boolean
   kind: "local" | "agent"
+}
+
+export type MaintenanceKind = "once" | "daily" | "weekly" | "monthly"
+
+export interface Maintenance {
+  id: number
+  name: string
+  description: string
+  all_monitors: boolean
+  monitor_ids: number[]
+  kind: MaintenanceKind
+  start_at: number
+  end_at: number
+  start_time: string
+  duration_min: number
+  weekdays: number[]
+  month_days: number[]
+  timezone: string
+  enabled: boolean
+  created_at: number
+  active: boolean
+  active_end?: number
+  next_start?: number
+  next_end?: number
 }
 
 export type NotifierType = "webhook" | "discord" | "slack" | "telegram" | "ntfy"

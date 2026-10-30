@@ -10,6 +10,8 @@ but plain text, monospace, light and dark.
 - Status across locations: **down** when the majority of online locations fail, **degraded** when only some do.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy.
+- **Maintenance windows**, one-off or recurring (daily, weekly, monthly, in any time zone), for some or all monitors:
+  checks keep running but no incidents or alerts are raised, and those checks don't count toward uptime.
 
 | dark | light |
 | --- | --- |

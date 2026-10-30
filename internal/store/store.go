@@ -133,6 +133,24 @@ var migrations = []string{
 		PRIMARY KEY (provider, subject)
 	);
 	CREATE INDEX identities_user ON identities(user_id);`,
+	`CREATE TABLE maintenances (
+		id INTEGER PRIMARY KEY,
+		name TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		all_monitors INTEGER NOT NULL DEFAULT 0,
+		monitor_ids TEXT NOT NULL DEFAULT '[]',
+		kind TEXT NOT NULL,
+		start_at INTEGER NOT NULL DEFAULT 0,
+		end_at INTEGER NOT NULL DEFAULT 0,
+		start_time TEXT NOT NULL DEFAULT '',
+		duration_min INTEGER NOT NULL DEFAULT 0,
+		weekdays TEXT NOT NULL DEFAULT '[]',
+		month_days TEXT NOT NULL DEFAULT '[]',
+		timezone TEXT NOT NULL DEFAULT 'UTC',
+		enabled INTEGER NOT NULL DEFAULT 1,
+		created_at INTEGER NOT NULL
+	);
+	ALTER TABLE results ADD COLUMN maint INTEGER NOT NULL DEFAULT 0;`,
 }
 
 func (s *Store) migrate() error {

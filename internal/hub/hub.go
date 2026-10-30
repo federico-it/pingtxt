@@ -27,6 +27,9 @@ const (
 	StatusDown     = "down"
 	StatusDegraded = "degraded"
 	StatusPaused   = "paused"
+	// StatusMaintenance is shown while a maintenance window covers the
+	// monitor: checks keep running but no incidents or alerts are raised.
+	StatusMaintenance = "maintenance"
 )
 
 // Config holds startup settings. PublicURL, LocalName, RetentionDays and
@@ -53,6 +56,10 @@ type monState struct {
 	m    *store.Monitor
 	next time.Time
 	locs map[string]*locState
+
+	real     string // status computed from the checks, ignoring maintenance
+	inMaint  bool   // a maintenance window currently covers the monitor
+	incident bool   // an incident is open (alerted as down)
 }
 
 // Hub is the central server.
@@ -65,6 +72,7 @@ type Hub struct {
 	mu       sync.Mutex
 	agents   map[int64]*agentConn
 	monitors map[int64]*monState
+	maints   []*store.Maintenance
 	localSem chan struct{}
 
 	smu     sync.RWMutex
@@ -130,11 +138,18 @@ func (h *Hub) reloadAll() error {
 	if err != nil {
 		return err
 	}
+	if err := h.MaintenancesChanged(); err != nil {
+		return err
+	}
+	open := map[int64]bool{}
+	for _, m := range ms {
+		open[m.ID], _ = h.store.HasOpenIncident(m.ID)
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for i, m := range ms {
 		// Spread the first run over a few seconds to avoid a thundering herd.
-		h.monitors[m.ID] = &monState{m: m, next: time.Now().Add(time.Duration(i%10) * 500 * time.Millisecond), locs: map[string]*locState{}}
+		h.monitors[m.ID] = &monState{m: m, next: time.Now().Add(time.Duration(i%10) * 500 * time.Millisecond), locs: map[string]*locState{}, incident: open[m.ID]}
 	}
 	return nil
 }
@@ -163,7 +178,11 @@ func (h *Hub) MonitorChanged(id int64) {
 		}
 		if m.Paused {
 			st.locs = map[string]*locState{}
+			st.real = ""
+			st.incident = false // pausing resolves open incidents
 		}
+		// Re-evaluate maintenance on the next tick (pause/resume resets status).
+		st.inMaint = false
 		return
 	}
 	h.monitors[id] = &monState{m: m, next: time.Now(), locs: map[string]*locState{}}
@@ -197,6 +216,7 @@ func jobFor(m *store.Monitor) check.Job {
 }
 
 func (h *Hub) tick(ctx context.Context, now time.Time) {
+	h.maintTick(now)
 	type dispatch struct {
 		loc string
 		job check.Job
@@ -306,35 +326,63 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	case down > 0:
 		status = StatusDegraded
 	}
+	st.real = status
+	inMaint := st.inMaint
+	display := status
+	if inMaint {
+		display = StatusMaintenance
+	}
 	prev := m.Status
-	changed := status != prev
+	changed := display != prev
 	if changed {
-		m.Status = status
+		m.Status = display
 		m.StatusSince = r.At
 	}
 	since := m.StatusSince
 	name := m.Name
+	alert := h.alertLocked(st)
 	h.mu.Unlock()
 
 	if err := h.store.InsertResult(&store.ResultRow{
 		MonitorID: r.MonitorID, Location: loc, TS: r.At, OK: r.OK, LatencyMs: r.LatencyMs,
-		StatusCode: r.StatusCode, Message: r.Message, CertExpiry: r.CertExpiry,
+		StatusCode: r.StatusCode, Message: r.Message, CertExpiry: r.CertExpiry, Maint: inMaint,
 	}); err != nil {
 		h.log.Error("insert result", "err", err)
 	}
-	if !changed {
-		return
+	if changed {
+		_ = h.store.SetMonitorStatus(m.ID, display, since)
+		h.log.Info("status change", "monitor", name, "from", prev, "to", display)
 	}
-	_ = h.store.SetMonitorStatus(m.ID, status, since)
-	h.log.Info("status change", "monitor", name, "from", prev, "to", status)
-	cause := strings.Join(causes, "; ")
+	h.raise(m, alert, strings.Join(causes, "; "), r.At)
+}
+
+// alertLocked decides whether an incident must be opened ("down") or
+// resolved ("up") given the monitor's real status. Nothing is raised during
+// maintenance; pending alerts fire once the window ends. Call with h.mu held.
+func (h *Hub) alertLocked(st *monState) string {
+	if st.inMaint || st.m.Paused {
+		return ""
+	}
 	switch {
-	case status == StatusDown && prev != StatusDown:
-		_ = h.store.OpenIncident(m.ID, r.At, cause)
-		h.notify.Send(Event{MonitorID: m.ID, Monitor: name, Target: m.Target, Status: StatusDown, Cause: cause, At: r.At})
-	case prev == StatusDown && status != StatusDown:
-		_ = h.store.ResolveIncident(m.ID, r.At)
-		h.notify.Send(Event{MonitorID: m.ID, Monitor: name, Target: m.Target, Status: StatusUp, At: r.At})
+	case st.real == StatusDown && !st.incident:
+		st.incident = true
+		return StatusDown
+	case st.real != "" && st.real != StatusDown && st.incident:
+		st.incident = false
+		return StatusUp
+	}
+	return ""
+}
+
+// raise opens or resolves the incident and sends notifications.
+func (h *Hub) raise(m *store.Monitor, alert, cause string, at int64) {
+	switch alert {
+	case StatusDown:
+		_ = h.store.OpenIncident(m.ID, at, cause)
+		h.notify.Send(Event{MonitorID: m.ID, Monitor: m.Name, Target: m.Target, Status: StatusDown, Cause: cause, At: at})
+	case StatusUp:
+		_ = h.store.ResolveIncident(m.ID, at)
+		h.notify.Send(Event{MonitorID: m.ID, Monitor: m.Name, Target: m.Target, Status: StatusUp, At: at})
 	}
 }
 

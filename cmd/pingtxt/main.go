@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+	_ "time/tzdata" // maintenance windows use IANA time zones
 
 	"github.com/federico-it/pingtxt/internal/hub"
 	"github.com/federico-it/pingtxt/internal/store"
