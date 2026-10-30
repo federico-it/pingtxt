@@ -415,6 +415,7 @@ func (h *Hub) unlinkIdentity(w http.ResponseWriter, r *http.Request, u *store.Us
 type userView struct {
 	*store.User
 	HasPassword bool              `json:"has_password"`
+	TwoFactor   bool              `json:"two_factor"`
 	Identities  []*store.Identity `json:"identities"`
 }
 
@@ -423,7 +424,7 @@ func (h *Hub) userView(u *store.User) userView {
 	if ids == nil {
 		ids = []*store.Identity{}
 	}
-	return userView{User: u, HasPassword: u.PasswordHash != "", Identities: ids}
+	return userView{User: u, HasPassword: u.PasswordHash != "", TwoFactor: h.store.TwoFactorEnabled(u.ID), Identities: ids}
 }
 
 func (h *Hub) listUsers(w http.ResponseWriter, r *http.Request, _ *store.User) {

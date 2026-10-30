@@ -25,6 +25,9 @@ const (
 	TypeTCP     = "tcp"
 	TypePing    = "ping"
 	TypeDNS     = "dns"
+	// TypePush is a heartbeat monitor: the monitored job calls the hub, so
+	// it is never probed and Run does not handle it.
+	TypePush = "push"
 )
 
 // Job describes one probe to execute.

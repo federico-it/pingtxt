@@ -14,6 +14,9 @@ import (
 // ErrNotFound is returned when a row does not exist.
 var ErrNotFound = errors.New("not found")
 
+// ErrConflict is returned when a unique value is already taken.
+var ErrConflict = errors.New("already exists")
+
 // Store wraps the database handle.
 type Store struct {
 	db *sql.DB
@@ -133,6 +136,70 @@ var migrations = []string{
 		PRIMARY KEY (provider, subject)
 	);
 	CREATE INDEX identities_user ON identities(user_id);`,
+	`CREATE TABLE status_pages (
+		id INTEGER PRIMARY KEY,
+		slug TEXT NOT NULL UNIQUE,
+		title TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		domain TEXT NOT NULL DEFAULT '',
+		published INTEGER NOT NULL DEFAULT 1,
+		show_incidents INTEGER NOT NULL DEFAULT 1,
+		created_at INTEGER NOT NULL
+	);
+	CREATE UNIQUE INDEX status_pages_domain ON status_pages(domain) WHERE domain != '';
+	CREATE TABLE status_page_monitors (
+		page_id INTEGER NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		position INTEGER NOT NULL DEFAULT 0,
+		PRIMARY KEY (page_id, monitor_id)
+	);
+	CREATE INDEX status_page_monitors_monitor ON status_page_monitors(monitor_id);`,
+	`CREATE TABLE user_totp (
+		user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+		secret TEXT NOT NULL,
+		enabled INTEGER NOT NULL DEFAULT 0,
+		last_step INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL
+	);
+	CREATE TABLE recovery_codes (
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		code_hash TEXT NOT NULL,
+		used_at INTEGER NOT NULL DEFAULT 0,
+		PRIMARY KEY (user_id, code_hash)
+	);
+	CREATE TABLE api_tokens (
+		id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		name TEXT NOT NULL,
+		token_hash TEXT NOT NULL UNIQUE,
+		hint TEXT NOT NULL DEFAULT '',
+		scope TEXT NOT NULL,
+		created_at INTEGER NOT NULL,
+		last_used_at INTEGER NOT NULL DEFAULT 0,
+		expires_at INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX api_tokens_user ON api_tokens(user_id);`,
+	`ALTER TABLE monitors ADD COLUMN push_token TEXT NOT NULL DEFAULT '';
+	ALTER TABLE monitors ADD COLUMN grace_sec INTEGER NOT NULL DEFAULT 0;
+	CREATE UNIQUE INDEX monitors_push_token ON monitors(push_token) WHERE push_token != '';`,
+	`CREATE TABLE maintenances (
+		id INTEGER PRIMARY KEY,
+		name TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		all_monitors INTEGER NOT NULL DEFAULT 0,
+		monitor_ids TEXT NOT NULL DEFAULT '[]',
+		kind TEXT NOT NULL,
+		start_at INTEGER NOT NULL DEFAULT 0,
+		end_at INTEGER NOT NULL DEFAULT 0,
+		start_time TEXT NOT NULL DEFAULT '',
+		duration_min INTEGER NOT NULL DEFAULT 0,
+		weekdays TEXT NOT NULL DEFAULT '[]',
+		month_days TEXT NOT NULL DEFAULT '[]',
+		timezone TEXT NOT NULL DEFAULT 'UTC',
+		enabled INTEGER NOT NULL DEFAULT 1,
+		created_at INTEGER NOT NULL
+	);
+	ALTER TABLE results ADD COLUMN maint INTEGER NOT NULL DEFAULT 0;`,
 	`ALTER TABLE monitors ADD COLUMN cert_expiry_alert INTEGER NOT NULL DEFAULT 1;
 	ALTER TABLE monitors ADD COLUMN domain_expiry_alert INTEGER NOT NULL DEFAULT 1;
 	CREATE TABLE expiry_checks (

@@ -3,6 +3,7 @@ package hub
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,7 @@ import (
 )
 
 // Notifier types.
-var NotifierTypes = []string{"webhook", "discord", "slack", "telegram", "ntfy"}
+var NotifierTypes = []string{"webhook", "discord", "slack", "telegram", "ntfy", "email"}
 
 // Event kinds. Status events have an empty kind for compatibility.
 const (
@@ -120,6 +121,8 @@ type Notifier struct {
 	store  *store.Store
 	log    *slog.Logger
 	client *http.Client
+	// tlsConfig overrides the TLS config used for SMTP (tests only).
+	tlsConfig *tls.Config
 }
 
 func NewNotifier(st *store.Store, log *slog.Logger) *Notifier {
@@ -178,6 +181,8 @@ func (n *Notifier) Deliver(ctx context.Context, nt *store.Notifier, e Event) err
 			hdr["Authorization"] = "Bearer " + c["token"]
 		}
 		return n.post(ctx, c["url"], "text/plain", []byte(text), hdr)
+	case "email":
+		return n.sendEmail(ctx, c, e)
 	}
 	return fmt.Errorf("unknown notifier type %q", nt.Type)
 }

@@ -7,6 +7,7 @@ const map: Record<Status, { glyph: string; label: string; cls: string }> = {
   degraded: { glyph: "◐", label: "degraded", cls: "text-warn" },
   paused: { glyph: "○", label: "paused", cls: "text-muted-foreground" },
   pending: { glyph: "◌", label: "pending", cls: "text-muted-foreground" },
+  maintenance: { glyph: "◇", label: "maintenance", cls: "text-info" },
 }
 
 export function StatusText({ status, className }: { status: Status; className?: string }) {

@@ -15,8 +15,15 @@ import { useApi, type MonitorSummary, type Status } from "@/lib/api"
 import { ago, interval, ms, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-const order: Record<Status, number> = { down: 0, degraded: 1, pending: 2, up: 3, paused: 4 }
-const filters = ["all", "up", "down", "degraded", "paused"] as const
+const order: Record<Status, number> = {
+  down: 0,
+  degraded: 1,
+  pending: 2,
+  maintenance: 3,
+  up: 4,
+  paused: 5,
+}
+const filters = ["all", "up", "down", "degraded", "maintenance", "paused"] as const
 
 export default function MonitorsPage() {
   const { data, isLoading } = useApi<MonitorSummary[]>("/api/monitors")
@@ -34,14 +41,28 @@ export default function MonitorsPage() {
     const s = q.toLowerCase()
     return (data ?? [])
       .filter((m) => filter === "all" || m.status === filter)
-      .filter((m) => !s || m.name.toLowerCase().includes(s) || m.target.toLowerCase().includes(s))
-      .sort((a, b) => order[a.status] - order[b.status] || a.name.localeCompare(b.name))
+      .filter(
+        (m) =>
+          !s ||
+          m.name.toLowerCase().includes(s) ||
+          m.target.toLowerCase().includes(s) ||
+          m.type.includes(s)
+      )
+      .sort(
+        (a, b) =>
+          order[a.status] - order[b.status] || a.name.localeCompare(b.name)
+      )
   }, [data, q, filter])
 
   return (
     <>
       <PageHeader cmd="pingtxt monitors ls" title="monitors">
-        <Input placeholder="grep..." value={q} onChange={(e) => setQ(e.target.value)} className="h-8 w-40" />
+        <Input
+          placeholder="grep..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="h-8 w-40"
+        />
         <Button render={<Link href="/monitors/new/" />} nativeButton={false}>
           <PlusIcon /> new
         </Button>
@@ -73,7 +94,10 @@ export default function MonitorsPage() {
           ) : (
             <>
               no monitors yet.{" "}
-              <Link href="/monitors/new/" className="text-primary underline underline-offset-4">
+              <Link
+                href="/monitors/new/"
+                className="text-primary underline underline-offset-4"
+              >
                 create the first one
               </Link>
             </>
@@ -99,21 +123,34 @@ export default function MonitorsPage() {
                 <div className="min-w-0">
                   <div className="truncate font-medium">{m.name}</div>
                   <div className="truncate text-xs text-muted-foreground">
-                    {m.type} · {m.target} · every {interval(m.interval_sec)}
-                    {m.locations.length > 1 && ` · ${m.locations.length} locations`}
+                    {m.type === "push"
+                      ? `heartbeat · expected every ${interval(m.interval_sec)}`
+                      : `${m.type} · ${m.target} · every ${interval(m.interval_sec)}`}
+                    {m.locations.length > 1 &&
+                      ` · ${m.locations.length} locations`}
                     <ExpiryBadges checks={m.expiry} now={now} />
                   </div>
                 </div>
               </div>
               <UptimeBars bars={m.bars} className="col-span-2 md:col-span-1" />
-              <span className={cn("text-right", m.uptime_24h >= 0 && m.uptime_24h < 0.99 && "text-warn", m.uptime_24h >= 0 && m.uptime_24h < 0.9 && "text-down")}>
+              <span
+                className={cn(
+                  "text-right",
+                  m.uptime_24h >= 0 && m.uptime_24h < 0.99 && "text-warn",
+                  m.uptime_24h >= 0 && m.uptime_24h < 0.9 && "text-down"
+                )}
+              >
                 <span className="md:hidden">
                   <StatusText status={m.status} className="mr-2" />
                 </span>
                 {pct(m.uptime_24h)}
               </span>
-              <span className="hidden text-right text-muted-foreground md:block">{ms(m.avg_ms_24h)}</span>
-              <span className="hidden text-right text-xs text-muted-foreground md:block">{m.paused ? "paused" : ago(m.last?.ts)}</span>
+              <span className="hidden text-right text-muted-foreground md:block">
+                {ms(m.avg_ms_24h)}
+              </span>
+              <span className="hidden text-right text-xs text-muted-foreground md:block">
+                {m.paused ? "paused" : ago(m.last?.ts)}
+              </span>
             </Link>
           ))}
         </div>

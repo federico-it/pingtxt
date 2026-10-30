@@ -11,8 +11,10 @@ import { cn } from "@/lib/utils"
 const nav = [
   { href: "/", label: "monitors", match: (p: string) => p === "/" || p.startsWith("/monitors") },
   { href: "/incidents/", label: "incidents" },
+  { href: "/maintenance/", label: "maint" },
   { href: "/agents/", label: "agents" },
   { href: "/notifications/", label: "notify" },
+  { href: "/status-pages/", label: "status" },
   { href: "/settings/", label: "settings" },
 ]
 
@@ -38,6 +40,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
 
   const down = ov.data?.status.down ?? 0
+  const maint = ov.data?.status.maintenance ?? 0
   return (
     <div className="mx-auto flex min-h-svh w-full max-w-6xl flex-col px-4 sm:px-6">
       <header className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-dashed bg-background/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
@@ -65,6 +68,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           {ov.data && (
             <span className="mr-2 hidden text-xs text-muted-foreground md:inline">
               {down > 0 ? <span className="text-down">{down} down</span> : <span className="text-up">all systems go</span>} ·{" "}
+              {maint > 0 && <span className="text-info">{maint} in maintenance · </span>}
               {ov.data.agents_online}/{ov.data.agents} agents
             </span>
           )}
