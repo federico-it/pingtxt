@@ -31,7 +31,7 @@ import {
   type Series,
 } from "@/lib/api"
 import { useNow } from "@/hooks/use-now"
-import { ago, datetime, duration, interval, ms, pct } from "@/lib/format"
+import { ago, datetime, displayTarget, duration, interval, ms, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 const ranges = ["1h", "6h", "24h", "7d", "30d"] as const
@@ -119,7 +119,7 @@ function View() {
           </>
         ) : (
           <>
-            {d.type} · <span className="text-foreground">{d.target}</span> ·
+            {d.type} · <span className="text-foreground">{displayTarget(d.target)}</span> ·
             every {interval(d.interval_sec)} · timeout {d.timeout_ms}ms ·
             retries {d.retries}
           </>

@@ -4,9 +4,11 @@ Minimal, terminal-flavoured uptime monitoring. Think Uptime Kuma / UptimeRobot /
 but plain text, monospace, light and dark.
 
 - **One container** for the hub: Go API + scheduler + SQLite + the Next.js UI, ~25 MB image.
-- **Agents** for multi-location checks: a ~7 MB static binary (or Docker image) that only
+- **Agents** for multi-location checks: a ~8 MB static binary (or Docker image) that only
   dials *out* to the hub over WebSocket. No open ports, works behind NAT. Install with one command.
-- Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**, and **heartbeat (push)** monitors for cron jobs and workers.
+- Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**,
+  databases (**PostgreSQL**, **MySQL/MariaDB**, **Redis**, **MongoDB**), **Docker containers**, **gRPC health**, **SMTP**,
+  and **heartbeat (push)** monitors for cron jobs and workers.
 - Status across locations: **down** when the majority of online locations fail, **degraded** when only some do.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
@@ -140,6 +142,35 @@ For jobs that run on a schedule (backups, cron, queues) create a monitor of type
 ```
 
 The monitor goes down (incident + notifications) when no call arrives within the **expected period** plus the **grace time**, and back up at the next call. Optional query parameters: `status=down` reports a failed run, `msg=` stores a short note, `ping=` the run time in ms. The URL uses the public URL from settings and can be regenerated from the monitor page.
+
+## Databases, containers, gRPC and SMTP
+
+| type | target | what is checked |
+| --- | --- | --- |
+| postgresql | `postgres://user:pass@host:5432/db?sslmode=disable` | connect and run a query (default `SELECT 1`); optional expected value of the first column |
+| mysql / mariadb | `mysql://user:pass@host:3306/db` (`?tls=true\|false\|skip-verify`) | same as postgresql |
+| redis | `redis://[user]:pass@host:6379/0`, `rediss://` for TLS | `AUTH` + `PING` |
+| mongodb | `mongodb://user:pass@host:27017/?authSource=admin`, `mongodb+srv://` | `hello`, SCRAM-SHA-256/SHA-1 auth, `ping`; shows primary/secondary |
+| docker container | container name or id | down when not running, restarting, paused or `unhealthy` |
+| grpc health | `grpc://host:port[/service]`, `grpcs://` for TLS | `grpc.health.v1.Health/Check` must return `SERVING` |
+| smtp | `smtp://host:25`, `smtp://host:587`, `smtps://host:465` | greeting, `EHLO`, `STARTTLS` when offered (certificate verified) |
+
+Passwords in connection URLs are hidden in the monitor list and in notifications; use a read-only
+database user. Postgres, MySQL and MongoDB TLS default to "use it when the server offers it".
+
+Docker checks talk to the Docker Engine of the location that runs them: the hub or the agent needs
+`/var/run/docker.sock` (or `DOCKER_HOST`). With Docker, add
+`-v /var/run/docker.sock:/var/run/docker.sock:ro` to the hub or agent container. For an agent
+installed with systemd, allow it with `sudo systemctl edit pingtxt-agent`:
+
+```ini
+[Service]
+SupplementaryGroups=docker
+```
+
+Access to the Docker socket is equivalent to root on that machine (`:ro` does not limit the API):
+pingtxt only reads `GET /containers/<name>/json`, but enable it only where you need container checks.
+Agents older than this version report these types as `unknown monitor type`: update them.
 
 ## Add a location (agent)
 

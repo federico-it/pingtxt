@@ -48,7 +48,7 @@ func eventTarget(m *store.Monitor) string {
 	if m.Type == check.TypePush {
 		return pushLocationName
 	}
-	return m.Target
+	return check.RedactTarget(m.Target)
 }
 
 // missedHeartbeat builds the failed result recorded when a push monitor's
