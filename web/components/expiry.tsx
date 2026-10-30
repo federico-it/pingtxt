@@ -4,7 +4,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-import { api, type ExpiryCheck } from "@/lib/api"
+import { api, useIsAdmin, type ExpiryCheck } from "@/lib/api"
 import { ago } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -77,6 +77,7 @@ export function ExpiryTable({
   onChange: () => void
 }) {
   const [busy, setBusy] = useState(false)
+  const isAdmin = useIsAdmin()
 
   async function refresh() {
     setBusy(true)
@@ -137,11 +138,13 @@ export function ExpiryTable({
           </div>
         )
       })}
-      <div>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={busy}>
-          {busy ? "checking..." : "check now"}
-        </Button>
-      </div>
+      {isAdmin && (
+        <div>
+          <Button variant="outline" size="sm" onClick={refresh} disabled={busy}>
+            {busy ? "checking..." : "check now"}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

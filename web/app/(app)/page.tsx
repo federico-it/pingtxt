@@ -12,7 +12,7 @@ import { UptimeBars } from "@/components/uptime-bars"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useMinute } from "@/hooks/use-now"
-import { useApi, type MonitorSummary, type Status } from "@/lib/api"
+import { useApi, useIsAdmin, type MonitorSummary, type Status } from "@/lib/api"
 import { ago, displayTarget, interval, ms, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -35,6 +35,7 @@ const filters = [
 
 export default function MonitorsPage() {
   const { data, isLoading } = useApi<MonitorSummary[]>("/api/monitors")
+  const isAdmin = useIsAdmin()
   const [q, setQ] = useState("")
   const [filter, setFilter] = useState<(typeof filters)[number]>("all")
   // "all", "none" (no group) or a group id
@@ -105,9 +106,11 @@ export default function MonitorsPage() {
           onChange={(e) => setQ(e.target.value)}
           className="h-8 w-40"
         />
-        <Button render={<Link href="/monitors/new/" />} nativeButton={false}>
-          <PlusIcon /> new
-        </Button>
+        {isAdmin && (
+          <Button render={<Link href="/monitors/new/" />} nativeButton={false}>
+            <PlusIcon /> new
+          </Button>
+        )}
       </PageHeader>
 
       <div className="mb-4 flex flex-wrap gap-1 text-xs">

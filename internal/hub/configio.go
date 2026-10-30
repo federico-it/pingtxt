@@ -124,7 +124,7 @@ var (
 	secretHeaderRe = regexp.MustCompile(`(?i)auth|token|key|secret|cookie|session|passw`)
 )
 
-func redactTarget(t string) string {
+func redactTargetPassword(t string) string {
 	return urlPasswordRe.ReplaceAllString(t, "${1}"+redactedPassword+"@")
 }
 
@@ -198,7 +198,7 @@ func (h *Hub) ExportConfig(secrets bool) (*ConfigDoc, error) {
 		if secrets {
 			c.PushToken = m.PushToken
 		} else {
-			c.Target = redactTarget(m.Target)
+			c.Target = redactTargetPassword(m.Target)
 			hdr := make(map[string]string, len(m.Headers))
 			for k, v := range m.Headers {
 				if secretHeaderRe.MatchString(k) && v != "" {
@@ -644,7 +644,7 @@ func (im *importer) importMonitors(old []*store.Monitor) error {
 		prev := match(old, &m)
 		redacted := false
 		if strings.Contains(m.Target, redactedPassword) {
-			if prev != nil && prev.Target != "" && redactTarget(prev.Target) == m.Target {
+			if prev != nil && prev.Target != "" && redactTargetPassword(prev.Target) == m.Target {
 				m.Target = prev.Target
 			} else {
 				redacted = true
@@ -842,7 +842,11 @@ func (h *Hub) configReloaded() {
 
 // exportConfig serves the configuration as a JSON download. ?secrets=1
 // includes passwords and tokens; it needs a browser session.
-func (h *Hub) exportConfig(w http.ResponseWriter, r *http.Request, _ *store.User) {
+func (h *Hub) exportConfig(w http.ResponseWriter, r *http.Request, u *store.User) {
+	if !u.IsAdmin() {
+		writeErr(w, http.StatusForbidden, "only admins can do this")
+		return
+	}
 	secrets := r.URL.Query().Get("secrets") == "1" || r.URL.Query().Get("secrets") == "true"
 	if secrets {
 		if _, tok, _ := h.authenticate(r); tok != nil {

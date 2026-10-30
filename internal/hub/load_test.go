@@ -278,7 +278,7 @@ func TestLoadDashboard(t *testing.T) {
 	for i := range 3 {
 		rec := httptest.NewRecorder()
 		t1 := time.Now()
-		h.listMonitors(rec, httptest.NewRequest("GET", "/api/monitors", nil), nil)
+		h.listMonitors(rec, httptest.NewRequest("GET", "/api/monitors", nil), &store.User{Role: store.RoleAdmin})
 		d := time.Since(t1)
 		var zb bytes.Buffer
 		zw, _ := gzip.NewWriterLevel(&zb, gzip.BestSpeed)

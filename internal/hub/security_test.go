@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/federico-it/pingtxt/internal/store"
 	"time"
 )
 
@@ -129,7 +131,7 @@ func TestTwoFactorLogin(t *testing.T) {
 
 func TestResetTwoFactor(t *testing.T) {
 	h, st := newTestHub(t)
-	u, _ := st.CreateUser("a@b.co", "x")
+	u, _ := st.CreateUser("a@b.co", "x", store.RoleAdmin)
 	st.SetPendingTOTP(u.ID, newTOTPSecret())
 	st.EnableTOTP(u.ID, 1, nil)
 	if !st.TwoFactorEnabled(u.ID) {

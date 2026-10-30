@@ -362,6 +362,18 @@ func TestConfigAPI(t *testing.T) {
 	if code, _, _ := tc.do("GET", "/api/backups", "", nil, nil); code != 403 {
 		t.Fatalf("token backups: want 403, got %d", code)
 	}
+
+	// Read-only users can do none of it.
+	v, err := st.CreateUser("viewer@b.c", "", store.RoleViewer)
+	must(t, err)
+	rec := httptest.NewRecorder()
+	must(t, h.startSession(rec, httptest.NewRequest("GET", "/", nil), v))
+	vc := &apiClient{t: t, srv: c.srv, cookie: rec.Result().Cookies()[0]}
+	for _, r := range [][2]string{{"GET", "/api/config/export"}, {"GET", "/api/backups"}, {"POST", "/api/backups"}, {"POST", "/api/config/import"}} {
+		if code := vc.json(r[0], r[1], "", nil); code != 403 {
+			t.Fatalf("viewer %s %s: want 403, got %d", r[0], r[1], code)
+		}
+	}
 }
 
 func TestBackupAPI(t *testing.T) {

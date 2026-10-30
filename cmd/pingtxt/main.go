@@ -35,6 +35,7 @@ func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 	enablePassword := flag.Bool("enable-password-login", false, "turn password login back on (if single sign-on is broken) and exit")
 	resetTwoFactor := flag.String("reset-2fa", "", "turn two-factor authentication off for the user with this email and exit")
+	makeAdmin := flag.String("make-admin", "", "give the admin role to the user with this email and exit")
 	backupTo := flag.String("backup", "", "write a consistent copy of the database to this file and exit (safe while the hub runs)")
 	restoreFrom := flag.String("restore", "", "replace the database with this backup file and exit (stop the hub first)")
 	exportTo := flag.String("export-config", "", "write the configuration as JSON to this file (- for stdout) and exit")
@@ -116,6 +117,16 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println("two-factor authentication turned off for " + *resetTwoFactor + ".")
+		return
+	}
+
+	if *makeAdmin != "" {
+		h := hub.New(cfg, st, log)
+		if err := h.MakeAdmin(*makeAdmin); err != nil {
+			log.Error("make admin", "err", err)
+			os.Exit(1)
+		}
+		fmt.Println(*makeAdmin + " is now an admin.")
 		return
 	}
 

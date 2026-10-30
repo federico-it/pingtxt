@@ -79,10 +79,12 @@ type ProviderSettings struct {
 
 // AuthSettings configure how people log in.
 type AuthSettings struct {
-	PasswordLogin  bool                        `json:"password_login"`
-	AllowSignup    bool                        `json:"allow_signup"`
-	AllowedDomains []string                    `json:"allowed_domains"`
-	Providers      map[string]ProviderSettings `json:"providers"`
+	PasswordLogin  bool     `json:"password_login"`
+	AllowSignup    bool     `json:"allow_signup"`
+	AllowedDomains []string `json:"allowed_domains"`
+	// DefaultRole is given to accounts created on first single sign-on login.
+	DefaultRole string                      `json:"default_role"`
+	Providers   map[string]ProviderSettings `json:"providers"`
 }
 
 // Login providers, in display order.
@@ -107,7 +109,7 @@ func defaultGeneral(seed Config) GeneralSettings {
 }
 
 func defaultAuth() AuthSettings {
-	return AuthSettings{PasswordLogin: true, AllowedDomains: []string{}, Providers: map[string]ProviderSettings{}}
+	return AuthSettings{PasswordLogin: true, AllowedDomains: []string{}, DefaultRole: store.RoleViewer, Providers: map[string]ProviderSettings{}}
 }
 
 func (g *GeneralSettings) normalize() {
@@ -150,6 +152,9 @@ func (g *GeneralSettings) validate() error {
 }
 
 func (a *AuthSettings) normalize() {
+	if !store.ValidRole(a.DefaultRole) {
+		a.DefaultRole = store.RoleViewer
+	}
 	if a.Providers == nil {
 		a.Providers = map[string]ProviderSettings{}
 	}
@@ -321,6 +326,7 @@ type authView struct {
 	PasswordLogin  bool           `json:"password_login"`
 	AllowSignup    bool           `json:"allow_signup"`
 	AllowedDomains []string       `json:"allowed_domains"`
+	DefaultRole    string         `json:"default_role"`
 	Providers      []providerView `json:"providers"`
 }
 
@@ -329,7 +335,7 @@ func (h *Hub) settingsResponse(r *http.Request) settingsView {
 	v := settingsView{
 		General:   h.generalSettings(),
 		DetectURL: requestURL(r),
-		Auth:      authView{PasswordLogin: a.PasswordLogin, AllowSignup: a.AllowSignup, AllowedDomains: a.AllowedDomains},
+		Auth:      authView{PasswordLogin: a.PasswordLogin, AllowSignup: a.AllowSignup, AllowedDomains: a.AllowedDomains, DefaultRole: a.DefaultRole},
 	}
 	for _, id := range providerIDs {
 		p := a.Providers[id]
@@ -374,6 +380,7 @@ func (h *Hub) putAuthSettings(w http.ResponseWriter, r *http.Request, _ *store.U
 		PasswordLogin  bool                        `json:"password_login"`
 		AllowSignup    bool                        `json:"allow_signup"`
 		AllowedDomains []string                    `json:"allowed_domains"`
+		DefaultRole    string                      `json:"default_role"`
 		Providers      map[string]ProviderSettings `json:"providers"`
 	}
 	if readJSON(r, &in) != nil {
@@ -381,7 +388,7 @@ func (h *Hub) putAuthSettings(w http.ResponseWriter, r *http.Request, _ *store.U
 		return
 	}
 	cur := h.authSettings()
-	a := AuthSettings{PasswordLogin: in.PasswordLogin, AllowSignup: in.AllowSignup, AllowedDomains: in.AllowedDomains, Providers: in.Providers}
+	a := AuthSettings{PasswordLogin: in.PasswordLogin, AllowSignup: in.AllowSignup, AllowedDomains: in.AllowedDomains, DefaultRole: in.DefaultRole, Providers: in.Providers}
 	if a.Providers == nil {
 		a.Providers = map[string]ProviderSettings{}
 	}

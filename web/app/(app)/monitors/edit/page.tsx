@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
 
+import { AdminOnly } from "@/components/admin-only"
 import { MonitorForm } from "@/components/monitor-form"
 import { PageHeader } from "@/components/page-header"
 import { useApi, type MonitorDetail } from "@/lib/api"
@@ -22,8 +23,10 @@ function Edit() {
 
 export default function EditMonitorPage() {
   return (
-    <Suspense>
-      <Edit />
-    </Suspense>
+    <AdminOnly>
+      <Suspense>
+        <Edit />
+      </Suspense>
+    </AdminOnly>
   )
 }

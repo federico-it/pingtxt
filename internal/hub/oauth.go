@@ -279,9 +279,9 @@ func (h *Hub) resolveExternalUser(provider string, ext *externalUser) (*store.Us
 		if !a.AllowSignup || !a.emailAllowed(ext.Email) {
 			return nil, fmt.Errorf("no account for %s on this instance", ext.Email)
 		}
-		u, err = h.store.CreateUser(ext.Email, "")
+		u, err = h.store.CreateUser(ext.Email, "", a.DefaultRole)
 		if err == nil {
-			h.log.Info("user created via sso", "email", ext.Email, "provider", provider)
+			h.log.Info("user created via sso", "email", ext.Email, "provider", provider, "role", u.Role)
 		}
 	}
 	if err != nil {

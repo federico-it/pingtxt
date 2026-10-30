@@ -1,6 +1,6 @@
 # pingtxt
 
-Minimal, terminal-flavoured uptime monitoring. Think Uptime Kuma / UptimeRobot / HetrixTools,
+Minimal, terminal-flavoured uptime monitoring. Website and docs: [pingtxt.com](https://pingtxt.com). Think Uptime Kuma / UptimeRobot / HetrixTools,
 but plain text, monospace, light and dark.
 
 - **One container** for the hub: Go API + scheduler + SQLite + the Next.js UI, ~25 MB image.
@@ -64,6 +64,7 @@ The generic OpenID Connect option works with Authentik, Keycloak, Authelia, Pock
 - A provider login is matched to an existing user by verified email, then linked. Users can also
   connect accounts from **settings → account**.
 - Turn on *create accounts on first single sign-on* to let new people in, optionally limited to some email domains.
+  New accounts get the role picked there (read-only by default).
 - You can turn off password login once a provider works. If you lock yourself out, run
   `pingtxt -enable-password-login` (in Docker: `docker exec pingtxt pingtxt -enable-password-login`, then restart).
 - Set the **public URL** in settings when the hub is behind a reverse proxy, so callback URLs are right.
@@ -74,8 +75,19 @@ In **settings → two-factor authentication** scan the QR code with an authentic
 (1Password, Bitwarden, Aegis, Google Authenticator...) and confirm a code. You get 10 single-use
 recovery codes. After that, password logins ask for a code; single sign-on logins rely on the provider's own MFA.
 
-- Lost phone and recovery codes: another user can click **reset 2fa** in **settings → users**, or run
+- Lost phone and recovery codes: an admin can click **reset 2fa** in **settings → users**, or run
   `pingtxt -reset-2fa you@example.com` on the server (in Docker: `docker exec pingtxt pingtxt -reset-2fa you@example.com`).
+
+### Users and roles
+
+Every user is an **admin** or **read-only**. Admins add users in **settings → users** (with a password, or without one
+to log in through single sign-on with the same email) and change roles there.
+
+- **Read-only** users see monitors, incidents, history, agents, maintenance and status pages, but every change is
+  refused by the API and the buttons are hidden. Passwords in monitor targets, request headers and bodies, push URLs
+  and notification channel settings are hidden from them. They can still change their own password, 2FA and read tokens.
+- Instance settings and users are for admins only. Admins cannot change their own role, so one admin always remains.
+- Users that existed before roles were added are admins. Locked out? `pingtxt -make-admin you@example.com`.
 
 ### API tokens
 
@@ -87,6 +99,8 @@ curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/monitors
 
 - **read only** tokens can call `GET` endpoints (monitors, incidents, agents, notifiers).
   **read + write** tokens can also create, edit, pause and delete.
+- A token never has more rights than its owner: read-only users only get read tokens, and the write tokens of an
+  admin who becomes read-only stop writing.
 - Tokens can expire after 30, 90 or 365 days, or never. They are shown once and stored hashed.
 - Tokens never reach account endpoints (password, 2FA, tokens, users, instance settings): those need a browser login.
 

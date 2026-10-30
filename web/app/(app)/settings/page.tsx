@@ -26,7 +26,11 @@ import { cn } from "@/lib/utils"
 
 export default function SettingsPage() {
   const me = useApi<Me>("/api/auth/me", { refreshInterval: 0 })
-  const settings = useApi<Settings>("/api/settings", { refreshInterval: 0 })
+  // Instance settings and users are for admins only.
+  const isAdmin = me.data?.user.role === "admin"
+  const settings = useApi<Settings>(isAdmin ? "/api/settings" : null, {
+    refreshInterval: 0,
+  })
   const options = useApi<AuthOptions>("/api/auth/options", {
     refreshInterval: 0,
   })
@@ -103,17 +107,23 @@ export default function SettingsPage() {
           </>
         )}
 
-        <Section title="users">
-          {me.data && <UsersList meId={me.data.user.id} />}
-        </Section>
+        {isAdmin && me.data && (
+          <Section title="users">
+            <UsersList meId={me.data.user.id} />
+          </Section>
+        )}
 
-        <ConfigTransfer
-          onImported={() => {
-            settings.mutate()
-            options.mutate()
-          }}
-        />
-        <DatabaseBackups />
+        {isAdmin && (
+          <>
+            <ConfigTransfer
+              onImported={() => {
+                settings.mutate()
+                options.mutate()
+              }}
+            />
+            <DatabaseBackups />
+          </>
+        )}
 
         <Section title="about">
           <pre className="text-xs text-muted-foreground">
@@ -173,6 +183,12 @@ function Account({
     <>
       <div className="mb-4 text-xs text-muted-foreground">
         logged in as <span className="text-foreground">{u.email}</span>
+        {u.role === "viewer" && (
+          <span className="block text-[11px]">
+            your account is read-only: you can see everything but cannot change
+            monitors or settings. ask an admin if you need more.
+          </span>
+        )}
       </div>
       <form onSubmit={changePassword} className="grid gap-3 sm:grid-cols-2">
         {u.has_password && (

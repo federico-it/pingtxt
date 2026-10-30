@@ -37,6 +37,7 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux := http.NewServeMux()
 	auth := h.requireAuth       // session or API token
 	session := h.requireSession // browser session only
+	admin := h.requireAdmin     // browser session of an admin
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "version": h.cfg.Version})
@@ -60,24 +61,26 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("POST /api/tokens", session(h.createToken))
 	mux.HandleFunc("DELETE /api/tokens/{id}", session(h.deleteToken))
 
-	mux.HandleFunc("GET /api/settings", session(h.getSettings))
-	mux.HandleFunc("PUT /api/settings/general", session(h.putGeneralSettings))
-	mux.HandleFunc("PUT /api/settings/auth", session(h.putAuthSettings))
-	mux.HandleFunc("GET /api/users", session(h.listUsers))
-	mux.HandleFunc("DELETE /api/users/{id}", session(h.deleteUser))
-	mux.HandleFunc("DELETE /api/users/{id}/2fa", session(h.resetUserTwoFactor))
+	mux.HandleFunc("GET /api/settings", admin(h.getSettings))
+	mux.HandleFunc("PUT /api/settings/general", admin(h.putGeneralSettings))
+	mux.HandleFunc("PUT /api/settings/auth", admin(h.putAuthSettings))
+	mux.HandleFunc("GET /api/users", admin(h.listUsers))
+	mux.HandleFunc("POST /api/users", admin(h.createUser))
+	mux.HandleFunc("PUT /api/users/{id}", admin(h.updateUser))
+	mux.HandleFunc("DELETE /api/users/{id}", admin(h.deleteUser))
+	mux.HandleFunc("DELETE /api/users/{id}/2fa", admin(h.resetUserTwoFactor))
 
-	// Backups and configuration export/import (admin only once roles exist).
-	mux.HandleFunc("GET /api/backups", session(h.listBackups))
-	mux.HandleFunc("POST /api/backups", session(h.createBackup))
-	mux.HandleFunc("POST /api/backups/upload", session(h.uploadBackup))
-	mux.HandleFunc("DELETE /api/backups/restore", session(h.cancelRestore))
-	mux.HandleFunc("GET /api/backups/{name}", session(h.downloadBackup))
-	mux.HandleFunc("DELETE /api/backups/{name}", session(h.deleteBackup))
-	mux.HandleFunc("POST /api/backups/{name}/restore", session(h.stageRestore))
-	mux.HandleFunc("PUT /api/settings/backups", session(h.putBackupSettings))
+	// Backups and configuration export/import: admins only.
+	mux.HandleFunc("GET /api/backups", admin(h.listBackups))
+	mux.HandleFunc("POST /api/backups", admin(h.createBackup))
+	mux.HandleFunc("POST /api/backups/upload", admin(h.uploadBackup))
+	mux.HandleFunc("DELETE /api/backups/restore", admin(h.cancelRestore))
+	mux.HandleFunc("GET /api/backups/{name}", admin(h.downloadBackup))
+	mux.HandleFunc("DELETE /api/backups/{name}", admin(h.deleteBackup))
+	mux.HandleFunc("POST /api/backups/{name}/restore", admin(h.stageRestore))
+	mux.HandleFunc("PUT /api/settings/backups", admin(h.putBackupSettings))
 	mux.HandleFunc("GET /api/config/export", auth(h.exportConfig)) // secrets only with a session
-	mux.HandleFunc("POST /api/config/import", session(h.importConfig))
+	mux.HandleFunc("POST /api/config/import", admin(h.importConfig))
 
 	mux.HandleFunc("GET /api/overview", auth(h.overview))
 	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
@@ -314,7 +317,7 @@ func (h *Hub) postSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte(c.Password), bcrypt.DefaultCost)
-	u, err := h.store.CreateUser(c.Email, string(hash))
+	u, err := h.store.CreateUser(c.Email, string(hash), store.RoleAdmin)
 	if err != nil {
 		h.internalErr(w, err)
 		return
@@ -595,7 +598,7 @@ func (h *Hub) summary(m *store.Monitor, expiry []*store.ExpiryCheck) *monitorSum
 	return s
 }
 
-func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User) {
+func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, u *store.User) {
 	f, err := parseMonitorFilter(r)
 	if err != nil {
 		writeErr(w, 400, err.Error())
@@ -619,6 +622,9 @@ func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, _ *store.User
 	for _, m := range ms {
 		if f.active && !f.match(m) {
 			continue
+		}
+		if !u.IsAdmin() {
+			redactMonitor(m)
 		}
 		out = append(out, h.summary(m, expiry[m.ID]))
 	}
@@ -700,7 +706,7 @@ type locationStatus struct {
 	Last   *store.ResultRow `json:"last"`
 }
 
-func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) {
+func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, u *store.User) {
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, 400, "invalid id")
@@ -718,6 +724,9 @@ func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) 
 	if err != nil {
 		h.internalErr(w, err)
 		return
+	}
+	if !u.IsAdmin() {
+		redactMonitor(m)
 	}
 	s := h.summary(m, expiry)
 	now := time.Now().UnixMilli()
@@ -1132,7 +1141,7 @@ func validateNotifier(n *store.Notifier) error {
 	return nil
 }
 
-func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, _ *store.User) {
+func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, u *store.User) {
 	list, err := h.store.ListNotifiers()
 	if err != nil {
 		h.internalErr(w, err)
@@ -1140,6 +1149,9 @@ func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, _ *store.Use
 	}
 	for _, n := range list {
 		maskNotifier(n)
+		if !u.IsAdmin() {
+			redactNotifier(n)
+		}
 	}
 	writeJSON(w, 200, list)
 }
