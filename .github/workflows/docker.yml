@@ -10,7 +10,7 @@ permissions:
   packages: write
   id-token: write # cosign keyless signing
 
-# Two quick merges on main would otherwise race to push :latest, and the older
+# Two quick merges on main would otherwise race to push :main, and the older
 # build could finish last. Keep only the newest run per ref.
 concurrency:
   group: docker-${{ github.ref }}
@@ -44,14 +44,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # main pushes :main; a v1.2.3 tag pushes :1.2.3 and :latest, so :latest
+      # is always the newest release (pre-release tags such as v1.3.0-rc.1
+      # do not move it: flavor latest=auto).
       - id: meta
         uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
+          flavor: latest=auto
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
-            type=raw,value=latest,enable={{is_default_branch}}
       - id: build
         uses: docker/build-push-action@v7
         with:

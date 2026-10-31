@@ -54,18 +54,29 @@ export function LatencyChart({ series }: { series: Series }) {
   const x = (i: number) => PAD.l + (slots <= 1 ? 0 : (i / (slots - 1)) * iw)
   const y = (v: number) => PAD.t + ih - (v / yMax) * ih
 
-  function path(vals: (number | null)[]) {
-    let d = ""
-    let pen = false
-    vals.forEach((v, i) => {
-      if (v === null) {
-        pen = false
-        return
-      }
-      d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`
-      pen = true
+  // Lines join consecutive points even across empty slots: older data comes
+  // from hourly rollups, so points are naturally further apart than the slot
+  // size. Only a gap much longer than the series' usual spacing (agent offline,
+  // monitor paused) breaks the line.
+  function segments(vals: (number | null)[]) {
+    const idx: number[] = []
+    vals.forEach((v, i) => v !== null && idx.push(i))
+    const gaps = idx.slice(1).map((v, k) => v - idx[k]).sort((a, b) => a - b)
+    const typical = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 1
+    const maxGap = Math.max(3, typical * 4)
+    const segs: number[][] = []
+    idx.forEach((i, k) => {
+      if (k === 0 || i - idx[k - 1] > maxGap) segs.push([i])
+      else segs[segs.length - 1].push(i)
     })
-    return d
+    return segs
+  }
+
+  function path(vals: (number | null)[], segs: number[][]) {
+    return segs
+      .filter((s) => s.length > 1)
+      .map((s) => s.map((i, k) => `${k ? "L" : "M"}${x(i).toFixed(1)},${y(vals[i]!).toFixed(1)}`).join(""))
+      .join("")
   }
 
   function onMove(e: React.MouseEvent<SVGSVGElement>) {
@@ -95,23 +106,21 @@ export function LatencyChart({ series }: { series: Series }) {
         {failSlots.map((f, i) =>
           f > 0 ? <rect key={i} x={x(i) - 1.5} y={PAD.t + ih + 3} width={3} height={5} fill="var(--down)" /> : null
         )}
-        {series.locations.map((l, li) =>
-          byLoc[l.id].map((v, i, arr) =>
-            v !== null && arr[i - 1] == null && arr[i + 1] == null ? (
-              <circle key={`${l.id}-${i}`} cx={x(i)} cy={y(v)} r={2} fill={COLORS[li % COLORS.length]} />
-            ) : null
+        {series.locations.map((l, li) => {
+          const vals = byLoc[l.id]
+          const segs = segments(vals)
+          const color = COLORS[li % COLORS.length]
+          return (
+            <g key={l.id}>
+              <path d={path(vals, segs)} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
+              {segs
+                .filter((s) => s.length === 1)
+                .map(([i]) => (
+                  <circle key={i} cx={x(i)} cy={y(vals[i]!)} r={2} fill={color} />
+                ))}
+            </g>
           )
-        )}
-        {series.locations.map((l, li) => (
-          <path
-            key={l.id}
-            d={path(byLoc[l.id])}
-            fill="none"
-            stroke={COLORS[li % COLORS.length]}
-            strokeWidth={1.5}
-            strokeLinejoin="round"
-          />
-        ))}
+        })}
         {hover !== null && (
           <line x1={x(hover)} x2={x(hover)} y1={PAD.t} y2={PAD.t + ih} stroke="var(--muted-foreground)" strokeDasharray="2 2" />
         )}

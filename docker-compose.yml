@@ -24,6 +24,8 @@ services:
   #   environment:
   #     PINGTXT_HUB: https://status.example.com
   #     PINGTXT_TOKEN: pt_xxx
+  #   volumes:
+  #     - ./agent-data:/data   # keeps the agent's self-updates
 
 # IPv6: containers get no IPv6 by default, so checks to IPv6-only targets fail.
 # Uncomment to enable it (Docker 27 or later, IPv6 on the server). See README "IPv6".

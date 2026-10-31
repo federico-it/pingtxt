@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -124,8 +125,13 @@ func releaseSum(ctx context.Context, client *http.Client, sumsURL, name string) 
 }
 
 // selfUpdateSupport reports whether this agent can replace its own binary,
-// and if not, why. It runs once at start.
-func selfUpdateSupport(disabled bool) (exe string, reason string) {
+// and if not, why. It returns the path updates are written to. It runs once
+// at start.
+//
+// In a container the image's binary is replaced with the next image, so
+// updates go to updateDir (a volume) instead, and useUpdatedBinary runs them
+// from there on the next start.
+func selfUpdateSupport(disabled bool, updateDir string) (target string, reason string) {
 	if disabled {
 		return "", protocol.NoUpdateDisabled
 	}
@@ -133,7 +139,10 @@ func selfUpdateSupport(disabled bool) (exe string, reason string) {
 		return "", protocol.NoUpdateUnsupported
 	}
 	if inContainer() {
-		return "", protocol.NoUpdateContainer
+		if updateDir == "" || !writableDir(updateDir) {
+			return "", protocol.NoUpdateContainer
+		}
+		return filepath.Join(updateDir, updatedBinName), ""
 	}
 	exe, err := os.Executable()
 	if err == nil {
@@ -144,13 +153,83 @@ func selfUpdateSupport(disabled bool) (exe string, reason string) {
 	}
 	// The new binary is written next to the old one and renamed over it,
 	// so the folder must be writable.
-	f, err := os.CreateTemp(filepath.Dir(exe), ".pingtxt-agent-probe-*")
-	if err != nil {
+	if !writableDir(filepath.Dir(exe)) {
 		return "", protocol.NoUpdateNotWritable
+	}
+	return exe, ""
+}
+
+func writableDir(dir string) bool {
+	f, err := os.CreateTemp(dir, ".pingtxt-agent-probe-*")
+	if err != nil {
+		return false
 	}
 	f.Close()
 	os.Remove(f.Name())
-	return exe, ""
+	return true
+}
+
+// In a container, the update folder holds the updated binary and the
+// version of the image it was installed on.
+const (
+	updatedBinName   = "pingtxt-agent"
+	imageVersionName = "image-version"
+	// envImageVersion carries the image's version to the updated binary,
+	// which writes it next to its own updates.
+	envImageVersion = "PINGTXT_IMAGE_VERSION"
+)
+
+// updatedBinary returns the binary a previous self-update left in dir, if
+// it belongs to this image and runs. An update is tied to the image it was
+// installed on: once a new image is pulled the folder is cleared, the image's
+// own binary starts and the hub updates it again if needed. imageVersion is
+// the version of the image's binary (this one).
+func updatedBinary(ctx context.Context, dir, imageVersion string) (bin, binVersion string, err error) {
+	bin = filepath.Join(dir, updatedBinName)
+	if _, err := os.Stat(bin); err != nil {
+		return "", "", nil
+	}
+	clear := func(why string) (string, string, error) {
+		os.Remove(bin)
+		os.Remove(filepath.Join(dir, imageVersionName))
+		return "", "", errors.New(why)
+	}
+	base, err := os.ReadFile(filepath.Join(dir, imageVersionName))
+	if err != nil || strings.TrimSpace(string(base)) != imageVersion {
+		return clear("the image changed since the last self-update, starting the image's version")
+	}
+	vctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(vctx, bin, "-version").Output()
+	if err != nil {
+		return clear("the updated binary does not run (" + err.Error() + "), starting the image's version")
+	}
+	return bin, strings.TrimSpace(string(out)), nil
+}
+
+// useUpdatedBinary replaces this process with the updated binary in dir,
+// when there is one. It returns only when the image's binary should run.
+func useUpdatedBinary(dir string, log *slog.Logger) {
+	self, err := os.Executable()
+	if err != nil {
+		return
+	}
+	if a, err1 := os.Stat(self); err1 == nil {
+		if b, err2 := os.Stat(filepath.Join(dir, updatedBinName)); err2 == nil && os.SameFile(a, b) {
+			return // this is the updated binary
+		}
+	}
+	bin, binVersion, err := updatedBinary(context.Background(), dir, os.Getenv(envImageVersion))
+	if err != nil {
+		log.Warn("self-update discarded", "reason", err)
+		return
+	}
+	if bin == "" {
+		return
+	}
+	log.Info("starting the self-updated agent", "image", version, "version", binVersion)
+	err = syscall.Exec(bin, append([]string{bin}, os.Args[1:]...), os.Environ())
+	log.Error("cannot start the self-updated agent, running the image's version", "err", err)
 }
 
 // secureHub reports whether updates from the hub at wsURL can be trusted:
@@ -191,6 +270,12 @@ func (a *agent) update(ctx context.Context, u protocol.Update) error {
 	}
 	if warn != "" {
 		a.log.Warn("update check", "version", u.Version, "note", warn)
+	}
+	if a.updateDir != "" {
+		// Tie the update to this image (see updatedBinary).
+		if err := os.WriteFile(filepath.Join(a.updateDir, imageVersionName), []byte(os.Getenv(envImageVersion)+"\n"), 0o644); err != nil {
+			return err
+		}
 	}
 	return downloadUpdate(ctx, a.client, a.httpURL, a.exe, u)
 }

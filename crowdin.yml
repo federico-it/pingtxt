@@ -1,16 +1,24 @@
 # Crowdin configuration for the hub UI translations.
-# Used by the Crowdin GitHub integration (project "pingtxt"): it uploads the
-# English source on every push to main and opens a pull request with the
-# translations. Source: web/messages/en.json. Targets: it, es, fr, de, pt-BR.
-# See CONTRIBUTING.md#translating-the-interface.
+# Used by the Crowdin GitHub integration (project "pingtxt", service branch
+# l10n_main): it uploads the English source on every push to main and opens a
+# pull request with the translations. See CONTRIBUTING.md#translating-the-interface.
+#
+# Source: web/messages/en.json. Output: web/messages/<two-letter code>.json
+# (it, fr, de, es, pt, ...).
+#
+# Crowdin is the only writer of the translation files, Italian included:
+# pull requests change en.json only. Editing it.json by hand as well is what
+# made the first Crowdin pull request conflict.
 
 preserve_hierarchy: true
 
 files:
   - source: /web/messages/en.json
     translation: /web/messages/%two_letters_code%.json
-    languages_mapping:
-      two_letters_code:
-        pt-BR: pt-BR
+    # Export only translated strings. Without this Crowdin copies the English
+    # text into every missing key, so the app could not fall back to en.json
+    # and a 0% language would look "complete". Missing keys fall back to
+    # English at runtime (web/lib/i18n.tsx).
+    skip_untranslated_strings: true
     # When an English string changes, keep its translations but mark them unapproved.
     update_option: update_as_unapproved
