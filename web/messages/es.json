@@ -622,7 +622,8 @@
       "slack": "",
       "telegram": "",
       "ntfy": "",
-      "email": ""
+      "email": "",
+      "app": ""
     },
     "fields": {
       "url": "",
@@ -637,7 +638,8 @@
       "username": "",
       "password": "",
       "from": "",
-      "to": ""
+      "to": "",
+      "users": ""
     },
     "options": {
       "starttls": "",
@@ -645,7 +647,8 @@
       "none": ""
     },
     "hints": {
-      "commaSeparated": ""
+      "commaSeparated": "",
+      "appUsers": ""
     }
   },
   "reports": {
@@ -961,7 +964,30 @@
     "disconnected": "",
     "disconnectTitle": "",
     "disconnectText": "",
-    "apiDocs": ""
+    "apiDocs": "",
+    "pushDevice": ""
+  },
+  "mobileApp": {
+    "title": "",
+    "intro": "",
+    "enabled": "",
+    "relayUrl": "",
+    "relayHint": "",
+    "relayChanged": "",
+    "registrationToken": "",
+    "registrationTokenHint": "",
+    "status": "",
+    "notRegistered": "",
+    "save": "",
+    "saved": "",
+    "error": "",
+    "test": "",
+    "testOk": "",
+    "register": "",
+    "registerTitle": "",
+    "registerText": "",
+    "registered": "",
+    "channelHint": ""
   },
   "users": {
     "roles": {
