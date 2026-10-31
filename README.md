@@ -311,3 +311,19 @@ make dev-web          # next dev on :3000, proxies /api to :8090
 make test lint
 make web hub agents   # production build into ./dist
 ```
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, how to open
+issues and how pull requests get reviewed and merged.
+
+- **Bugs**: open a [bug report](https://github.com/federico-it/pingtxt/issues/new?template=bug_report.yml).
+- **Ideas**: open a [feature request](https://github.com/federico-it/pingtxt/issues/new?template=feature_request.yml);
+  for bigger changes, agree on the approach in an issue before writing code.
+- **Security problems**: report them privately as described in [SECURITY.md](SECURITY.md), never in a public issue.
+
+Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE)
