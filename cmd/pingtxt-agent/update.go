@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,6 +52,24 @@ func selfUpdateSupport(disabled bool) (exe string, reason string) {
 	f.Close()
 	os.Remove(f.Name())
 	return exe, ""
+}
+
+// secureHub reports whether updates from the hub at wsURL can be trusted:
+// it is reached over TLS, or over plain http on a loopback or private
+// network address (a home lab without certificates).
+func secureHub(wsURL string) bool {
+	u, err := url.Parse(wsURL)
+	if err != nil {
+		return false
+	}
+	if u.Scheme == "wss" {
+		return true
+	}
+	if strings.EqualFold(u.Hostname(), "localhost") {
+		return true
+	}
+	ip := net.ParseIP(u.Hostname())
+	return ip != nil && (ip.IsLoopback() || ip.IsPrivate())
 }
 
 func inContainer() bool {

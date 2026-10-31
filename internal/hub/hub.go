@@ -98,6 +98,7 @@ type Hub struct {
 	states     oauthStates
 	oauth      oauthPending // OAuth consent requests and codes of MCP clients
 	challenges challenges
+	limits     loginLimits // brute force protection, see ratelimit.go
 	httpClient *http.Client
 
 	pages statusPages

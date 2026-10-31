@@ -231,6 +231,10 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
               Keep an agent on its version with <C>-no-auto-update</C> (or <C>PINGTXT_NO_AUTO_UPDATE=1</C> in{" "}
               <C>/etc/pingtxt-agent.env</C>).
             </li>
+            <li>
+              Agents update themselves only from an https hub (or plain http on a loopback or private IP address).
+              To allow it over plain http anyway, use <C>-insecure-update</C> (<C>PINGTXT_INSECURE_UPDATE=1</C>).
+            </li>
             <li>Docker agents never replace their binary: pull the new image or use Watchtower.</li>
           </ul>
         </Section>

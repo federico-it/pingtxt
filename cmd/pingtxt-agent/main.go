@@ -35,6 +35,7 @@ func main() {
 	token := flag.String("token", os.Getenv("PINGTXT_TOKEN"), "agent token (env PINGTXT_TOKEN)")
 	concurrency := flag.Int("concurrency", 32, "max parallel checks")
 	noUpdate := flag.Bool("no-auto-update", envBool("PINGTXT_NO_AUTO_UPDATE"), "never replace this binary when the hub asks (env PINGTXT_NO_AUTO_UPDATE)")
+	insecureUpdate := flag.Bool("insecure-update", envBool("PINGTXT_INSECURE_UPDATE"), "allow self-update from a hub reached over plain http on a public address (env PINGTXT_INSECURE_UPDATE)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 	if *showVersion {
@@ -53,6 +54,12 @@ func main() {
 	}
 
 	exe, noUpdateReason := selfUpdateSupport(*noUpdate)
+	if exe != "" && !*insecureUpdate && !secureHub(wsURL) {
+		// Over plain http anyone on the path could swap the binary and its
+		// checksum: never install code received that way.
+		exe, noUpdateReason = "", protocol.NoUpdateInsecure
+		log.Warn("self-update disabled: the hub URL is plain http, use https (or -insecure-update)")
+	}
 	ag := &agent{
 		log: log, wsURL: wsURL, httpURL: toHTTP(wsURL), token: *token, concurrency: *concurrency,
 		exe: exe, noUpdateReason: noUpdateReason,

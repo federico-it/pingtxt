@@ -364,8 +364,13 @@ func (h *Hub) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 403, "password login is disabled, use single sign-on")
 		return
 	}
-	u, err := h.store.UserByEmail(strings.ToLower(strings.TrimSpace(c.Email)))
+	email := strings.ToLower(strings.TrimSpace(c.Email))
+	if h.passwordBlocked(w, r, email) {
+		return
+	}
+	u, err := h.store.UserByEmail(email)
 	if err != nil || u.PasswordHash == "" || bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(c.Password)) != nil {
+		h.passwordFailed(r, email)
 		time.Sleep(400 * time.Millisecond)
 		writeErr(w, 401, "invalid email or password")
 		return
@@ -1247,7 +1252,13 @@ func maskNotifier(n *store.Notifier) {
 	}
 }
 
-// keepSecrets fills empty write-only values of n from the stored channel.
+// secretBoundKeys are the settings a write-only secret belongs to: when one
+// of them changes the stored secret is not reused, so it cannot be sent to
+// another server (or in clear text) by editing the channel or testing a draft.
+var secretBoundKeys = map[string][]string{"email": {"host", "port", "username", "security"}}
+
+// keepSecrets fills empty write-only values of n from the stored channel,
+// as long as they would go to the same server.
 func (h *Hub) keepSecrets(n *store.Notifier) {
 	if n.ID == 0 || len(writeOnlyKeys[n.Type]) == 0 {
 		return
@@ -1255,6 +1266,11 @@ func (h *Hub) keepSecrets(n *store.Notifier) {
 	cur, err := h.store.Notifier(n.ID)
 	if err != nil || cur.Type != n.Type {
 		return
+	}
+	for _, k := range secretBoundKeys[n.Type] {
+		if n.Config[k] != cur.Config[k] {
+			return
+		}
 	}
 	for _, k := range writeOnlyKeys[n.Type] {
 		if n.Config[k] == "" {

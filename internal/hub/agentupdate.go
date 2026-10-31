@@ -224,6 +224,8 @@ func noUpdateText(hl protocol.Hello) string {
 		return "the agent cannot write its own binary: re-run the install script"
 	case protocol.NoUpdateUnsupported:
 		return "self-update is not supported on this OS"
+	case protocol.NoUpdateInsecure:
+		return "the agent reaches the hub over plain http: use an https hub URL (or -insecure-update)"
 	}
 	return "agent version too old for self-update: re-run the install script once"
 }

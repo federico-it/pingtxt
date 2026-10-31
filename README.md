@@ -401,6 +401,9 @@ the agents page.
   install script once. It now installs to `/opt/pingtxt-agent`, owned by a `pingtxt-agent` user.
 - To keep an agent on its current version, start it with `-no-auto-update`
   (or `PINGTXT_NO_AUTO_UPDATE=1` in `/etc/pingtxt-agent.env`).
+- Agents update themselves only from a hub reached over **https** (or plain http on a
+  loopback or private IP address): over plain http anyone on the path could swap the binary
+  and its checksum. To accept that risk anyway, use `-insecure-update` (`PINGTXT_INSECURE_UPDATE=1`).
 - **Docker agents** never replace their own binary: pull the new image, or let
   [Watchtower](https://containrrr.dev/watchtower/) (or a similar image updater) do it:
 
