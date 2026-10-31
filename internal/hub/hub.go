@@ -174,6 +174,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.backupLoop(ctx)
 	go h.reportLoop(ctx)
 	go h.releaseLoop(ctx)
+	go h.agentUpdateLoop(ctx)
 	go h.escalationLoop(ctx)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
