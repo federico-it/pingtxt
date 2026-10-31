@@ -34,7 +34,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <span>
           pingtxt ·{" "}
           <a href={`${REPO}/blob/main/LICENSE`} className="underline-offset-4 hover:text-foreground hover:underline">
-            MIT license
+            AGPL-3.0 license
           </a>{" "}
           ·{" "}
           <a href={REPO} className="underline-offset-4 hover:text-foreground hover:underline">

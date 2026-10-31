@@ -116,5 +116,5 @@ Look at `git log` for the style:
 
 ## License
 
-By contributing you agree that your contributions are licensed under the [MIT License](LICENSE),
-the same license as the project.
+pingtxt is licensed under the [GNU Affero General Public License v3.0](LICENSE). By contributing you
+agree that your contributions are licensed under the same license.

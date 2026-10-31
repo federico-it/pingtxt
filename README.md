@@ -326,4 +326,9 @@ Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-[MIT](LICENSE)
+Copyright (C) 2026 Federico Mengascini and pingtxt contributors.
+
+pingtxt is free software, licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+You can use it for anything, including commercially, self-host it and modify it. If you distribute a modified
+version, or run one as a service that other people use over a network, you must publish its source code under
+the same license.

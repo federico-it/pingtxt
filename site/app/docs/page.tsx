@@ -326,8 +326,13 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
 
         <Section id="contributing" title="contributing">
           <p>
-            pingtxt is open source under the <a href={`${REPO}/blob/main/LICENSE`} className="text-foreground underline underline-offset-4">MIT license</a>.
-            Bug reports, fixes and new check types or notifiers are welcome.
+            pingtxt is free software under the{" "}
+            <a href={`${REPO}/blob/main/LICENSE`} className="text-foreground underline underline-offset-4">
+              AGPL-3.0 license
+            </a>
+            : use it, self-host it and change it freely; if you distribute a modified version or run one as a service for
+            others, publish its source under the same license. Bug reports, fixes and new check types or notifiers are
+            welcome.
           </p>
           <ul>
             <li>
