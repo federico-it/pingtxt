@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # pingtxt agent: a ~10 MB probe that connects out to the hub.
 
 # Keep in sync with the "go" line of go.mod (CI checks it).

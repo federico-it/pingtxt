@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # pingtxt hub: Go API + scheduler + embedded Next.js UI in one small image.
 
 # Keep in sync with the "go" line of go.mod (CI checks it). The agent binaries
