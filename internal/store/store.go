@@ -415,6 +415,12 @@ var laterMigrations = []migration{
 	{sqlite: `ALTER TABLE monitors ADD COLUMN ip_family INTEGER NOT NULL DEFAULT 0`},
 	// 20: IPv6 connectivity of each agent: 0 unknown, 1 yes, 2 no.
 	{sqlite: `ALTER TABLE agents ADD COLUMN ipv6 INTEGER NOT NULL DEFAULT 0`},
+	// 21: the refresh token an OAuth grant had before its last rotation, so a
+	// reused one is spotted and the grant revoked.
+	{sqlite: `ALTER TABLE oauth_grants ADD COLUMN prev_refresh_hash TEXT NOT NULL DEFAULT '';
+	CREATE INDEX oauth_grants_prev_refresh ON oauth_grants(prev_refresh_hash);`,
+		mysql: `ALTER TABLE oauth_grants ADD COLUMN prev_refresh_hash VARCHAR(128) NOT NULL DEFAULT '';
+	CREATE INDEX oauth_grants_prev_refresh ON oauth_grants(prev_refresh_hash);`},
 }
 
 func sqliteOnly(list []string) []migration {

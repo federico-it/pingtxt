@@ -17,15 +17,23 @@ import (
 	"github.com/federico-it/pingtxt/internal/store"
 )
 
-// OAuth 2.1 authorization for the MCP server, as the MCP authorization spec
-// asks: an MCP client (Claude, Cursor...) discovers the hub from a 401 on
-// /mcp, registers itself (dynamic client registration), sends the user to
-// the consent page with PKCE, and gets an access token plus a refresh token.
+// OAuth 2.1 authorization for the MCP server and the native apps.
 //
-// The hub is both the authorization server and the resource server. OAuth
-// tokens only work on /mcp, never on the REST API, and like API tokens they
-// never have more rights than their user: scope "read" or "write", capped by
-// the user's role at every request. API tokens keep working on /mcp.
+// MCP clients (Claude, Cursor...) follow the MCP authorization spec: they
+// discover the hub from a 401 on /mcp, register themselves (dynamic client
+// registration), send the user to the consent page with PKCE, and get an
+// access token plus a refresh token.
+//
+// The iOS app is a built-in public client (client_id "pingtxt-ios", redirect
+// pingtxt://oauth): it skips registration and runs the same flow from
+// ASWebAuthenticationSession. The user signs in on the hub's own login page,
+// so passwords, 2FA and single sign-on all work.
+//
+// The hub is both the authorization server and the resource server. Access
+// tokens work on /mcp and on the REST API like API tokens: they never have
+// more rights than their user (scope "read" or "write", capped by the user's
+// role at every request) and never reach account endpoints. Refresh tokens
+// rotate at every use; presenting an old one again revokes the grant.
 
 const (
 	oauthAuthorizePath = "/oauth/authorize"
@@ -46,6 +54,37 @@ const (
 )
 
 var oauthScopes = []string{ScopeRead, ScopeWrite}
+
+// Built-in clients: native apps with a fixed client_id, created at startup
+// and never cleaned up.
+const (
+	iosClientID    = "pingtxt-ios"
+	iosRedirectURI = "pingtxt://oauth"
+)
+
+var builtinOAuthClients = []*store.OAuthClient{
+	{ID: iosClientID, Name: "Pingtxt for iOS", RedirectURIs: []string{iosRedirectURI}},
+}
+
+func builtinClientIDs() []string {
+	ids := make([]string, len(builtinOAuthClients))
+	for i, c := range builtinOAuthClients {
+		ids[i] = c.ID
+	}
+	return ids
+}
+
+// isNativeApp reports whether a client is one of the hub's own apps.
+func isNativeApp(clientID string) bool { return slices.Contains(builtinClientIDs(), clientID) }
+
+// ensureOAuthClients registers the built-in clients.
+func (h *Hub) ensureOAuthClients() {
+	for _, c := range builtinOAuthClients {
+		if err := h.store.EnsureOAuthClient(&store.OAuthClient{ID: c.ID, Name: c.Name, RedirectURIs: c.RedirectURIs}); err != nil {
+			h.log.Error("register oauth client", "client", c.ID, "err", err)
+		}
+	}
+}
 
 // oauthPending holds consent requests and authorization codes in memory:
 // both live for minutes and are single use.
@@ -167,8 +206,12 @@ func (h *Hub) protectedResourceMetadata(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	base := h.issuer(r)
+	resource := base + mcpPath
+	if strings.TrimRight(strings.TrimPrefix(r.URL.Path, "/.well-known/oauth-protected-resource"), "/") == "/api" {
+		resource = base + "/api"
+	}
 	writeJSON(w, 200, map[string]any{
-		"resource":                 base + mcpPath,
+		"resource":                 resource,
 		"resource_name":            "pingtxt",
 		"authorization_servers":    []string{base},
 		"scopes_supported":         oauthScopes,
@@ -345,8 +388,10 @@ func (h *Hub) authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if res := q.Get("resource"); res != "" {
-		if u, err := url.Parse(res); err != nil || strings.Trim(u.Path, "/") != strings.Trim(mcpPath, "/") {
-			fail("invalid_target", "this server only issues tokens for "+h.issuer(r)+mcpPath)
+		// Tokens work on the MCP server and the REST API alike.
+		u, err := url.Parse(res)
+		if err != nil || !slices.Contains([]string{"", strings.Trim(mcpPath, "/"), "api"}, strings.Trim(u.Path, "/")) {
+			fail("invalid_target", "this server only issues tokens for "+h.issuer(r)+mcpPath+" and "+h.issuer(r)+"/api")
 			return
 		}
 	}
@@ -381,7 +426,7 @@ func (h *Hub) authorize(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = consentPage.Execute(w, map[string]any{
 		"Client": client.Name, "Redirect": redirectHost, "Email": u.Email, "Request": id,
-		"Write": scope == ScopeWrite, "Admin": u.IsAdmin(),
+		"Write": scope == ScopeWrite, "Admin": u.IsAdmin(), "Native": isNativeApp(client.ID),
 	})
 }
 
@@ -417,7 +462,7 @@ func (h *Hub) authorizeAnswer(w http.ResponseWriter, r *http.Request) {
 		userID: u.ID, clientID: req.clientID, redirectURI: req.redirectURI,
 		challenge: req.challenge, scope: scope, expires: time.Now().Add(oauthCodeTTL),
 	})
-	h.log.Info("mcp app authorized", "user", u.Email, "client", req.clientID, "scope", scope)
+	h.log.Info("oauth app authorized", "user", u.Email, "client", req.clientID, "scope", scope)
 	redirectWith(w, r, req.redirectURI, url.Values{"code": {code}, "state": {req.state}, "iss": {iss}})
 }
 
@@ -483,7 +528,16 @@ func (h *Hub) tokenEndpoint(w http.ResponseWriter, r *http.Request) {
 		}
 		writeTokens(w, access, refresh, g.Scope)
 	case "refresh_token":
-		g, err := h.store.OAuthGrantByRefresh(HashToken(f.Get("refresh_token")))
+		hash := HashToken(f.Get("refresh_token"))
+		g, err := h.store.OAuthGrantByRefresh(hash)
+		if errors.Is(err, store.ErrNotFound) {
+			// A refresh token that was already rotated: someone else may
+			// hold it, so the whole grant ends (OAuth 2.1 section 4.3.1).
+			if old, err := h.store.OAuthGrantByPreviousRefresh(hash); err == nil && old.ClientID == f.Get("client_id") {
+				_ = h.store.DeleteOAuthGrantByID(old.ID)
+				h.log.Warn("oauth refresh token reused, grant revoked", "client", old.ClientID, "grant", old.ID)
+			}
+		}
 		if err != nil || g.ClientID != f.Get("client_id") || g.RefreshExpires <= time.Now().UnixMilli() {
 			oauthErr(w, 400, "invalid_grant", "unknown or expired refresh token")
 			return
@@ -529,8 +583,8 @@ func (h *Hub) revokeEndpoint(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// oauthAccessToken resolves an OAuth access token of the MCP server to a
-// user and an equivalent API token (for scope checks).
+// oauthAccessToken resolves an OAuth access token to a user and an
+// equivalent API token (for scope checks).
 func (h *Hub) oauthAccessToken(t string) (*store.User, *store.APIToken, error) {
 	g, err := h.store.OAuthGrantByAccess(HashToken(t))
 	if err != nil {
@@ -555,7 +609,7 @@ func (h *Hub) cleanOAuth(now time.Time) {
 	if err := h.store.DeleteExpiredOAuthGrants(now.UnixMilli()); err != nil {
 		h.log.Error("clean oauth grants", "err", err)
 	}
-	if err := h.store.DeleteUnusedOAuthClients(now.Add(-oauthUnusedClientTTL).UnixMilli()); err != nil {
+	if err := h.store.DeleteUnusedOAuthClients(now.Add(-oauthUnusedClientTTL).UnixMilli(), builtinClientIDs()...); err != nil {
 		h.log.Error("clean oauth clients", "err", err)
 	}
 }
@@ -611,8 +665,10 @@ button.allow{border-color:var(--accent);color:var(--accent)}.w{color:var(--warn)
 </style></head><body><main>
 <h1><span class="p">$</span> pingtxt authorize</h1>
 {{if .Error}}<p>{{.Error}}</p>{{else}}
-<p><b>{{.Client}}</b> wants to use pingtxt through MCP as <b>{{.Email}}</b>.</p>
-<p>After you allow it, you go back to <b>{{.Redirect}}</b>. Only continue if you started this from your AI assistant.</p>
+{{if .Native}}<p><b>{{.Client}}</b> wants to sign in to this hub as <b>{{.Email}}</b>.</p>
+<p>After you allow it, you go back to the app. Only continue if you started this from the app.</p>
+{{else}}<p><b>{{.Client}}</b> wants to use pingtxt through MCP as <b>{{.Email}}</b>.</p>
+<p>After you allow it, you go back to <b>{{.Redirect}}</b>. Only continue if you started this from your AI assistant.</p>{{end}}
 <form method="post" action="/oauth/authorize">
 <input type="hidden" name="request" value="{{.Request}}">
 <label><input type="radio" name="scope" value="read" {{if not .Write}}checked{{end}}><span>read only<small>monitors, incidents, results, maintenance</small></span></label>

@@ -319,7 +319,7 @@ func TestMCPOAuth(t *testing.T) {
 		t.Fatalf("code reused: %d", st)
 	}
 
-	// The access token works on /mcp, with write tools, but not on the REST API.
+	// The access token works on /mcp, with write tools, and on the REST API.
 	mc := &mcpClient{t: t, url: srv.URL, token: tok["access_token"].(string)}
 	if names := mc.toolNames(); !strings.Contains(strings.Join(names, ","), "create_monitor") {
 		t.Fatalf("oauth tools: %v", names)
@@ -327,7 +327,7 @@ func TestMCPOAuth(t *testing.T) {
 	if n := mc.callOK("list_monitors", nil).(map[string]any)["count"]; n.(float64) != 1 {
 		t.Fatalf("oauth list: %v", n)
 	}
-	if res := bearerDo(t, srv.URL, mc.token, "GET", "/api/monitors", nil); res.StatusCode != 401 {
+	if res := bearerDo(t, srv.URL, mc.token, "GET", "/api/monitors", nil); res.StatusCode != 200 {
 		t.Fatalf("oauth token on REST API: %d", res.StatusCode)
 	}
 
@@ -336,13 +336,23 @@ func TestMCPOAuth(t *testing.T) {
 	if st != 200 || tok2["access_token"] == tok["access_token"] {
 		t.Fatalf("refresh: %d %+v", st, tok2)
 	}
-	if st, _ := token(url.Values{"grant_type": {"refresh_token"}, "refresh_token": {tok["refresh_token"].(string)}, "client_id": {clientID}}); st != 400 {
-		t.Fatalf("old refresh token: %d", st)
-	}
 	if res := mc.post(`{"jsonrpc":"2.0","id":1,"method":"ping"}`); res.StatusCode != 401 {
 		t.Fatalf("old access token: %d", res.StatusCode)
 	}
 	mc.token = tok2["access_token"].(string)
+	mc.rpc("ping", nil)
+	// Reusing the old refresh token revokes the grant (it may have leaked).
+	if st, _ := token(url.Values{"grant_type": {"refresh_token"}, "refresh_token": {tok["refresh_token"].(string)}, "client_id": {clientID}}); st != 400 {
+		t.Fatalf("old refresh token: %d", st)
+	}
+	if res := mc.post(`{"jsonrpc":"2.0","id":1,"method":"ping"}`); res.StatusCode != 401 {
+		t.Fatalf("grant kept after refresh reuse: %d", res.StatusCode)
+	}
+	code = consent(admin, redirect, "write", "allow").Query().Get("code")
+	if st, tok = token(url.Values{"grant_type": {"authorization_code"}, "code": {code}, "client_id": {clientID}, "code_verifier": {verifier}}); st != 200 {
+		t.Fatalf("token again: %d %+v", st, tok)
+	}
+	mc.token = tok["access_token"].(string)
 	mc.rpc("ping", nil)
 
 	// Connected apps: listed and revocable from settings.

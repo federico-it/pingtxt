@@ -138,6 +138,7 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 	if err := h.loadSettings(); err != nil {
 		log.Error("load settings", "err", err)
 	}
+	h.ensureOAuthClients()
 	h.reloadPageDomains()
 	return h
 }

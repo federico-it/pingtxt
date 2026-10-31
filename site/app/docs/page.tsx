@@ -30,6 +30,7 @@ const toc = [
   ["2fa", "two-factor auth"],
   ["api", "api tokens"],
   ["mcp", "mcp server"],
+  ["apps", "native apps"],
   ["prometheus", "prometheus"],
   ["upgrade", "upgrade + backup"],
   ["verify", "verify a release"],
@@ -538,7 +539,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             connector in claude.ai or Claude Desktop (or <C>claude mcp add --transport http pingtxt https://status.example.com/mcp</C>{" "}
             then <C>/mcp</C> in Claude Code). You log in to pingtxt in the browser and choose read only or read + write (admins
             only). Discovery, dynamic client registration, PKCE and rotating refresh tokens are supported; access tokens last an
-            hour and only work on <C>/mcp</C>. Connected apps can be disconnected in{" "}
+            hour and work on <C>/mcp</C> and the API. Connected apps can be disconnected in{" "}
             <b className="text-foreground">settings → api tokens</b>. Behind a proxy, set the public URL in settings.
           </p>
           <p>
@@ -588,6 +589,40 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
               [<C key="9">create / delete_maintenance</C>, "admin write token, ISO 8601 times"],
             ]}
           />
+        </Section>
+
+        <Section id="apps" title="native apps">
+          <p>
+            The iOS app signs in with OAuth 2.1 (authorization code + PKCE) on the hub&apos;s own login page, so passwords, 2FA,
+            GitHub, Google and OpenID Connect all work. It is the built-in public client <C>pingtxt-ios</C> with redirect URI{" "}
+            <C>pingtxt://oauth</C>: no secret and no registration. Admins choose read only or read + write on the consent page,
+            read-only users always get read only.
+          </p>
+          <Table
+            head={["step", "request"]}
+            rows={[
+              [
+                "sign in",
+                <span key="1" className="break-all"><C>GET /oauth/authorize?response_type=code&amp;client_id=pingtxt-ios&amp;redirect_uri=pingtxt://oauth&amp;scope=read%20write&amp;state=…&amp;code_challenge=…&amp;code_challenge_method=S256</C></span>,
+              ],
+              [
+                "get tokens",
+                <span key="2" className="break-all"><C>POST /oauth/token grant_type=authorization_code&amp;code=…&amp;client_id=pingtxt-ios&amp;redirect_uri=pingtxt://oauth&amp;code_verifier=…</C></span>,
+              ],
+              ["call the api", <span key="3" className="break-all"><C>Authorization: Bearer pma_…</C></span>],
+              [
+                "refresh",
+                <span key="4" className="break-all"><C>POST /oauth/token grant_type=refresh_token&amp;refresh_token=pmr_…&amp;client_id=pingtxt-ios</C></span>,
+              ],
+              ["sign out", <span key="5" className="break-all"><C>POST /oauth/revoke token=pmr_…&amp;client_id=pingtxt-ios</C></span>],
+            ]}
+          />
+          <p>
+            Access tokens last an hour and work on the whole API like an API token of the same scope (never on account
+            endpoints). Refresh tokens last 30 days from their last use and rotate: every refresh returns a new one, and using
+            an old one again ends the sign-in. Each sign-in is listed in{" "}
+            <b className="text-foreground">settings → api tokens → connected apps</b>, where it can be disconnected.
+          </p>
         </Section>
 
         <Section id="prometheus" title="prometheus">
