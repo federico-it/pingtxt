@@ -53,6 +53,7 @@
     "agents": "{online}/{total} agent",
     "readOnly": "sola lettura",
     "readOnlyHint": "il tuo account può solo leggere",
+    "menu": "menu",
     "logout": "esci",
     "themeHint": "premi <kbd>d</kbd> per cambiare tema"
   },
