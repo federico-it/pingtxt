@@ -3,15 +3,17 @@
 import { useEffect, useState } from "react"
 import QRCode from "qrcode"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { CopyBlock } from "@/components/copy-block"
 import { Field } from "@/components/settings/field"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { api, type Me } from "@/lib/api"
+import { tr } from "@/lib/i18n"
 
 function errMsg(err: unknown) {
-  return err instanceof Error ? err.message : "error"
+  return err instanceof Error ? err.message : tr("twoFactor.error")
 }
 
 function CodeInput({
@@ -25,12 +27,13 @@ function CodeInput({
   onChange: (v: string) => void
   recovery?: boolean
 }) {
+  const t = useTranslations("twoFactor")
   return (
     <Input
       id={id}
       inputMode={recovery ? "text" : "numeric"}
       autoComplete="one-time-code"
-      placeholder={recovery ? "123456 or xxxxx-xxxxx" : "123456"}
+      placeholder={recovery ? t("recoveryPlaceholder") : "123456"}
       required
       value={value}
       onChange={(e) => onChange(e.target.value)}
@@ -45,16 +48,16 @@ function RecoveryCodes({
   codes: string[]
   onDone: () => void
 }) {
+  const t = useTranslations("twoFactor")
   return (
     <div className="grid gap-3">
       <p className="text-xs text-muted-foreground">
-        save these recovery codes somewhere safe. each one works once, if you
-        lose your phone. they are shown only now.
+        {t("recoveryHint")}
       </p>
       <CopyBlock code={codes.join("\n")} />
       <div>
         <Button variant="outline" onClick={onDone}>
-          I saved them
+          {t("saved")}
         </Button>
       </div>
     </div>
@@ -70,6 +73,7 @@ export function TwoFactor({ me, onChange }: { me: Me; onChange: () => void }) {
   const [code, setCode] = useState("")
   const [codes, setCodes] = useState<string[] | null>(null)
   const [busy, setBusy] = useState(false)
+  const t = useTranslations("twoFactor")
 
   useEffect(() => {
     if (!setup) return
@@ -105,7 +109,7 @@ export function TwoFactor({ me, onChange }: { me: Me; onChange: () => void }) {
       setSetup(null)
       setCode("")
       setCodes(r.recovery_codes)
-      toast.success("two-factor authentication is on")
+      toast.success(t("on"))
     })
   }
 
@@ -123,7 +127,7 @@ export function TwoFactor({ me, onChange }: { me: Me; onChange: () => void }) {
     run(async () => {
       await api("/api/auth/2fa/disable", { method: "POST", body: { code } })
       setCode("")
-      toast.success("two-factor authentication is off")
+      toast.success(t("off"))
       onChange()
     })
 
@@ -143,8 +147,7 @@ export function TwoFactor({ me, onChange }: { me: Me; onChange: () => void }) {
     return (
       <form onSubmit={confirm} className="grid gap-4">
         <p className="text-xs text-muted-foreground">
-          scan the code with an authenticator app (1Password, Bitwarden, Aegis,
-          Google Authenticator...), then type the 6 digit code it shows.
+          {t("scan")}
         </p>
         <div className="flex flex-wrap items-start gap-4">
           {qr ? (
@@ -157,22 +160,22 @@ export function TwoFactor({ me, onChange }: { me: Me; onChange: () => void }) {
             <div className="size-44 shrink-0 border border-dashed" />
           )}
           <div className="grid min-w-0 flex-1 gap-3">
-            <Field label="or enter this key">
+            <Field label={t("key")}>
               <CopyBlock code={setup.secret.match(/.{1,4}/g)!.join(" ")} />
             </Field>
-            <Field label="code" htmlFor="totp-confirm">
+            <Field label={t("code")} htmlFor="totp-confirm">
               <CodeInput id="totp-confirm" value={code} onChange={setCode} />
             </Field>
             <div className="flex gap-2">
               <Button type="submit" disabled={busy}>
-                turn on
+                {t("turnOn")}
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => setSetup(null)}
               >
-                cancel
+                {t("cancel")}
               </Button>
             </div>
           </div>
@@ -185,10 +188,10 @@ export function TwoFactor({ me, onChange }: { me: Me; onChange: () => void }) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
         <span className="text-muted-foreground">
-          off · ask for a code from your phone after the password
+          {t("offHint")}
         </span>
         <Button variant="outline" onClick={start} disabled={busy}>
-          set up two-factor
+          {t("setup")}
         </Button>
       </div>
     )
@@ -197,17 +200,14 @@ export function TwoFactor({ me, onChange }: { me: Me; onChange: () => void }) {
   return (
     <div className="grid gap-3">
       <div className="text-xs">
-        <span className="text-up">on</span>{" "}
-        <span className="text-muted-foreground">
-          · {me.recovery_codes_left} recovery code
-          {me.recovery_codes_left === 1 ? "" : "s"} left
-        </span>
+        <span className="text-up">{t("onLabel")}</span>{" "}
+        <span className="text-muted-foreground">· {t("codesLeft", { count: me.recovery_codes_left })}</span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field
-          label="code"
+          label={t("code")}
           htmlFor="totp-manage"
-          hint="needed to turn it off or to get new recovery codes"
+          hint={t("manageHint")}
         >
           <CodeInput
             id="totp-manage"
@@ -219,10 +219,10 @@ export function TwoFactor({ me, onChange }: { me: Me; onChange: () => void }) {
       </div>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" disabled={busy || !code} onClick={regenerate}>
-          new recovery codes
+          {t("newCodes")}
         </Button>
         <Button variant="ghost" disabled={busy || !code} onClick={disable}>
-          turn off
+          {t("turnOff")}
         </Button>
       </div>
     </div>

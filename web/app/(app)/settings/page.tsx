@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { PageHeader, Section } from "@/components/page-header"
 import { ApiTokens } from "@/components/settings/api-tokens"
@@ -22,6 +23,7 @@ import {
   type Me,
   type Settings,
 } from "@/lib/api"
+import { isLocale, locales, useLocale, type Locale } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 export default function SettingsPage() {
@@ -35,6 +37,10 @@ export default function SettingsPage() {
     refreshInterval: 0,
   })
   const { theme, setTheme } = useTheme()
+  const { locale, setLocale } = useLocale()
+  const t = useTranslations("settings")
+  const tc = useTranslations("common")
+  const tl = useTranslations("language")
 
   // Result of an OAuth "connect account" round trip.
   useEffect(() => {
@@ -42,33 +48,60 @@ export default function SettingsPage() {
     const err = q.get("error")
     const linked = q.get("linked")
     if (err) toast.error(err)
-    if (linked) toast.success(`${linked} account connected`)
+    if (linked) toast.success(t("linked", { provider: linked }))
     if (err || linked)
       window.history.replaceState(null, "", window.location.pathname)
-  }, [])
+  }, [t])
 
   return (
     <>
-      <PageHeader cmd="pingtxt config" title="settings" />
+      <PageHeader cmd="pingtxt config" title={t("title")} />
       <div className="max-w-2xl">
-        <Section title="appearance" className="mt-0">
+        <Section title={t("appearance")} className="mt-0">
           <div className="flex gap-2">
-            {["system", "light", "dark"].map((t) => (
+            {(["system", "light", "dark"] as const).map((th) => (
               <button
-                key={t}
-                onClick={() => setTheme(t)}
+                key={th}
+                onClick={() => setTheme(th)}
                 className={cn(
                   "border border-dashed px-3 py-1.5 hover:bg-accent",
-                  theme === t && "border-solid border-primary text-primary"
+                  theme === th && "border-solid border-primary text-primary"
                 )}
               >
-                {t}
+                {tc(`theme.${th}`)}
               </button>
             ))}
           </div>
         </Section>
 
-        <Section title="account">
+        <Section title={tl("title")}>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(locales) as Locale[]).map((l) => (
+              <button
+                key={l}
+                lang={l}
+                onClick={() => isLocale(l) && setLocale(l)}
+                className={cn(
+                  "border border-dashed px-3 py-1.5 hover:bg-accent",
+                  locale === l && "border-solid border-primary text-primary"
+                )}
+              >
+                {locales[l]}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {tl.rich("hint", {
+              link: (c) => (
+                <a href="https://crowdin.com/project/pingtxt" target="_blank" rel="noreferrer" className="underline underline-offset-4">
+                  {c}
+                </a>
+              ),
+            })}
+          </p>
+        </Section>
+
+        <Section title={t("account")}>
           {me.data && (
             <Account
               me={me.data}
@@ -81,11 +114,11 @@ export default function SettingsPage() {
           )}
         </Section>
 
-        <Section title="two-factor authentication">
+        <Section title={t("twoFactor")}>
           {me.data && <TwoFactor me={me.data} onChange={() => me.mutate()} />}
         </Section>
 
-        <Section title="api tokens">
+        <Section title={t("apiTokens")}>
           <ApiTokens />
         </Section>
 
@@ -108,7 +141,7 @@ export default function SettingsPage() {
         )}
 
         {isAdmin && me.data && (
-          <Section title="users">
+          <Section title={t("users")}>
             <UsersList meId={me.data.user.id} />
           </Section>
         )}
@@ -125,7 +158,7 @@ export default function SettingsPage() {
           </>
         )}
 
-        <Section title="about">
+        <Section title={t("about")}>
           <pre className="text-xs text-muted-foreground">
             {`version    ${me.data?.version ?? "--"}
 source     github.com/federico-it/pingtxt`}
@@ -148,6 +181,7 @@ function Account({
   const [cur, setCur] = useState("")
   const [next, setNext] = useState("")
   const u = me.user
+  const t = useTranslations("settings")
 
   async function changePassword(e: React.FormEvent) {
     e.preventDefault()
@@ -157,43 +191,40 @@ function Account({
         body: { current: cur, new: next },
       })
       toast.success(
-        u.has_password
-          ? "password changed. other sessions were logged out."
-          : "password set"
+        u.has_password ? t("passwordChanged") : t("passwordSet")
       )
       setCur("")
       setNext("")
       onChange()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
   }
 
   async function unlink(provider: string) {
     try {
       await api(`/api/auth/identities/${provider}`, { method: "DELETE" })
-      toast.success(`${provider} disconnected`)
+      toast.success(t("unlinked", { provider }))
       onChange()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
   }
 
   return (
     <>
       <div className="mb-4 text-xs text-muted-foreground">
-        logged in as <span className="text-foreground">{u.email}</span>
+        {t.rich("loggedInAs", { email: u.email, hl: (c) => <span className="text-foreground">{c}</span> })}
         {u.role === "viewer" && (
           <span className="block text-[11px]">
-            your account is read-only: you can see everything but cannot change
-            monitors or settings. ask an admin if you need more.
+            {t("viewerHint")}
           </span>
         )}
       </div>
       <form onSubmit={changePassword} className="grid gap-3 sm:grid-cols-2">
         {u.has_password && (
           <div className="grid gap-1.5">
-            <Label htmlFor="cur">current password</Label>
+            <Label htmlFor="cur">{t("currentPassword")}</Label>
             <Input
               id="cur"
               type="password"
@@ -206,7 +237,7 @@ function Account({
         )}
         <div className="grid gap-1.5">
           <Label htmlFor="new">
-            {u.has_password ? "new password" : "set a password"}
+            {u.has_password ? t("newPassword") : t("setAPassword")}
           </Label>
           <Input
             id="new"
@@ -220,7 +251,7 @@ function Account({
         </div>
         <div className="sm:col-span-2">
           <Button type="submit" variant="outline">
-            {u.has_password ? "change password" : "set password"}
+            {u.has_password ? t("changePassword") : t("setPassword")}
           </Button>
         </div>
       </form>
@@ -228,7 +259,7 @@ function Account({
       {(providers.length > 0 || u.identities.length > 0) && (
         <div className="mt-6">
           <div className="mb-2 text-xs text-muted-foreground">
-            connected logins
+            {t("connectedLogins")}
           </div>
           <div className="divide-y divide-dashed border border-dashed">
             {providers.map((p) => {
@@ -241,19 +272,19 @@ function Account({
                   <div className="min-w-0">
                     <span className="text-foreground">{p.label}</span>{" "}
                     <span className="text-muted-foreground">
-                      {id ? `· ${id.email || "connected"}` : "· not connected"}
+                      {id ? `· ${id.email || t("connected")}` : `· ${t("notConnected")}`}
                     </span>
                   </div>
                   {id ? (
                     <Confirm
                       trigger={
                         <Button size="xs" variant="ghost">
-                          disconnect
+                          {t("disconnect")}
                         </Button>
                       }
-                      title={`disconnect ${p.label}?`}
-                      description="You will no longer be able to log in with this account."
-                      action="disconnect"
+                      title={t("disconnectTitle", { provider: p.label })}
+                      description={t("disconnectText")}
+                      action={t("disconnect")}
                       onConfirm={() => unlink(p.id)}
                     />
                   ) : (
@@ -265,7 +296,7 @@ function Account({
                       }
                       nativeButton={false}
                     >
-                      connect
+                      {t("connect")}
                     </Button>
                   )}
                 </div>

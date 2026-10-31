@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import "@fontsource-variable/jetbrains-mono"
 
 import "./globals.css"
+import { I18nProvider } from "@/lib/i18n"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -21,8 +22,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className="antialiased">
       <body>
         <ThemeProvider>
-          <TooltipProvider delay={150}>{children}</TooltipProvider>
-          <Toaster position="bottom-right" />
+          <I18nProvider>
+            <TooltipProvider delay={150}>{children}</TooltipProvider>
+            <Toaster position="bottom-right" />
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>

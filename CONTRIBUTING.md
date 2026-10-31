@@ -1,7 +1,7 @@
 # Contributing to pingtxt
 
 Thanks for helping. Bug reports, fixes, new check types, notification channels, docs and
-translations of the docs are all welcome. This page explains how to open an issue, how to set up
+translations (of the interface and of the docs) are all welcome. This page explains how to open an issue, how to set up
 the project and how a pull request gets merged.
 
 By taking part you agree to follow the [code of conduct](CODE_OF_CONDUCT.md).
@@ -74,6 +74,33 @@ The public website (pingtxt.com) lives in [`site/`](site/) and is a separate Nex
 - `web/` – the hub UI (Next.js static export, shadcn/ui, Tailwind 4).
 - `site/` – the public website and docs.
 
+## Translating the interface
+
+The hub UI is translated on [Crowdin](https://crowdin.com/project/pingtxt). You don't need to touch the
+code: sign in on Crowdin, pick a language and translate. A maintainer merges the pull request that Crowdin
+opens with the new translations. Want a language that is not listed? Open an issue and we'll add it.
+
+How it works, for developers:
+
+- All UI text lives in [`web/messages/en.json`](web/messages/en.json), grouped by page or component
+  (`dashboard`, `monitorForm`, `settings`, ...). English is the source; the other files
+  (`it.json`, `es.json`, ...) are written by Crowdin, so don't edit them by hand except to seed a new
+  language.
+- Components read text with `useTranslations` from `use-intl`:
+  `const t = useTranslations("dashboard")` then `t("title")`. Helpers outside components
+  (like `lib/format.ts`) use `tr("time.never")` from `lib/i18n`.
+- Messages use ICU syntax: `{name}` for values, `{count, plural, one {# monitor} other {# monitors}}`
+  for plurals and `<code>...</code>` tags rendered with `t.rich`. Keep commands, URLs and product names
+  out of the strings when you can.
+- When you add or change text, update `en.json` only, in the namespace of the page you touched.
+  Missing keys in a translation fall back to English. `tsc` fails on a key that doesn't exist in `en.json`.
+- [`crowdin.yml`](crowdin.yml) maps `web/messages/en.json` to `web/messages/<lang>.json`. Crowdin uploads
+  the source on every push to `main` and opens a pull request with the translations.
+- A language shows up in the picker once it is listed in `locales` and `loaders` in
+  [`web/lib/i18n.tsx`](web/lib/i18n.tsx). Add it there when its file is reasonably complete.
+- The language is chosen per browser (saved in `localStorage`, otherwise taken from the browser
+  settings) with the picker in the header, on the login page, on status pages and in **settings**.
+
 ## Pull requests
 
 1. Fork the repo and create a branch from `main` (`fix-dns-timeout`, `add-matrix-notifier`...).
@@ -112,7 +139,8 @@ Look at `git log` for the style:
 
 - Go: `gofmt`, `go vet` clean, standard library first. Keep the hub a single static binary with no CGO.
 - TypeScript: the existing ESLint and TypeScript config, components from `web/components/ui`.
-- UI text is lowercase, plain and short, like the rest of the interface. Check light and dark mode
+- UI text goes in `web/messages/en.json` (see [Translating the interface](#translating-the-interface)) and
+  is lowercase, plain and short, like the rest of the interface. Check light and dark mode
   and a phone-sized screen.
 - Never log or return secrets (passwords, tokens, webhook URLs) to read-only users or in exports
   without secrets.

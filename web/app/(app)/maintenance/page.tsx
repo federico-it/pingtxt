@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { Confirm } from "@/components/confirm"
 import { GroupToggle, TagToggle, useLabels } from "@/components/labels"
@@ -18,15 +19,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { useNow } from "@/hooks/use-now"
 import { api, useApi, useIsAdmin, type Maintenance, type MaintenanceKind, type Monitor } from "@/lib/api"
 import { datetime, duration } from "@/lib/format"
+import { tr } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-const kinds: { value: MaintenanceKind; label: string }[] = [
-  { value: "once", label: "once" },
-  { value: "daily", label: "every day" },
-  { value: "weekly", label: "every week" },
-  { value: "monthly", label: "every month" },
-]
-const weekdays = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+const kinds: MaintenanceKind[] = ["once", "daily", "weekly", "monthly"]
+const weekdays = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
+const dayName = (d: number) => tr(`maintenance.weekdays.${weekdays[d]}`)
 // Monday first in the picker.
 const weekdayOrder = [1, 2, 3, 4, 5, 6, 0]
 
@@ -89,14 +87,16 @@ function minutes(n: number) {
 
 function schedule(m: Maintenance) {
   if (m.kind === "once") return `${datetime(m.start_at).slice(0, 16)} → ${datetime(m.end_at).slice(0, 16)}`
-  let days = "every day"
-  if (m.kind === "weekly") days = "every " + weekdayOrder.filter((d) => m.weekdays.includes(d)).map((d) => weekdays[d]).join(", ")
-  if (m.kind === "monthly") days = "on day " + m.month_days.join(", ")
-  return `${days} at ${m.start_time} ${m.timezone} for ${minutes(m.duration_min)}`
+  let days = tr("maintenance.everyDay")
+  if (m.kind === "weekly")
+    days = tr("maintenance.everyWeekday", { days: weekdayOrder.filter((d) => m.weekdays.includes(d)).map(dayName).join(", ") })
+  if (m.kind === "monthly") days = tr("maintenance.onDays", { days: m.month_days.join(", ") })
+  return tr("maintenance.scheduleLine", { days, time: m.start_time, tz: m.timezone, duration: minutes(m.duration_min) })
 }
 
 export default function MaintenancePage() {
   const isAdmin = useIsAdmin()
+  const t = useTranslations("maintenance")
   const { data, mutate } = useApi<Maintenance[]>("/api/maintenances", { refreshInterval: 30_000 })
   const monitors = useApi<Monitor[]>("/api/monitors", { refreshInterval: 0 })
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -134,11 +134,11 @@ export default function MaintenancePage() {
     if (!draft) return
     try {
       await api(draft.id ? `/api/maintenances/${draft.id}` : "/api/maintenances", { method: draft.id ? "PUT" : "POST", body: draft })
-      toast.success("saved")
+      toast.success(t("saved"))
       setDraft(null)
       mutate()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
   }
 
@@ -146,7 +146,7 @@ export default function MaintenancePage() {
     try {
       await api(`/api/maintenances/${m.id}`, { method: "PUT", body: { ...m, enabled } })
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
     mutate()
   }
@@ -157,42 +157,40 @@ export default function MaintenancePage() {
   }
 
   function scope(m: Maintenance) {
-    if (m.all_monitors) return "all monitors"
+    if (m.all_monitors) return t("allMonitors")
     const list = [
       ...(m.group_ids ?? []).map((id) => groupById.get(id) && `[${groupById.get(id)!.name}]`),
       ...(m.tag_ids ?? []).map((id) => tagById.get(id) && `#${tagById.get(id)!.name}`),
       ...m.monitor_ids.map((id) => names.get(id)),
     ].filter(Boolean) as string[]
-    if (list.length === 0) return "no monitors"
+    if (list.length === 0) return t("noMonitors")
     return list.length <= 3 ? list.join(", ") : `${list.slice(0, 3).join(", ")} +${list.length - 3}`
   }
 
   function state(m: Maintenance) {
-    if (!m.enabled) return <span className="text-muted-foreground">disabled</span>
-    if (m.active && m.active_end) return <span className="text-info">◇ active · ends in {duration(m.active_end - now)}</span>
-    if (m.next_start) return <span className="text-muted-foreground">next in {duration(m.next_start - now)}</span>
-    return <span className="text-muted-foreground">ended</span>
+    if (!m.enabled) return <span className="text-muted-foreground">{t("disabled")}</span>
+    if (m.active && m.active_end) return <span className="text-info">◇ {t("activeEnds", { in: duration(m.active_end - now) })}</span>
+    if (m.next_start) return <span className="text-muted-foreground">{t("nextIn", { in: duration(m.next_start - now) })}</span>
+    return <span className="text-muted-foreground">{t("ended")}</span>
   }
 
   const recurring = draft && draft.kind !== "once"
 
   return (
     <>
-      <PageHeader cmd="pingtxt maint ls" title="maintenance">
+      <PageHeader cmd="pingtxt maint ls" title={t("title")}>
         {isAdmin && (
           <Button onClick={() => setDraft(newDraft())}>
-            <PlusIcon /> schedule
+            <PlusIcon /> {t("schedule")}
           </Button>
         )}
       </PageHeader>
       <p className="-mt-3 mb-6 max-w-2xl text-xs text-muted-foreground">
-        During a maintenance window checks keep running but the covered monitors show as maintenance: no incidents are opened and no
-        alerts are sent, and those checks don&apos;t count toward uptime. If a monitor is still down when the window ends, the alert
-        fires then.
+        {t("intro")}
       </p>
 
       {data && data.length === 0 ? (
-        <Empty>no maintenance windows scheduled.</Empty>
+        <Empty>{t("empty")}</Empty>
       ) : (
         <div className="border-t border-dashed">
           {(data ?? []).map((m) => (
@@ -211,14 +209,14 @@ export default function MaintenancePage() {
               {isAdmin && (
                 <>
                   <Button variant="ghost" size="xs" onClick={() => setDraft({ ...m, group_ids: m.group_ids ?? [], tag_ids: m.tag_ids ?? [] })}>
-                    edit
+                    {t("edit")}
                   </Button>
                   <Confirm
-                    title={`delete ${m.name}?`}
+                    title={t("deleteTitle", { name: m.name })}
                     onConfirm={() => remove(m)}
                     trigger={
                       <Button variant="ghost" size="xs" className="text-down">
-                        rm
+                        {t("rm")}
                       </Button>
                     }
                   />
@@ -234,29 +232,29 @@ export default function MaintenancePage() {
           {draft && (
             <form onSubmit={save} className="grid gap-4">
               <DialogHeader>
-                <DialogTitle>{draft.id ? "edit maintenance" : "schedule maintenance"}</DialogTitle>
-                <DialogDescription>Alerts are paused for the selected monitors while the window is active.</DialogDescription>
+                <DialogTitle>{draft.id ? t("editTitle") : t("newTitle")}</DialogTitle>
+                <DialogDescription>{t("dialogText")}</DialogDescription>
               </DialogHeader>
 
               <div className="grid gap-1.5">
-                <Label htmlFor="mw-name">name</Label>
-                <Input id="mw-name" required value={draft.name} onChange={(e) => set("name", e.target.value)} placeholder="database upgrade" />
+                <Label htmlFor="mw-name">{t("name")}</Label>
+                <Input id="mw-name" required value={draft.name} onChange={(e) => set("name", e.target.value)} placeholder={t("namePlaceholder")} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="mw-desc">notes (optional)</Label>
+                <Label htmlFor="mw-desc">{t("notes")}</Label>
                 <Textarea id="mw-desc" rows={2} value={draft.description} onChange={(e) => set("description", e.target.value)} />
               </div>
 
               <div className="grid gap-1.5">
-                <Label>repeat</Label>
-                <Select items={kinds} value={draft.kind} onValueChange={(v) => v && changeKind(v as MaintenanceKind)}>
+                <Label>{t("repeat")}</Label>
+                <Select items={kinds.map((k) => ({ value: k, label: t(`kinds.${k}`) }))} value={draft.kind} onValueChange={(v) => v && changeKind(v as MaintenanceKind)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {kinds.map((k) => (
-                      <SelectItem key={k.value} value={k.value}>
-                        {k.label}
+                      <SelectItem key={k} value={k}>
+                        {t(`kinds.${k}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -266,11 +264,11 @@ export default function MaintenancePage() {
               {!recurring ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="grid gap-1.5">
-                    <Label htmlFor="mw-start">start</Label>
+                    <Label htmlFor="mw-start">{t("start")}</Label>
                     <Input id="mw-start" type="datetime-local" required value={toLocalInput(draft.start_at)} onChange={(e) => set("start_at", fromLocalInput(e.target.value))} />
                   </div>
                   <div className="grid gap-1.5">
-                    <Label htmlFor="mw-end">end</Label>
+                    <Label htmlFor="mw-end">{t("end")}</Label>
                     <Input id="mw-end" type="datetime-local" required value={toLocalInput(draft.end_at)} onChange={(e) => set("end_at", fromLocalInput(e.target.value))} />
                   </div>
                 </div>
@@ -278,11 +276,11 @@ export default function MaintenancePage() {
                 <>
                   {draft.kind === "weekly" && (
                     <div className="grid gap-1.5">
-                      <Label>days</Label>
+                      <Label>{t("days")}</Label>
                       <div className="flex flex-wrap gap-1">
                         {weekdayOrder.map((d) => (
                           <DayToggle key={d} on={draft.weekdays.includes(d)} onChange={(on) => toggle("weekdays", d, on)}>
-                            {weekdays[d]}
+                            {dayName(d)}
                           </DayToggle>
                         ))}
                       </div>
@@ -290,7 +288,7 @@ export default function MaintenancePage() {
                   )}
                   {draft.kind === "monthly" && (
                     <div className="grid gap-1.5">
-                      <Label>days of the month</Label>
+                      <Label>{t("monthDays")}</Label>
                       <div className="grid grid-cols-7 gap-1">
                         {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                           <DayToggle key={d} on={draft.month_days.includes(d)} onChange={(on) => toggle("month_days", d, on)}>
@@ -298,20 +296,20 @@ export default function MaintenancePage() {
                           </DayToggle>
                         ))}
                       </div>
-                      <p className="text-xs text-muted-foreground">Months without that day are skipped.</p>
+                      <p className="text-xs text-muted-foreground">{t("monthDaysHint")}</p>
                     </div>
                   )}
                   <div className="grid gap-4 sm:grid-cols-3">
                     <div className="grid gap-1.5">
-                      <Label htmlFor="mw-time">at</Label>
+                      <Label htmlFor="mw-time">{t("at")}</Label>
                       <Input id="mw-time" type="time" required value={draft.start_time} onChange={(e) => set("start_time", e.target.value)} />
                     </div>
                     <div className="grid gap-1.5">
-                      <Label htmlFor="mw-dur">minutes</Label>
+                      <Label htmlFor="mw-dur">{t("minutes")}</Label>
                       <Input id="mw-dur" type="number" min={1} max={10080} required value={draft.duration_min} onChange={(e) => set("duration_min", Number(e.target.value))} />
                     </div>
                     <div className="grid gap-1.5">
-                      <Label htmlFor="mw-tz">time zone</Label>
+                      <Label htmlFor="mw-tz">{t("timezone")}</Label>
                       <Input id="mw-tz" list="mw-zones" required value={draft.timezone} onChange={(e) => set("timezone", e.target.value)} />
                       <datalist id="mw-zones">
                         {zones.map((z) => (
@@ -322,11 +320,11 @@ export default function MaintenancePage() {
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-1.5">
-                      <Label htmlFor="mw-from">from (optional)</Label>
+                      <Label htmlFor="mw-from">{t("from")}</Label>
                       <Input id="mw-from" type="datetime-local" value={toLocalInput(draft.start_at)} onChange={(e) => set("start_at", fromLocalInput(e.target.value))} />
                     </div>
                     <div className="grid gap-1.5">
-                      <Label htmlFor="mw-until">until (optional)</Label>
+                      <Label htmlFor="mw-until">{t("until")}</Label>
                       <Input id="mw-until" type="datetime-local" value={toLocalInput(draft.end_at)} onChange={(e) => set("end_at", fromLocalInput(e.target.value))} />
                     </div>
                   </div>
@@ -335,15 +333,15 @@ export default function MaintenancePage() {
 
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
-                  <Label>monitors</Label>
+                  <Label>{t("monitors")}</Label>
                   <label className="flex cursor-pointer items-center gap-2 text-xs">
                     <Switch checked={draft.all_monitors} onCheckedChange={(v) => set("all_monitors", v)} />
-                    all monitors
+                    {t("allMonitors")}
                   </label>
                 </div>
                 {!draft.all_monitors && (groups.data?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap items-center gap-1">
-                    <span className="mr-1 text-xs text-muted-foreground">groups:</span>
+                    <span className="mr-1 text-xs text-muted-foreground">{t("groups")}</span>
                     {(groups.data ?? []).map((g) => (
                       <GroupToggle key={g.id} group={g} on={draft.group_ids.includes(g.id)} onChange={(on) => toggle("group_ids", g.id, on)} />
                     ))}
@@ -351,14 +349,14 @@ export default function MaintenancePage() {
                 )}
                 {!draft.all_monitors && (tags.data?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap items-center gap-1">
-                    <span className="mr-1 text-xs text-muted-foreground">tags:</span>
-                    {(tags.data ?? []).map((t) => (
-                      <TagToggle key={t.id} tag={t} on={draft.tag_ids.includes(t.id)} onChange={(on) => toggle("tag_ids", t.id, on)} />
+                    <span className="mr-1 text-xs text-muted-foreground">{t("tags")}</span>
+                    {(tags.data ?? []).map((tg) => (
+                      <TagToggle key={tg.id} tag={tg} on={draft.tag_ids.includes(tg.id)} onChange={(on) => toggle("tag_ids", tg.id, on)} />
                     ))}
                   </div>
                 )}
                 {!draft.all_monitors && (draft.group_ids.length > 0 || draft.tag_ids.length > 0) && (
-                  <p className="text-xs text-muted-foreground">Groups and tags also cover monitors added to them later.</p>
+                  <p className="text-xs text-muted-foreground">{t("labelsHint")}</p>
                 )}
                 {!draft.all_monitors && (
                   <div className="grid max-h-48 gap-1 overflow-y-auto sm:grid-cols-2">
@@ -368,18 +366,18 @@ export default function MaintenancePage() {
                         <span className="truncate">{m.name}</span>
                       </label>
                     ))}
-                    {monitors.data?.length === 0 && <span className="text-xs text-muted-foreground">no monitors yet</span>}
+                    {monitors.data?.length === 0 && <span className="text-xs text-muted-foreground">{t("noMonitorsYet")}</span>}
                   </div>
                 )}
               </div>
 
               <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <Switch checked={draft.enabled} onCheckedChange={(v) => set("enabled", v)} />
-                enabled
+                {t("enabled")}
               </label>
 
               <DialogFooter>
-                <Button type="submit">save</Button>
+                <Button type="submit">{t("save")}</Button>
               </DialogFooter>
             </form>
           )}

@@ -2,10 +2,12 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { Button } from "@/components/ui/button"
 import { api, useIsAdmin, type ExpiryCheck } from "@/lib/api"
 import { ago } from "@/lib/format"
+import { tr } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 const DAY = 86_400_000
@@ -24,10 +26,10 @@ function tone(days: number | null) {
 }
 
 export function daysLabel(days: number | null): string {
-  if (days === null) return "unknown"
-  if (days < 0) return `expired ${-days}d ago`
-  if (days === 0) return "expires today"
-  return `${days}d left`
+  if (days === null) return tr("expiry.unknown")
+  if (days < 0) return tr("expiry.expiredAgo", { days: -days })
+  if (days === 0) return tr("expiry.today")
+  return tr("expiry.left", { days })
 }
 
 function date(ms: number) {
@@ -36,7 +38,6 @@ function date(ms: number) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-const labels = { cert: "tls cert", domain: "domain" } as const
 
 /** Compact "cert 5d" markers for monitors expiring within 30 days. */
 export function ExpiryBadges({
@@ -53,11 +54,16 @@ export function ExpiryBadges({
         x.days !== null && x.days <= 30
     )
   if (!soon.length) return null
+  return <ExpiryBadgeList soon={soon} />
+}
+
+function ExpiryBadgeList({ soon }: { soon: { e: ExpiryCheck; days: number }[] }) {
+  const t = useTranslations("expiry")
   return (
     <>
       {soon.map(({ e, days }) => (
         <span key={e.kind} className={cn("ml-2", tone(days))}>
-          {e.kind} {days < 0 ? "expired" : `${days}d`}
+          {t(`badge.${e.kind}`)} {days < 0 ? t("expired") : t("days", { days })}
         </span>
       ))}
     </>
@@ -78,6 +84,7 @@ export function ExpiryTable({
 }) {
   const [busy, setBusy] = useState(false)
   const isAdmin = useIsAdmin()
+  const t = useTranslations("expiry")
 
   async function refresh() {
     setBusy(true)
@@ -85,7 +92,7 @@ export function ExpiryTable({
       await api(`/api/monitors/${monitorId}/expiry`, { method: "POST" })
       onChange()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "error")
+      toast.error(e instanceof Error ? e.message : t("error"))
     } finally {
       setBusy(false)
     }
@@ -100,7 +107,7 @@ export function ExpiryTable({
             key={e.kind}
             className="grid gap-x-4 gap-y-0.5 text-xs sm:grid-cols-[80px_1fr_auto]"
           >
-            <span className="text-muted-foreground">{labels[e.kind]}</span>
+            <span className="text-muted-foreground">{t(`kind.${e.kind}`)}</span>
             <div className="min-w-0">
               <span className="text-foreground">{e.subject}</span>
               {e.expires_at > 0 && (
@@ -116,7 +123,7 @@ export function ExpiryTable({
               {e.issuer && (
                 <span className="text-muted-foreground">
                   {" "}
-                  · {e.kind === "cert" ? "issuer" : "registrar"} {e.issuer}
+                  · {e.kind === "cert" ? t("issuer") : t("registrar")} {e.issuer}
                 </span>
               )}
               {e.error && (
@@ -132,8 +139,8 @@ export function ExpiryTable({
             </div>
             <span className="text-muted-foreground sm:text-right">
               {e.checked_at
-                ? `${e.source ? e.source + " · " : ""}checked ${ago(e.checked_at)}`
-                : "waiting for the first lookup"}
+                ? `${e.source ? e.source + " · " : ""}${t("checked", { ago: ago(e.checked_at) })}`
+                : t("waiting")}
             </span>
           </div>
         )
@@ -141,7 +148,7 @@ export function ExpiryTable({
       {isAdmin && (
         <div>
           <Button variant="outline" size="sm" onClick={refresh} disabled={busy}>
-            {busy ? "checking..." : "check now"}
+            {busy ? t("checking") : t("checkNow")}
           </Button>
         </div>
       )}

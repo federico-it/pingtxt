@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { Confirm } from "@/components/confirm"
 import { Empty, PageHeader } from "@/components/page-header"
@@ -12,37 +13,37 @@ import { api, statusPageURL, useApi, useIsAdmin, type StatusPage } from "@/lib/a
 export default function StatusPagesPage() {
   const { data, mutate } = useApi<{ pages: StatusPage[]; hub_url: string }>("/api/status-pages", { refreshInterval: 0 })
   const isAdmin = useIsAdmin()
+  const t = useTranslations("statusPages")
 
   async function remove(p: StatusPage) {
     try {
       await api(`/api/status-pages/${p.id}`, { method: "DELETE" })
-      toast.success("status page deleted")
+      toast.success(t("deleted"))
       mutate()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
   }
 
   return (
     <>
-      <PageHeader cmd="pingtxt status-pages ls" title="status pages">
+      <PageHeader cmd="pingtxt status-pages ls" title={t("title")}>
         {isAdmin && (
           <Button render={<Link href="/status-pages/edit/" />} nativeButton={false}>
-            <PlusIcon /> new
+            <PlusIcon /> {t("new")}
           </Button>
         )}
       </PageHeader>
       <p className="-mt-3 mb-6 max-w-2xl text-xs text-muted-foreground">
-        Public pages that show the state and uptime history of the monitors you pick. Visitors see names and status
-        only, never targets or error messages.
+        {t("intro")}
       </p>
 
       {data && data.pages.length === 0 ? (
         <Empty>
-          no status pages yet.{" "}
+          {t("empty")}{" "}
           {isAdmin && (
             <Link href="/status-pages/edit/" className="text-primary underline underline-offset-4">
-              create one
+              {t("createOne")}
             </Link>
           )}
         </Empty>
@@ -61,27 +62,27 @@ export default function StatusPagesPage() {
                     ) : (
                       <span className="truncate">{p.title}</span>
                     )}
-                    {!p.published && <span className="text-xs text-muted-foreground">[draft]</span>}
+                    {!p.published && <span className="text-xs text-muted-foreground">[{t("draft")}]</span>}
                   </div>
                   <div className="truncate text-xs text-muted-foreground">
-                    {url} · {p.monitor_ids.length} monitor{p.monitor_ids.length === 1 ? "" : "s"}
+                    {url} · {t("monitorCount", { count: p.monitor_ids.length })}
                   </div>
                 </div>
                 <Button variant="ghost" size="xs" render={<a href={`/status/${p.slug}/`} target="_blank" rel="noreferrer" />} nativeButton={false}>
-                  open
+                  {t("open")}
                 </Button>
                 {isAdmin && (
                   <>
                     <Button variant="ghost" size="xs" render={<Link href={`/status-pages/edit/?id=${p.id}`} />} nativeButton={false}>
-                      edit
+                      {t("edit")}
                     </Button>
                     <Confirm
-                      title={`delete ${p.title}?`}
-                      description="The public page stops working right away."
+                      title={t("deleteTitle", { name: p.title })}
+                      description={t("deleteText")}
                       onConfirm={() => remove(p)}
                       trigger={
                         <Button variant="ghost" size="xs" className="text-down">
-                          rm
+                          {t("rm")}
                         </Button>
                       }
                     />

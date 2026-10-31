@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { Confirm } from "@/components/confirm"
 import { CopyBlock } from "@/components/copy-block"
@@ -10,10 +11,10 @@ import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-const examples = (url: string) => ({
-  cron: `# crontab: ping only when the job succeeds
+const examples = (url: string, c: { cron: string; failure: string }) => ({
+  cron: `# ${c.cron}
 0 3 * * * /usr/local/bin/backup.sh && curl -fsS -m 10 --retry 3 ${url} >/dev/null`,
-  failure: `# report the outcome either way, with the run time in ms
+  failure: `# ${c.failure}
 start=$(date +%s%3N)
 if /usr/local/bin/backup.sh; then status=up; else status=down; fi
 curl -fsS -m 10 --retry 3 "${url}?status=$status&ping=$(( $(date +%s%3N) - start ))&msg=backup" >/dev/null`,
@@ -31,50 +32,48 @@ export function PushInfo({
   onRotated: () => void
 }) {
   const [tab, setTab] = useState<"url" | "cron" | "failure">("url")
-  const ex = examples(url)
+  const t = useTranslations("pushInfo")
+  const ex = examples(url, { cron: t("cronComment"), failure: t("failureComment") })
 
   async function rotate() {
     await api(`/api/monitors/${id}/push-token`, { method: "POST" })
-    toast.success("new push URL created")
+    toast.success(t("rotated"))
     onRotated()
   }
 
   return (
     <Section
-      title="push url"
+      title={t("title")}
       actions={
         <div className="flex items-center gap-1 normal-case">
-          {(["url", "cron", "failure"] as const).map((t) => (
+          {(["url", "cron", "failure"] as const).map((k) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={k}
+              onClick={() => setTab(k)}
               className={cn(
                 "px-1.5 hover:text-foreground",
-                tab === t && "bg-accent text-foreground"
+                tab === k && "bg-accent text-foreground"
               )}
             >
-              {t}
+              {t(`tabs.${k}`)}
             </button>
           ))}
         </div>
       }
     >
       <p className="mb-2 text-xs text-muted-foreground">
-        Call this URL (any method) at the end of every run. Optional parameters:{" "}
-        <code>status=down</code> to report a failed run, <code>msg=</code> for a
-        short note, <code>ping=</code> for the run time in ms. Keep it secret:
-        anyone with the URL can send heartbeats.
+        {t.rich("hint", { code: (c) => <code>{c}</code> })}
       </p>
       <CopyBlock code={ex[tab]} />
       <div className="mt-2">
         <Confirm
-          title="create a new push URL?"
-          description="The current URL stops working immediately. Update your jobs with the new one."
-          action="regenerate"
+          title={t("confirmTitle")}
+          description={t("confirmText")}
+          action={t("regenerate")}
           onConfirm={rotate}
           trigger={
             <Button variant="outline" size="xs">
-              regenerate url
+              {t("regenerateUrl")}
             </Button>
           }
         />

@@ -1,3 +1,7 @@
+"use client"
+
+import { useTranslations } from "use-intl"
+
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { Bar } from "@/lib/api"
 import { datetime, utcDate, ms, pct } from "@/lib/format"
@@ -22,6 +26,7 @@ export function UptimeBars({
   height?: string
   daily?: boolean
 }) {
+  const t = useTranslations("uptimeBars")
   return (
     <div className={cn("flex items-stretch gap-px", height, className)}>
       {bars.map((b) => (
@@ -34,11 +39,11 @@ export function UptimeBars({
             <div>
               {b.total === 0
                 ? b.maint
-                  ? "maintenance"
-                  : "no data"
-                : `${pct(b.ok / b.total)} · ${b.ok}/${b.total} ok · avg ${ms(b.avg_ms)}`}
+                  ? t("maintenance")
+                  : t("noData")
+                : t("summary", { pct: pct(b.ok / b.total), ok: b.ok, total: b.total, avg: ms(b.avg_ms) })}
             </div>
-            {b.total > 0 && b.maint > 0 && <div className="text-info">+ {b.maint} checks in maintenance</div>}
+            {b.total > 0 && b.maint > 0 && <div className="text-info">{t("maintChecks", { count: b.maint })}</div>}
           </TooltipContent>
         </Tooltip>
       ))}
