@@ -377,3 +377,24 @@ PINGTXT_TEST_DB_URL="mariadb://root:pingtxt@127.0.0.1:3306/mysql" go test ./inte
 A schema change is a new entry at the end of `migrations` in `internal/store/store.go`, with a
 `postgres` / `mysql` variant when the SQLite text does not work there. CI runs the tests on SQLite,
 PostgreSQL, MariaDB and MySQL.
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, how to open
+issues and how pull requests get reviewed and merged.
+
+- **Bugs**: open a [bug report](https://github.com/federico-it/pingtxt/issues/new?template=bug_report.yml).
+- **Ideas**: open a [feature request](https://github.com/federico-it/pingtxt/issues/new?template=feature_request.yml);
+  for bigger changes, agree on the approach in an issue before writing code.
+- **Security problems**: report them privately as described in [SECURITY.md](SECURITY.md), never in a public issue.
+
+Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+Copyright (C) 2026 Federico Mengascini and pingtxt contributors.
+
+pingtxt is free software, licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+You can use it for anything, including commercially, self-host it and modify it. If you distribute a modified
+version, or run one as a service that other people use over a network, you must publish its source code under
+the same license.

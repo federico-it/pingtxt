@@ -1,0 +1,80 @@
+name: Bug report
+description: Something doesn't work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please search [existing issues](https://github.com/federico-it/pingtxt/issues?q=is%3Aissue) first.
+        **Security problems go to [a private report](https://github.com/federico-it/pingtxt/security/advisories/new), not here.**
+        Remove tokens, passwords and hostnames you don't want public from logs and screenshots.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create an http monitor for https://example.com with ...
+        2. Add location ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: pingtxt version
+      description: Shown in **settings** and at the bottom of the UI, or `pingtxt -version`.
+      placeholder: v1.2.3 or main-abc1234
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      multiple: true
+      options:
+        - hub (scheduler, checks, incidents)
+        - agent
+        - web UI
+        - notifications
+        - status pages
+        - login / SSO / 2FA
+        - API / Prometheus
+        - backups / config export
+        - install script / Docker image
+        - other
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options:
+        - Docker / docker compose
+        - binary
+        - other
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS and architecture, reverse proxy, browser if it's a UI issue.
+      placeholder: Debian 13 arm64, Caddy, Firefox 140
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "`docker logs pingtxt`, `journalctl -u pingtxt-agent`, or the browser console. Formatted as code automatically."
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, monitor settings, links.

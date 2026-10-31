@@ -32,9 +32,21 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1">{children}</main>
       <footer className="mt-16 flex flex-wrap items-center justify-between gap-2 border-t border-dashed py-4 text-xs text-muted-foreground">
         <span>
-          pingtxt · open source ·{" "}
+          pingtxt ·{" "}
+          <a href={`${REPO}/blob/main/LICENSE`} className="underline-offset-4 hover:text-foreground hover:underline">
+            AGPL-3.0 license
+          </a>{" "}
+          ·{" "}
           <a href={REPO} className="underline-offset-4 hover:text-foreground hover:underline">
             github.com/federico-it/pingtxt
+          </a>{" "}
+          ·{" "}
+          <Link href="/docs/#contributing" className="underline-offset-4 hover:text-foreground hover:underline">
+            contributing
+          </Link>{" "}
+          ·{" "}
+          <a href={`${REPO}/blob/main/SECURITY.md`} className="underline-offset-4 hover:text-foreground hover:underline">
+            security
           </a>
         </span>
         <span>
