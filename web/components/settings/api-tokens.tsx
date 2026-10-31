@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
@@ -110,6 +111,20 @@ export function ApiTokens() {
         {tt.rich("mcpIntro", {
           url: origin + "/mcp",
           b: (c) => <span className="text-foreground">{c}</span>,
+        })}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {tt.rich("apiDocs", {
+          docs: (c) => (
+            <Link href="/api-docs/" className="text-foreground underline underline-offset-4">
+              {c}
+            </Link>
+          ),
+          spec: (c) => (
+            <a href="/api/openapi.json" target="_blank" rel="noreferrer" className="text-foreground underline underline-offset-4">
+              {c}
+            </a>
+          ),
         })}
       </p>
 

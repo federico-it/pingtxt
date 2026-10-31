@@ -34,6 +34,12 @@ const sessionCookie = "pingtxt_session"
 
 // Handler returns the HTTP handler serving the API and the web UI.
 func (h *Hub) Handler(ui fs.FS) http.Handler {
+	return securityHeaders(gzipAPI(h.customDomains(h.routes(ui), ui)))
+}
+
+// routes registers every endpoint. Keep openapi.json in sync: a test checks
+// that each /api route is documented there.
+func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux := http.NewServeMux()
 	auth := h.requireAuth       // session or API token
 	session := h.requireSession // browser session only
@@ -41,6 +47,10 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "version": h.cfg.Version})
+	})
+	mux.HandleFunc("GET /api/openapi.json", h.openAPI)
+	mux.HandleFunc("GET /api/docs", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/api-docs/", http.StatusFound)
 	})
 	mux.HandleFunc("GET /api/setup", h.getSetup)
 	mux.HandleFunc("POST /api/setup", h.postSetup)
@@ -160,7 +170,7 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 		writeErr(w, http.StatusNotFound, "not found")
 	})
 	mux.Handle("/", spaHandler(ui))
-	return securityHeaders(gzipAPI(h.customDomains(mux, ui)))
+	return mux
 }
 
 // gzipWriter marks API responses whose client accepts gzip; writeJSON

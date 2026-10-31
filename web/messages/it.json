@@ -827,7 +827,8 @@
     "disconnect": "scollega",
     "disconnected": "{name} scollegata",
     "disconnectTitle": "scollegare {name}?",
-    "disconnectText": "L'assistente perde subito l'accesso e dovrà accedere di nuovo."
+    "disconnectText": "L'assistente perde subito l'accesso e dovrà accedere di nuovo.",
+    "apiDocs": "Riferimento API: <docs>documentazione interattiva</docs> e <spec>documento OpenAPI</spec>."
   },
   "users": {
     "roles": {
@@ -953,5 +954,10 @@
     "keep": "conserva",
     "keepHint": "i backup pianificati più vecchi vengono eliminati",
     "saveSchedule": "salva pianificazione"
+  },
+  "apiDocs": {
+    "title": "riferimento API",
+    "intro": "Tutti gli endpoint della REST API dell'hub. Try it out usa la tua sessione del browser; per provare un token, incollalo in Authorize. Account e impostazioni dell'istanza accettano solo la sessione del browser.",
+    "error": "impossibile caricare il documento API: {error}"
   }
 }
