@@ -7,6 +7,7 @@ import { useTranslations } from "use-intl"
 
 import { Confirm } from "@/components/confirm"
 import { Empty, PageHeader } from "@/components/page-header"
+import { PeriodicReports } from "@/components/reports"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -182,6 +183,8 @@ export default function NotificationsPage() {
           ))}
         </div>
       )}
+
+      {data && isAdmin !== undefined && <PeriodicReports notifiers={data} isAdmin={isAdmin} />}
 
       <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
         <DialogContent className="sm:max-w-md">

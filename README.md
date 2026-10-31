@@ -14,6 +14,8 @@ but plain text, monospace, light and dark.
   several does not lower it.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
+- **Periodic email reports**, weekly (Mondays) or monthly (on the 1st): uptime, incidents and downtime per monitor group,
+  compared with the period before, sent through your email channels at the hour and in the time zone you pick.
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain, plus SVG badges for READMEs.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
 - **MCP server** on `/mcp`: Claude and other AI assistants can read status and incidents and, with a write token,
