@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -135,13 +136,21 @@ func TestReleaseCheck(t *testing.T) {
 		{"match upper case", verifyStrict, "v1.2.3", strings.ToUpper(good), "", ""},
 		{"mismatch", verifyAuto, "v1.2.3", other, "does not match", ""},
 		{"no entry for platform", verifyAuto, "v1.2.4", good, "no checksum", ""},
-		{"release not found", verifyAuto, "v9.0.0", good, "no checksum", ""},
+		{"release files not uploaded yet, auto", verifyAuto, "v9.0.0", good, "no SHA256SUMS yet", ""},
+		{"release files not uploaded yet, strict", verifyStrict, "v9.0.0", good, "no SHA256SUMS yet", ""},
 		{"github down, auto", verifyAuto, "v1.2.5", good, "", "cannot read"},
 		{"github down, strict", verifyStrict, "v1.2.5", good, "cannot read", ""},
 		{"dev build, auto", verifyAuto, "main-abc1234", other, "", "not a release"},
 		{"dev build, strict", verifyStrict, "main-abc1234", good, "not a published release", ""},
 		{"path in version", verifyStrict, "v1.2.3/../x", good, "not a published release", ""},
 		{"off", verifyOff, "v1.2.3", other, "", ""},
+	}
+	var soon *retrySoonError
+	if _, err := releaseCheck(ctx, srv.Client(), srv.URL+"/", verifyAuto, "v9.0.0", good); !errors.As(err, &soon) {
+		t.Errorf("missing SHA256SUMS should be retried soon, got %v", err)
+	}
+	if _, err := releaseCheck(ctx, srv.Client(), srv.URL+"/", verifyAuto, "v1.2.4", good); errors.As(err, &soon) {
+		t.Errorf("missing entry must not be retried soon, got %v", err)
 	}
 	for _, c := range cases {
 		warn, err := releaseCheck(ctx, srv.Client(), srv.URL+"/", c.mode, c.version, c.sum)

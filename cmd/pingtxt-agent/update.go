@@ -74,6 +74,10 @@ func releaseCheck(ctx context.Context, client *http.Client, baseURL, mode, versi
 	name := agentFileName()
 	want, found, err := releaseSum(ctx, client, strings.TrimRight(baseURL, "/")+"/"+version+"/SHA256SUMS", name)
 	switch {
+	case errors.Is(err, errNoSums):
+		// The hub can start before the release workflow has uploaded the
+		// files: wait for them instead of installing an unchecked binary.
+		return "", &retrySoonError{fmt.Sprintf("release %s has no SHA256SUMS yet (its files may still be uploading), update postponed", version)}
 	case err != nil && mode == verifyStrict:
 		return "", fmt.Errorf("cannot read the release checksums: %w", err)
 	case err != nil:
@@ -86,8 +90,18 @@ func releaseCheck(ctx context.Context, client *http.Client, baseURL, mode, versi
 	return "", nil
 }
 
+// errNoSums means the release has no SHA256SUMS file (yet).
+var errNoSums = errors.New("no SHA256SUMS in the release")
+
+// retrySoonError is an update failure that should clear up by itself, so
+// the hub retries within minutes instead of hours.
+type retrySoonError struct{ msg string }
+
+func (e *retrySoonError) Error() string { return e.msg }
+
 // releaseSum fetches a SHA256SUMS file and returns the digest listed for
-// name. found is false when the file or the entry does not exist.
+// name. found is false when the entry does not exist; err is errNoSums when
+// the file does not exist.
 func releaseSum(ctx context.Context, client *http.Client, sumsURL, name string) (sum string, found bool, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -102,7 +116,7 @@ func releaseSum(ctx context.Context, client *http.Client, sumsURL, name string) 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return "", false, nil
+		return "", false, errNoSums
 	}
 	if resp.StatusCode != http.StatusOK {
 		return "", false, fmt.Errorf("%s answered %s", req.URL.Host, resp.Status)

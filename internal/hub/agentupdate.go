@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -37,12 +38,25 @@ type AgentUpdateSettings struct {
 const (
 	updateTimeout    = 5 * time.Minute // an update with no news after this is considered lost
 	updateRetryAfter = 6 * time.Hour   // after a failure, wait before trying the same version again
+	updateRetrySoon  = 5 * time.Minute // after a failure the agent expects to clear up by itself
+	// How often connected agents are offered pending updates, and the
+	// release is checked for its checksums.
+	updateLoopEvery = time.Minute
+	// Agents check updates against the release's SHA256SUMS, which the
+	// release workflow uploads a few minutes after the Docker image is out.
+	// The hub waits for it before offering updates, up to this long (forks
+	// and air-gapped installs never see it).
+	releaseSumsWait = 30 * time.Minute
 )
+
+// releaseDownloadURL is a variable so tests can point it at a fake server.
+var releaseDownloadURL = "https://github.com/" + releaseRepo + "/releases/download/"
 
 type agentUpdate struct {
 	target  string
 	started time.Time
 	err     string
+	retry   time.Duration // wait after err before an automatic retry
 }
 
 type agentUpdates struct {
@@ -50,6 +64,9 @@ type agentUpdates struct {
 	settings *AgentUpdateSettings // nil until loaded
 	state    map[int64]*agentUpdate
 	sums     map[string]binarySum // by file path
+	// published is set once the hub's release has its SHA256SUMS (or the
+	// hub stopped waiting for it): automatic updates wait until then.
+	published bool
 }
 
 type binarySum struct {
@@ -201,7 +218,7 @@ func (h *Hub) offerUpdate(ac *agentConn, manual bool) error {
 			u.mu.Unlock()
 			return errors.New("update already in progress")
 		}
-		if !manual && st.err != "" && time.Since(st.started) < updateRetryAfter {
+		if !manual && st.err != "" && time.Since(st.started) < st.retry {
 			u.mu.Unlock()
 			return errors.New("last update failed: " + st.err)
 		}
@@ -240,7 +257,87 @@ func (h *Hub) agentConnected(ac *agentConn) {
 		h.log.Info("agent updated", "agent", ac.agent.Name, "version", ac.hello.Version)
 	}
 	u.mu.Unlock()
-	if h.agentUpdateSettings().AutoUpdate {
+	if h.autoUpdateReady() {
+		_ = h.offerUpdate(ac, false)
+	}
+}
+
+// autoUpdateReady reports whether agents should be updated automatically now.
+func (h *Hub) autoUpdateReady() bool {
+	h.updates.mu.Lock()
+	published := h.updates.published
+	h.updates.mu.Unlock()
+	return published && h.agentUpdateSettings().AutoUpdate
+}
+
+// agentUpdateLoop waits until the hub's release is fully published, then
+// offers updates to connected agents, and again every minute to retry
+// failed ones once their retry delay is over.
+func (h *Hub) agentUpdateLoop(ctx context.Context) {
+	start := time.Now()
+	t := time.NewTicker(updateLoopEvery)
+	defer t.Stop()
+	for {
+		h.updates.mu.Lock()
+		published := h.updates.published
+		h.updates.mu.Unlock()
+		if !published && h.releasePublished(ctx, time.Since(start)) {
+			h.updates.mu.Lock()
+			h.updates.published = true
+			h.updates.mu.Unlock()
+		}
+		if h.autoUpdateReady() {
+			h.offerUpdateAll()
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+// releasePublished reports whether the release of the hub's version has its
+// SHA256SUMS, which agents check updates against. It answers true when
+// there is nothing to wait for: not a release build, the update check is off
+// (the hub makes no request to GitHub), GitHub cannot be reached (the agents
+// decide), or the hub has waited long enough.
+func (h *Hub) releasePublished(ctx context.Context, waited time.Duration) bool {
+	v := h.cfg.Version
+	if _, ok := semver(v); !ok || strings.ContainsAny(v, "-+") || h.generalSettings().UpdateCheck.Disabled {
+		return true
+	}
+	if waited >= releaseSumsWait {
+		h.log.Warn("release checksums not found, updating agents anyway", "version", v)
+		return true
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, releaseDownloadURL+v+"/SHA256SUMS", nil)
+	if err != nil {
+		return true
+	}
+	req.Header.Set("User-Agent", "pingtxt/"+v)
+	res, err := h.httpClient.Do(req)
+	if err != nil {
+		return true
+	}
+	res.Body.Close()
+	if res.StatusCode == http.StatusNotFound {
+		h.log.Info("waiting for the release checksums before updating agents", "version", v)
+		return false
+	}
+	return true
+}
+
+func (h *Hub) offerUpdateAll() {
+	h.mu.Lock()
+	conns := make([]*agentConn, 0, len(h.agents))
+	for _, ac := range h.agents {
+		conns = append(conns, ac)
+	}
+	h.mu.Unlock()
+	for _, ac := range conns {
 		_ = h.offerUpdate(ac, false)
 	}
 }
@@ -254,6 +351,12 @@ func (h *Hub) updateFailed(id int64, st protocol.UpdateStatus) {
 		s.err = st.Error
 		if s.err == "" {
 			s.err = "unknown error"
+		}
+		s.retry = updateRetryAfter
+		// Agents up to v0.3.1 report a release without SHA256SUMS (still
+		// uploading) as "publishes no checksum" without RetrySoon.
+		if st.RetrySoon || strings.Contains(st.Error, "publishes no checksum") {
+			s.retry = updateRetrySoon
 		}
 	}
 }
@@ -306,16 +409,8 @@ func (h *Hub) putAgentUpdateSettings(w http.ResponseWriter, r *http.Request, _ *
 		h.internalErr(w, err)
 		return
 	}
-	if in.AutoUpdate {
-		h.mu.Lock()
-		conns := make([]*agentConn, 0, len(h.agents))
-		for _, ac := range h.agents {
-			conns = append(conns, ac)
-		}
-		h.mu.Unlock()
-		for _, ac := range conns {
-			_ = h.offerUpdate(ac, false)
-		}
+	if h.autoUpdateReady() {
+		h.offerUpdateAll()
 	}
 	writeJSON(w, 200, in)
 }
