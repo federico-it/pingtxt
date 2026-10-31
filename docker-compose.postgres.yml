@@ -1,0 +1,39 @@
+# pingtxt hub + PostgreSQL. Start with:
+#   docker compose -f docker-compose.postgres.yml up -d
+# Set DB_PASSWORD in a .env file next to this file before the first start
+# (letters and digits only, or URL-encode it in PINGTXT_DB_URL).
+services:
+  pingtxt:
+    image: ghcr.io/federico-it/pingtxt:latest
+    # build: .
+    container_name: pingtxt
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      PINGTXT_DB_URL: postgres://pingtxt:${DB_PASSWORD:-pingtxt}@db:5432/pingtxt?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+    # Only for "docker container" monitors on the hub location:
+    # volumes:
+    #   - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  db:
+    image: postgres:17-alpine
+    container_name: pingtxt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pingtxt
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pingtxt}
+      POSTGRES_DB: pingtxt
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pingtxt -d pingtxt"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres:

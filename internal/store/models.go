@@ -45,11 +45,11 @@ func (s *Store) CreateUser(email, hash, role string) (*User, error) {
 		return nil, errors.New("invalid role")
 	}
 	u := &User{Email: email, PasswordHash: hash, Role: role, CreatedAt: now()}
-	res, err := s.db.Exec(`INSERT INTO users (email, password_hash, role, created_at) VALUES (?, ?, ?, ?)`, u.Email, u.PasswordHash, u.Role, u.CreatedAt)
+	id, err := s.db.insert(s.db, `INSERT INTO users (email, password_hash, role, created_at) VALUES (?, ?, ?, ?)`, u.Email, u.PasswordHash, u.Role, u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
-	u.ID, _ = res.LastInsertId()
+	u.ID = id
 	return u, nil
 }
 
@@ -162,11 +162,11 @@ func (s *Store) AgentByToken(hash string) (*Agent, error) {
 
 func (s *Store) CreateAgent(name, location, tokenHash string) (*Agent, error) {
 	a := &Agent{Name: name, Location: location, TokenHash: tokenHash, CreatedAt: now()}
-	res, err := s.db.Exec(`INSERT INTO agents (name, location, token_hash, created_at) VALUES (?, ?, ?, ?)`, a.Name, a.Location, a.TokenHash, a.CreatedAt)
+	id, err := s.db.insert(s.db, `INSERT INTO agents (name, location, token_hash, created_at) VALUES (?, ?, ?, ?)`, a.Name, a.Location, a.TokenHash, a.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
-	a.ID, _ = res.LastInsertId()
+	a.ID = id
 	return a, nil
 }
 
@@ -260,7 +260,7 @@ func (s *Store) ListMonitors() ([]*Monitor, error) {
 }
 
 func (s *Store) listMonitorsWhere(where string, args ...any) ([]*Monitor, error) {
-	rows, err := s.db.Query(`SELECT `+monitorCols+` FROM monitors `+where+` ORDER BY name COLLATE NOCASE`, args...)
+	rows, err := s.db.Query(`SELECT `+monitorCols+` FROM monitors `+where+` ORDER BY LOWER(name)`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -321,13 +321,13 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 		return err
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec(`INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id)
+	id, err := s.db.insert(tx, `INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt, nullID(m.GroupID))
 	if err != nil {
 		return err
 	}
-	m.ID, _ = res.LastInsertId()
+	m.ID = id
 	if err := setMonitorTags(tx, m.ID, m.TagIDs); err != nil {
 		return err
 	}
@@ -402,12 +402,12 @@ type ResultRow struct {
 }
 
 func (s *Store) InsertResult(r *ResultRow) error {
-	res, err := s.db.Exec(`INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	id, err := s.db.insert(s.db, `INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint))
 	if err != nil {
 		return err
 	}
-	r.ID, _ = res.LastInsertId()
+	r.ID = id
 	return nil
 }
 
@@ -473,7 +473,7 @@ func (s *Store) Uptime(monitorID, since int64) (float64, float64, error) {
 	}
 	var t, o, n sql.NullInt64
 	var l sql.NullFloat64
-	err := s.db.QueryRow(`SELECT COUNT(*), SUM(ok), SUM(CASE WHEN ok = 1 THEN latency_ms END), SUM(ok = 1)
+	err := s.db.QueryRow(`SELECT COUNT(*), SUM(ok), SUM(CASE WHEN ok = 1 THEN latency_ms END), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END)
 		FROM results WHERE monitor_id = ? AND ts >= ? AND maint = 0`, monitorID, max(since, w)).Scan(&t, &o, &l, &n)
 	if err != nil {
 		return -1, 0, err
@@ -555,7 +555,7 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 	}
 	w := s.RollupUntil()
 	if from < w {
-		rows, err := s.db.Query(`SELECT (MAX(start, ?) - ?) / ? AS b, `+loc+` AS loc, SUM(total), SUM(ok), SUM(maint),
+		rows, err := s.db.Query(`SELECT `+s.db.idiv(s.db.greatest("start", "?")+" - ?", "?")+` AS b, `+loc+` AS loc, SUM(total), SUM(ok), SUM(maint),
 			SUM(lat_sum), SUM(lat_n), COALESCE(MIN(CASE WHEN lat_n > 0 THEN lat_min END), 0), MAX(lat_max)
 			FROM result_rollups WHERE monitor_id = ? AND start >= ? AND start < ? GROUP BY b, loc`,
 			from, from, size, monitorID, from-from%RollupHour, min(w, to))
@@ -566,8 +566,8 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 			return nil, err
 		}
 	}
-	rows, err := s.db.Query(`SELECT ((ts - ?) / ?) AS b, `+loc+` AS loc, SUM(maint = 0), SUM(ok AND maint = 0), SUM(maint),
-		COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(ok = 1),
+	rows, err := s.db.Query(`SELECT `+s.db.idiv("ts - ?", "?")+` AS b, `+loc+` AS loc, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
+		COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END),
 		COALESCE(MIN(CASE WHEN ok = 1 THEN latency_ms END), 0),
 		COALESCE(MAX(CASE WHEN ok = 1 THEN latency_ms END), 0)
 		FROM results WHERE monitor_id = ? AND ts >= ? AND ts < ? GROUP BY b, loc`, from, size, monitorID, max(from, w), to)
@@ -604,7 +604,11 @@ func (s *Store) PruneResults(before int64) (int64, error) {
 	before = min(before, s.RollupUntil())
 	var total int64
 	for {
-		res, err := s.db.Exec(`DELETE FROM results WHERE id IN (SELECT id FROM results WHERE ts < ? LIMIT 5000)`, before)
+		q := `DELETE FROM results WHERE id IN (SELECT id FROM results WHERE ts < ? LIMIT 5000)`
+		if s.db.driver == DriverMySQL { // no LIMIT in IN subqueries, but DELETE ... LIMIT
+			q = `DELETE FROM results WHERE ts < ? LIMIT 5000`
+		}
+		res, err := s.db.Exec(q, before)
 		if err != nil {
 			return total, err
 		}
@@ -623,13 +627,25 @@ func (s *Store) InsertResults(rows []*ResultRow) error {
 		return err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare(`INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	q := `INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	pg := s.db.driver == DriverPostgres
+	if pg {
+		q += ` RETURNING id`
+	}
+	stmt, err := tx.Prepare(q)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 	for _, r := range rows {
-		res, err := stmt.Exec(r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint))
+		args := []any{r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint)}
+		if pg {
+			if err := stmt.QueryRow(args...).Scan(&r.ID); err != nil {
+				return err
+			}
+			continue
+		}
+		res, err := stmt.Exec(args...)
 		if err != nil {
 			return err
 		}
@@ -655,9 +671,9 @@ type StatCell struct {
 // `size` ms (aligned to from). One pass over that time range instead of a
 // query per monitor.
 func (s *Store) ResultStats(from, to, size int64) ([]StatCell, error) {
-	rows, err := s.db.Query(`SELECT monitor_id, (ts - ?) / ?, SUM(maint = 0), SUM(ok AND maint = 0), SUM(maint),
-		COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(ok = 1),
-		COALESCE(SUM(CASE WHEN ok = 1 AND maint = 0 THEN latency_ms END), 0), SUM(ok = 1 AND maint = 0)
+	rows, err := s.db.Query(`SELECT monitor_id, `+s.db.idiv("ts - ?", "?")+`, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
+		COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END),
+		COALESCE(SUM(CASE WHEN ok = 1 AND maint = 0 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END)
 		FROM results INDEXED BY results_ts WHERE ts >= ? AND ts < ? GROUP BY 1, 2`, from, size, from, to)
 	if err != nil {
 		return nil, err
@@ -789,11 +805,11 @@ func (s *Store) Notifier(id int64) (*Notifier, error) {
 func (s *Store) CreateNotifier(n *Notifier) error {
 	cfg, _ := json.Marshal(n.Config)
 	n.CreatedAt = now()
-	res, err := s.db.Exec(`INSERT INTO notifiers (name, type, config, enabled, created_at) VALUES (?, ?, ?, ?, ?)`, n.Name, n.Type, string(cfg), b2i(n.Enabled), n.CreatedAt)
+	id, err := s.db.insert(s.db, `INSERT INTO notifiers (name, type, config, enabled, created_at) VALUES (?, ?, ?, ?, ?)`, n.Name, n.Type, string(cfg), b2i(n.Enabled), n.CreatedAt)
 	if err != nil {
 		return err
 	}
-	n.ID, _ = res.LastInsertId()
+	n.ID = id
 	return nil
 }
 

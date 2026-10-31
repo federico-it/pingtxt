@@ -1,4 +1,5 @@
-# Hub (API + web UI + built-in probe) in a single container.
+# Hub (API + web UI + built-in probe) in a single container, with SQLite in ./data.
+# For PostgreSQL or MariaDB see docker-compose.postgres.yml and docker-compose.mariadb.yml.
 services:
   pingtxt:
     image: ghcr.io/federico-it/pingtxt:latest

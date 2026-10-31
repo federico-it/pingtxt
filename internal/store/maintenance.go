@@ -219,7 +219,7 @@ func scanMaintenance(sc interface{ Scan(...any) error }) (*Maintenance, error) {
 }
 
 func (s *Store) ListMaintenances() ([]*Maintenance, error) {
-	rows, err := s.db.Query(`SELECT ` + maintCols + ` FROM maintenances ORDER BY name COLLATE NOCASE`)
+	rows, err := s.db.Query(`SELECT ` + maintCols + ` FROM maintenances ORDER BY LOWER(name)`)
 	if err != nil {
 		return nil, err
 	}
@@ -249,13 +249,13 @@ func jsonIDs[T any](v []T) string {
 
 func (s *Store) CreateMaintenance(m *Maintenance) error {
 	m.CreatedAt = now()
-	res, err := s.db.Exec(`INSERT INTO maintenances (name, description, all_monitors, monitor_ids, kind, start_at, end_at, start_time, duration_min, weekdays, month_days, timezone, enabled, created_at, group_ids, tag_ids)
+	id, err := s.db.insert(s.db, `INSERT INTO maintenances (name, description, all_monitors, monitor_ids, kind, start_at, end_at, start_time, duration_min, weekdays, month_days, timezone, enabled, created_at, group_ids, tag_ids)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.Name, m.Description, b2i(m.AllMonitors), jsonIDs(m.MonitorIDs), m.Kind, m.StartAt, m.EndAt, m.StartTime, m.DurationMin, jsonIDs(m.Weekdays), jsonIDs(m.MonthDays), m.Timezone, b2i(m.Enabled), m.CreatedAt, jsonIDs(m.GroupIDs), jsonIDs(m.TagIDs))
 	if err != nil {
 		return err
 	}
-	m.ID, _ = res.LastInsertId()
+	m.ID = id
 	return nil
 }
 

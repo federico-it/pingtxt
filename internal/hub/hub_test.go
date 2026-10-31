@@ -3,6 +3,7 @@ package hub
 import (
 	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -11,13 +12,37 @@ import (
 	"github.com/federico-it/pingtxt/internal/store"
 )
 
-func newTestHub(t *testing.T) (*Hub, *store.Store) {
+// openTestStore opens an empty store: SQLite in dir, or a scratch database
+// on the server of PINGTXT_TEST_DB_URL (postgres:// or mysql://).
+func openTestStore(t *testing.T, dir string) *store.Store {
 	t.Helper()
-	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
+	if u := os.Getenv("PINGTXT_TEST_DB_URL"); u != "" {
+		st, drop, err := store.OpenScratch(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(drop)
+		return st
+	}
+	st, err := store.Open(filepath.Join(dir, "pingtxt.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
+	return st
+}
+
+// sqliteOnly skips tests of features that only exist with SQLite (file backups).
+func sqliteOnly(t *testing.T, st *store.Store) {
+	t.Helper()
+	if st.Driver() != store.DriverSQLite {
+		t.Skip("SQLite only")
+	}
+}
+
+func newTestHub(t *testing.T) (*Hub, *store.Store) {
+	t.Helper()
+	st := openTestStore(t, t.TempDir())
 	h := New(Config{LocalName: "hub"}, st, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err := h.reloadAll(); err != nil {
 		t.Fatal(err)

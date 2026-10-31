@@ -25,6 +25,10 @@ import (
 // hub: the web UI stages the chosen backup as <data>/pingtxt.db.restore and
 // the hub swaps it in on its next start (ApplyPendingRestore). From a shell,
 // `pingtxt -restore <file>` does the same with the hub stopped.
+//
+// With PostgreSQL or MariaDB/MySQL there are no backup files: the database
+// server is backed up with its own tools (pg_dump, mariadb-dump), and the
+// configuration export still works.
 
 const keyBackups = "backups"
 
@@ -96,8 +100,17 @@ func (h *Hub) backupSettings() BackupSettings {
 	return b
 }
 
+// errNoFileBackups is returned by the backup features that need SQLite.
+var errNoFileBackups = errors.New("database backups are made by pingtxt only with SQLite: back up the database server with pg_dump or mariadb-dump instead (the configuration export works with every database)")
+
+// FileBackups reports whether the hub can take and restore backup files (SQLite only).
+func (h *Hub) FileBackups() bool { return h.store.Driver() == store.DriverSQLite }
+
 // CreateBackup writes a snapshot of the database to the backups folder.
 func (h *Hub) CreateBackup(kind string) (*BackupFile, error) {
+	if !h.FileBackups() {
+		return nil, errNoFileBackups
+	}
 	h.backupMu.Lock()
 	defer h.backupMu.Unlock()
 	now := time.Now()
@@ -188,7 +201,7 @@ func (h *Hub) backupLoop(ctx context.Context) {
 
 func (h *Hub) scheduledBackup(now time.Time) {
 	s := h.backupSettings()
-	if !s.Enabled {
+	if !s.Enabled || !h.FileBackups() {
 		return
 	}
 	list, err := h.ListBackups()
@@ -228,6 +241,9 @@ type backupsView struct {
 	Dir      string         `json:"dir"`
 	// PendingRestore is set when a backup is staged for the next start.
 	PendingRestore *pendingRestore `json:"pending_restore"`
+	// Driver is the database kind; FileBackups is false unless it is SQLite.
+	Driver      string `json:"driver"`
+	FileBackups bool   `json:"file_backups"`
 }
 
 type pendingRestore struct {
@@ -236,6 +252,9 @@ type pendingRestore struct {
 }
 
 func (h *Hub) pendingRestore() *pendingRestore {
+	if !h.FileBackups() {
+		return nil
+	}
 	fi, err := os.Stat(PendingRestorePath(h.store.Path()))
 	if err != nil {
 		return nil
@@ -250,11 +269,16 @@ func (h *Hub) listBackups(w http.ResponseWriter, r *http.Request, _ *store.User)
 		h.internalErr(w, err)
 		return
 	}
-	writeJSON(w, 200, backupsView{Settings: h.backupSettings(), Backups: list, Dir: h.backupDir(), PendingRestore: h.pendingRestore()})
+	writeJSON(w, 200, backupsView{Settings: h.backupSettings(), Backups: list, Dir: h.backupDir(), PendingRestore: h.pendingRestore(),
+		Driver: h.store.Driver(), FileBackups: h.FileBackups()})
 }
 
 func (h *Hub) createBackup(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	b, err := h.CreateBackup(backupManual)
+	if errors.Is(err, errNoFileBackups) {
+		writeErr(w, 400, err.Error())
+		return
+	}
 	if err != nil {
 		h.internalErr(w, err)
 		return
@@ -329,6 +353,10 @@ func (h *Hub) deleteBackup(w http.ResponseWriter, r *http.Request, _ *store.User
 // uploadBackup stores a database file sent as the raw request body
 // (Content-Type: application/octet-stream) in the backups folder.
 func (h *Hub) uploadBackup(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	if !h.FileBackups() {
+		writeErr(w, 400, errNoFileBackups.Error())
+		return
+	}
 	if err := os.MkdirAll(h.backupDir(), 0o700); err != nil {
 		h.internalErr(w, err)
 		return
@@ -374,6 +402,10 @@ func (h *Hub) uploadBackup(w http.ResponseWriter, r *http.Request, _ *store.User
 
 // stageRestore copies a backup to <db>.restore; the hub swaps it in at the next start.
 func (h *Hub) stageRestore(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	if !h.FileBackups() {
+		writeErr(w, 400, errNoFileBackups.Error())
+		return
+	}
 	p, ok := h.backupPath(w, r)
 	if !ok {
 		return

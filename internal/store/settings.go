@@ -10,7 +10,7 @@ import (
 // It returns ErrNotFound when the key was never written.
 func (s *Store) GetSetting(key string, v any) error {
 	var raw string
-	err := s.db.QueryRow(`SELECT value FROM settings WHERE key = ?`, key).Scan(&raw)
+	err := s.db.QueryRow(`SELECT value FROM settings WHERE "key" = ?`, key).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -26,7 +26,7 @@ func (s *Store) SetSetting(key string, v any) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.db.Exec(`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, string(b))
+	_, err = s.db.Exec(`INSERT INTO settings ("key", value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, string(b))
 	return err
 }
 

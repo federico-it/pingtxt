@@ -290,7 +290,9 @@ func (h *Hub) ImportConfig(doc *ConfigDoc, opt ImportOptions) (*ImportResult, er
 	if opt.Replace {
 		res.Mode = "replace"
 	}
-	if opt.Backup {
+	if opt.Backup && !h.FileBackups() {
+		res.Warnings = append(res.Warnings, "no automatic backup before the import with "+h.store.Driver()+": back up the database server first if you may want to undo it")
+	} else if opt.Backup {
 		b, err := h.CreateBackup(backupPreImport)
 		if err != nil {
 			return nil, fmt.Errorf("backup before import: %w", err)

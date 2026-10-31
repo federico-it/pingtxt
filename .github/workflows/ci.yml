@@ -16,6 +16,67 @@ jobs:
       - run: go vet ./cmd/... ./internal/...
       - run: go test ./cmd/... ./internal/...
 
+  # The store and hub tests again, on real database servers. Each test gets
+  # its own scratch database on the server of PINGTXT_TEST_DB_URL.
+  go-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pingtxt
+          POSTGRES_PASSWORD: pingtxt
+          POSTGRES_DB: pingtxt
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pingtxt" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PINGTXT_TEST_DB_URL: postgres://pingtxt:pingtxt@127.0.0.1:5432/pingtxt?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./internal/store/... ./internal/hub/...
+
+  go-mariadb:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: pingtxt
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PINGTXT_TEST_DB_URL: mariadb://root:pingtxt@127.0.0.1:3306/mysql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./internal/store/... ./internal/hub/...
+
+  go-mysql:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pingtxt
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ppingtxt" --health-interval 5s --health-timeout 5s --health-retries 30
+    env:
+      PINGTXT_TEST_DB_URL: mysql://root:pingtxt@127.0.0.1:3306/mysql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./internal/store/... ./internal/hub/...
+
   web:
     runs-on: ubuntu-latest
     defaults:

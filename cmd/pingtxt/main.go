@@ -50,7 +50,7 @@ func main() {
 
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	retention, _ := strconv.Atoi(env("PINGTXT_RETENTION_DAYS", "30"))
-	// Only the address, data dir and agent dir are read at every start. The other
+	// Only the address, data dir, database URL and agent dir are read at every start. The other
 	// values seed the database on first start; then they are edited in the web UI.
 	cfg := hub.Config{
 		Addr:          env("PINGTXT_ADDR", ":8090"),
@@ -63,7 +63,14 @@ func main() {
 		Version:       version,
 	}
 
+	// PINGTXT_DB_URL selects PostgreSQL (postgres://) or MariaDB/MySQL
+	// (mysql://, mariadb://). Without it the hub uses SQLite in the data dir.
+	dbURL := os.Getenv("PINGTXT_DB_URL")
 	dbPath := filepath.Join(cfg.DataDir, "pingtxt.db")
+	if dbURL != "" && (*restoreFrom != "" || *backupTo != "") {
+		log.Error("-backup and -restore work with SQLite only: with PINGTXT_DB_URL use pg_dump / mariadb-dump (or -export-config)")
+		os.Exit(1)
+	}
 
 	if *restoreFrom != "" {
 		kept, err := store.Restore(dbPath, *restoreFrom, hub.BackupDir(cfg.DataDir))
@@ -86,19 +93,26 @@ func main() {
 		return
 	}
 
-	// A restore chosen in the web UI is applied before opening the database.
-	if kept, err := hub.ApplyPendingRestore(dbPath, cfg.DataDir); err != nil {
-		log.Error("restore staged backup failed, starting with the current database", "err", err)
-	} else if kept != "" {
-		log.Info("restored staged backup", "previous_database", kept)
+	if dbURL == "" {
+		// A restore chosen in the web UI is applied before opening the database.
+		if kept, err := hub.ApplyPendingRestore(dbPath, cfg.DataDir); err != nil {
+			log.Error("restore staged backup failed, starting with the current database", "err", err)
+		} else if kept != "" {
+			log.Info("restored staged backup", "previous_database", kept)
+		}
 	}
 
-	st, err := store.Open(dbPath)
+	dsn := dbPath
+	if dbURL != "" {
+		dsn = dbURL
+	}
+	st, err := store.Open(dsn)
 	if err != nil {
 		log.Error("open database", "err", err)
 		os.Exit(1)
 	}
 	defer st.Close()
+	log.Info("database", "driver", st.Driver())
 
 	if *enablePassword {
 		h := hub.New(cfg, st, log)

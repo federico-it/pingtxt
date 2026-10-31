@@ -58,6 +58,7 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
   const input = useRef<HTMLInputElement>(null)
+  const { data: backups } = useApi<Backups>("/api/backups")
 
   async function pick(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -188,14 +189,16 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
                 also apply instance settings (public url, login, retention...)
               </label>
               <p className="text-[11px] text-muted-foreground">
-                a database backup is taken before importing.
+                {backups && !backups.file_backups
+                  ? "no automatic backup with this database: back up the database server first if you may want to undo the import."
+                  : "a database backup is taken before importing."}
               </p>
               <div className="flex gap-2">
                 {mode === "replace" ? (
                   <Confirm
                     trigger={importButton}
                     title="replace the configuration?"
-                    description="Every current monitor, with its history, and every group, tag, channel, maintenance window and status page will be deleted, then the file is imported. A backup is taken first."
+                    description={`Every current monitor, with its history, and every group, tag, channel, maintenance window and status page will be deleted, then the file is imported.${backups && !backups.file_backups ? "" : " A backup is taken first."}`}
                     action="replace"
                     onConfirm={runImport}
                   />
@@ -308,6 +311,8 @@ export function DatabaseBackups() {
     }
   }
 
+  if (data && !data.file_backups) return <ServerBackups driver={data.driver} />
+
   return (
     <Section title="database backups">
       <div className="grid gap-6">
@@ -418,6 +423,47 @@ export function DatabaseBackups() {
             ))}
           </div>
         )}
+      </div>
+    </Section>
+  )
+}
+
+const dumpCommands = {
+  postgres: {
+    name: "PostgreSQL",
+    backup: "docker exec pingtxt-postgres pg_dump -U pingtxt -Fc pingtxt > pingtxt.dump",
+    restore:
+      "docker stop pingtxt\ndocker exec -i pingtxt-postgres pg_restore -U pingtxt -d pingtxt --clean --if-exists < pingtxt.dump\ndocker start pingtxt",
+  },
+  mysql: {
+    name: "MariaDB/MySQL",
+    backup:
+      'docker exec pingtxt-mariadb sh -c \'mariadb-dump -u pingtxt -p"$MARIADB_PASSWORD" --single-transaction pingtxt\' > pingtxt.sql',
+    restore:
+      'docker stop pingtxt\ndocker exec -i pingtxt-mariadb sh -c \'mariadb -u pingtxt -p"$MARIADB_PASSWORD" pingtxt\' < pingtxt.sql\ndocker start pingtxt',
+  },
+}
+
+/** With PostgreSQL or MariaDB/MySQL the database server is backed up with its own tools. */
+function ServerBackups({ driver }: { driver: "postgres" | "mysql" | "sqlite" }) {
+  const c = dumpCommands[driver === "postgres" ? "postgres" : "mysql"]
+  return (
+    <Section title="database backups">
+      <div className="grid gap-4 text-xs">
+        <p className="text-muted-foreground">
+          this hub stores its data in {c.name}. back up the database server with its own
+          tools (or your provider&apos;s snapshots): the dump holds settings, users,
+          secrets and history. the configuration export above works too, without
+          history and users. with the docker compose files from the docs:
+        </p>
+        <div className="grid gap-1">
+          <div className="text-muted-foreground">backup</div>
+          <pre className="overflow-x-auto border border-dashed p-3 text-[11px]">{c.backup}</pre>
+        </div>
+        <div className="grid gap-1">
+          <div className="text-muted-foreground">restore</div>
+          <pre className="overflow-x-auto border border-dashed p-3 text-[11px]">{c.restore}</pre>
+        </div>
       </div>
     </Section>
   )

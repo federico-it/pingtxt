@@ -461,6 +461,10 @@ export interface Backups {
   dir: string
   /** a backup staged to replace the database at the next start */
   pending_restore: { name: string; staged_at: number } | null
+  /** database kind: sqlite, postgres or mysql (MariaDB/MySQL) */
+  driver: "sqlite" | "postgres" | "mysql"
+  /** backup files are made by pingtxt only with SQLite */
+  file_backups: boolean
 }
 
 export interface ImportResult {

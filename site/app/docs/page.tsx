@@ -8,8 +8,11 @@ export const metadata: Metadata = {
   description: "Install and configure pingtxt: hub, agents, login, notifications, status pages, API and Prometheus.",
 }
 
+const RAW = "https://raw.githubusercontent.com/federico-it/pingtxt/main"
+
 const toc = [
   ["hub", "run the hub"],
+  ["database", "postgres / mariadb"],
   ["reverse-proxy", "reverse proxy"],
   ["agents", "add a location"],
   ["agent-updates", "agent updates"],
@@ -123,8 +126,58 @@ export default function Docs() {
             rows={[
               [<C key="a">PINGTXT_ADDR</C>, ":8090", "listen address"],
               [<C key="d">PINGTXT_DATA</C>, "/data", "SQLite database directory"],
+              [<C key="u">PINGTXT_DB_URL</C>, "", "PostgreSQL or MariaDB/MySQL instead of SQLite"],
             ]}
           />
+        </Section>
+
+        <Section id="database" title="postgresql or mariadb">
+          <p>
+            SQLite is the default and needs nothing else. To keep the data in PostgreSQL (13+) or MariaDB (10.6+) / MySQL
+            (8.0.13+), start the hub with <C>PINGTXT_DB_URL</C>. Tables are created and migrated at start. The compose files
+            below start the hub and the database with one command; set the passwords in <C>.env</C> before the first start.
+          </p>
+          <CopyBlock
+            label="postgresql"
+            code={`curl -O ${RAW}/docker-compose.postgres.yml
+echo "DB_PASSWORD=$(openssl rand -hex 16)" > .env
+docker compose -f docker-compose.postgres.yml up -d`}
+          />
+          <CopyBlock
+            label="mariadb"
+            code={`curl -O ${RAW}/docker-compose.mariadb.yml
+printf "DB_PASSWORD=%s\\nDB_ROOT_PASSWORD=%s\\n" $(openssl rand -hex 16) $(openssl rand -hex 16) > .env
+docker compose -f docker-compose.mariadb.yml up -d`}
+          />
+          <p>With your own database server, create an empty database and a user, then:</p>
+          <CopyBlock
+            label="env"
+            code={`PINGTXT_DB_URL=postgres://pingtxt:secret@db.example.com:5432/pingtxt?sslmode=require
+PINGTXT_DB_URL=mariadb://pingtxt:secret@db.example.com:3306/pingtxt   # mysql:// works too`}
+          />
+          <p>
+            Special characters in the password must be URL-encoded. History rollups, Prometheus metrics and the
+            configuration export work the same on every database. The built-in backups in settings are SQLite files: with
+            PostgreSQL or MariaDB back up the server with its own tools.
+          </p>
+          <CopyBlock
+            label="postgresql backup / restore"
+            code={`docker exec pingtxt-postgres pg_dump -U pingtxt -Fc pingtxt > pingtxt.dump
+docker stop pingtxt
+docker exec -i pingtxt-postgres pg_restore -U pingtxt -d pingtxt --clean --if-exists < pingtxt.dump
+docker start pingtxt`}
+          />
+          <CopyBlock
+            label="mariadb backup / restore"
+            code={`docker exec pingtxt-mariadb sh -c 'mariadb-dump -u pingtxt -p"$MARIADB_PASSWORD" --single-transaction pingtxt' > pingtxt.sql
+docker stop pingtxt
+docker exec -i pingtxt-mariadb sh -c 'mariadb -u pingtxt -p"$MARIADB_PASSWORD" pingtxt' < pingtxt.sql
+docker start pingtxt`}
+          />
+          <p>
+            To move an existing SQLite hub, export the configuration with secrets (settings → configuration export) and
+            import it in the new hub. History stays behind.
+          </p>
         </Section>
 
         <Section id="reverse-proxy" title="reverse proxy">
@@ -317,9 +370,10 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
         <Section id="upgrade" title="upgrade + backup">
           <CopyBlock code={`docker compose pull && docker compose up -d`} />
           <p>
-            Database migrations run on start. All state is one SQLite database, <C>/data/pingtxt.db</C>: to back it up, stop the
-            container and copy the data folder. Agents installed with the script follow the hub version on their
-            own.
+            Database migrations run on start. With SQLite all state is one file, <C>/data/pingtxt.db</C>: settings → database
+            backups takes copies while the hub runs, on demand or on a schedule, and restores them. With PostgreSQL or MariaDB
+            use <a href="#database" className="text-foreground underline underline-offset-4">pg_dump or mariadb-dump</a>.
+            Agents installed with the script follow the hub version on their own.
           </p>
         </Section>
       </div>
