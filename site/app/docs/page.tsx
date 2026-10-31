@@ -252,6 +252,11 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
               Pulling a new image starts its own binary again and clears the volume.
             </li>
             <li>
+              To keep containers immutable instead, set <C>PINGTXT_NO_AUTO_UPDATE=1</C> and let an image updater pull{" "}
+              <C>:latest</C> (What&apos;s Up Docker or the maintained Watchtower fork). It needs the Docker socket, and the
+              agent then follows the latest release rather than the hub&apos;s version.
+            </li>
+            <li>
               Docker tags: <C>:latest</C> is the newest release, <C>:1.2.3</C> a given release, <C>:main</C> the latest build
               of the main branch.
             </li>

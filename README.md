@@ -442,6 +442,11 @@ the agents page.
   Docker creates an anonymous volume that lasts as long as the container. When you pull a new
   image, its own binary starts again, the volume is cleared and the hub updates it if needed.
   Images from before this change cannot update themselves: pull `:latest` once.
+- To keep containers immutable instead (Kubernetes, read-only file system), start the agent with
+  `PINGTXT_NO_AUTO_UPDATE=1` and let an image updater pull `:latest`, such as
+  [What's Up Docker](https://github.com/getwud/wud) or the maintained
+  [Watchtower fork](https://github.com/nicholas-fedor/watchtower). They need the Docker socket,
+  and the agent then follows the latest release rather than the hub's version.
 - Docker tags: `:latest` is the newest release, `:1.2.3` a given release, `:main` the latest
   build of the main branch.
 
