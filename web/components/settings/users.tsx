@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { Confirm } from "@/components/confirm"
 import { Field } from "@/components/settings/field"
@@ -14,7 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { api, roles, useApi, type Role, type User } from "@/lib/api"
+import { api, roles as roleValues, useApi, type Role, type User } from "@/lib/api"
+
+/** Roles with their translated label and hint. */
+export function useRoles() {
+  const t = useTranslations("users.roles")
+  return roleValues.map((value) => ({ value, label: t(`${value}.label`), hint: t(`${value}.hint`) }))
+}
 
 function RoleSelect({
   value,
@@ -25,6 +32,7 @@ function RoleSelect({
   onChange: (r: Role) => void
   className?: string
 }) {
+  const roles = useRoles()
   return (
     <Select
       items={roles}
@@ -48,36 +56,36 @@ function RoleSelect({
 export function UsersList({ meId }: { meId: number }) {
   const { data, mutate } = useApi<User[]>("/api/users", { refreshInterval: 0 })
   const [adding, setAdding] = useState(false)
+  const t = useTranslations("users")
+  const roleList = useRoles()
 
   async function remove(u: User) {
     try {
       await api(`/api/users/${u.id}`, { method: "DELETE" })
-      toast.success(`${u.email} deleted`)
+      toast.success(t("deleted", { email: u.email }))
       mutate()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
   }
 
   async function resetTwoFactor(u: User) {
     try {
       await api(`/api/users/${u.id}/2fa`, { method: "DELETE" })
-      toast.success(`two-factor turned off for ${u.email}`)
+      toast.success(t("twoFactorReset", { email: u.email }))
       mutate()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
   }
 
   async function setRole(u: User, role: Role) {
     try {
       await api(`/api/users/${u.id}`, { method: "PUT", body: { role } })
-      toast.success(
-        `${u.email} is now ${roles.find((r) => r.value === role)?.label}`
-      )
+      toast.success(t("roleChanged", { email: u.email, role: roleList.find((r) => r.value === role)?.label ?? role }))
       mutate()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
   }
 
@@ -86,8 +94,8 @@ export function UsersList({ meId }: { meId: number }) {
       <div className="divide-y divide-dashed border border-dashed">
         {data?.map((u) => {
           const methods = [
-            u.has_password && "password",
-            u.two_factor && "2fa",
+            u.has_password && t("methods.password"),
+            u.two_factor && t("methods.twoFactor"),
             ...u.identities.map((i) => i.provider),
           ]
             .filter(Boolean)
@@ -99,14 +107,14 @@ export function UsersList({ meId }: { meId: number }) {
             >
               <div className="min-w-0">
                 <span className="text-foreground">{u.email}</span>
-                {u.id === meId && <span className="text-primary"> (you)</span>}
+                {u.id === meId && <span className="text-primary"> ({t("you")})</span>}
                 <span className="block text-[11px] text-muted-foreground">
-                  {methods || "single sign-on only"} · since{" "}
-                  {new Date(u.created_at).toLocaleDateString()}
+                  {methods || t("ssoOnly")} ·{" "}
+                  {t("since", { date: new Date(u.created_at).toLocaleDateString() })}
                 </span>
               </div>
               {u.id === meId ? (
-                <span className="text-muted-foreground">[admin]</span>
+                <span className="text-muted-foreground">[{roleList[0].label}]</span>
               ) : (
                 <div className="flex flex-wrap items-center gap-1">
                   <RoleSelect
@@ -118,23 +126,23 @@ export function UsersList({ meId }: { meId: number }) {
                     <Confirm
                       trigger={
                         <Button size="xs" variant="ghost">
-                          reset 2fa
+                          {t("reset2fa")}
                         </Button>
                       }
-                      title={`turn off two-factor for ${u.email}?`}
-                      description="Use this when they lost their phone and recovery codes. They are logged out and can set it up again."
-                      action="reset"
+                      title={t("reset2faTitle", { email: u.email })}
+                      description={t("reset2faText")}
+                      action={t("reset")}
                       onConfirm={() => resetTwoFactor(u)}
                     />
                   )}
                   <Confirm
                     trigger={
                       <Button size="xs" variant="ghost">
-                        delete
+                        {t("delete")}
                       </Button>
                     }
-                    title={`delete ${u.email}?`}
-                    description="The user is logged out and can no longer log in."
+                    title={t("deleteTitle", { email: u.email })}
+                    description={t("deleteText")}
                     onConfirm={() => remove(u)}
                   />
                 </div>
@@ -144,9 +152,7 @@ export function UsersList({ meId }: { meId: number }) {
         })}
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        read-only users see monitors, incidents and history but cannot change
-        anything; passwords and tokens in monitors and notification channels are
-        hidden from them.
+        {t("viewerHint")}
       </p>
       {adding ? (
         <AddUser
@@ -162,7 +168,7 @@ export function UsersList({ meId }: { meId: number }) {
           className="mt-3"
           onClick={() => setAdding(true)}
         >
-          add user
+          {t("add")}
         </Button>
       )}
     </>
@@ -174,6 +180,8 @@ function AddUser({ onDone }: { onDone: (added: boolean) => void }) {
   const [password, setPassword] = useState("")
   const [role, setRole] = useState<Role>("viewer")
   const [busy, setBusy] = useState(false)
+  const t = useTranslations("users")
+  const roles = useRoles()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -183,10 +191,10 @@ function AddUser({ onDone }: { onDone: (added: boolean) => void }) {
         method: "POST",
         body: { email, password, role },
       })
-      toast.success(`${email} added`)
+      toast.success(t("added", { email }))
       onDone(true)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     } finally {
       setBusy(false)
     }
@@ -197,7 +205,7 @@ function AddUser({ onDone }: { onDone: (added: boolean) => void }) {
       onSubmit={submit}
       className="mt-3 grid gap-3 border border-dashed p-3 sm:grid-cols-3"
     >
-      <Field label="email" htmlFor="new-user-email">
+      <Field label={t("email")} htmlFor="new-user-email">
         <Input
           id="new-user-email"
           type="email"
@@ -207,9 +215,9 @@ function AddUser({ onDone }: { onDone: (added: boolean) => void }) {
         />
       </Field>
       <Field
-        label="password"
+        label={t("password")}
         htmlFor="new-user-password"
-        hint="empty: log in with single sign-on (same email)"
+        hint={t("passwordHint")}
       >
         <Input
           id="new-user-password"
@@ -220,12 +228,12 @@ function AddUser({ onDone }: { onDone: (added: boolean) => void }) {
           onChange={(e) => setPassword(e.target.value)}
         />
       </Field>
-      <Field label="role" hint={roles.find((r) => r.value === role)?.hint}>
+      <Field label={t("role")} hint={roles.find((r) => r.value === role)?.hint}>
         <RoleSelect value={role} onChange={setRole} className="w-full" />
       </Field>
       <div className="flex gap-2 sm:col-span-3">
         <Button type="submit" size="sm" disabled={busy}>
-          add
+          {t("addShort")}
         </Button>
         <Button
           type="button"
@@ -233,7 +241,7 @@ function AddUser({ onDone }: { onDone: (added: boolean) => void }) {
           variant="ghost"
           onClick={() => onDone(false)}
         >
-          cancel
+          {t("cancel")}
         </Button>
       </div>
     </form>

@@ -2,9 +2,11 @@
 
 import { Fragment, useEffect, useSyncExternalStore } from "react"
 import useSWR from "swr"
+import { useTranslations } from "use-intl"
 
 import { Section } from "@/components/page-header"
 import { StatusText } from "@/components/status"
+import { LanguagePicker } from "@/components/language-picker"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UptimeBars } from "@/components/uptime-bars"
 import { api, ApiError, type PageStatus, type PublicStatusPage } from "@/lib/api"
@@ -12,12 +14,13 @@ import { useNow } from "@/hooks/use-now"
 import { ago, datetime, duration, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-const banner: Record<PageStatus, { text: string; cls: string; glyph: string }> = {
-  operational: { text: "all systems operational", cls: "border-up/40 text-up", glyph: "●" },
-  degraded: { text: "degraded performance", cls: "border-warn/40 text-warn", glyph: "◐" },
-  partial_outage: { text: "partial outage", cls: "border-down/40 text-down", glyph: "●" },
-  major_outage: { text: "major outage", cls: "border-down/40 text-down", glyph: "●" },
-  unknown: { text: "waiting for the first checks", cls: "text-muted-foreground", glyph: "◌" },
+// Texts are in statusPublic.banner.<status>.
+const banner: Record<PageStatus, { cls: string; glyph: string }> = {
+  operational: { cls: "border-up/40 text-up", glyph: "●" },
+  degraded: { cls: "border-warn/40 text-warn", glyph: "◐" },
+  partial_outage: { cls: "border-down/40 text-down", glyph: "●" },
+  major_outage: { cls: "border-down/40 text-down", glyph: "●" },
+  unknown: { cls: "text-muted-foreground", glyph: "◌" },
 }
 
 const noop = () => () => {}
@@ -35,6 +38,8 @@ function endpoint(): string {
 export default function PublicStatusPage() {
   const path = useSyncExternalStore(noop, endpoint, () => null)
   const now = useNow()
+  const t = useTranslations("statusPublic")
+  const tc = useTranslations("common")
   const { data, error } = useSWR<PublicStatusPage>(path, (p: string) => api<PublicStatusPage>(p), {
     refreshInterval: 60_000,
   })
@@ -49,7 +54,7 @@ export default function PublicStatusPage() {
         <div className="text-xs text-muted-foreground">
           <span className="text-primary">$</span> curl status
         </div>
-        <div>{error instanceof ApiError && error.status === 404 ? "404: status page not found" : `! ${error.message}`}</div>
+        <div>{error instanceof ApiError && error.status === 404 ? t("notFound") : `! ${error.message}`}</div>
       </div>
     )
   }
@@ -57,13 +62,14 @@ export default function PublicStatusPage() {
     return (
       <div className="flex min-h-svh items-center justify-center text-muted-foreground">
         <span>
-          loading<span className="cursor-blink">_</span>
+          {tc("loading")}<span className="cursor-blink">_</span>
         </span>
       </div>
     )
   }
 
-  const b = banner[data.status] ?? banner.unknown
+  const status = banner[data.status] ? data.status : "unknown"
+  const b = banner[status]
   const open = data.incidents.filter((i) => !i.resolved_at)
   const past = data.incidents.filter((i) => i.resolved_at)
 
@@ -73,8 +79,9 @@ export default function PublicStatusPage() {
         <h1 className="min-w-0 truncate font-semibold tracking-tight">
           <span className="text-primary">&gt;</span> {data.title}
         </h1>
-        {!data.published && <span className="text-xs text-warn">[draft: only you can see this]</span>}
-        <div className="ml-auto">
+        {!data.published && <span className="text-xs text-warn">[{t("draft")}]</span>}
+        <div className="ml-auto flex items-center gap-1">
+          <LanguagePicker />
           <ThemeToggle />
         </div>
       </header>
@@ -82,20 +89,20 @@ export default function PublicStatusPage() {
       <main className="flex-1 py-8">
         <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 border px-4 py-4", b.cls)}>
           <span className={cn("text-lg", data.status.endsWith("outage") && "animate-pulse")}>{b.glyph}</span>
-          <span className="text-base font-medium">{b.text}</span>
-          <span className="ml-auto text-xs text-muted-foreground">updated {now ? ago(data.updated_at) : ""}</span>
+          <span className="text-base font-medium">{t(`banner.${status}`)}</span>
+          <span className="ml-auto text-xs text-muted-foreground">{now ? t("updated", { ago: ago(data.updated_at) }) : ""}</span>
         </div>
         {data.description && <p className="mt-4 whitespace-pre-line text-muted-foreground">{data.description}</p>}
 
         {open.length > 0 && (
-          <Section title="ongoing incidents">
+          <Section title={t("ongoingIncidents")}>
             <div className="border-t border-dashed">
               {open.map((i) => (
                 <div key={i.id} className="flex flex-wrap gap-x-4 border-b border-dashed px-2 py-2">
-                  <span className="animate-pulse text-down">ongoing</span>
+                  <span className="animate-pulse text-down">{t("ongoing")}</span>
                   <span className="font-medium">{i.monitor_name}</span>
                   <span className="ml-auto text-muted-foreground">
-                    since {datetime(i.started_at)} · {duration((now || data.updated_at) - i.started_at)}
+                    {t("since", { start: datetime(i.started_at), duration: duration((now || data.updated_at) - i.started_at) })}
                   </span>
                 </div>
               ))}
@@ -103,9 +110,9 @@ export default function PublicStatusPage() {
           </Section>
         )}
 
-        <Section title={`services · last ${data.days} days`}>
+        <Section title={t("services", { days: data.days })}>
           {data.monitors.length === 0 ? (
-            <div className="border border-dashed p-8 text-center text-muted-foreground">nothing to show yet.</div>
+            <div className="border border-dashed p-8 text-center text-muted-foreground">{t("nothing")}</div>
           ) : (
             <div className="border-t border-dashed">
               {data.monitors.map((m, i) => (
@@ -122,25 +129,25 @@ export default function PublicStatusPage() {
                 </Fragment>
               ))}
               <div className="flex justify-between px-2 pt-1.5 text-[11px] text-muted-foreground">
-                <span>{data.days} days ago</span>
-                <span>today (UTC)</span>
+                <span>{t("daysAgo", { days: data.days })}</span>
+                <span>{t("today")}</span>
               </div>
             </div>
           )}
         </Section>
 
         {data.show_incidents && (
-          <Section title="past incidents">
+          <Section title={t("pastIncidents")}>
             {past.length === 0 ? (
-              <div className="text-xs text-muted-foreground">no incidents in the last {data.days} days.</div>
+              <div className="text-xs text-muted-foreground">{t("noIncidents", { days: data.days })}</div>
             ) : (
               <div className="border-t border-dashed">
                 {past.map((i) => (
                   <div key={i.id} className="flex flex-wrap gap-x-4 border-b border-dashed px-2 py-2">
-                    <span className="text-up">resolved</span>
+                    <span className="text-up">{t("resolved")}</span>
                     <span className="font-medium">{i.monitor_name}</span>
                     <span className="ml-auto text-muted-foreground">
-                      {datetime(i.started_at)} · down for {duration(i.resolved_at - i.started_at)}
+                      {t("downFor", { start: datetime(i.started_at), duration: duration(i.resolved_at - i.started_at) })}
                     </span>
                   </div>
                 ))}
@@ -151,10 +158,8 @@ export default function PublicStatusPage() {
       </main>
 
       <footer className="flex justify-between border-t border-dashed py-3 text-xs text-muted-foreground">
-        <span>
-          powered by <span className="text-foreground">pingtxt</span>
-        </span>
-        <span>refreshes every minute</span>
+        <span>{t.rich("poweredBy", { hl: (c) => <span className="text-foreground">{c}</span> })}</span>
+        <span>{t("refreshes")}</span>
       </footer>
     </div>
   )
@@ -162,14 +167,15 @@ export default function PublicStatusPage() {
 
 /** Section title of a group, with the state of its worst monitor. */
 function GroupHeader({ page, name }: { page: PublicStatusPage; name: string }) {
+  const t = useTranslations("statusPublic.group")
   const ms = page.monitors.filter((m) => m.group === name && m.status !== "paused")
   const down = ms.filter((m) => m.status === "down").length
   const degraded = ms.filter((m) => m.status === "degraded").length
   let text = ""
   let cls = "text-muted-foreground"
-  if (down > 0) [text, cls] = [down === ms.length ? "outage" : `${down}/${ms.length} down`, "text-down"]
-  else if (degraded > 0) [text, cls] = ["degraded", "text-warn"]
-  else if (ms.some((m) => m.status === "up")) [text, cls] = ["operational", "text-up"]
+  if (down > 0) [text, cls] = [down === ms.length ? t("outage") : t("down", { down, total: ms.length }), "text-down"]
+  else if (degraded > 0) [text, cls] = [t("degraded"), "text-warn"]
+  else if (ms.some((m) => m.status === "up")) [text, cls] = [t("operational"), "text-up"]
   return (
     <div className="flex items-center gap-3 border-b border-dashed bg-muted/40 px-2 py-1.5 text-xs">
       <span className="font-medium uppercase">{name}</span>

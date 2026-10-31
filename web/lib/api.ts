@@ -295,10 +295,8 @@ export interface Identity {
 
 export type Role = "admin" | "viewer"
 
-export const roles: { value: Role; label: string; hint: string }[] = [
-  { value: "admin", label: "admin", hint: "changes monitors, settings and users" },
-  { value: "viewer", label: "read-only", hint: "sees everything but secrets, changes nothing" },
-]
+/** Labels and hints are in messages: users.roles.<role>. */
+export const roles: Role[] = ["admin", "viewer"]
 
 export interface User {
   id: number
