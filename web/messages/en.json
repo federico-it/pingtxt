@@ -148,6 +148,7 @@
     "degradedAt": "degraded at {pct}%",
     "ipv4Only": "IPv4 only",
     "ipv6Only": "IPv6 only",
+    "ipBoth": "IPv4 and IPv6",
     "degradedAtDefault": "degraded at default"
   },
   "monitorForm": {
@@ -280,8 +281,8 @@
     "online": "online",
     "offline": "offline",
     "noIPv6": "no IPv6",
-    "noIPv6Hint": "This location has no IPv6 connectivity: it cannot run IPv6-only checks. With IPv4 or IPv6 it checks over IPv4.",
-    "noIPv6Selected": "Some selected locations have no IPv6: remove them or choose IPv4 or IPv6.",
+    "noIPv6Hint": "This location has no IPv6 connectivity: it cannot check over IPv6. With IPv4 or IPv6, or the instance default, it checks over IPv4.",
+    "noIPv6Selected": "Some selected locations have no IPv6: remove them or choose another ip version.",
     "method": "method",
     "acceptedStatus": "accepted status",
     "acceptedStatusHint": "e.g. 200-299,301 or 2xx. empty = 200-399",
@@ -301,10 +302,12 @@
     "degradedPctPlaceholder": "default",
     "ipFamily": {
       "label": "ip version",
-      "hint": "IPv4 or IPv6 only, to catch one of them broken on a dual-stack host. Locations without IPv6 check over IPv4 and cannot be used for IPv6 only.",
-      "v0": "IPv4 or IPv6",
+      "hint": "on a dual-stack host, IPv4 or IPv6 passes with whichever answers first: check both, or one of them, to catch the other broken. Locations without IPv6 check over IPv4 and cannot be used for IPv6.",
+      "default": "instance default",
+      "either": "IPv4 or IPv6 (first to answer)",
       "v4": "IPv4 only",
-      "v6": "IPv6 only"
+      "v6": "IPv6 only",
+      "both": "IPv4 and IPv6 (both must work)"
     },
     "responseRules": {
       "title": "response checks",
@@ -845,7 +848,9 @@
     "missingScheme": "no http:// or https:// in front: pick one",
     "status": "status",
     "degradedPct": "degraded at (% of locations)",
-    "degradedPctHint": "degraded when at least this share of a monitor's online locations fails, down when more than half do. monitors can override it"
+    "degradedPctHint": "degraded when at least this share of a monitor's online locations fails, down when more than half do. monitors can override it",
+    "ipFamily": "ip version",
+    "ipFamilyHint": "how monitors check dual-stack hosts, unless they set their own. locations without IPv6 check over IPv4"
   },
   "authSettings": {
     "title": "authentication",

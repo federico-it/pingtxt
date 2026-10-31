@@ -524,9 +524,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 	switch {
 	case m.Type == check.TypePush || m.Type == check.TypeDocker:
-		m.IPFamily = check.IPAny // no network check of their own
-	case m.IPFamily != check.IPAny && m.IPFamily != check.IPv4 && m.IPFamily != check.IPv6:
-		return errors.New("ip_family must be 0 (IPv4 or IPv6), 4 or 6")
+		m.IPFamily = ipDefault // no network check of their own
+	case !validFamily(m.IPFamily) && m.IPFamily != ipDefault:
+		return errors.New("ip_family must be 0 (instance default), 1 (IPv4 or IPv6), 4, 6 or 46 (IPv4 and IPv6)")
 	}
 	if m.Assertions == nil {
 		m.Assertions = []check.Assertion{}
@@ -649,12 +649,18 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	return nil
 }
 
-// checkIPv6Locations refuses an IPv6-only monitor on a location known to
+// validFamily reports whether f is an IP family a monitor or the instance
+// default can be set to.
+func validFamily(f int) bool {
+	return f == ipEither || f == check.IPv4 || f == check.IPv6 || f == check.IPBoth
+}
+
+// checkIPv6Locations refuses an IPv6-only (or IPv4 and IPv6) monitor on a location known to
 // have no IPv6: every check there would fail. Locations that never reported
 // (older agents) are allowed.
 func (h *Hub) checkIPv6Locations(m *store.Monitor) error {
-	if m.IPFamily != check.IPv6 {
-		return nil
+	if !needsIPv6(m.IPFamily) {
+		return nil // the instance default falls back to IPv4 where needed
 	}
 	var bad []string
 	names := h.locationNames()

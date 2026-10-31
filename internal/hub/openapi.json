@@ -6804,8 +6804,8 @@
           },
           "ip_family": {
             "type": "integer",
-            "enum": [0, 4, 6],
-            "description": "Check over IPv4 only (4), IPv6 only (6) or either (0, default). Without it, a dual-stack target passes when either family works; locations without IPv6 check over IPv4. IPv6 only is refused on a location without IPv6 (see Location.ipv6). Ignored for push and docker."
+            "enum": [0, 1, 4, 6, 46],
+            "description": "0 = instance default (GeneralSettings.ip_family), 1 = IPv4 or IPv6 (whichever connects first), 4 = IPv4 only, 6 = IPv6 only, 46 = IPv4 and IPv6 (both checked, the check fails when either fails). Locations without IPv6 check over IPv4 with 0 and 1; 6 and 46 are refused on them (see Location.ipv6). Ignored for push and docker."
           },
           "headers": {
             "type": "object",
@@ -7825,6 +7825,11 @@
           "degraded_pct": {
             "type": "integer",
             "description": "Default degraded threshold, 1 to 50."
+          },
+          "ip_family": {
+            "type": "integer",
+            "enum": [1, 4, 6, 46],
+            "description": "Default IP family of monitors with ip_family 0: 1 IPv4 or IPv6 (default), 4 IPv4 only, 6 IPv6 only, 46 IPv4 and IPv6. Locations without IPv6 check those monitors over IPv4."
           },
           "update_check": {
             "type": "object",

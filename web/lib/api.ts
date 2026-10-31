@@ -62,7 +62,8 @@ export interface Monitor {
   /** percent of failing locations that marks the monitor degraded; 0 = instance default */
   degraded_pct: number
   /** 4 = IPv4 only, 6 = IPv6 only, 0 = either */
-  ip_family: 0 | 4 | 6
+  /** 0 instance default, 1 IPv4 or IPv6, 4, 6, 46 IPv4 and IPv6 */
+  ip_family: IPFamily
   locations: string[]
   /** 0 = no group */
   group_id: number
@@ -201,6 +202,10 @@ export interface Agent {
   update_state?: "updating" | "failed"
   update_error?: string
 }
+
+/** 0 instance default (monitors only), 1 IPv4 or IPv6 (first to answer),
+ * 4 IPv4 only, 6 IPv6 only, 46 IPv4 and IPv6 (both must work) */
+export type IPFamily = 0 | 1 | 4 | 6 | 46
 
 export interface Location {
   id: string
@@ -411,6 +416,7 @@ export interface GeneralSettings {
   metrics: MetricsSettings
   /** default percent of failing locations that marks a monitor degraded */
   degraded_pct: number
+  ip_family: Exclude<IPFamily, 0>
   update_check: { disabled: boolean }
 }
 

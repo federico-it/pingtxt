@@ -36,6 +36,9 @@ type GeneralSettings struct {
 	// DegradedPct is the default share of failing locations (percent) from
 	// which a monitor is degraded. Monitors can override it.
 	DegradedPct int `json:"degraded_pct"`
+	// IPFamily is the default IP family of monitors (1 IPv4 or IPv6, 4, 6,
+	// 46 IPv4 and IPv6). Monitors can override it.
+	IPFamily int `json:"ip_family"`
 	// UpdateCheck looks for new pingtxt releases on GitHub.
 	UpdateCheck UpdateCheckSettings `json:"update_check"`
 }
@@ -147,6 +150,9 @@ func (g *GeneralSettings) normalize() {
 		g.DegradedPct = defaultDegradedPct
 	}
 	g.DegradedPct = min(max(g.DegradedPct, 1), maxDegradedPct)
+	if !validFamily(g.IPFamily) {
+		g.IPFamily = ipEither
+	}
 	g.Expiry.CertDays = normalizeDays(g.Expiry.CertDays, defaultCertDays)
 	g.Expiry.DomainDays = normalizeDays(g.Expiry.DomainDays, defaultDomainDays)
 }

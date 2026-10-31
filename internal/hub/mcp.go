@@ -509,7 +509,7 @@ func monitorFields() map[string]any {
 		"dns_record":          prop("string", "DNS record type, e.g. A, AAAA, MX, TXT"),
 		"dns_expected":        prop("string", "Expected DNS answer"),
 		"ignore_tls":          prop("boolean", "Ignore TLS certificate errors"),
-		"ip_family":           map[string]any{"type": "integer", "enum": []int{0, 4, 6}, "description": "Check over IPv4 only (4), IPv6 only (6) or either (0, default). IPv6 only is refused on locations without IPv6; with 0 they check over IPv4"},
+		"ip_family":           map[string]any{"type": "integer", "enum": []int{0, 1, 4, 6, 46}, "description": "0 instance default, 1 IPv4 or IPv6 (first to connect), 4 IPv4 only, 6 IPv6 only, 46 IPv4 and IPv6 (both must work). 6 and 46 are refused on locations without IPv6"},
 		"grace_sec":           prop("integer", "Push monitors: extra seconds before a missing heartbeat is down"),
 		"locations":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Where to check from: ids from list_agents (\"local\" is the hub itself). Default local."},
 		"group_id":            prop("integer", "Group id from list_groups, 0 for none"),

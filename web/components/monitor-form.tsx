@@ -157,7 +157,14 @@ function withValue(list: { value: string; label: string }[], sec: number) {
 
 const methods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 const records = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"]
-const ipFamilies = [0, 4, 6] as const
+const ipFamilies = [0, 1, 4, 6, 46] as const
+const ipFamilyKey = {
+  0: "default",
+  1: "either",
+  4: "v4",
+  6: "v6",
+  46: "both",
+} as const
 // Labels are in messages: monitorForm.mcpTransports.<value>.
 const mcpTransports = ["auto", "streamable", "sse"] as const
 
@@ -315,13 +322,16 @@ export function MonitorForm({
   const allNoIPv6 =
     (locations.data ?? []).length > 0 &&
     (locations.data ?? []).every((l) => l.ipv6 === 2)
-  const v6Only = m.ip_family === 6 && m.type !== "docker"
+  // IPv6 only, or IPv4 and IPv6, chosen on the monitor (the instance
+  // default falls back to IPv4 where IPv6 does not work).
+  const v6Only =
+    (m.ip_family === 6 || m.ip_family === 46) && m.type !== "docker"
   const badV6 = v6Only ? m.locations.filter((l) => noIPv6.has(l)) : []
 
   function setIPFamily(f: Monitor["ip_family"]) {
     setM((p) => {
       const next = { ...p, ip_family: f }
-      if (f === 6) {
+      if (f === 6 || f === 46) {
         const ok = p.locations.filter((l) => !noIPv6.has(l))
         if (ok.length > 0) next.locations = ok
       }
@@ -705,7 +715,7 @@ export function MonitorForm({
                 <Select
                   items={ipFamilies.map((f) => ({
                     value: String(f),
-                    label: tr(`ipFamily.v${f}`),
+                    label: tr(`ipFamily.${ipFamilyKey[f]}`),
                   }))}
                   value={String(m.ip_family ?? 0)}
                   onValueChange={(v) =>
@@ -720,9 +730,13 @@ export function MonitorForm({
                       <SelectItem
                         key={f}
                         value={String(f)}
-                        disabled={f === 6 && allNoIPv6 && m.ip_family !== 6}
+                        disabled={
+                          (f === 6 || f === 46) &&
+                          allNoIPv6 &&
+                          m.ip_family !== f
+                        }
                       >
-                        {tr(`ipFamily.v${f}`)}
+                        {tr(`ipFamily.${ipFamilyKey[f]}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>

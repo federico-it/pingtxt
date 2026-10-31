@@ -306,18 +306,25 @@ brackets when a port follows: `[2001:db8::1]:443` (tcp), `https://[2001:db8::1]/
 `redis://[2001:db8::1]:6379`, `grpc://[2001:db8::1]:50051`. Ping and dns take the bare address
 (`2001:db8::1`); ping uses ICMPv6.
 
-By default a check passes when IPv4 *or* IPv6 works (Go tries both), so a broken IPv6 on a dual-stack
-host goes unnoticed. Set **ip version** on the monitor to *IPv4 only* or *IPv6 only* (API:
-`"ip_family": 4` or `6`); make two monitors to watch both. Agents older than this version cannot do it,
-so the hub reports their checks as failed with "update it". TLS certificate expiry is still read over
-either family.
+**ip version** sets how a check treats a dual-stack host:
+
+| option | API `ip_family` | the check |
+|---|---|---|
+| instance default | `0` | uses the default set in Settings → general (IPv4 or IPv6 unless changed) |
+| IPv4 or IPv6 | `1` | one connection, whichever family answers first (Go tries IPv6, then IPv4 after 300 ms): a broken IPv6 goes unnoticed |
+| IPv4 only / IPv6 only | `4` / `6` | only that family |
+| IPv4 and IPv6 | `46` | both, in parallel: fails when either fails (the message says which), latency is the slower one |
+
+Agents older than this version cannot do it, so the hub reports their checks as failed with "update
+it". TLS certificate expiry is still read over either family.
 
 The hub and every agent check whether they reach the Internet over IPv6 (a TCP connection to
 well-known IPv6 resolvers at start and every 10 minutes); the agents page and the monitor form show
-the result. A location without IPv6 cannot be chosen for an *IPv6 only* monitor, and monitors set to
-*IPv4 or IPv6* check over IPv4 there instead of failing on hosts that have both. Set `PINGTXT_IPV6=on`
-or `off` on the hub or agent to skip the probe (for networks that block those addresses). Agents
-older than this version never report it and can be chosen.
+the result. A location without IPv6 cannot be chosen for a monitor set to *IPv6 only* or *IPv4 and
+IPv6*. Monitors on *IPv4 or IPv6* or on the instance default check over IPv4 there instead (also when
+the default is IPv6 or both). Set `PINGTXT_IPV6=on` or `off` on the hub or agent to skip the probe
+(for networks that block those addresses). Agents older than this version never report it and can be
+chosen.
 
 The hub listens on IPv4 and IPv6 (`PINGTXT_ADDR=:8090`), and agents connect to IPv6 hubs too
 (`PINGTXT_HUB=http://[2001:db8::1]:8090`). Login rate limits count IPv6 clients per /64.

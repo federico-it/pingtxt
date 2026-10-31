@@ -240,8 +240,8 @@ func TestIPFamilyNeedsAnUpdatedAgent(t *testing.T) {
 	if got, _ := st.Monitor(m.ID); got.IPFamily != check.IPv6 {
 		t.Fatalf("ip_family not stored: %d", got.IPFamily)
 	}
-	if j := jobFor(m); j.IPFamily != check.IPv6 {
-		t.Fatalf("job ip_family %d", j.IPFamily)
+	if f := h.familyAtLocked(m, loc, ipEither); f != check.IPv6 {
+		t.Fatalf("job ip_family %d", f)
 	}
 	h.MonitorChanged(m.ID)
 
@@ -336,37 +336,56 @@ func TestIPv6Locations(t *testing.T) {
 	h.agents[noV6.ID].ipv6.Store(check.IPv6No)
 	h.agents[v6.ID] = &agentConn{agent: v6, done: make(chan struct{})}
 	h.agents[v6.ID].ipv6.Store(check.IPv6Yes)
+	h.agents[old.ID] = &agentConn{agent: old, done: make(chan struct{})}
 	h.localIPv6.Set(check.IPv6No)
-	_ = st.SetAgentIPv6(old.ID, int(check.IPv6Unknown))
+	at := func(fam, def int, loc string) int {
+		return h.familyAtLocked(&store.Monitor{Type: "http", IPFamily: fam}, loc, def)
+	}
+	local, yes, unknown := LocalLocation, AgentLocation(v6.ID), AgentLocation(old.ID)
+	cases := []struct {
+		fam, def int
+		loc      string
+		want     int
+	}{
+		{ipEither, ipEither, local, check.IPv4}, // no IPv6: IPv4
+		{ipEither, ipEither, yes, check.IPAny},
+		{ipEither, ipEither, unknown, check.IPAny},
+		{ipDefault, ipEither, yes, check.IPAny},
+		{ipDefault, check.IPBoth, yes, check.IPBoth},
+		{ipDefault, check.IPBoth, local, check.IPv4}, // the default falls back
+		{ipDefault, check.IPv6, local, check.IPv4},
+		{check.IPv6, ipEither, local, check.IPv6}, // chosen on the monitor: kept
+		{check.IPBoth, ipEither, yes, check.IPBoth},
+		{check.IPv4, check.IPBoth, yes, check.IPv4},
+	}
+	for _, c := range cases {
+		if got := at(c.fam, c.def, c.loc); got != c.want {
+			t.Errorf("family %d default %d at %s: %d, want %d", c.fam, c.def, c.loc, got, c.want)
+		}
+	}
+	if f := h.familyAtLocked(&store.Monitor{Type: "docker"}, yes, check.IPv6); f != check.IPAny {
+		t.Errorf("docker: %d", f)
+	}
 
-	// Either family: IPv4 where IPv6 does not work.
-	if f := h.ipFamilyAt(LocalLocation, check.IPAny); f != check.IPv4 {
-		t.Errorf("local: %d", f)
-	}
-	if f := h.ipFamilyAt(AgentLocation(v6.ID), check.IPAny); f != check.IPAny {
-		t.Errorf("ipv6 agent: %d", f)
-	}
-	if f := h.ipFamilyAt(AgentLocation(old.ID), check.IPAny); f != check.IPAny {
-		t.Errorf("unknown agent: %d", f)
-	}
-	if f := h.ipFamilyAt(LocalLocation, check.IPv6); f != check.IPv6 {
-		t.Errorf("IPv6 only must not change: %d", f)
-	}
-
-	// IPv6 only is refused where IPv6 does not work.
+	// IPv6 only and IPv4 and IPv6 are refused where IPv6 does not work.
 	m := &store.Monitor{Name: "m", Type: "ping", Target: "example.com", IPFamily: check.IPv6,
-		Locations: []string{AgentLocation(v6.ID), AgentLocation(old.ID)}}
+		Locations: []string{yes, unknown}}
 	if err := h.checkIPv6Locations(m); err != nil {
 		t.Errorf("ipv6 and unknown locations: %v", err)
 	}
-	m.Locations = append(m.Locations, AgentLocation(noV6.ID), LocalLocation)
-	err := h.checkIPv6Locations(m)
-	if err == nil || !strings.Contains(err.Error(), "ams · Amsterdam") || !strings.Contains(err.Error(), "hub") {
-		t.Errorf("want refusal naming both, got %v", err)
+	m.Locations = append(m.Locations, AgentLocation(noV6.ID), local)
+	for _, f := range []int{check.IPv6, check.IPBoth} {
+		m.IPFamily = f
+		err := h.checkIPv6Locations(m)
+		if err == nil || !strings.Contains(err.Error(), "ams · Amsterdam") || !strings.Contains(err.Error(), "hub") {
+			t.Errorf("family %d: want refusal naming both, got %v", f, err)
+		}
 	}
-	m.IPFamily = check.IPAny
-	if err := h.checkIPv6Locations(m); err != nil {
-		t.Errorf("either family: %v", err)
+	for _, f := range []int{ipDefault, ipEither, check.IPv4} {
+		m.IPFamily = f
+		if err := h.checkIPv6Locations(m); err != nil {
+			t.Errorf("family %d: %v", f, err)
+		}
 	}
 
 	// An offline agent keeps its last reported state.
@@ -374,5 +393,50 @@ func TestIPv6Locations(t *testing.T) {
 	delete(h.agents, noV6.ID)
 	if s := h.locationIPv6(AgentLocation(noV6.ID)); s != check.IPv6No {
 		t.Errorf("offline agent: %d", s)
+	}
+}
+
+func TestBothFamiliesNeedAnUpdatedAgent(t *testing.T) {
+	h, st := newTestHub(t)
+	a, _ := st.CreateAgent("a", "a", "a")
+	h.agents[a.ID] = &agentConn{agent: a, done: make(chan struct{})}
+	loc := AgentLocation(a.ID)
+	m := &store.Monitor{Name: "m", Type: "http", Target: "http://x", Retries: 1, Locations: []string{loc}, IPFamily: check.IPBoth}
+	if err := st.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	h.MonitorChanged(m.ID)
+	// An agent from before IPBoth echoes the family but checked either one.
+	r := result(m.ID, true)
+	r.IPFamily = check.IPBoth
+	h.HandleResult(loc, r)
+	if s := status(t, st, m.ID); s != StatusDown {
+		t.Fatalf("want down, got %s", s)
+	}
+	r.Both = true
+	h.HandleResult(loc, r)
+	if s := status(t, st, m.ID); s != StatusUp {
+		t.Fatalf("want up, got %s", s)
+	}
+}
+
+func TestValidateIPFamilies(t *testing.T) {
+	h, _ := newTestHub(t)
+	for _, f := range []int{0, 1, 4, 6, 46} {
+		m := &store.Monitor{Name: "x", Type: "http", Target: "https://example.com", IPFamily: f}
+		if err := h.validateMonitor(m); err != nil {
+			t.Errorf("%d: %v", f, err)
+		}
+	}
+	for _, f := range []int{2, 5, 64} {
+		m := &store.Monitor{Name: "x", Type: "http", Target: "https://example.com", IPFamily: f}
+		if err := h.validateMonitor(m); err == nil {
+			t.Errorf("%d accepted", f)
+		}
+	}
+	g := GeneralSettings{IPFamily: 0}
+	g.normalize()
+	if g.IPFamily != ipEither {
+		t.Errorf("default family %d", g.IPFamily)
 	}
 }
