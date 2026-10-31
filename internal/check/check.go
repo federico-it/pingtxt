@@ -57,7 +57,8 @@ type Job struct {
 	Body           string            `json:"body,omitempty"`
 	// Assertions are rules on the JSON body of http/keyword responses.
 	Assertions []Assertion `json:"assertions,omitempty"`
-	// IPFamily limits the check to IPv4 (4) or IPv6 (6); 0 uses either.
+	// IPFamily limits the check to IPv4 (4) or IPv6 (6), or runs it over
+	// both (46); 0 uses either.
 	IPFamily int `json:"ip_family,omitempty"`
 }
 
@@ -78,8 +79,11 @@ type Result struct {
 	Timing *Timing `json:"timing,omitempty"`
 	// IPFamily repeats the job's IP family, so the hub can tell agents that
 	// do not know the setting (and would use either family) from those that do.
-	IPFamily int   `json:"ip_family,omitempty"`
-	At       int64 `json:"at"` // unix milliseconds
+	IPFamily int `json:"ip_family,omitempty"`
+	// Both is set when the check ran over IPv4 and IPv6 (IPBoth). Agents
+	// older than it echo IPBoth but check over either family.
+	Both bool  `json:"both,omitempty"`
+	At   int64 `json:"at"` // unix milliseconds
 }
 
 // Timing is the time spent in each phase of an HTTP request, in ms. With
@@ -96,6 +100,12 @@ type Timing struct {
 
 // Run executes the job and always returns a Result.
 func Run(ctx context.Context, j Job) Result {
+	if j.IPFamily == IPBoth {
+		r := runBoth(ctx, j, Run)
+		r.IPFamily = IPBoth
+		r.Message = truncate(r.Message, 300)
+		return r
+	}
 	timeout := time.Duration(j.TimeoutMs) * time.Millisecond
 	if timeout <= 0 {
 		timeout = 10 * time.Second

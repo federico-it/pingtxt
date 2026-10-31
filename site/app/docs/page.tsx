@@ -318,9 +318,16 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             <C>redis://[2001:db8::1]:6379</C>). Ping and dns take the bare address.
           </p>
           <p>
-            By default a check passes when IPv4 <i>or</i> IPv6 works, so a broken IPv6 on a dual-stack host goes unnoticed.
-            Set <b className="text-foreground">ip version</b> to <i>IPv4 only</i> or <i>IPv6 only</i> on the monitor (two
-            monitors cover both). Agents older than this version cannot do it and report the check as failed: update them.
+            <b className="text-foreground">ip version</b> on a dual-stack host: <i>IPv4 or IPv6</i> opens one connection
+            with whichever family answers first, so a broken IPv6 goes unnoticed; <i>IPv4 only</i> or <i>IPv6 only</i> use
+            one family; <i>IPv4 and IPv6</i> checks both and fails when either fails. The default is set in settings and
+            each monitor can override it (API <C>ip_family</C>: 0 default, 1, 4, 6, 46). Agents older than this version
+            cannot do it and report the check as failed: update them.
+          </p>
+          <p>
+            The hub and agents check whether they reach IPv6 at start and every 10 minutes (agents page and monitor form
+            show it). A location without IPv6 cannot be chosen for <i>IPv6 only</i> or <i>IPv4 and IPv6</i>; <i>IPv4 or
+            IPv6</i> and the instance default check over IPv4 there. <C>PINGTXT_IPV6=on</C> or <C>off</C> skips the probe.
           </p>
           <p>
             The hub listens on IPv4 and IPv6 (<C>:8090</C>). Docker containers get no IPv6 by default, so checks to IPv6

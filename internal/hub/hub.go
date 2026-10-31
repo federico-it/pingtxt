@@ -90,6 +90,7 @@ type Hub struct {
 	warmUntil int64
 
 	localQueue chan check.Job
+	localIPv6  check.IPv6Watcher            // IPv6 connectivity of the built-in location
 	skipped    atomic.Int64                 // local checks skipped: previous still running or pool full
 	writer     atomic.Pointer[resultWriter] // batches result inserts while Run is active
 
@@ -177,6 +178,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.releaseLoop(ctx)
 	go h.agentUpdateLoop(ctx)
 	go h.escalationLoop(ctx)
+	go h.localIPv6.Run(ctx, 10*time.Minute)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for {
@@ -280,7 +282,6 @@ func jobFor(m *store.Monitor) check.Job {
 		Headers:        m.Headers,
 		Body:           m.Body,
 		Assertions:     m.Assertions,
-		IPFamily:       m.IPFamily,
 	}
 }
 
@@ -292,6 +293,7 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 	}
 	var work []dispatch
 	var missed []check.Result
+	defFamily := h.generalSettings().IPFamily
 	h.mu.Lock()
 	for _, st := range h.monitors {
 		if st.m.Paused || now.Before(st.next) {
@@ -310,6 +312,7 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 		}
 		job := jobFor(st.m)
 		for _, loc := range h.locationsOf(st.m) {
+			job.IPFamily = h.familyAtLocked(st.m, loc, defFamily)
 			if loc == LocalLocation {
 				if st.busy {
 					// The previous local check has not finished yet: skip
@@ -357,6 +360,77 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 	}
 }
 
+// IP families of a monitor (store.Monitor.IPFamily and the instance
+// default). Jobs use check.IPAny for "either".
+const (
+	ipDefault = 0 // monitor: follow the instance default
+	ipEither  = 1 // IPv4 or IPv6, whichever connects first
+)
+
+// monitorFamily resolves a monitor's IP family (ipEither, IPv4, IPv6 or
+// IPBoth), applying the instance default.
+func monitorFamily(m *store.Monitor, def int) int {
+	if m.IPFamily != ipDefault {
+		return m.IPFamily
+	}
+	if def == ipDefault {
+		return ipEither
+	}
+	return def
+}
+
+func needsIPv6(f int) bool { return f == check.IPv6 || f == check.IPBoth }
+
+// locationIPv6 returns the IPv6 connectivity of a location (check.IPv6Yes,
+// IPv6No or IPv6Unknown). Offline agents keep the last reported state.
+func (h *Hub) locationIPv6(loc string) int32 {
+	if id, ok := parseAgentLocation(loc); ok {
+		h.mu.Lock()
+		ac := h.agents[id]
+		h.mu.Unlock()
+		if ac == nil {
+			if a, err := h.store.Agent(id); err == nil {
+				return int32(a.IPv6)
+			}
+			return check.IPv6Unknown
+		}
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.locationIPv6Locked(loc)
+}
+
+// locationIPv6Locked is locationIPv6 for online locations, with h.mu held.
+func (h *Hub) locationIPv6Locked(loc string) int32 {
+	if loc == LocalLocation {
+		return h.localIPv6.State()
+	}
+	if id, ok := parseAgentLocation(loc); ok {
+		if ac := h.agents[id]; ac != nil {
+			return ac.ipv6.Load()
+		}
+	}
+	return check.IPv6Unknown
+}
+
+// familyAtLocked is the IP family a monitor's check runs with at a location,
+// as sent in the job. Where IPv6 does not work, "either" and the instance
+// default check over IPv4 (an IPv6 one chosen on the monitor itself cannot
+// be saved for that location, see checkIPv6Locations).
+func (h *Hub) familyAtLocked(m *store.Monitor, loc string, def int) int {
+	if m.Type == check.TypePush || m.Type == check.TypeDocker {
+		return check.IPAny // no network check of their own
+	}
+	f := monitorFamily(m, def)
+	if h.locationIPv6Locked(loc) == check.IPv6No && (f == ipEither || (m.IPFamily == ipDefault && needsIPv6(f))) {
+		return check.IPv4
+	}
+	if f == ipEither {
+		return check.IPAny
+	}
+	return f
+}
+
 // localWorker runs checks for the hub's built-in location. A fixed pool of
 // workers bounds the number of checks (and goroutines) in flight.
 func (h *Hub) localWorker(ctx context.Context) {
@@ -384,7 +458,8 @@ func (h *Hub) setIdle(id int64) {
 
 // HandleResult stores a result and re-evaluates the monitor status.
 func (h *Hub) HandleResult(loc string, r check.Result) {
-	defPct := h.generalSettings().DegradedPct
+	gs := h.generalSettings()
+	defPct := gs.DegradedPct
 	h.mu.Lock()
 	st, ok := h.monitors[r.MonitorID]
 	if !ok || st.m.Paused {
@@ -409,7 +484,8 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		r.Message = "this agent cannot check response rules: update it"
 	}
 	// Same for the IP family: an old agent would use either one.
-	if r.OK && m.IPFamily != check.IPAny && r.IPFamily != m.IPFamily && loc != LocalLocation {
+	if fam := h.familyAtLocked(m, loc, gs.IPFamily); r.OK && fam != check.IPAny && loc != LocalLocation &&
+		(r.IPFamily != fam || (fam == check.IPBoth && !r.Both)) {
 		r.OK = false
 		r.Message = "this agent cannot limit checks to IPv4 or IPv6: update it"
 	}

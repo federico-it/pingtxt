@@ -8,16 +8,31 @@ import { Section } from "@/components/page-header"
 import { Field } from "@/components/settings/field"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { UPGRADE_DOCS } from "@/components/update-notice"
 import {
   api,
   useApi,
   type GeneralSettings,
+  type IPFamily,
   type Settings,
   type VersionStatus,
 } from "@/lib/api"
 import { ago } from "@/lib/format"
+
+const ipFamilies = [
+  [1, "either"],
+  [4, "v4"],
+  [6, "v6"],
+  [46, "both"],
+] as const
 
 export function GeneralSettingsForm({
   settings,
@@ -29,6 +44,7 @@ export function GeneralSettingsForm({
   const [g, setG] = useState<GeneralSettings>(settings.general)
   const [busy, setBusy] = useState(false)
   const t = useTranslations("generalSettings")
+  const tf = useTranslations("monitorForm.ipFamily")
   const set = <K extends keyof GeneralSettings>(k: K, v: GeneralSettings[K]) =>
     setG((p) => ({ ...p, [k]: v }))
   const setDef = (k: keyof GeneralSettings["monitor_defaults"], v: number) =>
@@ -114,10 +130,7 @@ export function GeneralSettingsForm({
               onChange={(e) => set("local_name", e.target.value)}
             />
           </Field>
-          <Field
-            label={t("localEnabled")}
-            hint={t("localEnabledHint")}
-          >
+          <Field label={t("localEnabled")} hint={t("localEnabledHint")}>
             <label className="flex h-8 items-center gap-2 text-xs">
               <Switch
                 checked={g.local_enabled}
@@ -196,10 +209,7 @@ export function GeneralSettingsForm({
 
       <Section title={t("metrics")}>
         <div className="grid gap-4">
-          <Field
-            label={t("metricsPublic")}
-            hint={t("metricsPublicHint")}
-          >
+          <Field label={t("metricsPublic")} hint={t("metricsPublicHint")}>
             <label className="flex h-8 items-center gap-2 text-xs">
               <Switch
                 checked={g.metrics.public}
@@ -232,6 +242,29 @@ export function GeneralSettingsForm({
               value={g.degraded_pct}
               onChange={(e) => set("degraded_pct", Number(e.target.value))}
             />
+          </Field>
+          <Field label={t("ipFamily")} hint={t("ipFamilyHint")}>
+            <Select
+              items={ipFamilies.map(([v, k]) => ({
+                value: String(v),
+                label: tf(k),
+              }))}
+              value={String(g.ip_family || 1)}
+              onValueChange={(v) =>
+                v && set("ip_family", Number(v) as Exclude<IPFamily, 0>)
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ipFamilies.map(([v, k]) => (
+                  <SelectItem key={v} value={String(v)}>
+                    {tf(k)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Field>
         </div>
       </Section>
@@ -311,9 +344,12 @@ function UpdateStatus() {
   async function checkNow() {
     setBusy(true)
     try {
-      await v.mutate(await api<VersionStatus>("/api/version/check", { method: "POST" }), {
-        revalidate: false,
-      })
+      await v.mutate(
+        await api<VersionStatus>("/api/version/check", { method: "POST" }),
+        {
+          revalidate: false,
+        }
+      )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err))
     } finally {
@@ -324,17 +360,28 @@ function UpdateStatus() {
   let line: React.ReactNode
   if (s.check_disabled) line = t("off")
   else if (!s.check_enabled) line = t("devBuild")
-  else if (s.error) line = <span className="text-down">{t("failed", { error: s.error })}</span>
+  else if (s.error)
+    line = <span className="text-down">{t("failed", { error: s.error })}</span>
   else if (!s.latest) line = t("notYet")
   else if (s.update_available)
     line = (
       <span className="text-info">
         {t("newer", { latest: s.latest.version })}{" "}
-        <a href={s.latest.url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+        <a
+          href={s.latest.url}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4"
+        >
           {t("notes")}
         </a>{" "}
         ·{" "}
-        <a href={UPGRADE_DOCS} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+        <a
+          href={UPGRADE_DOCS}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-4"
+        >
           {t("how")}
         </a>
       </span>
@@ -348,7 +395,13 @@ function UpdateStatus() {
         {s.checked_at > 0 && <> · {t("checked", { ago: ago(s.checked_at) })}</>}
       </span>
       {s.check_enabled && (
-        <Button type="button" size="xs" variant="outline" disabled={busy} onClick={checkNow}>
+        <Button
+          type="button"
+          size="xs"
+          variant="outline"
+          disabled={busy}
+          onClick={checkNow}
+        >
           {busy ? "..." : t("checkNow")}
         </Button>
       )}

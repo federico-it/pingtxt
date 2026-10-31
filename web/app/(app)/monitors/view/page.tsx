@@ -149,7 +149,9 @@ function View() {
                   ? t("degradedAt", { pct: d.degraded_pct })
                   : t("degradedAtDefault")
               }`}
-            {d.ip_family ? ` · ${t(d.ip_family === 4 ? "ipv4Only" : "ipv6Only")}` : ""}
+            {d.ip_family === 4 || d.ip_family === 6 || d.ip_family === 46
+              ? ` · ${t(d.ip_family === 4 ? "ipv4Only" : d.ip_family === 6 ? "ipv6Only" : "ipBoth")}`
+              : ""}
           </>
         )}
       </div>

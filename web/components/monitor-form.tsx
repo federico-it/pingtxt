@@ -150,12 +150,21 @@ function withValue(list: { value: string; label: string }[], sec: number) {
     : [...list, { value: String(sec), label: "" }].sort(
         (a, b) => Number(a.value) - Number(b.value)
       )
-  return all.map((x) => (x.value === "0" ? x : { ...x, label: interval(Number(x.value)) }))
+  return all.map((x) =>
+    x.value === "0" ? x : { ...x, label: interval(Number(x.value)) }
+  )
 }
 
 const methods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 const records = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"]
-const ipFamilies = [0, 4, 6] as const
+const ipFamilies = [0, 1, 4, 6, 46] as const
+const ipFamilyKey = {
+  0: "default",
+  1: "either",
+  4: "v4",
+  6: "v6",
+  46: "both",
+} as const
 // Labels are in messages: monitorForm.mcpTransports.<value>.
 const mcpTransports = ["auto", "streamable", "sse"] as const
 
@@ -277,8 +286,13 @@ export function MonitorForm({
   const ivList = isPush
     ? withValue(pushIntervals, m.interval_sec)
     : withValue(intervals, m.interval_sec)
-  const graceList = withValue(graces, m.grace_sec).map((g) => (g.value === "0" ? { ...g, label: tr("noGrace") } : g))
-  const typeItems = types.map((x) => ({ value: x.value, label: tr(`types.${x.value}.label`) }))
+  const graceList = withValue(graces, m.grace_sec).map((g) =>
+    g.value === "0" ? { ...g, label: tr("noGrace") } : g
+  )
+  const typeItems = types.map((x) => ({
+    value: x.value,
+    label: tr(`types.${x.value}.label`),
+  }))
 
   function setType(type: MonitorType) {
     setM((p) => {
@@ -296,6 +310,30 @@ export function MonitorForm({
         next.interval_sec = 60
         if (!next.locations.some((l) => l !== "push"))
           next.locations = ["local"]
+      }
+      return next
+    })
+  }
+
+  // Locations whose network has no IPv6: an IPv6-only monitor cannot use them.
+  const noIPv6 = new Set(
+    (locations.data ?? []).filter((l) => l.ipv6 === 2).map((l) => l.id)
+  )
+  const allNoIPv6 =
+    (locations.data ?? []).length > 0 &&
+    (locations.data ?? []).every((l) => l.ipv6 === 2)
+  // IPv6 only, or IPv4 and IPv6, chosen on the monitor (the instance
+  // default falls back to IPv4 where IPv6 does not work).
+  const v6Only =
+    (m.ip_family === 6 || m.ip_family === 46) && m.type !== "docker"
+  const badV6 = v6Only ? m.locations.filter((l) => noIPv6.has(l)) : []
+
+  function setIPFamily(f: Monitor["ip_family"]) {
+    setM((p) => {
+      const next = { ...p, ip_family: f }
+      if (f === 6 || f === 46) {
+        const ok = p.locations.filter((l) => !noIPv6.has(l))
+        if (ok.length > 0) next.locations = ok
       }
       return next
     })
@@ -417,10 +455,7 @@ export function MonitorForm({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field
-                label={tr("mcpMinTools")}
-                hint={tr("mcpMinToolsHint")}
-              >
+              <Field label={tr("mcpMinTools")} hint={tr("mcpMinToolsHint")}>
                 <Input
                   type="number"
                   min={0}
@@ -492,10 +527,7 @@ export function MonitorForm({
           )}
           {m.type === "keyword" && (
             <>
-              <Field
-                label={tr("keyword")}
-                hint={tr("keywordHint")}
-              >
+              <Field label={tr("keyword")} hint={tr("keywordHint")}>
                 <Input
                   required
                   value={m.keyword}
@@ -559,10 +591,7 @@ export function MonitorForm({
 
       <Section title={tr("sections.labels")}>
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-          <Field
-            label={tr("group")}
-            hint={tr("groupHint")}
-          >
+          <Field label={tr("group")} hint={tr("groupHint")}>
             <Select
               items={groupItems}
               value={String(m.group_id ?? 0)}
@@ -580,10 +609,7 @@ export function MonitorForm({
               </SelectContent>
             </Select>
           </Field>
-          <Field
-            label={tr("tags")}
-            hint={tr("tagsHint")}
-          >
+          <Field label={tr("tags")} hint={tr("tagsHint")}>
             <TagPicker
               value={m.tag_ids ?? []}
               onChange={(ids) => set("tag_ids", ids)}
@@ -618,10 +644,7 @@ export function MonitorForm({
             </Select>
           </Field>
           {isPush && (
-            <Field
-              label={tr("grace")}
-              hint={tr("graceHint")}
-            >
+            <Field label={tr("grace")} hint={tr("graceHint")}>
               <Select
                 items={graceList}
                 value={String(m.grace_sec)}
@@ -652,10 +675,7 @@ export function MonitorForm({
                   onChange={(e) => set("timeout_ms", Number(e.target.value))}
                 />
               </Field>
-              <Field
-                label={tr("retries")}
-                hint={tr("retriesHint")}
-              >
+              <Field label={tr("retries")} hint={tr("retriesHint")}>
                 <Input
                   type="number"
                   min={1}
@@ -675,10 +695,7 @@ export function MonitorForm({
             {tr("locationsHint")}
           </p>
           <div className="mb-4 grid gap-4 sm:grid-cols-2">
-            <Field
-              label={tr("degradedPct")}
-              hint={tr("degradedPctHint")}
-            >
+            <Field label={tr("degradedPct")} hint={tr("degradedPctHint")}>
               <Input
                 type="number"
                 min={1}
@@ -698,11 +715,11 @@ export function MonitorForm({
                 <Select
                   items={ipFamilies.map((f) => ({
                     value: String(f),
-                    label: tr(`ipFamily.v${f}`),
+                    label: tr(`ipFamily.${ipFamilyKey[f]}`),
                   }))}
                   value={String(m.ip_family ?? 0)}
                   onValueChange={(v) =>
-                    v && set("ip_family", Number(v) as Monitor["ip_family"])
+                    v && setIPFamily(Number(v) as Monitor["ip_family"])
                   }
                 >
                   <SelectTrigger className="w-full">
@@ -710,8 +727,16 @@ export function MonitorForm({
                   </SelectTrigger>
                   <SelectContent>
                     {ipFamilies.map((f) => (
-                      <SelectItem key={f} value={String(f)}>
-                        {tr(`ipFamily.v${f}`)}
+                      <SelectItem
+                        key={f}
+                        value={String(f)}
+                        disabled={
+                          (f === 6 || f === 46) &&
+                          allNoIPv6 &&
+                          m.ip_family !== f
+                        }
+                      >
+                        {tr(`ipFamily.${ipFamilyKey[f]}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -720,31 +745,58 @@ export function MonitorForm({
             )}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            {(locations.data ?? []).map((l) => (
-              <label
-                key={l.id}
-                className="flex cursor-pointer items-center gap-2 border border-dashed px-3 py-2 hover:bg-accent/50"
-              >
-                <Checkbox
-                  checked={m.locations.includes(l.id)}
-                  onCheckedChange={(v) => toggleLoc(l.id, v)}
-                />
-                <span className="flex-1 truncate">{l.name}</span>
-                <span
+            {(locations.data ?? []).map((l) => {
+              const checked = m.locations.includes(l.id)
+              // Without IPv6 the location cannot be added to an IPv6-only
+              // monitor; one already selected can still be removed.
+              const blocked = v6Only && l.ipv6 === 2
+              return (
+                <label
+                  key={l.id}
                   className={cn(
-                    "text-xs",
-                    l.online ? "text-up" : "text-muted-foreground"
+                    "flex items-center gap-2 border border-dashed px-3 py-2",
+                    blocked && !checked
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer hover:bg-accent/50",
+                    blocked && checked && "border-destructive"
                   )}
+                  title={blocked ? tr("noIPv6Hint") : undefined}
                 >
-                  {l.kind === "local"
-                    ? tr("builtIn")
-                    : l.online
-                      ? tr("online")
-                      : tr("offline")}
-                </span>
-              </label>
-            ))}
+                  <Checkbox
+                    checked={checked}
+                    disabled={blocked && !checked}
+                    onCheckedChange={(v) => toggleLoc(l.id, v)}
+                  />
+                  <span className="flex-1 truncate">{l.name}</span>
+                  {l.ipv6 === 2 && m.type !== "docker" && (
+                    <span
+                      className={cn(
+                        "text-xs",
+                        blocked ? "text-down" : "text-muted-foreground"
+                      )}
+                    >
+                      {tr("noIPv6")}
+                    </span>
+                  )}
+                  <span
+                    className={cn(
+                      "text-xs",
+                      l.online ? "text-up" : "text-muted-foreground"
+                    )}
+                  >
+                    {l.kind === "local"
+                      ? tr("builtIn")
+                      : l.online
+                        ? tr("online")
+                        : tr("offline")}
+                  </span>
+                </label>
+              )
+            })}
           </div>
+          {badV6.length > 0 && (
+            <p className="mt-2 text-xs text-down">{tr("noIPv6Selected")}</p>
+          )}
         </Section>
       )}
 
@@ -769,10 +821,7 @@ export function MonitorForm({
                 </SelectContent>
               </Select>
             </Field>
-            <Field
-              label={tr("acceptedStatus")}
-              hint={tr("acceptedStatusHint")}
-            >
+            <Field label={tr("acceptedStatus")} hint={tr("acceptedStatusHint")}>
               <Input
                 value={m.expected_status}
                 onChange={(e) => set("expected_status", e.target.value)}

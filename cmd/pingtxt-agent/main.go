@@ -87,6 +87,17 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// The hub only lets IPv6-only monitors use agents that reach IPv6.
+	ag.ipv6Changed = make(chan struct{}, 1)
+	ag.ipv6.OnChange = func(s int32) {
+		log.Info("IPv6 connectivity", "available", s == check.IPv6Yes)
+		select {
+		case ag.ipv6Changed <- struct{}{}:
+		default:
+		}
+	}
+	go ag.ipv6.Run(ctx, 10*time.Minute)
+
 	backoff := time.Second
 	for ctx.Err() == nil {
 		start := time.Now()
@@ -170,6 +181,18 @@ type agent struct {
 	noUpdateReason string
 	verify         string // release checksum check mode, see releaseCheck
 	releaseURL     string
+
+	ipv6        check.IPv6Watcher
+	ipv6Changed chan struct{}
+}
+
+// networkMessage reports the IPv6 state, or ok false while it is unknown.
+func (a *agent) networkMessage() (protocol.Message, bool) {
+	s := a.ipv6.State()
+	if s == check.IPv6Unknown {
+		return protocol.Message{}, false
+	}
+	return protocol.Message{Type: protocol.TypeNetwork, Network: &protocol.Network{IPv6: s == check.IPv6Yes}}, true
 }
 
 func (a *agent) session(ctx context.Context) error {
@@ -205,10 +228,26 @@ func (a *agent) session(ctx context.Context) error {
 	updated := make(chan error, 1)
 
 	go func() {
+		send := func(m protocol.Message) bool {
+			wctx, c := context.WithTimeout(sctx, 10*time.Second)
+			defer c()
+			if err := wsjson.Write(wctx, conn, m); err != nil {
+				scancel()
+				return false
+			}
+			return true
+		}
+		if m, ok := a.networkMessage(); ok && !send(m) {
+			return
+		}
 		for {
 			select {
 			case <-sctx.Done():
 				return
+			case <-a.ipv6Changed:
+				if m, ok := a.networkMessage(); ok && !send(m) {
+					return
+				}
 			case r := <-results:
 				wctx, c := context.WithTimeout(sctx, 10*time.Second)
 				err := wsjson.Write(wctx, conn, protocol.Message{Type: protocol.TypeResult, Result: &r})

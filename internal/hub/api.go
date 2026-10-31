@@ -525,9 +525,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 	switch {
 	case m.Type == check.TypePush || m.Type == check.TypeDocker:
-		m.IPFamily = check.IPAny // no network check of their own
-	case m.IPFamily != check.IPAny && m.IPFamily != check.IPv4 && m.IPFamily != check.IPv6:
-		return errors.New("ip_family must be 0 (IPv4 or IPv6), 4 or 6")
+		m.IPFamily = ipDefault // no network check of their own
+	case !validFamily(m.IPFamily) && m.IPFamily != ipDefault:
+		return errors.New("ip_family must be 0 (instance default), 1 (IPv4 or IPv6), 4, 6 or 46 (IPv4 and IPv6)")
 	}
 	if m.Assertions == nil {
 		m.Assertions = []check.Assertion{}
@@ -646,6 +646,32 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	m.Locations = slices.Compact(locs)
 	if len(m.Locations) == 0 {
 		m.Locations = []string{LocalLocation}
+	}
+	return nil
+}
+
+// validFamily reports whether f is an IP family a monitor or the instance
+// default can be set to.
+func validFamily(f int) bool {
+	return f == ipEither || f == check.IPv4 || f == check.IPv6 || f == check.IPBoth
+}
+
+// checkIPv6Locations refuses an IPv6-only (or IPv4 and IPv6) monitor on a location known to
+// have no IPv6: every check there would fail. Locations that never reported
+// (older agents) are allowed.
+func (h *Hub) checkIPv6Locations(m *store.Monitor) error {
+	if !needsIPv6(m.IPFamily) {
+		return nil // the instance default falls back to IPv4 where needed
+	}
+	var bad []string
+	names := h.locationNames()
+	for _, l := range m.Locations {
+		if h.locationIPv6(l) == check.IPv6No {
+			bad = append(bad, nameOr(names, l))
+		}
+	}
+	if len(bad) > 0 {
+		return fmt.Errorf("no IPv6 connectivity at %s: remove these locations or check over IPv4 or IPv6", strings.Join(bad, ", "))
 	}
 	return nil
 }
@@ -826,7 +852,11 @@ func (h *Hub) createMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 		writeErr(w, 400, "invalid body")
 		return
 	}
-	if err := h.validateMonitor(&m); err != nil {
+	err := h.validateMonitor(&m)
+	if err == nil {
+		err = h.checkIPv6Locations(&m)
+	}
+	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
 	}
@@ -950,7 +980,11 @@ func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 		return
 	}
 	m.ID = id
-	if err := h.validateMonitor(&m); err != nil {
+	err = h.validateMonitor(&m)
+	if err == nil {
+		err = h.checkIPv6Locations(&m)
+	}
+	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
 	}
@@ -1127,7 +1161,7 @@ type agentView struct {
 func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	out := []map[string]any{}
 	if h.localEnabled() {
-		out = append(out, map[string]any{"id": LocalLocation, "name": h.localName(), "online": true, "kind": "local"})
+		out = append(out, map[string]any{"id": LocalLocation, "name": h.localName(), "online": true, "kind": "local", "ipv6": h.localIPv6.State()})
 	}
 	agents, err := h.store.ListAgents()
 	if err != nil {
@@ -1135,7 +1169,7 @@ func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.Use
 		return
 	}
 	for _, a := range agents {
-		out = append(out, map[string]any{"id": AgentLocation(a.ID), "name": agentLabel(a), "online": h.AgentOnline(a.ID), "kind": "agent"})
+		out = append(out, map[string]any{"id": AgentLocation(a.ID), "name": agentLabel(a), "online": h.AgentOnline(a.ID), "kind": "agent", "ipv6": h.locationIPv6(AgentLocation(a.ID))})
 	}
 	writeJSON(w, 200, out)
 }

@@ -2068,13 +2068,15 @@
                     "id": "local",
                     "name": "hub",
                     "online": true,
-                    "kind": "local"
+                    "kind": "local",
+                    "ipv6": 2
                   },
                   {
                     "id": "agent:2",
                     "name": "fra-1 · Frankfurt",
                     "online": true,
-                    "kind": "agent"
+                    "kind": "agent",
+                    "ipv6": 1
                   }
                 ]
               }
@@ -6802,8 +6804,8 @@
           },
           "ip_family": {
             "type": "integer",
-            "enum": [0, 4, 6],
-            "description": "Check over IPv4 only (4), IPv6 only (6) or either (0, default). Without it, a dual-stack target passes when either family works. Ignored for push and docker."
+            "enum": [0, 1, 4, 6, 46],
+            "description": "0 = instance default (GeneralSettings.ip_family), 1 = IPv4 or IPv6 (whichever connects first), 4 = IPv4 only, 6 = IPv6 only, 46 = IPv4 and IPv6 (both checked, the check fails when either fails). Locations without IPv6 check over IPv4 with 0 and 1; 6 and 46 are refused on them (see Location.ipv6). Ignored for push and docker."
           },
           "headers": {
             "type": "object",
@@ -7466,6 +7468,11 @@
             "format": "int64",
             "description": "Unix time in milliseconds (0 = never / unknown)."
           },
+          "ipv6": {
+            "type": "integer",
+            "enum": [0, 1, 2],
+            "description": "IPv6 connectivity as last probed: 0 unknown (agents before this field), 1 available, 2 not available. IPv6-only monitors cannot use a location with 2, and monitors with ip_family 0 check over IPv4 there."
+          },
           "location_id": {
             "type": "string",
             "description": "Value to use in monitor locations.",
@@ -7516,6 +7523,11 @@
               "local",
               "agent"
             ]
+          },
+          "ipv6": {
+            "type": "integer",
+            "enum": [0, 1, 2],
+            "description": "IPv6 connectivity as last probed: 0 unknown (agents before this field), 1 available, 2 not available. IPv6-only monitors cannot use a location with 2, and monitors with ip_family 0 check over IPv4 there."
           }
         }
       },
@@ -7813,6 +7825,11 @@
           "degraded_pct": {
             "type": "integer",
             "description": "Default degraded threshold, 1 to 50."
+          },
+          "ip_family": {
+            "type": "integer",
+            "enum": [1, 4, 6, 46],
+            "description": "Default IP family of monitors with ip_family 0: 1 IPv4 or IPv6 (default), 4 IPv4 only, 6 IPv6 only, 46 IPv4 and IPv6. Locations without IPv6 check those monitors over IPv4."
           },
           "update_check": {
             "type": "object",

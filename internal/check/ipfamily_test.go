@@ -1,6 +1,11 @@
 package check
 
-import "testing"
+import (
+	"context"
+	"net"
+	"strings"
+	"testing"
+)
 
 func TestNetFor(t *testing.T) {
 	cases := []struct {
@@ -56,5 +61,52 @@ func TestResultRepeatsIPFamily(t *testing.T) {
 	r := Run(t.Context(), Job{Type: "nope", IPFamily: IPv6})
 	if r.IPFamily != IPv6 {
 		t.Fatalf("IPFamily = %d", r.IPFamily)
+	}
+}
+
+func TestRunBoth(t *testing.T) {
+	fake := func(ok4, ok6 bool) func(context.Context, Job) Result {
+		return func(_ context.Context, j Job) Result {
+			if j.IPFamily == IPv4 {
+				return Result{OK: ok4, LatencyMs: 10, Message: map[bool]string{false: "refused"}[ok4], Asserted: 2}
+			}
+			return Result{OK: ok6, LatencyMs: 30, Message: map[bool]string{false: "unreachable"}[ok6], Asserted: 1}
+		}
+	}
+	j := Job{IPFamily: IPBoth}
+	r := runBoth(context.Background(), j, fake(true, true))
+	if !r.OK || r.LatencyMs != 30 || r.Asserted != 1 || !r.Both || r.Message != "" {
+		t.Errorf("both ok: %+v", r)
+	}
+	if r := runBoth(context.Background(), j, fake(true, false)); r.OK || r.Message != "IPv6: unreachable" {
+		t.Errorf("ipv6 down: %+v", r)
+	}
+	if r := runBoth(context.Background(), j, fake(false, true)); r.OK || r.Message != "IPv4: refused" {
+		t.Errorf("ipv4 down: %+v", r)
+	}
+	if r := runBoth(context.Background(), j, fake(false, false)); r.OK || r.Message != "IPv4: refused; IPv6: unreachable" {
+		t.Errorf("both down: %+v", r)
+	}
+}
+
+func TestRunBothTCP(t *testing.T) {
+	ln, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			c.Close()
+		}
+	}()
+	// An IPv4 address cannot be reached over IPv6: the check fails on it.
+	r := Run(context.Background(), Job{Type: TypeTCP, Target: ln.Addr().String(), IPFamily: IPBoth, TimeoutMs: 2000})
+	if r.OK || !r.Both || r.IPFamily != IPBoth || !strings.HasPrefix(r.Message, "IPv6: ") {
+		t.Fatalf("%+v", r)
 	}
 }

@@ -11,11 +11,13 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
+	"github.com/federico-it/pingtxt/internal/check"
 	"github.com/federico-it/pingtxt/internal/protocol"
 	"github.com/federico-it/pingtxt/internal/store"
 )
@@ -27,6 +29,7 @@ type agentConn struct {
 	out   chan protocol.Message
 	once  sync.Once
 	done  chan struct{}
+	ipv6  atomic.Int32 // check.IPv6Yes/No as reported, IPv6Unknown before
 }
 
 func (a *agentConn) label() string {
@@ -130,6 +133,7 @@ func (h *Hub) ServeAgent(w http.ResponseWriter, r *http.Request) {
 	_ = h.store.TouchAgent(ag.ID, hl.Version, hl.Hostname, hl.OS+"/"+hl.Arch, clientIP(r))
 
 	ac := &agentConn{agent: ag, hello: *hl, conn: conn, out: make(chan protocol.Message, 256), done: make(chan struct{})}
+	ac.ipv6.Store(int32(ag.IPv6)) // last known, until the agent reports again
 	h.mu.Lock()
 	if old := h.agents[ag.ID]; old != nil {
 		old.close()
@@ -200,6 +204,15 @@ func (h *Hub) ServeAgent(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case msg.Type == protocol.TypeResult && msg.Result != nil:
 			h.HandleResult(loc, *msg.Result)
+		case msg.Type == protocol.TypeNetwork && msg.Network != nil:
+			v := check.IPv6No
+			if msg.Network.IPv6 {
+				v = check.IPv6Yes
+			}
+			if ac.ipv6.Swap(v) != v {
+				h.log.Info("agent IPv6", "agent", ag.Name, "available", msg.Network.IPv6)
+				_ = h.store.SetAgentIPv6(ag.ID, int(v))
+			}
 		case msg.Type == protocol.TypeUpdateStatus && msg.UpdateStatus != nil:
 			h.log.Warn("agent update failed", "agent", ag.Name, "err", msg.UpdateStatus.Error)
 			h.updateFailed(ag.ID, *msg.UpdateStatus)
