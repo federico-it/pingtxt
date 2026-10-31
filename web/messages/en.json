@@ -610,6 +610,39 @@
       "commaSeparated": "comma separated"
     }
   },
+  "reports": {
+    "title": "periodic reports",
+    "intro": "An email with the uptime and the incidents of the last week or month, per monitor group, sent through your email channels.",
+    "kinds": {
+      "weekly": "weekly report, every Monday for the week before",
+      "monthly": "monthly report, on the 1st for the month before"
+    },
+    "next": "next {date}",
+    "last": "last sent {date}",
+    "channels": "email channels",
+    "channelsHint": "Each selected channel sends the report to its recipients. Disabled channels are skipped.",
+    "noEmail": "No email channel yet: add one above to receive the reports.",
+    "disabled": "disabled",
+    "groups": "groups",
+    "groupsHint": "Pick groups to report only on them.",
+    "allMonitors": "all monitors",
+    "hour": "hour",
+    "hourHint": "Hour of the day (0-23) the reports are sent.",
+    "timezone": "time zone",
+    "save": "save",
+    "saved": "saved",
+    "error": "error",
+    "preview": {
+      "weekly": "preview weekly",
+      "monthly": "preview monthly"
+    },
+    "sendNow": "send now",
+    "sending": "sending report...",
+    "sent": "report sent to {count, plural, one {# channel} other {# channels}}",
+    "sentPartly": "report sent to {count, plural, one {# channel} other {# channels}}, some failed: {error}",
+    "close": "close",
+    "previewHint": "The preview uses the saved settings."
+  },
   "statusPages": {
     "title": "status pages",
     "new": "new",

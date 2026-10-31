@@ -524,6 +524,41 @@ export interface BackupSettings {
   keep: number
 }
 
+export type ReportKind = "weekly" | "monthly"
+
+export interface ReportSettings {
+  weekly: boolean
+  monthly: boolean
+  /** hour of the day (0-23, in timezone) the reports are sent */
+  hour: number
+  timezone: string
+  /** email channels that receive the reports */
+  notifier_ids: number[]
+  /** only these groups; empty: every monitor */
+  group_ids: number[]
+}
+
+export interface Reports extends ReportSettings {
+  /** next report of each enabled kind (unix ms) */
+  next: Partial<Record<ReportKind, number>>
+  last: Partial<Record<ReportKind, { from: number; sent_at: number }>>
+}
+
+export interface Report {
+  kind: ReportKind
+  from: number
+  to: number
+  timezone: string
+  uptime: number
+  prev_uptime: number
+  incidents: number
+  downtime_ms: number
+  monitors: number
+  subject: string
+  /** plain text body of the email */
+  text: string
+}
+
 export interface Backups {
   settings: BackupSettings
   backups: BackupFile[]

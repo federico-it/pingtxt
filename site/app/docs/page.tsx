@@ -401,6 +401,12 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Webhook (JSON), Discord, Slack, Telegram, ntfy and email (SMTP with STARTTLS/TLS). Add them under{" "}
             <b className="text-foreground">notify</b>, test them before saving, and attach them to monitors.
           </p>
+          <p>
+            <b className="text-foreground">Periodic reports</b>, on the same page, email the uptime, the incidents and the
+            downtime of the last week (every Monday) or month (on the 1st) per monitor group, compared with the period before.
+            Pick the email channels, optionally some groups, the hour and the time zone; preview a report or send it now
+            before turning it on.
+          </p>
         </Section>
 
         <Section id="sso" title="single sign-on">

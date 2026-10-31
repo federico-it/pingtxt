@@ -46,6 +46,10 @@
       "description": "Alert channels: webhook, Discord, Slack, Telegram, ntfy, email."
     },
     {
+      "name": "Reports",
+      "description": "Periodic email reports: uptime and incidents of the last week or month, per monitor group."
+    },
+    {
       "name": "Status pages",
       "description": "Public pages and their data."
     },
@@ -5462,6 +5466,234 @@
           }
         }
       }
+    },
+    "/api/reports": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Get report settings",
+        "operationId": "getReports",
+        "description": "Report settings, when the next reports go out and the last ones sent.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reports"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Save report settings",
+        "operationId": "putReports",
+        "description": "Turns the weekly and monthly reports on or off and picks the email channels, the groups, the hour and the time zone. A report that is turned on starts with the next period.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportSettings"
+              },
+              "example": {
+                "weekly": true,
+                "monthly": true,
+                "hour": 8,
+                "timezone": "Europe/Rome",
+                "notifier_ids": [
+                  3
+                ],
+                "group_ids": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reports"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/reports/preview": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Preview a report",
+        "operationId": "previewReport",
+        "description": "The report of the last complete week (Monday to Sunday) or month, with the saved settings, as it would be sent now. `text` is the plain text body of the email.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "weekly",
+                "monthly"
+              ],
+              "default": "weekly"
+            },
+            "description": "Which report."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/reports/send": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Send a report now",
+        "operationId": "sendReport",
+        "description": "Emails the report of the last complete period to the saved channels now. The schedule does not change.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "weekly",
+                      "monthly"
+                    ],
+                    "default": "weekly"
+                  }
+                }
+              },
+              "example": {
+                "kind": "monthly"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sent to at least one channel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "sent": {
+                      "type": "integer",
+                      "description": "Channels that accepted the email."
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Channels that failed, if any."
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true,
+                  "sent": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7192,6 +7424,250 @@
           "error": {
             "type": "string",
             "description": "Why the last check failed."
+          }
+        }
+      },
+      "ReportSettings": {
+        "type": "object",
+        "properties": {
+          "weekly": {
+            "type": "boolean",
+            "description": "Send a report every Monday for the week before."
+          },
+          "monthly": {
+            "type": "boolean",
+            "description": "Send a report on the 1st for the month before."
+          },
+          "hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23,
+            "description": "Hour of the day the reports are sent, in `timezone`."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone of the periods and of the times in the report.",
+            "examples": [
+              "Europe/Rome"
+            ]
+          },
+          "notifier_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Email channels that receive the reports. Disabled channels are skipped."
+          },
+          "group_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Only these monitor groups. Empty: every monitor."
+          }
+        }
+      },
+      "Reports": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ReportSettings"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "next": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "description": "When the next report of each enabled kind goes out (unix ms), by kind."
+              },
+              "last": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Start of the period (unix ms)."
+                    },
+                    "sent_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix ms."
+                    }
+                  }
+                },
+                "description": "Last report sent, by kind."
+              }
+            }
+          }
+        ]
+      },
+      "ReportIncident": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitor_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitor": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "resolved_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "0 while open."
+          },
+          "duration_ms": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Part of the incident inside the period."
+          },
+          "cause": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportMonitor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "uptime": {
+            "type": "number",
+            "description": "0 to 1, -1 without data. Degraded counts as up, maintenance is left out."
+          },
+          "prev_uptime": {
+            "type": "number",
+            "description": "0 to 1, -1 without data. Degraded counts as up, maintenance is left out."
+          },
+          "avg_ms": {
+            "type": "number"
+          },
+          "incidents": {
+            "type": "integer"
+          },
+          "downtime_ms": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ReportGroup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "0: monitors without a group."
+          },
+          "name": {
+            "type": "string"
+          },
+          "uptime": {
+            "type": "number",
+            "description": "Average uptime of the monitors of the group, -1 without data."
+          },
+          "prev_uptime": {
+            "type": "number"
+          },
+          "incidents": {
+            "type": "integer"
+          },
+          "downtime_ms": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportMonitor"
+            }
+          },
+          "incident_list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportIncident"
+            }
+          }
+        }
+      },
+      "Report": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "monthly"
+            ]
+          },
+          "from": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Start of the period (unix ms, included)."
+          },
+          "to": {
+            "type": "integer",
+            "format": "int64",
+            "description": "End of the period (unix ms, excluded)."
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "uptime": {
+            "type": "number",
+            "description": "Average uptime of the monitors, -1 without data."
+          },
+          "prev_uptime": {
+            "type": "number",
+            "description": "Same for the period before."
+          },
+          "incidents": {
+            "type": "integer"
+          },
+          "downtime_ms": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitors": {
+            "type": "integer"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportGroup"
+            }
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject."
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text body of the email."
+          },
+          "url": {
+            "type": "string",
+            "description": "Public URL of the hub, when set."
           }
         }
       }
