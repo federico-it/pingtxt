@@ -36,6 +36,8 @@ type GeneralSettings struct {
 	// DegradedPct is the default share of failing locations (percent) from
 	// which a monitor is degraded. Monitors can override it.
 	DegradedPct int `json:"degraded_pct"`
+	// UpdateCheck looks for new pingtxt releases on GitHub.
+	UpdateCheck UpdateCheckSettings `json:"update_check"`
 }
 
 // ExpirySettings set when certificate and domain expiry alerts are sent:
@@ -106,6 +108,7 @@ func defaultGeneral(seed Config) GeneralSettings {
 		LocalEnabled:    !seed.DisableLocal,
 		RetentionDays:   seed.RetentionDays,
 		MonitorDefaults: MonitorDefaults{IntervalSec: 60, TimeoutMs: 10000, Retries: 2},
+		UpdateCheck:     UpdateCheckSettings{Disabled: seed.DisableUpdateCheck},
 	}
 	g.normalize()
 	return g
@@ -379,6 +382,7 @@ func (h *Hub) putGeneralSettings(w http.ResponseWriter, r *http.Request, _ *stor
 	h.smu.Lock()
 	h.general = g
 	h.smu.Unlock()
+	h.wakeReleaseCheck()
 	writeJSON(w, 200, h.settingsResponse(r))
 }
 

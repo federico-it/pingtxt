@@ -726,6 +726,9 @@
     "metricsPublicHint": "off: scrapers need an api token (read scope is enough). on: anyone who can reach the hub can read monitor names and statuses",
     "public": "public",
     "tokenRequired": "api token required",
+    "updates": "updates",
+    "updateCheck": "check for new versions",
+    "updateCheckHint": "asks GitHub for the latest release every 12 hours and tells admins when one is out. off: the hub never contacts GitHub",
     "defaults": "new monitor defaults",
     "interval": "interval (s)",
     "timeout": "timeout (ms)",
@@ -959,5 +962,21 @@
     "title": "api reference",
     "intro": "Every endpoint of the hub's REST API. Try it out uses your browser session; to test a token, paste it in Authorize. Account and instance settings accept the browser session only.",
     "error": "could not load the API document: {error}"
+  },
+  "update": {
+    "available": "pingtxt <b>{latest}</b> is available (this hub runs {current}).",
+    "notes": "release notes",
+    "how": "how to update",
+    "dismiss": "hide until the next version",
+    "footer": "{latest} available",
+    "running": "this hub runs {current}",
+    "off": "update check off",
+    "devBuild": "development build: no update check",
+    "failed": "last check failed: {error}",
+    "notYet": "not checked yet",
+    "newer": "{latest} is available.",
+    "upToDate": "up to date",
+    "checked": "checked {ago}",
+    "checkNow": "check now"
   }
 }
