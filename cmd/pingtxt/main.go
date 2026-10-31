@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -95,7 +96,37 @@ func main() {
 		return
 	}
 
+	// When running as a server, listen right away and show the animated
+	// "starting / updating" page until the database is migrated and the hub
+	// is ready. One-shot commands (flags that exit) do not listen.
+	oneShot := *enablePassword || *resetTwoFactor != "" || *makeAdmin != "" || *exportTo != "" || *importFrom != ""
+	var (
+		boot *hub.Starting
+		swap *hub.SwapHandler
+		srv  *http.Server
+	)
+	if !oneShot {
+		boot = hub.NewStarting(ui.FS(), version, hub.PreviousVersion(cfg.DataDir))
+		swap = hub.NewSwapHandler(boot)
+		srv = &http.Server{Handler: swap, ReadHeaderTimeout: 10 * time.Second}
+		ln, err := net.Listen("tcp", cfg.Addr)
+		if err != nil {
+			log.Error("http server", "err", err)
+			os.Exit(1)
+		}
+		go func() {
+			if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Error("http server", "err", err)
+				os.Exit(1)
+			}
+		}()
+		log.Info("pingtxt hub starting", "addr", cfg.Addr, "version", version)
+	}
+
 	if dbURL == "" {
+		if boot != nil && fileExists(hub.PendingRestorePath(dbPath)) {
+			boot.SetPhase(hub.PhaseRestore)
+		}
 		// A restore chosen in the web UI is applied before opening the database.
 		if kept, err := hub.ApplyPendingRestore(dbPath, cfg.DataDir); err != nil {
 			log.Error("restore staged backup failed, starting with the current database", "err", err)
@@ -107,6 +138,9 @@ func main() {
 	dsn := dbPath
 	if dbURL != "" {
 		dsn = dbURL
+	}
+	if boot != nil {
+		boot.SetPhase(hub.PhaseDatabase)
 	}
 	st, err := store.Open(dsn)
 	if err != nil {
@@ -196,6 +230,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	boot.SetPhase(hub.PhaseStarting)
 	h := hub.New(cfg, st, log)
 	go func() {
 		if err := h.Run(ctx); err != nil {
@@ -204,20 +239,19 @@ func main() {
 		}
 	}()
 
-	srv := &http.Server{
-		Addr:              cfg.Addr,
-		Handler:           h.Handler(ui.FS()),
-		ReadHeaderTimeout: 10 * time.Second,
+	swap.Set(h.Handler(ui.FS()))
+	if err := hub.RecordVersion(cfg.DataDir, version); err != nil {
+		log.Warn("save version", "err", err)
 	}
-	go func() {
-		<-ctx.Done()
-		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(sctx)
-	}()
 	log.Info("pingtxt hub listening", "addr", cfg.Addr, "version", version, "data", cfg.DataDir)
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Error("http server", "err", err)
-		os.Exit(1)
-	}
+
+	<-ctx.Done()
+	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(sctx)
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }

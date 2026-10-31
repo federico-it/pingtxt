@@ -154,3 +154,24 @@
     opacity: 0;
   }
 }
+
+/* Heartbeat line of the "hub restarting" screen (components/hub-offline.tsx). */
+.hub-beat {
+  stroke-dasharray: 70 430;
+  stroke-dashoffset: 500;
+  animation: hub-beat 2.2s linear infinite;
+  filter: drop-shadow(0 0 3px currentColor);
+}
+
+@keyframes hub-beat {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-beat {
+    animation: none;
+    stroke-dasharray: none;
+  }
+}
