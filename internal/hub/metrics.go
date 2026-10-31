@@ -188,6 +188,17 @@ func (h *Hub) renderMetrics(now time.Time) ([]byte, error) {
 	for _, x := range latest {
 		e.sample("pingtxt_check_latency_seconds", locLabels(x), x.r.LatencyMs/1000)
 	}
+	e.family("pingtxt_check_phase_seconds", "gauge", "Time per phase of the last HTTP check from each location: dns, connect, tls, ttfb (wait for the first byte).")
+	for _, x := range latest {
+		if p := x.r.Timing; p != nil {
+			for _, ph := range []struct {
+				name string
+				ms   float64
+			}{{"dns", p.DNSMs}, {"connect", p.ConnectMs}, {"tls", p.TLSMs}, {"ttfb", p.TTFBMs}} {
+				e.sample("pingtxt_check_phase_seconds", append(locLabels(x), "phase", ph.name), ph.ms/1000)
+			}
+		}
+	}
 	e.family("pingtxt_check_status_code", "gauge", "HTTP status code of the last check from each location (HTTP monitors).")
 	for _, x := range latest {
 		if x.r.StatusCode > 0 {
