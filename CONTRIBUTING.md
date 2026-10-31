@@ -83,20 +83,20 @@ opens with the new translations. Want a language that is not listed? Open an iss
 How it works, for developers:
 
 - All UI text lives in [`web/messages/en.json`](web/messages/en.json), grouped by page or component
-  (`dashboard`, `monitorForm`, `settings`, ...). English is the source. `it.json` is kept by the
-  maintainers by hand; the other files (`es.json`, `fr.json`, ...) are written by Crowdin, so don't
-  edit them by hand except to seed a new language.
+  (`dashboard`, `monitorForm`, `settings`, ...). English is the source; the other files
+  (`it.json`, `es.json`, ...) are written by Crowdin, so don't edit them by hand except to seed a new
+  language.
 - Components read text with `useTranslations` from `use-intl`:
   `const t = useTranslations("dashboard")` then `t("title")`. Helpers outside components
   (like `lib/format.ts`) use `tr("time.never")` from `lib/i18n`.
 - Messages use ICU syntax: `{name}` for values, `{count, plural, one {# monitor} other {# monitors}}`
   for plurals and `<code>...</code>` tags rendered with `t.rich`. Keep commands, URLs and product names
   out of the strings when you can.
-- When you add or change text, update `en.json` (and `it.json` if you can) in the namespace of the
-  page you touched. Missing keys in a translation fall back to English. `tsc` fails on a key that doesn't exist in `en.json`.
+- When you add or change text, update `en.json` only, in the namespace of the page you touched, and
+  translate it on Crowdin. Missing keys in a translation fall back to English. `tsc` fails on a key that doesn't exist in `en.json`.
 - [`crowdin.yml`](crowdin.yml) maps `web/messages/en.json` to `web/messages/<lang>.json`. Crowdin uploads
   the source on every push to `main` and opens a pull request from `l10n_main` with the translations.
-  It exports only translated strings and never writes `it.json`.
+  It exports only translated strings, so an untranslated key is left out and falls back to English.
 - A language shows up in the picker once it is listed in `locales` and `loaders` in
   [`web/lib/i18n.tsx`](web/lib/i18n.tsx). Add it there when its file is reasonably complete.
 - The language is chosen per browser (saved in `localStorage`, otherwise taken from the browser

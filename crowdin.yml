@@ -4,20 +4,17 @@
 # pull request with the translations. See CONTRIBUTING.md#translating-the-interface.
 #
 # Source: web/messages/en.json. Output: web/messages/<two-letter code>.json
-# (fr, de, es, pt, ...).
+# (it, fr, de, es, pt, ...).
 #
-# Italian is written by hand in the same pull requests that add English text,
-# so Crowdin never writes it.json: two writers on the same file is what made
-# the Crowdin pull requests conflict and put English text into it.json.
+# Crowdin is the only writer of the translation files, Italian included:
+# pull requests change en.json only. Editing it.json by hand as well is what
+# made the first Crowdin pull request conflict.
 
 preserve_hierarchy: true
 
 files:
   - source: /web/messages/en.json
     translation: /web/messages/%two_letters_code%.json
-    # Leave it.json to the maintainers (see above).
-    excluded_target_languages:
-      - it
     # Export only translated strings. Without this Crowdin copies the English
     # text into every missing key, so the app could not fall back to en.json
     # and a 0% language would look "complete". Missing keys fall back to
