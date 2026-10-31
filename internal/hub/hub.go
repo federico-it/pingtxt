@@ -104,7 +104,8 @@ type Hub struct {
 	limits     loginLimits // brute force protection, see ratelimit.go
 	httpClient *http.Client
 
-	pages statusPages
+	pages     statusPages
+	subLimits subscribeLimits // status page subscriptions, see pageincidents.go
 
 	metricsCache metricsCache
 	updates      agentUpdates

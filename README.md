@@ -18,6 +18,7 @@ but plain text, monospace, light and dark.
 - **Periodic email reports**, weekly (Mondays) or monthly (on the 1st): uptime, incidents and downtime per monitor group,
   compared with the period before, sent through your email channels at the hour and in the time zone you pick.
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain, plus SVG badges for READMEs.
+  Post incidents with written updates (investigating, identified, monitoring, resolved); visitors can subscribe by email.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
 - **MCP server** on `/mcp`: Claude and other AI assistants can read status and incidents and, with a write token,
   manage monitors and maintenance windows.
@@ -243,6 +244,20 @@ monitor page or the status page editor:
 ```
 
 A badge never shows more than its page: drafts and monitors that are not on the page answer a grey "not found".
+
+### Incidents and email subscribers
+
+Open **incidents** on a page (button on the status page list) to tell visitors what is going on: a title, an impact
+(none, minor, major, critical) and a timeline of updates, each with a status (*investigating*, *identified*,
+*monitoring*, *resolved*) and a message. Open incidents are shown at the top of the page, and their impact makes the
+page banner at least *degraded* (minor), *partial outage* (major) or *major outage* (critical). Resolved ones go to the
+history for the shown days.
+
+To let visitors **subscribe by email**, pick an email notification channel under *email subscriptions* in the page
+settings: its SMTP server and sender are used (not its recipients). Visitors enter their address on the page and confirm
+it through a link (valid 7 days); then every update posted with *email subscribers* checked reaches them. Each email has
+an unsubscribe link and a one-click `List-Unsubscribe` header. Admins see and remove subscribers under the incidents of
+the page. Links point to the custom domain of the page, or else to the public URL from the settings, so set it.
 
 ## Escalation and reminders
 

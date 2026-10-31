@@ -297,6 +297,101 @@ var laterMigrations = []migration{
 	ALTER TABLE result_rollups ADD COLUMN conn_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
 	ALTER TABLE result_rollups ADD COLUMN tls_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
 	ALTER TABLE result_rollups ADD COLUMN ttfb_sum DOUBLE PRECISION NOT NULL DEFAULT 0;`},
+	// 17: incidents written on status pages (with their updates) and the
+	// email subscribers of a page. subscribe_notifier_id is the email
+	// channel that sends to subscribers (0 = subscriptions off).
+	{
+		sqlite: `ALTER TABLE status_pages ADD COLUMN subscribe_notifier_id INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE page_incidents (
+		id INTEGER PRIMARY KEY,
+		page_id INTEGER NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		title TEXT NOT NULL,
+		impact TEXT NOT NULL DEFAULT 'minor',
+		status TEXT NOT NULL,
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL,
+		resolved_at INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX page_incidents_page ON page_incidents(page_id, created_at);
+	CREATE TABLE page_incident_updates (
+		id INTEGER PRIMARY KEY,
+		incident_id INTEGER NOT NULL REFERENCES page_incidents(id) ON DELETE CASCADE,
+		status TEXT NOT NULL,
+		message TEXT NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+	CREATE INDEX page_incident_updates_incident ON page_incident_updates(incident_id, created_at);
+	CREATE TABLE page_subscribers (
+		id INTEGER PRIMARY KEY,
+		page_id INTEGER NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		email TEXT NOT NULL,
+		token TEXT NOT NULL UNIQUE,
+		confirmed_at INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL,
+		UNIQUE (page_id, email)
+	);`,
+		postgres: `ALTER TABLE status_pages ADD COLUMN subscribe_notifier_id BIGINT NOT NULL DEFAULT 0;
+	CREATE TABLE page_incidents (
+		id BIGSERIAL PRIMARY KEY,
+		page_id BIGINT NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		title TEXT NOT NULL,
+		impact TEXT NOT NULL DEFAULT 'minor',
+		status TEXT NOT NULL,
+		created_at BIGINT NOT NULL,
+		updated_at BIGINT NOT NULL,
+		resolved_at BIGINT NOT NULL DEFAULT 0
+	);
+	CREATE INDEX page_incidents_page ON page_incidents(page_id, created_at);
+	CREATE TABLE page_incident_updates (
+		id BIGSERIAL PRIMARY KEY,
+		incident_id BIGINT NOT NULL REFERENCES page_incidents(id) ON DELETE CASCADE,
+		status TEXT NOT NULL,
+		message TEXT NOT NULL,
+		created_at BIGINT NOT NULL
+	);
+	CREATE INDEX page_incident_updates_incident ON page_incident_updates(incident_id, created_at);
+	CREATE TABLE page_subscribers (
+		id BIGSERIAL PRIMARY KEY,
+		page_id BIGINT NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		email TEXT NOT NULL,
+		token TEXT NOT NULL UNIQUE,
+		confirmed_at BIGINT NOT NULL DEFAULT 0,
+		created_at BIGINT NOT NULL,
+		UNIQUE (page_id, email)
+	);`,
+		mysql: `ALTER TABLE status_pages ADD COLUMN subscribe_notifier_id BIGINT NOT NULL DEFAULT 0;
+	CREATE TABLE page_incidents (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		page_id BIGINT NOT NULL,
+		title VARCHAR(255) NOT NULL,
+		impact VARCHAR(16) NOT NULL DEFAULT 'minor',
+		status VARCHAR(16) NOT NULL,
+		created_at BIGINT NOT NULL,
+		updated_at BIGINT NOT NULL,
+		resolved_at BIGINT NOT NULL DEFAULT 0,
+		INDEX page_incidents_page (page_id, created_at),
+		FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+	CREATE TABLE page_incident_updates (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		incident_id BIGINT NOT NULL,
+		status VARCHAR(16) NOT NULL,
+		message TEXT NOT NULL,
+		created_at BIGINT NOT NULL,
+		INDEX page_incident_updates_incident (incident_id, created_at),
+		FOREIGN KEY (incident_id) REFERENCES page_incidents(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+	CREATE TABLE page_subscribers (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		page_id BIGINT NOT NULL,
+		email VARCHAR(254) NOT NULL,
+		token VARCHAR(64) NOT NULL UNIQUE,
+		confirmed_at BIGINT NOT NULL DEFAULT 0,
+		created_at BIGINT NOT NULL,
+		UNIQUE KEY page_subscribers_email (page_id, email),
+		FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {
