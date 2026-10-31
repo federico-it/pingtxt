@@ -73,7 +73,7 @@ func sameSnapshot(t *testing.T, name string, a, b snapshot) {
 		}
 		for j := range a.buckets[i] {
 			x, y := a.buckets[i][j], b.buckets[i][j]
-			if x.Start != y.Start || x.Location != y.Location || x.Total != y.Total || x.OK != y.OK || x.Maint != y.Maint ||
+			if x.Start != y.Start || x.Location != y.Location || x.Total != y.Total || x.OK != y.OK || x.Degraded != y.Degraded || x.Maint != y.Maint ||
 				!near(x.AvgMs, y.AvgMs) || !near(x.MinMs, y.MinMs) || !near(x.MaxMs, y.MaxMs) {
 				t.Fatalf("%s: bucket %d/%d: %+v, want %+v", name, i, j, y, x)
 			}
@@ -95,7 +95,14 @@ func TestRollupKeepsHistory(t *testing.T) {
 	for i := range 6 * 24 * 12 { // 6 days, every 5 min, two locations
 		ts := now - int64(i)*5*60*1000 - 1
 		for _, loc := range []string{"local", "agent:1"} {
-			rows = append(rows, &ResultRow{MonitorID: m.ID, Location: loc, TS: ts, OK: i%9 != 0, LatencyMs: float64(5 + (i*7)%50), Maint: i%13 == 0})
+			r := &ResultRow{MonitorID: m.ID, Location: loc, TS: ts, OK: i%9 != 0, LatencyMs: float64(5 + (i*7)%50), Maint: i%13 == 0}
+			if !r.OK {
+				r.MonState = MonDown
+				if i%2 == 0 {
+					r.MonState = MonDegraded
+				}
+			}
+			rows = append(rows, r)
 		}
 	}
 	if err := s.InsertResults(rows); err != nil {

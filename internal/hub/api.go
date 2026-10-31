@@ -649,12 +649,16 @@ type activeMaint struct {
 	EndAt int64  `json:"end_at"`
 }
 
+// bar is one slot of an uptime bar. OK counts the checks taken while the
+// monitor was up or degraded (not down), Degraded those taken while it was
+// degraded, so one failing location among several does not make it red.
 type bar struct {
-	T     int64   `json:"t"`
-	Total int     `json:"total"`
-	OK    int     `json:"ok"`
-	Maint int     `json:"maint"`
-	AvgMs float64 `json:"avg_ms"`
+	T        int64   `json:"t"`
+	Total    int     `json:"total"`
+	OK       int     `json:"ok"`
+	Degraded int     `json:"degraded"`
+	Maint    int     `json:"maint"`
+	AvgMs    float64 `json:"avg_ms"`
 }
 
 const barCount = 48

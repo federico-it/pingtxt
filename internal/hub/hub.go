@@ -432,6 +432,20 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	}
 	status := classify(n, down, pct)
 	st.real = status
+	// Uptime is computed from the status kept with each result. Locations
+	// that have not answered yet since the start count as not failing, so a
+	// failing agent that happens to answer first does not count as downtime.
+	pending := 0
+	for _, l := range h.locationsOf(m) {
+		if st.locs[l] != nil {
+			continue
+		}
+		if id, ok := parseAgentLocation(l); ok && h.agents[id] == nil {
+			continue
+		}
+		pending++
+	}
+	state := resultState(classify(n+pending, down, pct))
 	inMaint := st.inMaint
 	display := status
 	if inMaint {
@@ -449,6 +463,7 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	row := &store.ResultRow{
 		MonitorID: r.MonitorID, Location: loc, TS: r.At, OK: r.OK, LatencyMs: r.LatencyMs,
 		StatusCode: r.StatusCode, Message: r.Message, CertExpiry: r.CertExpiry, Maint: inMaint,
+		MonState: state,
 	}
 	if st.stats != nil {
 		st.stats.add(row)
@@ -465,6 +480,18 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		h.log.Info("status change", "monitor", name, "from", prev, "to", display)
 	}
 	h.raise(m, alert, strings.Join(causes, "; "), r.At)
+}
+
+// resultState maps a monitor status to the value stored with each result, which
+// uptime is computed from.
+func resultState(status string) int {
+	switch status {
+	case StatusDown:
+		return store.MonDown
+	case StatusDegraded:
+		return store.MonDegraded
+	}
+	return store.MonUp
 }
 
 // Share of failing locations that marks a monitor degraded.

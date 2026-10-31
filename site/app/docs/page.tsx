@@ -214,6 +214,10 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Then tick the new location in any monitor. The hub schedules every check and sends it to the agents; agents are
             stateless, open no ports and reconnect with backoff.
           </p>
+          <p>
+            With several locations the monitor is down when more than half of them fail, and degraded past the threshold set
+            in settings. Uptime follows that status, not single checks: one failing location among several does not lower it.
+          </p>
         </Section>
 
         <Section id="agent-updates" title="agent updates">

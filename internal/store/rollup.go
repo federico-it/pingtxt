@@ -85,8 +85,9 @@ func (s *Store) rollupHour(h int64) error {
 	defer tx.Rollback()
 	// The hour is a trusted integer: written inline so that PostgreSQL knows its type.
 	q := `INSERT INTO result_rollups
-		(monitor_id, location, start, total, ok, maint, lat_sum, lat_n, up_lat_sum, up_lat_n, lat_min, lat_max)
-		SELECT monitor_id, location, ` + strconv.FormatInt(h, 10) + `, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
+		(monitor_id, location, start, total, ok, up, degraded, maint, lat_sum, lat_n, up_lat_sum, up_lat_n, lat_min, lat_max)
+		SELECT monitor_id, location, ` + strconv.FormatInt(h, 10) + `, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END),
+			SUM(CASE WHEN mon_state < 2 AND maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN mon_state = 1 AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
 			COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END),
 			COALESCE(SUM(CASE WHEN ok = 1 AND maint = 0 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END),
 			COALESCE(MIN(CASE WHEN ok = 1 THEN latency_ms END), 0), COALESCE(MAX(CASE WHEN ok = 1 THEN latency_ms END), 0)
@@ -97,7 +98,7 @@ func (s *Store) rollupHour(h int64) error {
 	case DriverMySQL:
 		q = strings.Replace(q, "INSERT INTO", "REPLACE INTO", 1)
 	case DriverPostgres:
-		q += ` ON CONFLICT (monitor_id, start, location) DO UPDATE SET total = excluded.total, ok = excluded.ok,
+		q += ` ON CONFLICT (monitor_id, start, location) DO UPDATE SET total = excluded.total, ok = excluded.ok, up = excluded.up, degraded = excluded.degraded,
 			maint = excluded.maint, lat_sum = excluded.lat_sum, lat_n = excluded.lat_n, up_lat_sum = excluded.up_lat_sum,
 			up_lat_n = excluded.up_lat_n, lat_min = excluded.lat_min, lat_max = excluded.lat_max`
 	}

@@ -418,11 +418,23 @@ type ResultRow struct {
 	Message    string  `json:"message"`
 	CertExpiry int64   `json:"cert_expiry"`
 	Maint      bool    `json:"maint"` // taken during a maintenance window
+	// MonState is the monitor status right after this result (MonUp,
+	// MonDegraded or MonDown). Uptime counts the rows taken while the
+	// monitor was not down, so one failing location among several does not
+	// lower it. Written only, not read back by RecentResults.
+	MonState int `json:"-"`
 }
 
+// Monitor status kept with each result.
+const (
+	MonUp       = 0
+	MonDegraded = 1
+	MonDown     = 2
+)
+
 func (s *Store) InsertResult(r *ResultRow) error {
-	id, err := s.db.insert(s.db, `INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint))
+	id, err := s.db.insert(s.db, `INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint, mon_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint), r.MonState)
 	if err != nil {
 		return err
 	}
@@ -472,9 +484,10 @@ func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
 	return out, rows.Err()
 }
 
-// Uptime returns the ratio of OK checks since `since` (ms), or -1 without
-// data, and the average latency of the OK checks. Checks taken during
-// maintenance windows are left out. History older than the raw results comes
+// Uptime returns the share of checks since `since` (ms) taken while the
+// monitor was up or degraded, or -1 without data, and the average latency of
+// the OK checks. A check failing on one location while the monitor stays up
+// does not lower it. Checks taken during maintenance windows are left out. History older than the raw results comes
 // from the hourly rollups, with hour precision.
 func (s *Store) Uptime(monitorID, since int64) (float64, float64, error) {
 	var total, ok, latN int64
@@ -483,7 +496,7 @@ func (s *Store) Uptime(monitorID, since int64) (float64, float64, error) {
 	if since < w {
 		var t, o, n sql.NullInt64
 		var l sql.NullFloat64
-		err := s.db.QueryRow(`SELECT SUM(total), SUM(ok), SUM(up_lat_sum), SUM(up_lat_n) FROM result_rollups
+		err := s.db.QueryRow(`SELECT SUM(total), SUM(up), SUM(up_lat_sum), SUM(up_lat_n) FROM result_rollups
 			WHERE monitor_id = ? AND start >= ? AND start < ?`, monitorID, since-since%RollupHour, w).Scan(&t, &o, &l, &n)
 		if err != nil {
 			return -1, 0, err
@@ -492,7 +505,7 @@ func (s *Store) Uptime(monitorID, since int64) (float64, float64, error) {
 	}
 	var t, o, n sql.NullInt64
 	var l sql.NullFloat64
-	err := s.db.QueryRow(`SELECT COUNT(*), SUM(ok), SUM(CASE WHEN ok = 1 THEN latency_ms END), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END)
+	err := s.db.QueryRow(`SELECT COUNT(*), SUM(CASE WHEN mon_state < 2 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 THEN latency_ms END), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END)
 		FROM results WHERE monitor_id = ? AND ts >= ? AND maint = 0`, monitorID, max(since, w)).Scan(&t, &o, &l, &n)
 	if err != nil {
 		return -1, 0, err
@@ -513,18 +526,23 @@ func (s *Store) Uptime(monitorID, since int64) (float64, float64, error) {
 
 // Bucket is an aggregated window of results.
 type Bucket struct {
-	Start    int64   `json:"t"`
-	Location string  `json:"location,omitempty"`
-	Total    int     `json:"total"` // checks outside maintenance
+	Start    int64  `json:"t"`
+	Location string `json:"location,omitempty"`
+	Total    int    `json:"total"` // checks outside maintenance
+	// OK counts the checks outside maintenance taken while the monitor was
+	// up or degraded; per location, the checks that succeeded there.
 	OK       int     `json:"ok"`
-	Maint    int     `json:"maint"` // checks during maintenance
+	Degraded int     `json:"degraded"` // checks taken while the monitor was degraded (not per location)
+	Maint    int     `json:"maint"`    // checks during maintenance
 	AvgMs    float64 `json:"avg_ms"`
 	MinMs    float64 `json:"min_ms"`
 	MaxMs    float64 `json:"max_ms"`
 }
 
 // Buckets aggregates results in [from, to) into fixed windows of `size` ms.
-// When perLocation is true buckets are split by location. History older than
+// When perLocation is true buckets are split by location and OK counts the
+// checks that succeeded there; otherwise OK follows the monitor status (see
+// Uptime). History older than
 // the raw results comes from the hourly rollups: each hour falls in the
 // window that contains its start.
 func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bucket, error) {
@@ -545,7 +563,7 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 			var k key
 			var b agg
 			var minMs, maxMs float64
-			if err := rows.Scan(&k.idx, &k.loc, &b.Total, &b.OK, &b.Maint, &b.latSum, &b.latN, &minMs, &maxMs); err != nil {
+			if err := rows.Scan(&k.idx, &k.loc, &b.Total, &b.OK, &b.Degraded, &b.Maint, &b.latSum, &b.latN, &minMs, &maxMs); err != nil {
 				return err
 			}
 			a := acc[k]
@@ -556,6 +574,7 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 			}
 			a.Total += b.Total
 			a.OK += b.OK
+			a.Degraded += b.Degraded
 			a.Maint += b.Maint
 			if b.latN > 0 {
 				if a.latN == 0 || minMs < a.MinMs {
@@ -568,13 +587,15 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 		}
 		return rows.Err()
 	}
-	loc := `''`
+	loc, rollOK, rollDeg := `''`, `up`, `degraded`
+	rawOK, rawDeg := `mon_state < 2`, `mon_state = 1`
 	if perLocation {
-		loc = `location`
+		loc, rollOK, rollDeg = `location`, `ok`, `0`
+		rawOK, rawDeg = `ok = 1`, `1 = 0`
 	}
 	w := s.RollupUntil()
 	if from < w {
-		rows, err := s.db.Query(`SELECT `+s.db.idiv(s.db.greatest("start", "?")+" - ?", "?")+` AS b, `+loc+` AS loc, SUM(total), SUM(ok), SUM(maint),
+		rows, err := s.db.Query(`SELECT `+s.db.idiv(s.db.greatest("start", "?")+" - ?", "?")+` AS b, `+loc+` AS loc, SUM(total), SUM(`+rollOK+`), SUM(`+rollDeg+`), SUM(maint),
 			SUM(lat_sum), SUM(lat_n), COALESCE(MIN(CASE WHEN lat_n > 0 THEN lat_min END), 0), MAX(lat_max)
 			FROM result_rollups WHERE monitor_id = ? AND start >= ? AND start < ? GROUP BY b, loc`,
 			from, from, size, monitorID, from-from%RollupHour, min(w, to))
@@ -585,7 +606,8 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 			return nil, err
 		}
 	}
-	rows, err := s.db.Query(`SELECT `+s.db.idiv("ts - ?", "?")+` AS b, `+loc+` AS loc, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
+	rows, err := s.db.Query(`SELECT `+s.db.idiv("ts - ?", "?")+` AS b, `+loc+` AS loc, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN `+rawOK+` AND maint = 0 THEN 1 ELSE 0 END),
+		SUM(CASE WHEN `+rawDeg+` AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
 		COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END),
 		COALESCE(MIN(CASE WHEN ok = 1 THEN latency_ms END), 0),
 		COALESCE(MAX(CASE WHEN ok = 1 THEN latency_ms END), 0)
@@ -646,7 +668,7 @@ func (s *Store) InsertResults(rows []*ResultRow) error {
 		return err
 	}
 	defer tx.Rollback()
-	q := `INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	q := `INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint, mon_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	pg := s.db.driver == DriverPostgres
 	if pg {
 		q += ` RETURNING id`
@@ -657,7 +679,7 @@ func (s *Store) InsertResults(rows []*ResultRow) error {
 	}
 	defer stmt.Close()
 	for _, r := range rows {
-		args := []any{r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint)}
+		args := []any{r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint), r.MonState}
 		if pg {
 			if err := stmt.QueryRow(args...).Scan(&r.ID); err != nil {
 				return err
@@ -678,7 +700,8 @@ type StatCell struct {
 	MonitorID int64
 	Start     int64
 	Total     int // checks outside maintenance
-	OK        int // OK checks outside maintenance
+	Up        int // checks outside maintenance taken while the monitor was not down
+	Degraded  int // checks outside maintenance taken while the monitor was degraded
 	Maint     int // checks during maintenance
 	LatSum    float64
 	LatN      int // OK checks
@@ -690,7 +713,8 @@ type StatCell struct {
 // `size` ms (aligned to from). One pass over that time range instead of a
 // query per monitor.
 func (s *Store) ResultStats(from, to, size int64) ([]StatCell, error) {
-	rows, err := s.db.Query(`SELECT monitor_id, `+s.db.idiv("ts - ?", "?")+`, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
+	rows, err := s.db.Query(`SELECT monitor_id, `+s.db.idiv("ts - ?", "?")+`, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END),
+		SUM(CASE WHEN mon_state < 2 AND maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN mon_state = 1 AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
 		COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END),
 		COALESCE(SUM(CASE WHEN ok = 1 AND maint = 0 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END)
 		FROM results INDEXED BY results_ts WHERE ts >= ? AND ts < ? GROUP BY 1, 2`, from, size, from, to)
@@ -702,7 +726,7 @@ func (s *Store) ResultStats(from, to, size int64) ([]StatCell, error) {
 	for rows.Next() {
 		var c StatCell
 		var idx int64
-		if err := rows.Scan(&c.MonitorID, &idx, &c.Total, &c.OK, &c.Maint, &c.LatSum, &c.LatN, &c.UpLatSum, &c.UpLatN); err != nil {
+		if err := rows.Scan(&c.MonitorID, &idx, &c.Total, &c.Up, &c.Degraded, &c.Maint, &c.LatSum, &c.LatN, &c.UpLatSum, &c.UpLatN); err != nil {
 			return nil, err
 		}
 		c.Start = from + idx*size

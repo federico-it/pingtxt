@@ -48,7 +48,8 @@ const statSize = int64(24*time.Hour/time.Millisecond) / barCount
 type statCell struct {
 	start    int64
 	total    int // checks outside maintenance
-	ok       int // OK checks outside maintenance
+	up       int // checks outside maintenance taken while the monitor was not down
+	degraded int // checks outside maintenance taken while the monitor was degraded
 	maint    int // checks during maintenance
 	latSum   float64
 	latN     int // OK checks (with maintenance), for the bar latency
@@ -92,8 +93,13 @@ func (s *monStats) add(r *store.ResultRow) {
 		c.maint++
 	} else {
 		c.total++
+		if r.MonState != store.MonDown {
+			c.up++
+		}
+		if r.MonState == store.MonDegraded {
+			c.degraded++
+		}
 		if r.OK {
-			c.ok++
 			c.upLatSum += r.LatencyMs
 			c.upLatN++
 		}
@@ -105,7 +111,9 @@ func (s *monStats) add(r *store.ResultRow) {
 }
 
 // bars returns the last barCount bars up to now, plus the uptime and the
-// average latency over them (-1 uptime without data).
+// average latency over them (-1 uptime without data). Uptime and the OK
+// count of a bar follow the monitor status: a check counts as up when the
+// monitor was not down right after it.
 func (s *monStats) bars(now int64) ([]bar, float64, float64) {
 	from := now - int64(24*time.Hour/time.Millisecond)
 	from -= from % statSize
@@ -113,7 +121,7 @@ func (s *monStats) bars(now int64) ([]bar, float64, float64) {
 	for t := from; t <= now; t += statSize {
 		b := bar{T: t}
 		if c := &s.cells[(t/statSize)%int64(len(s.cells))]; c.start == t {
-			b.Total, b.OK, b.Maint = c.total, c.ok, c.maint
+			b.Total, b.OK, b.Degraded, b.Maint = c.total, c.up, c.degraded, c.maint
 			if c.latN > 0 {
 				b.AvgMs = c.latSum / float64(c.latN)
 			}
@@ -131,7 +139,7 @@ func (s *monStats) bars(now int64) ([]bar, float64, float64) {
 			continue
 		}
 		total += c.total
-		ok += c.ok
+		ok += c.up
 		lat += c.upLatSum
 		latN += c.upLatN
 	}
@@ -176,7 +184,8 @@ func (h *Hub) warmStats() {
 		}
 		if c := st.stats.cell(rc.Start); c != nil {
 			c.total += rc.Total
-			c.ok += rc.OK
+			c.up += rc.Up
+			c.degraded += rc.Degraded
 			c.maint += rc.Maint
 			c.latSum += rc.LatSum
 			c.latN += rc.LatN

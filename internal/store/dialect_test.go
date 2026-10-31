@@ -112,7 +112,16 @@ func TestDialectQueries(t *testing.T) {
 	var rows []*ResultRow
 	for i := range 10 {
 		for _, loc := range []string{"local", "eu"} {
-			rows = append(rows, &ResultRow{MonitorID: ms[0].ID, Location: loc, TS: base + int64(i)*60_000 + 1, OK: i%5 != 0, LatencyMs: float64(10 + i)})
+			r := &ResultRow{MonitorID: ms[0].ID, Location: loc, TS: base + int64(i)*60_000 + 1, OK: i%5 != 0, LatencyMs: float64(10 + i)}
+			if !r.OK {
+				// The monitor only went down with the local failure; the
+				// eu one alone left it degraded, which still counts as up.
+				r.MonState = MonDegraded
+				if loc == "local" {
+					r.MonState = MonDown
+				}
+			}
+			rows = append(rows, r)
 		}
 	}
 	must(t, s.InsertResults(rows))
@@ -120,18 +129,21 @@ func TestDialectQueries(t *testing.T) {
 		t.Fatalf("batch ids: %d %d", rows[0].ID, rows[1].ID)
 	}
 	bs, err := s.Buckets(ms[0].ID, base, base+10*60_000, 5*60_000, false)
-	if err != nil || len(bs) != 2 || bs[0].Total != 10 || bs[0].OK != 8 || bs[1].Start != base+5*60_000 {
+	if err != nil || len(bs) != 2 || bs[0].Total != 10 || bs[0].OK != 9 || bs[0].Degraded != 1 || bs[1].Start != base+5*60_000 {
 		t.Fatalf("buckets: %+v %v", bs, err)
 	}
 	if bs[0].MinMs != 11 || bs[0].MaxMs != 14 {
 		t.Fatalf("bucket latency: %+v", bs[0])
 	}
+	if bl, err := s.Buckets(ms[0].ID, base, base+10*60_000, 5*60_000, true); err != nil || len(bl) != 4 || bl[0].Total != 5 || bl[0].OK != 4 || bl[0].Degraded != 0 {
+		t.Fatalf("buckets per location: %+v %v", bl, err)
+	}
 	cells, err := s.ResultStats(base, base+10*60_000, 5*60_000)
-	if err != nil || len(cells) != 2 || cells[1].Total != 10 || cells[1].UpLatN != 8 {
+	if err != nil || len(cells) != 2 || cells[1].Total != 10 || cells[1].UpLatN != 8 || cells[1].Up != 9 || cells[1].Degraded != 1 {
 		t.Fatalf("stats: %+v %v", cells, err)
 	}
 	up, avg, err := s.Uptime(ms[0].ID, base)
-	if err != nil || up != 0.8 || avg <= 10 {
+	if err != nil || up != 0.9 || avg <= 10 {
 		t.Fatalf("uptime: %v %v %v", up, avg, err)
 	}
 	latest, _ := s.LatestPerLocation(ms[0].ID)

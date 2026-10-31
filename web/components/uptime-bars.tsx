@@ -7,17 +7,17 @@ import type { Bar } from "@/lib/api"
 import { datetime, utcDate, ms, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-// Share of failed checks in a bucket that turns it yellow, and red past the
-// outage line (same >50% rule the hub uses to call a monitor down). A single
-// missed check out of ~150 stays green.
-const WARN_FAILED = 0.2
-const DOWN_FAILED = 0.5
+// ok counts the checks taken while the monitor was up or degraded, so a
+// single failing location does not show here. Share of checks taken while the
+// monitor was down (or degraded) that turns a bar yellow, and red past half.
+const WARN_SHARE = 0.2
+const DOWN_SHARE = 0.5
 
 function barClass(b: Bar) {
   if (b.total === 0) return b.maint ? "bg-info" : "bg-muted"
-  const failed = (b.total - b.ok) / b.total
-  if (failed > DOWN_FAILED) return "bg-down"
-  if (failed >= WARN_FAILED) return "bg-warn"
+  const down = (b.total - b.ok) / b.total
+  if (down > DOWN_SHARE) return "bg-down"
+  if (down + (b.degraded ?? 0) / b.total >= WARN_SHARE) return "bg-warn"
   return "bg-up"
 }
 
@@ -49,6 +49,7 @@ export function UptimeBars({
                   : t("noData")
                 : t("summary", { pct: pct(b.ok / b.total), ok: b.ok, total: b.total, avg: ms(b.avg_ms) })}
             </div>
+            {b.total > 0 && !!b.degraded && <div className="text-warn">{t("degradedChecks", { count: b.degraded })}</div>}
             {b.total > 0 && b.maint > 0 && <div className="text-info">{t("maintChecks", { count: b.maint })}</div>}
           </TooltipContent>
         </Tooltip>
