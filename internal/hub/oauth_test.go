@@ -2,6 +2,8 @@ package hub
 
 import (
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -241,5 +243,21 @@ func TestGeneralSettings(t *testing.T) {
 	json.NewDecoder(res.Body).Decode(&ag)
 	if ag.HubURL != "https://status.example.com" {
 		t.Fatalf("hub url: %s", ag.HubURL)
+	}
+}
+
+func TestHubURLWithoutScheme(t *testing.T) {
+	st := openTestStore(t, t.TempDir())
+	h := New(Config{LocalName: "hub", PublicURL: "status.example.com"}, st, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err := h.reloadAll(); err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest("GET", "/", nil)
+	if got := h.hubURL(r); got != "http://status.example.com" {
+		t.Fatalf("plain request: %q", got)
+	}
+	r.Header.Set("X-Forwarded-Proto", "https")
+	if got := h.hubURL(r); got != "https://status.example.com" {
+		t.Fatalf("behind https proxy: %q", got)
 	}
 }

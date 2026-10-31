@@ -30,10 +30,19 @@ type agentConn struct {
 }
 
 func (a *agentConn) label() string {
-	if a.agent.Location != "" {
-		return a.agent.Location
+	return agentLabel(a.agent)
+}
+
+// agentLabel is how an agent is shown as a monitor location: its name,
+// followed by its location when one is set.
+func agentLabel(a *store.Agent) string {
+	switch {
+	case a.Location == "" || a.Location == a.Name:
+		return a.Name
+	case a.Name == "":
+		return a.Location
 	}
-	return a.agent.Name
+	return a.Name + " · " + a.Location
 }
 
 func (a *agentConn) send(m protocol.Message) {
