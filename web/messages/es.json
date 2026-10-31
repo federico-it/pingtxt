@@ -352,6 +352,7 @@
     "title": "",
     "hint": "",
     "pageHint": "",
+    "protectedHint": "",
     "needsPage": "",
     "kinds": {
       "status": "",
@@ -735,6 +736,14 @@
     "channelDisabled": "",
     "subscribeHint": "",
     "subscribeNoChannel": "",
+    "passwordTitle": "",
+    "protected": "",
+    "protectedHint": "",
+    "password": "",
+    "newPassword": "",
+    "passwordPlaceholder": "",
+    "passwordSet": "",
+    "passwordNew": "",
     "incidents": ""
   },
   "statusPublic": {
@@ -780,6 +789,15 @@
       "confirmed": "",
       "unsubscribed": "",
       "badLink": ""
+    },
+    "locked": {
+      "title": "",
+      "hint": "",
+      "password": "",
+      "submit": "",
+      "checking": "",
+      "wrong": "",
+      "error": ""
     }
   },
   "settings": {
