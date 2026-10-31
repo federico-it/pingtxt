@@ -234,3 +234,54 @@ func TestValidateResponseRules(t *testing.T) {
 		t.Fatalf("tcp monitors drop rules: %v %+v", err, tcp.Assertions)
 	}
 }
+
+// Uptime follows the monitor status: one failing location among three
+// leaves the monitor up (or degraded) and does not lower it; rounds where
+// the monitor is down do.
+func TestUptimeFollowsMonitorStatus(t *testing.T) {
+	h, st := newTestHub(t)
+	var locs []string
+	for _, n := range []string{"a", "b"} {
+		a, err := st.CreateAgent(n, n, n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		h.agents[a.ID] = &agentConn{agent: a, done: make(chan struct{})}
+		locs = append(locs, AgentLocation(a.ID))
+	}
+	locs = append(locs, LocalLocation)
+	m := &store.Monitor{Name: "m", Type: "http", Target: "http://x", IntervalSec: 60, Retries: 1, Locations: locs}
+	if err := st.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	h.MonitorChanged(m.ID)
+	round := func(failing int) {
+		for i, l := range locs {
+			h.HandleResult(l, result(m.ID, i >= failing))
+		}
+	}
+	for range 9 {
+		round(1) // agent a always fails
+	}
+	if up, _, err := st.Uptime(m.ID, 0); err != nil || up != 1 {
+		t.Fatalf("one failing location: uptime %v %v, want 1", up, err)
+	}
+	s := h.summary(m, nil)
+	if s.Uptime24h != 1 {
+		t.Fatalf("one failing location: dashboard uptime %v, want 1", s.Uptime24h)
+	}
+	// Two of three failing: the monitor is down from the second answer on.
+	round(2)
+	if up, _, _ := st.Uptime(m.ID, 0); up != 28.0/30 {
+		t.Fatalf("after a down round: uptime %v, want %v", up, 28.0/30)
+	}
+	s = h.summary(m, nil)
+	total, ok := 0, 0
+	for _, b := range s.Bars {
+		total += b.Total
+		ok += b.OK
+	}
+	if total != 30 || ok != 28 || s.Uptime24h != 28.0/30 {
+		t.Fatalf("bars: %d/%d ok, uptime %v", ok, total, s.Uptime24h)
+	}
+}

@@ -381,7 +381,7 @@ func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
 		for i := range days {
 			t := from + int64(i)*day
 			b := byStart[t]
-			pm.Bars = append(pm.Bars, bar{T: t, Total: b.Total, OK: b.OK, AvgMs: b.AvgMs})
+			pm.Bars = append(pm.Bars, bar{T: t, Total: b.Total, OK: b.OK, Degraded: b.Degraded, AvgMs: b.AvgMs})
 		}
 		p.Monitors = append(p.Monitors, pm)
 	}

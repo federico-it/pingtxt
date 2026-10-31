@@ -362,7 +362,8 @@
   "uptimeBars": {
     "maintenance": "manutenzione",
     "noData": "nessun dato",
-    "summary": "{pct} · {ok}/{total} ok · media {avg}",
+    "summary": "{pct} · {ok}/{total} up · media {avg}",
+    "degradedChecks": "{count, plural, one {# controllo} other {# controlli}} con stato degradato",
     "maintChecks": "+ {count, plural, one {# controllo} other {# controlli}} in manutenzione"
   },
   "incidents": {

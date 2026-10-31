@@ -5791,7 +5791,12 @@
             "description": "Checks outside maintenance."
           },
           "ok": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Checks outside maintenance taken while the monitor was up or degraded. One failing location among several does not lower it."
+          },
+          "degraded": {
+            "type": "integer",
+            "description": "Checks outside maintenance taken while the monitor was degraded."
           },
           "maint": {
             "type": "integer",
@@ -5858,7 +5863,7 @@
             "properties": {
               "uptime_24h": {
                 "type": "number",
-                "description": "Percent."
+                "description": "Share of checks taken while the monitor was up or degraded (not of single location checks), maintenance excluded. -1 without data."
               },
               "avg_ms_24h": {
                 "type": "number"
@@ -5924,10 +5929,12 @@
             "type": "object",
             "properties": {
               "uptime_7d": {
-                "type": "number"
+                "type": "number",
+                "description": "Share of checks taken while the monitor was up or degraded (not of single location checks), maintenance excluded. -1 without data."
               },
               "uptime_30d": {
-                "type": "number"
+                "type": "number",
+                "description": "Share of checks taken while the monitor was up or degraded (not of single location checks), maintenance excluded. -1 without data."
               },
               "location_status": {
                 "type": "array",
@@ -5979,7 +5986,12 @@
             "type": "integer"
           },
           "ok": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Per location: checks that succeeded there. Otherwise: checks taken while the monitor was up or degraded."
+          },
+          "degraded": {
+            "type": "integer",
+            "description": "Checks taken while the monitor was degraded (0 per location)."
           },
           "maint": {
             "type": "integer"
@@ -6465,10 +6477,11 @@
                 },
                 "uptime": {
                   "type": "number",
-                  "description": "Over the shown days."
+                  "description": "Over the shown days. Share of checks taken while the monitor was up or degraded (not of single location checks), maintenance excluded. -1 without data."
                 },
                 "uptime_24h": {
-                  "type": "number"
+                  "type": "number",
+                  "description": "Share of checks taken while the monitor was up or degraded (not of single location checks), maintenance excluded. -1 without data."
                 },
                 "bars": {
                   "type": "array",

@@ -238,6 +238,15 @@ var laterMigrations = []migration{
 	// 13: rules on the JSON body of HTTP responses.
 	{sqlite: `ALTER TABLE monitors ADD COLUMN assertions TEXT NOT NULL DEFAULT '[]'`,
 		mysql: `ALTER TABLE monitors ADD COLUMN assertions TEXT NOT NULL DEFAULT ('[]')`},
+	// 14: uptime follows the monitor status, not single checks. Each result
+	// keeps the monitor status right after it (0 up, 1 degraded, 2 down) and
+	// rollups count the rows taken while the monitor was up or degraded.
+	// Older rows only know their own check, so ok stands in for the status.
+	{sqlite: `ALTER TABLE results ADD COLUMN mon_state INTEGER NOT NULL DEFAULT 0;
+	UPDATE results SET mon_state = 2 WHERE ok = 0;
+	ALTER TABLE result_rollups ADD COLUMN up INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0;
+	UPDATE result_rollups SET up = ok;`},
 }
 
 func sqliteOnly(list []string) []migration {

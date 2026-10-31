@@ -200,7 +200,7 @@ func (h *Hub) renderMetrics(now time.Time) ([]byte, error) {
 	}
 
 	// Uptime and average latency, maintenance windows left out.
-	e.family("pingtxt_monitor_uptime_ratio", "gauge", "Share of successful checks over the window (0-1), maintenance windows excluded.")
+	e.family("pingtxt_monitor_uptime_ratio", "gauge", "Share of checks taken while the monitor was up or degraded over the window (0-1), maintenance windows excluded.")
 	var avg []struct {
 		m      *store.Monitor
 		window string

@@ -89,7 +89,8 @@ export interface ResultRow {
 export interface Bar {
   t: number
   total: number
-  ok: number
+  ok: number // checks taken while the monitor was up or degraded
+  degraded?: number // checks taken while the monitor was degraded
   maint: number
   avg_ms: number
 }
