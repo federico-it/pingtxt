@@ -47,7 +47,11 @@ ENV CGO_ENABLED=0
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=$VERSION" -o /out/pingtxt ./cmd/pingtxt
 
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates tzdata
+# The hub runs as user pingtxt (uid 10001): docker/entrypoint.sh starts as
+# root, fixes the owner of /data and drops privileges.
+RUN apk add --no-cache ca-certificates tzdata setpriv \
+ && addgroup -S -g 10001 pingtxt \
+ && adduser -S -D -H -u 10001 -G pingtxt -h /data -s /sbin/nologin pingtxt
 COPY --from=go /out/pingtxt /usr/local/bin/pingtxt
 COPY --from=agents / /usr/share/pingtxt/agents
 ENV PINGTXT_ADDR=:8090 \
@@ -56,4 +60,5 @@ ENV PINGTXT_ADDR=:8090 \
 VOLUME /data
 EXPOSE 8090
 HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:8090/api/health >/dev/null || exit 1
-ENTRYPOINT ["pingtxt"]
+COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint
+ENTRYPOINT ["docker-entrypoint", "pingtxt"]

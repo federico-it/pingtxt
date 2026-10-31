@@ -12,13 +12,10 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	probing "github.com/prometheus-community/pro-bing"
 )
 
 // Supported monitor types.
@@ -348,32 +345,6 @@ func runTCP(ctx context.Context, j Job) Result {
 	}
 	_ = conn.Close()
 	return Result{OK: true, LatencyMs: lat, Message: "port open"}
-}
-
-func runPing(ctx context.Context, j Job, timeout time.Duration) Result {
-	p := probing.New(StripBrackets(j.Target))
-	p.SetNetwork(j.netFor("ip"))
-	if err := p.Resolve(); err != nil {
-		return Result{Message: cleanErr(err)}
-	}
-	p.Count = 3
-	p.Interval = 300 * time.Millisecond
-	p.Timeout = timeout
-	// Raw sockets need CAP_NET_RAW; unprivileged UDP ping needs
-	// net.ipv4.ping_group_range. Default to privileged (works in Docker as root).
-	p.SetPrivileged(os.Getenv("PINGTXT_UNPRIVILEGED_PING") == "")
-	if err := p.RunWithContext(ctx); err != nil {
-		return Result{Message: cleanErr(err)}
-	}
-	s := p.Statistics()
-	if s.PacketsRecv == 0 {
-		return Result{Message: fmt.Sprintf("100%% packet loss (%s)", s.IPAddr)}
-	}
-	return Result{
-		OK:        true,
-		LatencyMs: ms(s.AvgRtt),
-		Message:   fmt.Sprintf("%d/%d packets, %.0f%% loss", s.PacketsRecv, s.PacketsSent, s.PacketLoss),
-	}
 }
 
 func runDNS(ctx context.Context, j Job) Result {
