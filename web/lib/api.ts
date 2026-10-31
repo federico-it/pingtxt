@@ -84,6 +84,21 @@ export interface ResultRow {
   message: string
   cert_expiry: number
   maint: boolean
+  /** HTTP checks only, from hub and updated agents */
+  timing?: Phases
+}
+
+/** Time per phase of an HTTP check, in ms. */
+export interface Phases {
+  dns_ms: number
+  connect_ms: number
+  tls_ms: number
+  /** wait from the request being sent to the first byte */
+  ttfb_ms: number
+  /** buckets: average latency of the checks with phases */
+  total_ms?: number
+  /** buckets: how many checks the averages come from */
+  n?: number
 }
 
 export interface Bar {
@@ -141,6 +156,7 @@ export interface Bucket {
   avg_ms: number
   min_ms: number
   max_ms: number
+  phases?: Phases
 }
 
 export interface Series {

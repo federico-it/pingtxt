@@ -17,6 +17,7 @@ const toc = [
   ["agents", "add a location"],
   ["agent-updates", "agent updates"],
   ["checks", "check types"],
+  ["phases", "response time per phase"],
   ["response-checks", "response checks (JSON)"],
   ["mcp", "mcp servers"],
   ["heartbeat", "heartbeat monitors"],
@@ -274,6 +275,18 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Passwords in connection URLs are hidden in the list and in notifications; use a read-only user. Docker checks need{" "}
             <C>/var/run/docker.sock</C> on the hub or agent that runs them (add{" "}
             <C>-v /var/run/docker.sock:/var/run/docker.sock:ro</C>).
+          </p>
+        </Section>
+
+        <Section id="phases" title="response time per phase">
+          <p>
+            HTTP and keyword checks measure where the time goes: <b className="text-foreground">DNS</b> lookup,{" "}
+            <b className="text-foreground">connect</b>, <b className="text-foreground">TLS</b> handshake,{" "}
+            <b className="text-foreground">wait</b> for the first byte (TTFB, the server at work) and{" "}
+            <b className="text-foreground">transfer</b> of the body. On the monitor page switch the response time chart to{" "}
+            <b className="text-foreground">by phase</b>, per location or all together; hover a latency in the log for the
+            breakdown of that check. With redirects the phases of every hop are added up. Agents measure phases from this
+            version on: update older ones to see their data.
           </p>
         </Section>
 
@@ -543,6 +556,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
               [<C key="1">pingtxt_monitor_up</C>, "1 up or degraded, 0 down"],
               [<C key="2">pingtxt_monitor_uptime_ratio</C>, "uptime per window (24h, 7d, 30d)"],
               [<C key="3">pingtxt_check_latency_seconds</C>, "last check per location"],
+              [<C key="3p">pingtxt_check_phase_seconds</C>, "DNS, connect, TLS and first byte of the last HTTP check"],
               [<C key="4">pingtxt_cert_expiry_days</C>, "days before the certificate expires"],
               [<C key="5">pingtxt_domain_expiry_days</C>, "days before the domain expires"],
               [<C key="6">pingtxt_agent_connected</C>, "agent connectivity"],
