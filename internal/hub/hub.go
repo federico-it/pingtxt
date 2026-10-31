@@ -46,6 +46,8 @@ type Config struct {
 	LocalName     string
 	Version       string
 	DisableLocal  bool
+	// DisableUpdateCheck turns the release check off on first start.
+	DisableUpdateCheck bool
 }
 
 type locState struct {
@@ -105,6 +107,7 @@ type Hub struct {
 
 	metricsCache metricsCache
 	updates      agentUpdates
+	releases     releaseChecker
 
 	backupMu sync.Mutex // one snapshot at a time
 	importMu sync.Mutex // one configuration import at a time
@@ -123,6 +126,7 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 	}
 	h.general, h.auth = defaultGeneral(cfg), defaultAuth()
 	h.httpClient = &http.Client{Timeout: 15 * time.Second}
+	h.releases.wake = make(chan struct{}, 1)
 	h.expiry.domains = expiry.NewDomains(h.httpClient)
 	h.expiry.cache = map[string]domainCacheEntry{}
 	if err := h.loadSettings(); err != nil {
@@ -164,6 +168,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.maintenance(ctx)
 	go h.expiryLoop(ctx)
 	go h.backupLoop(ctx)
+	go h.releaseLoop(ctx)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for {

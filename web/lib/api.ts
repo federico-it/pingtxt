@@ -384,6 +384,26 @@ export interface GeneralSettings {
   metrics: MetricsSettings
   /** default percent of failing locations that marks a monitor degraded */
   degraded_pct: number
+  update_check: { disabled: boolean }
+}
+
+export interface ReleaseInfo {
+  version: string
+  name: string
+  /** release notes on GitHub */
+  url: string
+  published_at: number
+}
+
+export interface VersionStatus {
+  current: string
+  /** on in the settings and running a release build */
+  check_enabled: boolean
+  check_disabled: boolean
+  latest: ReleaseInfo | null
+  update_available: boolean
+  checked_at: number
+  error?: string
 }
 
 export interface MetricsSettings {

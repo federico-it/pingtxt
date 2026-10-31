@@ -727,6 +727,9 @@
     "metricsPublicHint": "disattivato: chi raccoglie le metriche ha bisogno di un token api (basta lo scope di lettura). attivo: chiunque raggiunga l'hub può leggere nomi e stati dei monitor",
     "public": "pubblico",
     "tokenRequired": "token api richiesto",
+    "updates": "aggiornamenti",
+    "updateCheck": "controlla nuove versioni",
+    "updateCheckHint": "chiede a GitHub l'ultima release ogni 12 ore e avvisa gli admin quando ne esce una. off: l'hub non contatta mai GitHub",
     "defaults": "valori predefiniti dei nuovi monitor",
     "interval": "intervallo (s)",
     "timeout": "timeout (ms)",
@@ -960,5 +963,21 @@
     "title": "riferimento API",
     "intro": "Tutti gli endpoint della REST API dell'hub. Try it out usa la tua sessione del browser; per provare un token, incollalo in Authorize. Account e impostazioni dell'istanza accettano solo la sessione del browser.",
     "error": "impossibile caricare il documento API: {error}"
+  },
+  "update": {
+    "available": "è disponibile pingtxt <b>{latest}</b> (questo hub usa la {current}).",
+    "notes": "note di rilascio",
+    "how": "come aggiornare",
+    "dismiss": "nascondi fino alla prossima versione",
+    "footer": "{latest} disponibile",
+    "running": "questo hub usa la {current}",
+    "off": "controllo aggiornamenti disattivato",
+    "devBuild": "build di sviluppo: nessun controllo aggiornamenti",
+    "failed": "ultimo controllo fallito: {error}",
+    "notYet": "non ancora controllato",
+    "newer": "è disponibile la {latest}.",
+    "upToDate": "aggiornato",
+    "checked": "controllato {ago}",
+    "checkNow": "controlla ora"
   }
 }
