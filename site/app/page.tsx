@@ -23,7 +23,7 @@ const features: { title: string; body: string }[] = [
   },
   {
     title: "status pages",
-    body: "Public pages with the monitors or groups you pick, 90-day uptime history and incidents. Custom domains.",
+    body: "Public pages with the monitors or groups you pick, 90-day uptime history and incidents with written updates. Email subscribers, custom domains.",
   },
   {
     title: "maintenance windows",

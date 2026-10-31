@@ -408,7 +408,7 @@ func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
 		}
 		p.Monitors = append(p.Monitors, pm)
 	}
-	p.Status = overallStatus(p.Monitors)
+	p.Status = worsePageStatus(overallStatus(p.Monitors), reportsStatus(p.Reports))
 	if sp.ShowIncidents {
 		incs, err := h.store.IncidentsSince(ids, from, 50)
 		if err != nil {
@@ -476,6 +476,36 @@ func (h *Hub) pageMonitors(sp *store.StatusPage) ([]pageMonitor, error) {
 		out = append(out, sections[g]...)
 	}
 	return out, nil
+}
+
+// pageStatusRank orders page states from the best.
+var pageStatusRank = map[string]int{PageUnknown: 0, PageOperational: 1, PageDegraded: 2, PagePartialOutage: 3, PageMajorOutage: 4}
+
+func worsePageStatus(a, b string) string {
+	if pageStatusRank[b] > pageStatusRank[a] {
+		return b
+	}
+	return a
+}
+
+// reportsStatus is the page state the open incidents written on the page
+// call for: a page never looks better than what its admins announced.
+func reportsStatus(list []*store.PageIncident) string {
+	out := PageUnknown
+	for _, r := range list {
+		if r.ResolvedAt != 0 {
+			continue
+		}
+		switch r.Impact {
+		case store.ImpactMinor:
+			out = worsePageStatus(out, PageDegraded)
+		case store.ImpactMajor:
+			out = worsePageStatus(out, PagePartialOutage)
+		case store.ImpactCritical:
+			out = worsePageStatus(out, PageMajorOutage)
+		}
+	}
+	return out
 }
 
 func overallStatus(ms []publicMonitor) string {

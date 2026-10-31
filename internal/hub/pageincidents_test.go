@@ -353,3 +353,17 @@ func TestNormalizeEmail(t *testing.T) {
 		}
 	}
 }
+
+func TestReportsStatus(t *testing.T) {
+	open := func(impact string) *store.PageIncident { return &store.PageIncident{Impact: impact} }
+	resolved := &store.PageIncident{Impact: store.ImpactCritical, ResolvedAt: 1}
+	if got := worsePageStatus(PageOperational, reportsStatus([]*store.PageIncident{open(store.ImpactNone), resolved})); got != PageOperational {
+		t.Fatalf("no impact: %s", got)
+	}
+	if got := worsePageStatus(PageOperational, reportsStatus([]*store.PageIncident{open(store.ImpactMinor), open(store.ImpactMajor)})); got != PagePartialOutage {
+		t.Fatalf("major: %s", got)
+	}
+	if got := worsePageStatus(PageMajorOutage, reportsStatus([]*store.PageIncident{open(store.ImpactMinor)})); got != PageMajorOutage {
+		t.Fatalf("monitors worse: %s", got)
+	}
+}

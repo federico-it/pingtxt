@@ -608,7 +608,8 @@
     "edit": "edit",
     "rm": "rm",
     "deleteTitle": "delete {name}?",
-    "deleteText": "The public page stops working right away."
+    "deleteText": "The public page stops working right away.",
+    "incidents": "incidents"
   },
   "statusPageForm": {
     "newTitle": "new status page",
@@ -641,7 +642,14 @@
     "saving": "saving...",
     "save": "save",
     "openPage": "open page",
-    "back": "back"
+    "back": "back",
+    "subscribeTitle": "email subscriptions",
+    "subscribeChannel": "send updates through",
+    "subscribeOff": "off: visitors cannot subscribe",
+    "channelDisabled": "disabled",
+    "subscribeHint": "Visitors can subscribe by email to the incidents you post. Emails go out through the SMTP server and sender of this email channel, not to its recipients.",
+    "subscribeNoChannel": "Add an email channel in notifications to let visitors subscribe.",
+    "incidents": "incidents"
   },
   "statusPublic": {
     "banner": {
@@ -672,6 +680,20 @@
       "down": "{down}/{total} down",
       "degraded": "degraded",
       "operational": "operational"
+    },
+    "reportStarted": "since {at}",
+    "subscribe": {
+      "title": "get updates",
+      "email": "email address",
+      "placeholder": "you@example.com",
+      "submit": "subscribe",
+      "sending": "sending...",
+      "sent": "Check {email}: open the link we sent to confirm.",
+      "hint": "Incident updates by email. Every email has a link to unsubscribe.",
+      "error": "error",
+      "confirmed": "{email} is subscribed: you will get incident updates by email.",
+      "unsubscribed": "{email} is unsubscribed: you will get no more emails.",
+      "badLink": "this link is not valid anymore."
     }
   },
   "settings": {
@@ -980,5 +1002,62 @@
     "upToDate": "up to date",
     "checked": "checked {ago}",
     "checkNow": "check now"
+  },
+  "reports": {
+    "pageTitle": "incidents: {name}",
+    "intro": "Tell visitors what is going on: open an incident and post updates until it is resolved. They show on the public page.",
+    "introSubscribers": "Tell visitors what is going on: open an incident and post updates until it is resolved. They show on the public page and are emailed to subscribers.",
+    "noPage": "no status page selected",
+    "openPage": "open page",
+    "back": "back",
+    "error": "error",
+    "incidentTitle": "title",
+    "titlePlaceholder": "Slow responses of the API",
+    "impactLabel": "impact",
+    "statusLabel": "status",
+    "message": "message",
+    "messagePlaceholder": "We are looking into slow responses of the API.",
+    "updatePlaceholder": "what changed?",
+    "notify": "email subscribers",
+    "create": "open incident",
+    "posting": "posting...",
+    "posted": "posted",
+    "postedNotified": "posted, {count, plural, one {# email} other {# emails}} on the way",
+    "postUpdate": "post update",
+    "saved": "incident saved",
+    "save": "save",
+    "cancel": "cancel",
+    "edit": "edit",
+    "rm": "rm",
+    "deleted": "incident deleted",
+    "deleteTitle": "delete {name}?",
+    "deleteText": "The incident and all its updates disappear from the public page. Emails already sent stay sent.",
+    "deleteUpdate": "delete update",
+    "updateDeleted": "update deleted",
+    "started": "started {at}",
+    "resolvedAt": "resolved {at}",
+    "openTitle": "open ({count})",
+    "noOpen": "no open incidents.",
+    "pastTitle": "resolved ({count})",
+    "subscribersTitle": "subscribers ({confirmed} confirmed, {pending} waiting)",
+    "subscriptionsOff": "Subscriptions are off: pick a working email channel in the page settings. Nobody gets emails until then.",
+    "noSubscribers": "nobody subscribed yet.",
+    "confirmed": "confirmed {at}",
+    "pending": "waiting for confirmation",
+    "subscriberRemoved": "subscriber removed",
+    "removeSubscriberTitle": "remove {email}?",
+    "status": {
+      "investigating": "investigating",
+      "identified": "identified",
+      "monitoring": "monitoring",
+      "resolved": "resolved"
+    },
+    "impact": {
+      "none": "no impact",
+      "minor": "minor",
+      "major": "major",
+      "critical": "critical"
+    },
+    "addUpdate": "add an update"
   }
 }

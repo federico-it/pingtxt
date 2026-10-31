@@ -361,6 +361,11 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             For a custom domain (e.g. <C>status.example.com</C>), set it on the page, point its DNS at the hub and route the host
             to pingtxt in your reverse proxy. On that host only the status page is served.
           </p>
+          <p>
+            Post <b className="text-foreground">incidents</b> on a page with a timeline of written updates (investigating,
+            identified, monitoring, resolved). With an email channel picked under <i>email subscriptions</i>, visitors can
+            subscribe: they confirm through a link, then get every update by email, each with an unsubscribe link.
+          </p>
         </Section>
 
         <Section id="maintenance" title="maintenance windows">

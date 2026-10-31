@@ -15,6 +15,7 @@ but plain text, monospace, light and dark.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
+  Post incidents with written updates (investigating, identified, monitoring, resolved); visitors can subscribe by email.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
 - **MCP server** on `/mcp`: Claude and other AI assistants can read status and incidents and, with a write token,
   manage monitors and maintenance windows.
@@ -227,6 +228,20 @@ times, never targets, locations or error messages. Drafts are visible only to lo
 For a **custom domain** (e.g. `status.example.com`), set it on the page, point its DNS at the hub and route the host
 to pingtxt in your reverse proxy (with its own TLS certificate). On that host pingtxt serves only the status page at
 `/`; the admin UI and API are not reachable there. The history covers the retention period, up to 90 days.
+
+### Incidents and email subscribers
+
+Open **incidents** on a page (button on the status page list) to tell visitors what is going on: a title, an impact
+(none, minor, major, critical) and a timeline of updates, each with a status (*investigating*, *identified*,
+*monitoring*, *resolved*) and a message. Open incidents are shown at the top of the page, and their impact makes the
+page banner at least *degraded* (minor), *partial outage* (major) or *major outage* (critical). Resolved ones go to the
+history for the shown days.
+
+To let visitors **subscribe by email**, pick an email notification channel under *email subscriptions* in the page
+settings: its SMTP server and sender are used (not its recipients). Visitors enter their address on the page and confirm
+it through a link (valid 7 days); then every update posted with *email subscribers* checked reaches them. Each email has
+an unsubscribe link and a one-click `List-Unsubscribe` header. Admins see and remove subscribers under the incidents of
+the page. Links point to the custom domain of the page, or else to the public URL from the settings, so set it.
 ## Heartbeat monitors (cron jobs)
 
 For jobs that run on a schedule (backups, cron, queues) create a monitor of type **heartbeat (push)**. It gets a secret URL; the job calls it at the end of every run, with any HTTP method:

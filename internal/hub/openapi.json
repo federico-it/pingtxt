@@ -7199,12 +7199,13 @@
           "status": {
             "type": "string",
             "enum": [
-              "up",
+              "operational",
               "degraded",
-              "down",
-              "maintenance",
+              "partial_outage",
+              "major_outage",
               "unknown"
-            ]
+            ],
+            "description": "Overall state, from the monitors and the open incidents written on the page (minor impact = degraded, major = partial outage, critical = major outage), whichever is worse."
           },
           "days": {
             "type": "integer",
