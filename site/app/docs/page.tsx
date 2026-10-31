@@ -126,6 +126,13 @@ export default function Docs() {
             .
           </p>
           <p>
+            The images run as the unprivileged user <C>pingtxt</C> (uid 10001). At start the entrypoint gives{" "}
+            <C>/data</C> to that user (volumes of older versions were written by root), lets it use a mounted Docker
+            socket and keeps only <C>CAP_NET_RAW</C> for ping. Run CLI commands with{" "}
+            <C>docker exec -u pingtxt pingtxt pingtxt ...</C>; to skip the root step, set{" "}
+            <C>user: &quot;10001:10001&quot;</C> and <C>chown -R 10001:10001 ./data</C>.
+          </p>
+          <p>
             Public URL, built-in location, retention, defaults for new monitors, users and login live under{" "}
             <b className="text-foreground">settings</b>. Only these are read at startup:
           </p>
@@ -479,7 +486,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
           <ul>
             <li>Logins are matched to existing users by verified email. New accounts can be allowed, optionally by email domain.</li>
             <li>
-              Locked out after turning off password login? Run <C>docker exec pingtxt pingtxt -enable-password-login</C> and
+              Locked out after turning off password login? Run <C>docker exec -u pingtxt pingtxt pingtxt -enable-password-login</C> and
               restart.
             </li>
           </ul>
@@ -489,7 +496,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
           <p>
             In <b className="text-foreground">settings → two-factor authentication</b> scan the QR code with any authenticator app.
             You get 10 single-use recovery codes. To reset a user: <b className="text-foreground">settings → users → reset 2fa</b>, or{" "}
-            <C>docker exec pingtxt pingtxt -reset-2fa you@example.com</C>.
+            <C>docker exec -u pingtxt pingtxt pingtxt -reset-2fa you@example.com</C>.
           </p>
         </Section>
 
@@ -675,8 +682,9 @@ make web hub agent agents`}
 PINGTXT_DATA=/var/lib/pingtxt PINGTXT_AGENT_DIR=/usr/local/share/pingtxt/agents /usr/local/bin/pingtxt`}
           />
           <p>
-            Outside Docker, ping checks need raw sockets: <C>sudo setcap cap_net_raw+ep /usr/local/bin/pingtxt</C> (and the
-            agent), or <C>PINGTXT_UNPRIVILEGED_PING=1</C> with <C>net.ipv4.ping_group_range</C>. A systemd unit example is in
+            Ping checks use a raw socket with <C>CAP_NET_RAW</C>, otherwise an unprivileged ICMP socket (allowed by{" "}
+            <C>net.ipv4.ping_group_range</C>). Outside Docker: <C>sudo setcap cap_net_raw+ep /usr/local/bin/pingtxt</C>{" "}
+            (and the agent); <C>PINGTXT_UNPRIVILEGED_PING=1</C> or <C>0</C> forces one of the two. A systemd unit example is in
             the{" "}
             <a href={`${REPO}#build-from-source`} className="text-foreground underline underline-offset-4">
               README
