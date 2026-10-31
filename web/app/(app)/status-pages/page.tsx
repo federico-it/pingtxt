@@ -71,6 +71,9 @@ export default function StatusPagesPage() {
                 <Button variant="ghost" size="xs" render={<a href={`/status/${p.slug}/`} target="_blank" rel="noreferrer" />} nativeButton={false}>
                   {t("open")}
                 </Button>
+                <Button variant="ghost" size="xs" render={<Link href={`/status-pages/incidents/?id=${p.id}`} />} nativeButton={false}>
+                  {t("incidents")}
+                </Button>
                 {isAdmin && (
                   <>
                     <Button variant="ghost" size="xs" render={<Link href={`/status-pages/edit/?id=${p.id}`} />} nativeButton={false}>

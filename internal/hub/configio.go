@@ -810,6 +810,7 @@ func (im *importer) importStatusPages() error {
 		p.ID = 0
 		p.MonitorIDs = im.mapIDs(p.MonitorIDs, im.monitors)
 		p.GroupIDs = im.mapIDs(p.GroupIDs, im.groups)
+		p.SubscribeNotifierID = im.notifiers[p.SubscribeNotifierID] // 0 if the channel was skipped
 		if err := h.validateStatusPage(req, &p); err != nil {
 			im.res.warn("status page %q skipped: %v", x.Slug, err)
 			im.res.Skipped["status_pages"]++

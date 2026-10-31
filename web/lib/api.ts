@@ -483,6 +483,46 @@ export interface StatusPage {
   monitor_ids: number[]
   /** every monitor of these groups, current and future */
   group_ids: number[]
+  /** email channel that sends incident updates to subscribers, 0 = off */
+  subscribe_notifier_id: number
+  created_at: number
+}
+
+export type ReportStatus = "investigating" | "identified" | "monitoring" | "resolved"
+export const reportStatuses: ReportStatus[] = ["investigating", "identified", "monitoring", "resolved"]
+export type ReportImpact = "none" | "minor" | "major" | "critical"
+export const reportImpacts: ReportImpact[] = ["none", "minor", "major", "critical"]
+
+export interface PageIncidentUpdate {
+  id: number
+  incident_id: number
+  status: ReportStatus
+  message: string
+  created_at: number
+}
+
+/** An incident written on a status page, with its timeline. */
+export interface PageIncident {
+  id: number
+  page_id: number
+  title: string
+  impact: ReportImpact
+  /** status of the latest update */
+  status: ReportStatus
+  created_at: number
+  updated_at: number
+  /** 0 = still open */
+  resolved_at: number
+  /** newest first */
+  updates: PageIncidentUpdate[]
+}
+
+export interface PageSubscriber {
+  id: number
+  page_id: number
+  email: string
+  /** 0 = waiting for confirmation */
+  confirmed_at: number
   created_at: number
 }
 
@@ -515,6 +555,10 @@ export interface PublicStatusPage {
     started_at: number
     resolved_at: number
   }[]
+  /** incidents written on the page: open ones, then recently resolved */
+  reports: PageIncident[]
+  /** visitors can subscribe by email */
+  subscribe: boolean
   updated_at: number
 }
 

@@ -677,7 +677,8 @@
     "edit": "modifica",
     "rm": "rm",
     "deleteTitle": "eliminare {name}?",
-    "deleteText": "La pagina pubblica smette subito di funzionare."
+    "deleteText": "La pagina pubblica smette subito di funzionare.",
+    "incidents": "incidenti"
   },
   "statusPageForm": {
     "newTitle": "nuova status page",
@@ -710,7 +711,14 @@
     "saving": "salvataggio...",
     "save": "salva",
     "openPage": "apri pagina",
-    "back": "indietro"
+    "back": "indietro",
+    "subscribeTitle": "iscrizioni via email",
+    "subscribeChannel": "invia gli aggiornamenti con",
+    "subscribeOff": "disattivate: i visitatori non possono iscriversi",
+    "channelDisabled": "disattivato",
+    "subscribeHint": "I visitatori possono iscriversi via email agli incidenti che pubblichi. Le email partono dal server SMTP e dal mittente di questo canale email, non ai suoi destinatari.",
+    "subscribeNoChannel": "Aggiungi un canale email nelle notifiche per far iscrivere i visitatori.",
+    "incidents": "incidenti"
   },
   "statusPublic": {
     "banner": {
@@ -741,6 +749,20 @@
       "down": "{down}/{total} down",
       "degraded": "degradato",
       "operational": "operativo"
+    },
+    "reportStarted": "dal {at}",
+    "subscribe": {
+      "title": "ricevi aggiornamenti",
+      "email": "indirizzo email",
+      "placeholder": "tu@esempio.it",
+      "submit": "iscriviti",
+      "sending": "invio...",
+      "sent": "Controlla {email}: apri il link che ti abbiamo inviato per confermare.",
+      "hint": "Aggiornamenti sugli incidenti via email. Ogni email ha un link per disiscriversi.",
+      "error": "errore",
+      "confirmed": "{email} è iscritto: riceverai gli aggiornamenti sugli incidenti via email.",
+      "unsubscribed": "{email} è disiscritto: non riceverai altre email.",
+      "badLink": "questo link non è più valido."
     }
   },
   "settings": {
@@ -1049,5 +1071,62 @@
     "upToDate": "aggiornato",
     "checked": "controllato {ago}",
     "checkNow": "controlla ora"
+  },
+  "reports": {
+    "pageTitle": "incidenti: {name}",
+    "intro": "Spiega ai visitatori cosa succede: apri un incidente e pubblica aggiornamenti fino alla risoluzione. Compaiono sulla pagina pubblica.",
+    "introSubscribers": "Spiega ai visitatori cosa succede: apri un incidente e pubblica aggiornamenti fino alla risoluzione. Compaiono sulla pagina pubblica e arrivano via email agli iscritti.",
+    "noPage": "nessuna status page selezionata",
+    "openPage": "apri pagina",
+    "back": "indietro",
+    "error": "errore",
+    "incidentTitle": "titolo",
+    "titlePlaceholder": "Risposte lente delle API",
+    "impactLabel": "impatto",
+    "statusLabel": "stato",
+    "message": "messaggio",
+    "messagePlaceholder": "Stiamo indagando sulle risposte lente delle API.",
+    "updatePlaceholder": "cosa è cambiato?",
+    "notify": "avvisa gli iscritti via email",
+    "create": "apri incidente",
+    "posting": "pubblicazione...",
+    "posted": "pubblicato",
+    "postedNotified": "pubblicato, {count, plural, one {# email in partenza} other {# email in partenza}}",
+    "postUpdate": "pubblica aggiornamento",
+    "saved": "incidente salvato",
+    "save": "salva",
+    "cancel": "annulla",
+    "edit": "modifica",
+    "rm": "rm",
+    "deleted": "incidente eliminato",
+    "deleteTitle": "eliminare {name}?",
+    "deleteText": "L'incidente e tutti i suoi aggiornamenti spariscono dalla pagina pubblica. Le email già inviate restano inviate.",
+    "deleteUpdate": "elimina aggiornamento",
+    "updateDeleted": "aggiornamento eliminato",
+    "started": "iniziato {at}",
+    "resolvedAt": "risolto {at}",
+    "openTitle": "aperti ({count})",
+    "noOpen": "nessun incidente aperto.",
+    "pastTitle": "risolti ({count})",
+    "subscribersTitle": "iscritti ({confirmed} confermati, {pending} in attesa)",
+    "subscriptionsOff": "Le iscrizioni sono disattivate: scegli un canale email funzionante nelle impostazioni della pagina. Fino ad allora nessuno riceve email.",
+    "noSubscribers": "ancora nessun iscritto.",
+    "confirmed": "confermato {at}",
+    "pending": "in attesa di conferma",
+    "subscriberRemoved": "iscritto rimosso",
+    "removeSubscriberTitle": "rimuovere {email}?",
+    "status": {
+      "investigating": "stiamo indagando",
+      "identified": "causa individuata",
+      "monitoring": "sotto osservazione",
+      "resolved": "risolto"
+    },
+    "impact": {
+      "none": "nessun impatto",
+      "minor": "lieve",
+      "major": "grave",
+      "critical": "critico"
+    },
+    "addUpdate": "aggiungi un aggiornamento"
   }
 }
