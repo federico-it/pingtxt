@@ -34,6 +34,11 @@ const (
 func (h *Hub) authenticate(r *http.Request) (*store.User, *store.APIToken, error) {
 	if v := r.Header.Get("Authorization"); v != "" {
 		t := bearer(r)
+		// OAuth access tokens are bound to the MCP server: they never
+		// reach the REST API directly.
+		if strings.HasPrefix(t, oauthAccessPrefix) && isMCPRequest(r) {
+			return h.oauthAccessToken(t)
+		}
 		if !strings.HasPrefix(t, apiTokenPrefix) {
 			return nil, nil, errors.New("invalid token")
 		}

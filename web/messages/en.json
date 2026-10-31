@@ -819,7 +819,15 @@
     "expiresOn": "expires {date}",
     "revoke": "revoke",
     "revokeTitle": "revoke {name}?",
-    "revokeText": "Scripts using this token stop working right away."
+    "revokeText": "Scripts using this token stop working right away.",
+    "mcpIntro": "AI assistants (Claude, Cursor…) connect to the MCP server at <b>{url}</b> by signing in with OAuth, or with a token.",
+    "mcpClaudeCode": "connect Claude Code to the MCP server:",
+    "connectedApps": "connected apps (signed in with OAuth to the MCP server)",
+    "connectedOn": "connected {date}",
+    "disconnect": "disconnect",
+    "disconnected": "{name} disconnected",
+    "disconnectTitle": "disconnect {name}?",
+    "disconnectText": "The assistant loses access right away and has to sign in again."
   },
   "users": {
     "roles": {
