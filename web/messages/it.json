@@ -622,7 +622,8 @@
       "slack": "slack",
       "telegram": "telegram",
       "ntfy": "ntfy",
-      "email": "email (smtp)"
+      "email": "email (smtp)",
+      "app": ""
     },
     "fields": {
       "url": "url",
@@ -637,7 +638,8 @@
       "username": "utente (facoltativo)",
       "password": "password",
       "from": "mittente",
-      "to": "destinatari"
+      "to": "destinatari",
+      "users": ""
     },
     "options": {
       "starttls": "starttls (587)",
@@ -645,7 +647,8 @@
       "none": "nessuna (25, relay locale)"
     },
     "hints": {
-      "commaSeparated": "separati da virgola"
+      "commaSeparated": "separati da virgola",
+      "appUsers": ""
     }
   },
   "reports": {
@@ -961,7 +964,30 @@
     "disconnected": "{name} scollegata",
     "disconnectTitle": "scollegare {name}?",
     "disconnectText": "L'assistente perde subito l'accesso e dovrà accedere di nuovo.",
-    "apiDocs": "Riferimento API: <docs>documentazione interattiva</docs> e <spec>documento OpenAPI</spec>."
+    "apiDocs": "Riferimento API: <docs>documentazione interattiva</docs> e <spec>documento OpenAPI</spec>.",
+    "pushDevice": ""
+  },
+  "mobileApp": {
+    "title": "",
+    "intro": "",
+    "enabled": "",
+    "relayUrl": "",
+    "relayHint": "",
+    "relayChanged": "",
+    "registrationToken": "",
+    "registrationTokenHint": "",
+    "status": "",
+    "notRegistered": "",
+    "save": "",
+    "saved": "",
+    "error": "",
+    "test": "",
+    "testOk": "",
+    "register": "",
+    "registerTitle": "",
+    "registerText": "",
+    "registered": "",
+    "channelHint": ""
   },
   "users": {
     "roles": {
