@@ -352,6 +352,7 @@
     "title": "badges",
     "hint": "SVG images for a README, served without login through the status page \"{page}\". They refresh every minute and show only what the page already shows.",
     "pageHint": "SVG image with the overall state of this page, for a README. It refreshes every minute.",
+    "protectedHint": "This page has a password: its badges show \"password protected\" to anyone who has not opened the page.",
     "needsPage": "Badges need a published status page that shows this monitor. Add it to one in <link>status pages</link>.",
     "kinds": {
       "status": "status",
@@ -735,6 +736,14 @@
     "channelDisabled": "disabled",
     "subscribeHint": "Visitors can subscribe by email to the incidents you post. Emails go out through the SMTP server and sender of this email channel, not to its recipients.",
     "subscribeNoChannel": "Add an email channel in notifications to let visitors subscribe.",
+    "passwordTitle": "password",
+    "protected": "protect with a password",
+    "protectedHint": "visitors enter a password to see the page, its badges and the subscription form. Logged-in users never need it.",
+    "password": "password",
+    "newPassword": "new password",
+    "passwordPlaceholder": "at least 6 characters",
+    "passwordSet": "A password is set. Leave the field empty to keep it; a new one logs out every visitor.",
+    "passwordNew": "Share it with the people who should see the page.",
     "incidents": "incidents"
   },
   "statusPublic": {
@@ -780,6 +789,15 @@
       "confirmed": "{email} is subscribed: you will get incident updates by email.",
       "unsubscribed": "{email} is unsubscribed: you will get no more emails.",
       "badLink": "this link is not valid anymore."
+    },
+    "locked": {
+      "title": "this page is password protected",
+      "hint": "Enter the password you were given to see the status.",
+      "password": "password",
+      "submit": "open",
+      "checking": "checking...",
+      "wrong": "wrong password",
+      "error": "error"
     }
   },
   "settings": {

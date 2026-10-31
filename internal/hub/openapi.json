@@ -3744,6 +3744,32 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "403": {
+            "description": "The page needs a password: unlock it with `POST /api/public/status/{slug}/unlock`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "password_required": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "error": "this status page needs a password",
+                  "password_required": true,
+                  "title": "Acme status"
+                }
+              }
+            }
           }
         }
       }
@@ -5773,6 +5799,80 @@
         }
       }
     },
+    "/api/public/status/{slug}/unlock": {
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Unlock a password protected status page",
+        "operationId": "publicUnlock",
+        "description": "Checks the page password and sets a cookie that opens the page, its badges and its subscription form for 30 days. Changing or removing the password closes the page again for every visitor. On a custom domain the path is `/api/public/status/unlock`. Limited to 10 wrong passwords per client address and 100 per page every 15 minutes.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unlocked (or the page has no password); the cookie is set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "description": "Wrong password.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
     "/api/public/subscriptions/{token}/confirm": {
       "post": {
         "tags": [
@@ -6703,12 +6803,6 @@
         "name": "pingtxt_session",
         "description": "Browser session, set by login."
       },
-      "sessionCookie": {
-        "type": "apiKey",
-        "in": "cookie",
-        "name": "pingtxt_session",
-        "description": "Browser session, set by login."
-      },
       "oauth2": {
         "type": "oauth2",
         "description": "Authorization code with PKCE (S256), public clients only. The iOS app uses client_id `pingtxt-ios` and redirect URI `pingtxt://oauth`.",
@@ -7065,7 +7159,13 @@
           },
           "ip_family": {
             "type": "integer",
-            "enum": [0, 1, 4, 6, 46],
+            "enum": [
+              0,
+              1,
+              4,
+              6,
+              46
+            ],
             "description": "0 = instance default (GeneralSettings.ip_family), 1 = IPv4 or IPv6 (whichever connects first), 4 = IPv4 only, 6 = IPv6 only, 46 = IPv4 and IPv6 (both checked, the check fails when either fails). Locations without IPv6 check over IPv4 with 0 and 1; 6 and 46 are refused on them (see Location.ipv6). Ignored for push and docker."
           },
           "headers": {
@@ -7907,6 +8007,15 @@
             "type": "integer",
             "format": "int64",
             "description": "Email notification channel that sends incident updates to the page's subscribers (its SMTP server and sender are used, its recipients are not). 0 = visitors cannot subscribe."
+          },
+          "protected": {
+            "type": "boolean",
+            "description": "Visitors need a password to open the page, its badges and its subscription form. Logged-in users open it without one. On save, false removes the password and true keeps the current one."
+          },
+          "password": {
+            "type": "string",
+            "writeOnly": true,
+            "description": "New password for visitors (6-72 characters), stored hashed and never returned. Needed when protected is set on a page without one."
           }
         },
         "required": [

@@ -21,14 +21,23 @@ type StatusPage struct {
 	// SubscribeNotifierID is the email channel that sends incident updates
 	// to the page's subscribers. 0 turns subscriptions off.
 	SubscribeNotifierID int64 `json:"subscribe_notifier_id"`
-	CreatedAt           int64 `json:"created_at"`
+	// Protected is true when visitors need a password. On save, false
+	// removes the password and true keeps the current one unless Password
+	// sets a new one.
+	Protected bool `json:"protected"`
+	// Password is a new password to set. It is never returned.
+	Password string `json:"password,omitempty"`
+	// PasswordHash is the bcrypt hash of the visitors' password, "" = none.
+	PasswordHash string `json:"-"`
+	CreatedAt    int64  `json:"created_at"`
 }
 
-const statusPageCols = `id, slug, title, description, domain, published, show_incidents, subscribe_notifier_id, created_at`
+const statusPageCols = `id, slug, title, description, domain, published, show_incidents, subscribe_notifier_id, password_hash, created_at`
 
 func (s *Store) scanStatusPage(sc interface{ Scan(...any) error }) (*StatusPage, error) {
 	p := &StatusPage{}
-	err := sc.Scan(&p.ID, &p.Slug, &p.Title, &p.Description, &p.Domain, &p.Published, &p.ShowIncidents, &p.SubscribeNotifierID, &p.CreatedAt)
+	err := sc.Scan(&p.ID, &p.Slug, &p.Title, &p.Description, &p.Domain, &p.Published, &p.ShowIncidents, &p.SubscribeNotifierID, &p.PasswordHash, &p.CreatedAt)
+	p.Protected = p.PasswordHash != ""
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -153,8 +162,8 @@ func (s *Store) CreateStatusPage(p *StatusPage) error {
 		return err
 	}
 	defer tx.Rollback()
-	id, err := s.db.insert(tx, `INSERT INTO status_pages (slug, title, description, domain, published, show_incidents, subscribe_notifier_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.Slug, p.Title, p.Description, p.Domain, b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.CreatedAt)
+	id, err := s.db.insert(tx, `INSERT INTO status_pages (slug, title, description, domain, published, show_incidents, subscribe_notifier_id, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.Slug, p.Title, p.Description, p.Domain, b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.PasswordHash, p.CreatedAt)
 	if err != nil {
 		return uniqueErr(err)
 	}
@@ -171,8 +180,8 @@ func (s *Store) UpdateStatusPage(p *StatusPage) error {
 		return err
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec(`UPDATE status_pages SET slug = ?, title = ?, description = ?, domain = ?, published = ?, show_incidents = ?, subscribe_notifier_id = ? WHERE id = ?`,
-		p.Slug, p.Title, p.Description, p.Domain, b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.ID)
+	res, err := tx.Exec(`UPDATE status_pages SET slug = ?, title = ?, description = ?, domain = ?, published = ?, show_incidents = ?, subscribe_notifier_id = ?, password_hash = ? WHERE id = ?`,
+		p.Slug, p.Title, p.Description, p.Domain, b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.PasswordHash, p.ID)
 	if err != nil {
 		return uniqueErr(err)
 	}

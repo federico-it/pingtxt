@@ -43,14 +43,20 @@ export default function PublicStatusPage() {
   const now = useNow()
   const t = useTranslations("statusPublic")
   const tc = useTranslations("common")
-  const { data, error } = useSWR<PublicStatusPage>(path, (p: string) => api<PublicStatusPage>(p), {
+  const { data, error, mutate } = useSWR<PublicStatusPage>(path, (p: string) => api<PublicStatusPage>(p), {
     refreshInterval: 60_000,
   })
+  const locked = error instanceof ApiError && error.status === 403 && (error.data as { password_required?: boolean } | undefined)?.password_required
+  const lockedTitle = locked ? ((error.data as { title?: string }).title ?? "") : ""
 
   useEffect(() => {
     if (data) document.title = data.title
-  }, [data])
+    else if (lockedTitle) document.title = lockedTitle
+  }, [data, lockedTitle])
 
+  if (locked && path) {
+    return <PasswordForm endpoint={`${path}/unlock`} title={lockedTitle} onUnlocked={() => mutate()} />
+  }
   if (error) {
     return (
       <div className="flex min-h-svh flex-col items-center justify-center gap-2 px-4 text-center">
@@ -240,6 +246,66 @@ function Report({ report }: { report: PageIncident }) {
       <div className="mt-3">
         <ReportTimeline incident={report} />
       </div>
+    </div>
+  )
+}
+
+/** Shown instead of a password protected page until the visitor unlocks it. */
+function PasswordForm({ endpoint, title, onUnlocked }: { endpoint: string; title: string; onUnlocked: () => void }) {
+  const t = useTranslations("statusPublic.locked")
+  const [password, setPassword] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState("")
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError("")
+    try {
+      await api(endpoint, { method: "POST", body: { password } })
+      onUnlocked()
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) setError(t("wrong"))
+      else setError(err instanceof Error ? err.message : t("error"))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto flex min-h-svh w-full max-w-3xl flex-col px-4 sm:px-6">
+      <header className="flex items-center gap-4 border-b border-dashed py-3">
+        <h1 className="min-w-0 truncate font-semibold tracking-tight">
+          <span className="text-primary">&gt;</span> {title}
+        </h1>
+        <div className="ml-auto flex items-center gap-1">
+          <LanguagePicker />
+          <ThemeToggle />
+        </div>
+      </header>
+      <main className="flex flex-1 items-center justify-center py-8">
+        <form onSubmit={submit} className="grid w-full max-w-sm gap-3">
+          <div className="text-xs text-muted-foreground">
+            <span className="text-primary">$</span> unlock status
+          </div>
+          <div className="font-medium">{t("title")}</div>
+          <p className="text-xs text-muted-foreground">{t("hint")}</p>
+          <Input
+            type="password"
+            required
+            autoFocus
+            maxLength={72}
+            autoComplete="current-password"
+            aria-label={t("password")}
+            placeholder={t("password")}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <Button type="submit" disabled={busy || !password}>
+            {busy ? t("checking") : t("submit")}
+          </Button>
+          {error && <p className="text-xs text-down">! {error}</p>}
+        </form>
+      </main>
     </div>
   )
 }
