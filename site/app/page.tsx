@@ -19,7 +19,7 @@ const features: { title: string; body: string }[] = [
   },
   {
     title: "lots of check types",
-    body: "HTTP(S), keyword, TCP, ICMP ping, DNS, PostgreSQL, MySQL, Redis, MongoDB, Docker, gRPC health, SMTP and heartbeat.",
+    body: "HTTP(S), keyword, TCP, ICMP ping, DNS, PostgreSQL, MySQL, Redis, MongoDB, Docker, gRPC health, SMTP, MCP servers and heartbeat.",
   },
   {
     title: "status pages",

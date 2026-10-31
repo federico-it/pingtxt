@@ -36,7 +36,7 @@ const types: {
   value: MonitorType
   placeholder: string
   /** Label of the target field (monitorForm.target.<key>); defaults to "host". */
-  target?: "url" | "container" | "address" | "server"
+  target?: "url" | "container" | "address" | "server" | "endpoint"
 }[] = [
   {
     value: "http",
@@ -88,6 +88,11 @@ const types: {
     value: "grpc",
     placeholder: "grpcs://api.example.com:443/my.Service",
     target: "address",
+  },
+  {
+    value: "mcp",
+    placeholder: "https://mcp.example.com/mcp",
+    target: "endpoint",
   },
   {
     value: "smtp",
@@ -150,6 +155,8 @@ function withValue(list: { value: string; label: string }[], sec: number) {
 
 const methods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 const records = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"]
+// Labels are in messages: monitorForm.mcpTransports.<value>.
+const mcpTransports = ["auto", "streamable", "sse"] as const
 
 export type MonitorInput = Omit<
   Monitor,
@@ -251,7 +258,9 @@ export function MonitorForm({
     setM((p) => ({ ...p, [k]: v }))
   const t = types.find((x) => x.value === m.type) ?? types[0]
   const isHTTP = m.type === "http" || m.type === "keyword"
-  const isHTTPS = isHTTP && m.target.trim().toLowerCase().startsWith("https://")
+  const isMCP = m.type === "mcp"
+  const isHTTPS =
+    (isHTTP || isMCP) && m.target.trim().toLowerCase().startsWith("https://")
   const isPush = m.type === "push"
   const isSQL = m.type === "postgres" || m.type === "mysql"
   const hasTLS = [
@@ -261,6 +270,7 @@ export function MonitorForm({
     "mongodb",
     "grpc",
     "smtp",
+    "mcp",
   ].includes(m.type)
   const ivList = isPush
     ? withValue(pushIntervals, m.interval_sec)
@@ -271,6 +281,12 @@ export function MonitorForm({
   function setType(type: MonitorType) {
     setM((p) => {
       const next = { ...p, type }
+      if ((type === "mcp") !== (p.type === "mcp")) {
+        // mcp reuses method, keyword and expected_status for its own settings
+        next.method = type === "mcp" ? "auto" : "GET"
+        next.keyword = ""
+        next.expected_status = ""
+      }
       if (type === "push" && p.type !== "push") {
         next.interval_sec = 3600
         if (!p.grace_sec) next.grace_sec = 300
@@ -371,6 +387,70 @@ export function MonitorForm({
             <p className="text-xs text-muted-foreground sm:col-span-2">
               {tr("grpcHint")}
             </p>
+          )}
+          {isMCP && (
+            <>
+              <Field label={tr("mcpTransport")}>
+                <Select
+                  items={mcpTransports.map((x) => ({
+                    value: x,
+                    label: tr(`mcpTransports.${x}`),
+                  }))}
+                  value={
+                    (mcpTransports as readonly string[]).includes(m.method)
+                      ? m.method
+                      : "auto"
+                  }
+                  onValueChange={(v) => v && set("method", v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mcpTransports.map((x) => (
+                      <SelectItem key={x} value={x}>
+                        {tr(`mcpTransports.${x}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field
+                label={tr("mcpMinTools")}
+                hint={tr("mcpMinToolsHint")}
+              >
+                <Input
+                  type="number"
+                  min={0}
+                  value={m.expected_status}
+                  onChange={(e) => set("expected_status", e.target.value)}
+                  placeholder="0"
+                />
+              </Field>
+              <Field
+                label={tr("mcpTools")}
+                hint={tr("mcpToolsHint")}
+                className="sm:col-span-2"
+              >
+                <Input
+                  value={m.keyword}
+                  onChange={(e) => set("keyword", e.target.value)}
+                  placeholder="search, create_issue"
+                />
+              </Field>
+              <Field
+                label={tr("headers")}
+                hint={tr("mcpHeadersHint")}
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  rows={2}
+                  value={headers}
+                  onChange={(e) => setHeaders(e.target.value)}
+                  placeholder="Authorization: Bearer ..."
+                />
+              </Field>
+            </>
           )}
           {isSQL && (
             <>

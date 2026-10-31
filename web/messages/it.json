@@ -193,6 +193,10 @@
         "label": "grpc health",
         "hint": "chiama grpc.health.v1.Health/Check"
       },
+      "mcp": {
+        "label": "server mcp",
+        "hint": "handshake initialize e tools/list su un server MCP remoto"
+      },
       "smtp": {
         "label": "smtp",
         "hint": "legge il saluto, EHLO e STARTTLS quando disponibile"
@@ -208,7 +212,8 @@
       "host": "host",
       "container": "nome o id del container",
       "address": "indirizzo",
-      "server": "server"
+      "server": "server",
+      "endpoint": "url dell'endpoint"
     },
     "sections": {
       "target": "destinazione",
@@ -228,6 +233,17 @@
     "pushHint": "pingtxt assegna a questo monitor un URL segreto. Chiamalo alla fine di ogni esecuzione del tuo job: il monitor va down quando non arriva nessuna chiamata entro il periodo atteso più la tolleranza. L'URL viene mostrato dopo il salvataggio.",
     "dockerHint": "Controllato sul docker engine di ogni località selezionata: l'hub o l'agent deve poter accedere a /var/run/docker.sock (o DOCKER_HOST). Con docker, montalo con -v /var/run/docker.sock:/var/run/docker.sock:ro.",
     "grpcHint": "grpc:// in chiaro, grpcs:// con TLS. Il percorso è il nome del servizio da controllare; omettilo per controllare tutto il server.",
+    "mcpTransport": "trasporto",
+    "mcpTransports": {
+      "auto": "auto (streamable http, poi sse legacy)",
+      "streamable": "streamable http",
+      "sse": "http+sse legacy"
+    },
+    "mcpMinTools": "tool minimi",
+    "mcpMinToolsHint": "opzionale: down se tools/list ne restituisce meno",
+    "mcpTools": "tool richiesti",
+    "mcpToolsHint": "opzionale, separati da virgola: down se ne manca uno",
+    "mcpHeadersHint": "uno per riga, inviati a ogni richiesta. Nascosti agli utenti in sola lettura",
     "query": "query",
     "queryHint": "facoltativa, predefinita SELECT 1",
     "expectedValue": "valore atteso",
