@@ -38,6 +38,7 @@ func main() {
 	insecureUpdate := flag.Bool("insecure-update", envBool("PINGTXT_INSECURE_UPDATE"), "allow self-update from a hub reached over plain http on a public address (env PINGTXT_INSECURE_UPDATE)")
 	verifyUpdate := flag.String("verify-update", envOr("PINGTXT_VERIFY_UPDATE", verifyAuto), "check self-updates against the checksums published with the GitHub release: auto, strict or off (env PINGTXT_VERIFY_UPDATE)")
 	releaseURL := flag.String("release-url", envOr("PINGTXT_RELEASE_URL", defaultReleaseURL), "base URL of the release downloads, for -verify-update (env PINGTXT_RELEASE_URL)")
+	updateDir := flag.String("update-dir", os.Getenv("PINGTXT_UPDATE_DIR"), "in a container, folder (a volume) that keeps self-updates across restarts (env PINGTXT_UPDATE_DIR)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 	if *showVersion {
@@ -59,7 +60,18 @@ func main() {
 		os.Exit(2)
 	}
 
-	exe, noUpdateReason := selfUpdateSupport(*noUpdate)
+	if inContainer() && *updateDir != "" && !*noUpdate {
+		// The image's binary records its version for the updated one, then
+		// hands over to it if a previous self-update left one in the volume.
+		if os.Getenv(envImageVersion) == "" {
+			os.Setenv(envImageVersion, version)
+		}
+		useUpdatedBinary(*updateDir, log)
+	} else {
+		*updateDir = ""
+	}
+
+	exe, noUpdateReason := selfUpdateSupport(*noUpdate, *updateDir)
 	if exe != "" && !*insecureUpdate && !secureHub(wsURL) {
 		// Over plain http anyone on the path could swap the binary and its
 		// checksum: never install code received that way.
@@ -68,7 +80,7 @@ func main() {
 	}
 	ag := &agent{
 		log: log, wsURL: wsURL, httpURL: toHTTP(wsURL), token: *token, concurrency: *concurrency,
-		exe: exe, noUpdateReason: noUpdateReason, verify: *verifyUpdate, releaseURL: *releaseURL,
+		exe: exe, updateDir: *updateDir, noUpdateReason: noUpdateReason, verify: *verifyUpdate, releaseURL: *releaseURL,
 		client: &http.Client{Timeout: 10 * time.Minute},
 	}
 
@@ -153,7 +165,8 @@ type agent struct {
 	concurrency int
 	client      *http.Client
 
-	exe            string // path of this binary, empty when it cannot self-update
+	exe            string // path updates are written to and run from, empty when it cannot self-update
+	updateDir      string // in a container, the volume that keeps updates
 	noUpdateReason string
 	verify         string // release checksum check mode, see releaseCheck
 	releaseURL     string

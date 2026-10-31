@@ -203,7 +203,7 @@ docker start pingtxt`}
             code={`# Docker
 docker run -d --name pingtxt-agent --restart unless-stopped --cap-add NET_RAW \\
   -e PINGTXT_HUB=https://status.example.com -e PINGTXT_TOKEN=pt_xxx \\
-  ghcr.io/federico-it/pingtxt-agent:latest
+  -v pingtxt-agent:/data ghcr.io/federico-it/pingtxt-agent:latest
 
 # Linux + systemd (binary downloaded from your hub)
 curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --hub https://status.example.com --token pt_xxx
@@ -223,8 +223,8 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
 
         <Section id="agent-updates" title="agent updates">
           <p>
-            The hub bundles agent binaries built with its own version. Agents installed with the script update themselves when
-            they reconnect after a hub upgrade: they download the binary from the hub, verify its SHA-256 and version, swap it
+            The hub bundles agent binaries built with its own version. Agents (installed with the script or in Docker) update
+            themselves when they reconnect after a hub upgrade: they download the binary from the hub, verify its SHA-256 and version, swap it
             and restart. A failed update keeps the old binary running.
           </p>
           <ul>
@@ -246,7 +246,15 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
               <C>auto</C> by default (skipped with a warning if GitHub is unreachable), <C>strict</C> to install only matching
               published releases, or <C>off</C> for forks and private builds.
             </li>
-            <li>Docker agents never replace their binary: pull the new image or use Watchtower.</li>
+            <li>
+              Docker agents keep the new binary in the <C>/data</C> volume and run it from there after a restart, with no Docker
+              socket. Mount a named volume (<C>-v pingtxt-agent:/data</C>) to keep updates when the container is recreated.
+              Pulling a new image starts its own binary again and clears the volume.
+            </li>
+            <li>
+              Docker tags: <C>:latest</C> is the newest release, <C>:1.2.3</C> a given release, <C>:main</C> the latest build
+              of the main branch.
+            </li>
           </ul>
         </Section>
 

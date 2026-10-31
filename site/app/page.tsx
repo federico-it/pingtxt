@@ -67,7 +67,7 @@ const compose = `services:
 const agent = `# in the UI: agents → add agent, then on the remote machine:
 docker run -d --name pingtxt-agent --restart unless-stopped --cap-add NET_RAW \\
   -e PINGTXT_HUB=https://status.example.com -e PINGTXT_TOKEN=pt_xxx \\
-  ghcr.io/federico-it/pingtxt-agent:latest
+  -v pingtxt-agent:/data ghcr.io/federico-it/pingtxt-agent:latest
 
 # or Linux + systemd, binary downloaded from your hub
 curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- \\

@@ -22,8 +22,8 @@ import (
 // version (see Dockerfile). When an agent with another version connects, the
 // hub sends it the download path and the SHA-256 of the matching binary; the
 // agent downloads it from the hub, checks the digest and the version, swaps
-// the file and restarts itself. Docker agents cannot do this and are updated
-// by pulling a new image.
+// the file and restarts itself. Docker agents keep the new binary in a volume
+// (/data) and run it from there until a new image is pulled.
 
 const keyAgentUpdates = "agent_updates"
 
@@ -217,7 +217,7 @@ func (h *Hub) offerUpdate(ac *agentConn, manual bool) error {
 func noUpdateText(hl protocol.Hello) string {
 	switch hl.NoUpdateReason {
 	case protocol.NoUpdateContainer:
-		return "agent runs in a container: pull the new image (or use Watchtower)"
+		return "agent runs in a container without a writable /data volume: pull the latest image (it keeps updates in /data) or update the image yourself"
 	case protocol.NoUpdateDisabled:
 		return "self-update is turned off on the agent (-no-auto-update)"
 	case protocol.NoUpdateNotWritable:

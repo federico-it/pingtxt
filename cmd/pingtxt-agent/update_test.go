@@ -156,3 +156,78 @@ func TestReleaseCheck(t *testing.T) {
 		}
 	}
 }
+
+func TestSelfUpdateSupportContainer(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no self-update on windows")
+	}
+	t.Setenv("PINGTXT_CONTAINER", "1")
+	if _, reason := selfUpdateSupport(false, ""); reason != protocol.NoUpdateContainer {
+		t.Fatalf("no update folder: reason %q, want container", reason)
+	}
+	if _, reason := selfUpdateSupport(false, filepath.Join(t.TempDir(), "missing")); reason != protocol.NoUpdateContainer {
+		t.Fatalf("missing update folder: reason %q, want container", reason)
+	}
+	dir := t.TempDir()
+	target, reason := selfUpdateSupport(false, dir)
+	if reason != "" || target != filepath.Join(dir, "pingtxt-agent") {
+		t.Fatalf("got %q, %q", target, reason)
+	}
+	if _, reason := selfUpdateSupport(true, dir); reason != protocol.NoUpdateDisabled {
+		t.Fatalf("disabled: reason %q", reason)
+	}
+}
+
+func TestUpdatedBinary(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a shell script as the binary")
+	}
+	ctx := context.Background()
+	setup := func(t *testing.T, script, base string) string {
+		t.Helper()
+		dir := t.TempDir()
+		if script != "" {
+			if err := os.WriteFile(filepath.Join(dir, updatedBinName), []byte(script), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if base != "" {
+			if err := os.WriteFile(filepath.Join(dir, imageVersionName), []byte(base+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return dir
+	}
+	exists := func(p string) bool { _, err := os.Stat(p); return err == nil }
+	good := "#!/bin/sh\necho v1.2.0\n"
+
+	t.Run("nothing installed", func(t *testing.T) {
+		bin, _, err := updatedBinary(ctx, t.TempDir(), "v1.0.0")
+		if bin != "" || err != nil {
+			t.Fatalf("got %q, %v", bin, err)
+		}
+	})
+	t.Run("same image", func(t *testing.T) {
+		dir := setup(t, good, "v1.0.0")
+		bin, v, err := updatedBinary(ctx, dir, "v1.0.0")
+		if err != nil || bin != filepath.Join(dir, updatedBinName) || v != "v1.2.0" {
+			t.Fatalf("got %q, %q, %v", bin, v, err)
+		}
+	})
+	for name, c := range map[string]struct{ script, base string }{
+		"new image":        {good, "v1.0.0"},
+		"no image version": {good, ""},
+		"broken binary":    {"#!/bin/sh\nexit 3\n", "v1.1.0"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := setup(t, c.script, c.base)
+			bin, _, err := updatedBinary(ctx, dir, "v1.1.0")
+			if bin != "" || err == nil {
+				t.Fatalf("got %q, %v, want the update discarded", bin, err)
+			}
+			if exists(filepath.Join(dir, updatedBinName)) || exists(filepath.Join(dir, imageVersionName)) {
+				t.Fatal("update folder not cleared")
+			}
+		})
+	}
+}
