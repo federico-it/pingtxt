@@ -148,6 +148,7 @@
     "degradedAt": "",
     "ipv4Only": "",
     "ipv6Only": "",
+    "ipBoth": "",
     "degradedAtDefault": ""
   },
   "monitorForm": {
@@ -279,6 +280,9 @@
     "builtIn": "",
     "online": "",
     "offline": "",
+    "noIPv6": "",
+    "noIPv6Hint": "",
+    "noIPv6Selected": "",
     "method": "",
     "acceptedStatus": "",
     "acceptedStatusHint": "",
@@ -299,9 +303,11 @@
     "ipFamily": {
       "label": "",
       "hint": "",
-      "v0": "",
+      "default": "",
+      "either": "",
       "v4": "",
-      "v6": ""
+      "v6": "",
+      "both": ""
     },
     "responseRules": {
       "title": "",
@@ -553,6 +559,8 @@
     "online": "",
     "offline": "",
     "neverConnected": "",
+    "ipv6Yes": "",
+    "ipv6No": "",
     "now": "",
     "update": "",
     "edit": "",
@@ -840,7 +848,9 @@
     "missingScheme": "",
     "status": "",
     "degradedPct": "",
-    "degradedPctHint": ""
+    "degradedPctHint": "",
+    "ipFamily": "",
+    "ipFamilyHint": ""
   },
   "authSettings": {
     "title": "",
@@ -1080,6 +1090,21 @@
     "upToDate": "",
     "checked": "",
     "checkNow": ""
+  },
+  "hubOffline": {
+    "starting": "",
+    "updating": "",
+    "restarting": "",
+    "hint": "",
+    "unreachable": "",
+    "waiting": "",
+    "steps": {
+      "restore": "",
+      "database": "",
+      "migrate": "",
+      "starting": "",
+      "wait": ""
+    }
   },
   "pageIncidents": {
     "pageTitle": "",
