@@ -326,6 +326,85 @@ the agents page.
 Pushing a `v*` tag publishes a GitHub release with the hub and agent binaries and `SHA256SUMS`,
 plus the Docker images for that tag.
 
+## Build from source
+
+You need **Go 1.26+** (the version in [go.mod](go.mod)), **Node.js 22+** with npm, `make` and `git`.
+No C compiler: everything is built with `CGO_ENABLED=0`. Docker is only needed for the images.
+
+```sh
+git clone https://github.com/federico-it/pingtxt.git && cd pingtxt
+git checkout v1.2.3        # optional: a release tag; main is the development version
+make web hub agent agents
+```
+
+| target | output | |
+| --- | --- | --- |
+| `make web` | `internal/ui/dist` | builds the Next.js UI (`web/out`) and copies it where the hub embeds it. Run it before `make hub`, or the hub has no web UI |
+| `make hub` | `dist/pingtxt` | the hub, with the UI inside, for this machine |
+| `make agent` | `dist/pingtxt-agent` | the agent for this machine |
+| `make agents` | `dist/agents/pingtxt-agent-<os>-<arch>` | agents for linux amd64/arm64/arm and darwin amd64/arm64, served by the hub for the install script and agent updates |
+
+The version comes from `git describe` (`v1.2.3`, or the commit on main); set it with `make hub agents VERSION=v1.2.3`.
+Agents update themselves to the hub version, so build hub and agents from the same checkout.
+
+Run the hub from the repository folder, or point it at the data and agent folders:
+
+```sh
+./dist/pingtxt     # data in ./data, agents from ./dist/agents, UI on :8090
+PINGTXT_DATA=/var/lib/pingtxt PINGTXT_AGENT_DIR=/usr/local/share/pingtxt/agents /usr/local/bin/pingtxt
+```
+
+Outside Docker, ICMP **ping** checks need raw sockets: `sudo setcap cap_net_raw+ep /usr/local/bin/pingtxt`
+(same for `pingtxt-agent`), or set `PINGTXT_UNPRIVILEGED_PING=1` and allow the user's group in
+`net.ipv4.ping_group_range`. A minimal systemd unit for the hub:
+
+```ini
+# /etc/systemd/system/pingtxt.service
+[Unit]
+Description=pingtxt hub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/pingtxt
+Environment=PINGTXT_DATA=/var/lib/pingtxt PINGTXT_AGENT_DIR=/usr/local/share/pingtxt/agents
+StateDirectory=pingtxt
+DynamicUser=yes
+AmbientCapabilities=CAP_NET_RAW
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Cross-compiling** for another platform (the UI is the same for all of them, build it once with `make web`):
+
+```sh
+V=$(git describe --tags --always)
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=$V" -o dist/pingtxt-linux-arm64 ./cmd/pingtxt
+CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags "-s -w -X main.version=$V" -o dist/pingtxt-agent-linux-armv7 ./cmd/pingtxt-agent
+```
+
+**Docker images.** The Dockerfiles build everything inside the image (Node and Go included), so only Docker is needed:
+
+```sh
+make docker                                   # pingtxt:dev and pingtxt-agent:dev for this machine
+docker build --build-arg VERSION=$(git describe --tags --always) -t pingtxt:dev .
+docker build --build-arg VERSION=$(git describe --tags --always) -f Dockerfile.agent -t pingtxt-agent:dev .
+# both architectures, pushed to your registry
+docker buildx build --platform linux/amd64,linux/arm64 -t registry.example.com/pingtxt:dev --push .
+```
+
+To run the compose files with an image built from your checkout, add
+[docker-compose.build.yml](docker-compose.build.yml) after any of them. It works the same with SQLite,
+PostgreSQL and MariaDB (create the `.env` with the passwords first, as above):
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+docker compose -f docker-compose.postgres.yml -f docker-compose.build.yml up -d --build
+docker compose -f docker-compose.mariadb.yml -f docker-compose.build.yml up -d --build
+```
+
 ## Architecture
 
 ```

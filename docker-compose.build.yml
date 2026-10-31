@@ -1,0 +1,12 @@
+# Build the hub image from this checkout instead of pulling it. Add this file after
+# any of the compose files:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#   docker compose -f docker-compose.postgres.yml -f docker-compose.build.yml up -d --build
+#   docker compose -f docker-compose.mariadb.yml -f docker-compose.build.yml up -d --build
+services:
+  pingtxt:
+    image: pingtxt:dev
+    build:
+      context: .
+      args:
+        VERSION: ${PINGTXT_VERSION:-dev}

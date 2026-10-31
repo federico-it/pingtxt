@@ -57,6 +57,9 @@ make web hub agents  # production build into ./dist (UI embedded in the hub)
 make docker        # build both images locally
 ```
 
+Production builds, cross-compiling and local Docker images are described in
+[Build from source](README.md#build-from-source).
+
 The public website (pingtxt.com) lives in [`site/`](site/) and is a separate Next.js app:
 `cd site && npm ci && npm run dev`.
 

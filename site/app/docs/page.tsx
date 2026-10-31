@@ -27,6 +27,7 @@ const toc = [
   ["api", "api tokens"],
   ["prometheus", "prometheus"],
   ["upgrade", "upgrade + backup"],
+  ["build", "build from source"],
   ["contributing", "contributing"],
 ] as const
 
@@ -376,6 +377,71 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             use <a href="#database" className="text-foreground underline underline-offset-4">pg_dump or mariadb-dump</a>.
             Agents installed with the script follow the hub version on their own.
           </p>
+        </Section>
+
+        <Section id="build" title="build from source">
+          <p>
+            Needs <b className="text-foreground">Go 1.26+</b>, <b className="text-foreground">Node.js 22+</b> with npm,{" "}
+            <C>make</C> and <C>git</C>. No C compiler (everything builds with <C>CGO_ENABLED=0</C>).
+          </p>
+          <CopyBlock
+            code={`git clone https://github.com/federico-it/pingtxt.git && cd pingtxt
+git checkout v1.2.3        # optional: a release tag
+make web hub agent agents`}
+          />
+          <Table
+            head={["target", "output", ""]}
+            rows={[
+              [<C key="w">make web</C>, <C key="w2">internal/ui/dist</C>, "the web UI, embedded in the hub: run it before make hub"],
+              [<C key="h">make hub</C>, <C key="h2">dist/pingtxt</C>, "the hub for this machine, UI included"],
+              [<C key="a">make agent</C>, <C key="a2">dist/pingtxt-agent</C>, "the agent for this machine"],
+              [
+                <C key="as">make agents</C>,
+                <C key="as2">dist/agents/</C>,
+                "agents for linux amd64/arm64/arm and darwin, served by the hub to the install script and for updates",
+              ],
+            ]}
+          />
+          <p>
+            The version comes from <C>git describe</C> (override with <C>VERSION=v1.2.3</C>). Build hub and agents from the
+            same checkout: agents update themselves to the hub version.
+          </p>
+          <CopyBlock
+            label="run"
+            code={`./dist/pingtxt     # data in ./data, agents from ./dist/agents, :8090
+PINGTXT_DATA=/var/lib/pingtxt PINGTXT_AGENT_DIR=/usr/local/share/pingtxt/agents /usr/local/bin/pingtxt`}
+          />
+          <p>
+            Outside Docker, ping checks need raw sockets: <C>sudo setcap cap_net_raw+ep /usr/local/bin/pingtxt</C> (and the
+            agent), or <C>PINGTXT_UNPRIVILEGED_PING=1</C> with <C>net.ipv4.ping_group_range</C>. A systemd unit example is in
+            the{" "}
+            <a href={`${REPO}#build-from-source`} className="text-foreground underline underline-offset-4">
+              README
+            </a>
+            .
+          </p>
+          <CopyBlock
+            label="cross-compile"
+            code={`V=$(git describe --tags --always)
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=$V" -o dist/pingtxt-linux-arm64 ./cmd/pingtxt
+CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags "-s -w -X main.version=$V" -o dist/pingtxt-agent-linux-armv7 ./cmd/pingtxt-agent`}
+          />
+          <CopyBlock
+            label="docker images (only docker needed)"
+            code={`make docker     # pingtxt:dev and pingtxt-agent:dev
+docker build --build-arg VERSION=$(git describe --tags --always) -t pingtxt:dev .
+docker build --build-arg VERSION=$(git describe --tags --always) -f Dockerfile.agent -t pingtxt-agent:dev .
+docker buildx build --platform linux/amd64,linux/arm64 -t registry.example.com/pingtxt:dev --push .`}
+          />
+          <p>
+            To run a compose file with your own build, add <C>docker-compose.build.yml</C> after it. Same for SQLite,
+            PostgreSQL and MariaDB (create the <C>.env</C> with the passwords first):
+          </p>
+          <CopyBlock
+            code={`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+docker compose -f docker-compose.postgres.yml -f docker-compose.build.yml up -d --build
+docker compose -f docker-compose.mariadb.yml -f docker-compose.build.yml up -d --build`}
+          />
         </Section>
 
         <Section id="contributing" title="contributing">
