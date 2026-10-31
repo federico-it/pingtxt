@@ -74,6 +74,28 @@ export function GeneralSettingsForm({
               value={g.public_url}
               onChange={(e) => set("public_url", e.target.value)}
             />
+            {missingScheme(g.public_url) && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-amber-600 dark:text-amber-400">
+                <span>no http:// or https:// in front: pick one</span>
+                {(["https", "http"] as const).map((sc) => (
+                  <Button
+                    key={sc}
+                    type="button"
+                    size="xs"
+                    variant={
+                      settings.detected_url.startsWith(sc + ":")
+                        ? "default"
+                        : "outline"
+                    }
+                    onClick={() =>
+                      set("public_url", `${sc}://${g.public_url.trim()}`)
+                    }
+                  >
+                    {sc}://
+                  </Button>
+                ))}
+              </div>
+            )}
           </Field>
           <Field
             label="built-in location"
@@ -189,6 +211,25 @@ export function GeneralSettingsForm({
         </div>
       </Section>
 
+      <Section title="status">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="degraded at (% of locations)"
+            htmlFor="degraded_pct"
+            hint="degraded when at least this share of a monitor's online locations fails, down when more than half do. monitors can override it"
+          >
+            <Input
+              id="degraded_pct"
+              type="number"
+              min={1}
+              max={50}
+              value={g.degraded_pct}
+              onChange={(e) => set("degraded_pct", Number(e.target.value))}
+            />
+          </Field>
+        </div>
+      </Section>
+
       <Section title="new monitor defaults">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="interval (s)" htmlFor="d_interval">
@@ -236,6 +277,12 @@ export function GeneralSettingsForm({
       </Section>
     </form>
   )
+}
+
+/** A non-empty URL typed (or seeded) without http:// or https://. */
+function missingScheme(u: string): boolean {
+  const v = u.trim()
+  return v !== "" && !/^[a-z][a-z0-9+.-]*:\/\//i.test(v)
 }
 
 /** Example prometheus.yml job for this hub. */

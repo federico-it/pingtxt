@@ -128,6 +128,8 @@ function View() {
             {d.type} · <span className="text-foreground">{displayTarget(d.target)}</span> ·
             every {interval(d.interval_sec)} · timeout {d.timeout_ms}ms ·
             retries {d.retries}
+            {d.locations.length > 1 &&
+              ` · degraded at ${d.degraded_pct ? `${d.degraded_pct}%` : "default"}`}
           </>
         )}
       </div>
