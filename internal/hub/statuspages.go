@@ -78,9 +78,11 @@ func (h *Hub) customDomains(next http.Handler, ui fs.FS) http.Handler {
 		}
 		p := r.URL.Path
 		switch {
-		case p == "/api/public/status" || p == "/api/public/status/":
+		case (p == "/api/public/status" || p == "/api/public/status/") && r.Method == http.MethodGet:
 			h.servePublicPage(w, r, slug, true)
-		case p == "/api/health", strings.HasPrefix(p, "/_next/"), p == "/icon.svg":
+		case p == "/api/public/status/subscribe" && r.Method == http.MethodPost:
+			h.serveSubscribe(w, r, slug)
+		case p == "/api/health", strings.HasPrefix(p, "/api/public/subscriptions/"), strings.HasPrefix(p, "/_next/"), p == "/icon.svg":
 			next.ServeHTTP(w, r)
 		case strings.HasPrefix(p, "/api/"), strings.HasPrefix(p, "/download/"), p == "/install-agent.sh":
 			writeErr(w, http.StatusNotFound, "not found")
@@ -159,6 +161,15 @@ func (h *Hub) validateStatusPage(r *http.Request, p *store.StatusPage) error {
 		}
 	}
 	p.GroupIDs = gids
+	if p.SubscribeNotifierID < 0 {
+		p.SubscribeNotifierID = 0
+	}
+	if p.SubscribeNotifierID != 0 {
+		n, err := h.store.Notifier(p.SubscribeNotifierID)
+		if err != nil || n.Type != "email" {
+			return errors.New("email subscriptions need an email notification channel")
+		}
+	}
 	return nil
 }
 
@@ -274,7 +285,11 @@ type publicPage struct {
 	Monitors      []publicMonitor  `json:"monitors"`
 	ShowIncidents bool             `json:"show_incidents"`
 	Incidents     []publicIncident `json:"incidents"`
-	UpdatedAt     int64            `json:"updated_at"`
+	// Reports are the incidents written on the page, with their updates.
+	Reports []*store.PageIncident `json:"reports"`
+	// Subscribe is true when visitors can subscribe by email.
+	Subscribe bool  `json:"subscribe"`
+	UpdatedAt int64 `json:"updated_at"`
 }
 
 type publicMonitor struct {
@@ -352,8 +367,16 @@ func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
 	p := &publicPage{
 		Slug: sp.Slug, Title: sp.Title, Description: sp.Description, Published: sp.Published,
 		Days: days, ShowIncidents: sp.ShowIncidents, Monitors: []publicMonitor{}, Incidents: []publicIncident{},
-		UpdatedAt: now.UnixMilli(),
+		Subscribe: h.subscribeChannel(sp) != nil, UpdatedAt: now.UnixMilli(),
 	}
+	reports, err := h.store.PublicPageIncidents(sp.ID, from, publicReportLimit)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range reports {
+		r.PageID = 0 // internal
+	}
+	p.Reports = reports
 	ms, err := h.pageMonitors(sp)
 	if err != nil {
 		return nil, err

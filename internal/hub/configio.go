@@ -300,7 +300,7 @@ func (h *Hub) ImportConfig(doc *ConfigDoc, opt ImportOptions) (*ImportResult, er
 		res.Backup = b.Name
 	}
 	im := &importer{h: h, doc: doc, opt: opt, res: res,
-		agents: map[int64]int64{}, groups: map[int64]int64{}, tags: map[int64]int64{}, monitors: map[int64]int64{}}
+		agents: map[int64]int64{}, groups: map[int64]int64{}, tags: map[int64]int64{}, monitors: map[int64]int64{}, notifiers: map[int64]int64{}}
 	err := im.run()
 	// Reload what the hub keeps in memory, also after a partial import.
 	h.configReloaded()
@@ -314,7 +314,7 @@ type importer struct {
 	res *ImportResult
 
 	// old id (in the document) -> id in this hub
-	agents, groups, tags, monitors map[int64]int64
+	agents, groups, tags, monitors, notifiers map[int64]int64
 }
 
 func (im *importer) run() error {
@@ -590,12 +590,14 @@ func (im *importer) importNotifiers(old []*store.Notifier) error {
 			if err := st.UpdateNotifier(&n); err != nil {
 				return err
 			}
+			im.notifiers[x.ID] = n.ID
 			im.res.Updated["notifiers"]++
 			continue
 		}
 		if err := st.CreateNotifier(&n); err != nil {
 			return err
 		}
+		im.notifiers[x.ID] = n.ID
 		cur = append(cur, &n)
 		im.res.Created["notifiers"]++
 	}
@@ -782,6 +784,7 @@ func (im *importer) importStatusPages() error {
 		p.ID = 0
 		p.MonitorIDs = im.mapIDs(p.MonitorIDs, im.monitors)
 		p.GroupIDs = im.mapIDs(p.GroupIDs, im.groups)
+		p.SubscribeNotifierID = im.notifiers[p.SubscribeNotifierID] // 0 if the channel was skipped
 		if err := h.validateStatusPage(req, &p); err != nil {
 			im.res.warn("status page %q skipped: %v", x.Slug, err)
 			im.res.Skipped["status_pages"]++

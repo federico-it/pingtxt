@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/mail"
 	"net/smtp"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"time"
@@ -147,9 +148,25 @@ func (n *Notifier) sendEmail(ctx context.Context, c map[string]string, e Event) 
 	if err != nil {
 		return err
 	}
+	to := make([]string, len(ec.To))
+	for i, a := range ec.To {
+		to[i] = a.Address
+	}
 	ctx, cancel := context.WithTimeout(ctx, emailTimeout)
 	defer cancel()
+	return n.deliver(ctx, ec, []outMail{{to: to, data: buildEmail(ec, e, time.Now())}}, nil)
+}
 
+// outMail is one message for deliver: its envelope recipients and content.
+type outMail struct {
+	to   []string
+	data []byte
+}
+
+// deliver sends the messages over one SMTP connection, in order. A message
+// refused by the server is reported to failed (when set) and the others are
+// still sent; any other error stops the delivery.
+func (n *Notifier) deliver(ctx context.Context, ec *emailConfig, msgs []outMail, failed func(i int, err error)) error {
 	addr := net.JoinHostPort(ec.Host, strconv.Itoa(ec.Port))
 	tlsCfg := &tls.Config{ServerName: ec.Host, MinVersion: tls.VersionTLS12}
 	if n.tlsConfig != nil {
@@ -205,25 +222,46 @@ func (n *Notifier) sendEmail(ctx context.Context, c map[string]string, e Event) 
 			return fmt.Errorf("smtp auth: %w", err)
 		}
 	}
-	if err := cl.Mail(ec.From.Address); err != nil {
+	for i, m := range msgs {
+		if err := sendOne(cl, ec.From.Address, m); err != nil {
+			var perr *textproto.Error
+			if failed == nil || !errors.As(err, &perr) {
+				return err
+			}
+			// The server refused this message (e.g. a bad recipient):
+			// reset the transaction and go on with the next one.
+			failed(i, err)
+			if err := cl.Reset(); err != nil {
+				return fmt.Errorf("rset: %w", err)
+			}
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+	}
+	_ = cl.Quit()
+	return nil
+}
+
+func sendOne(cl *smtp.Client, from string, m outMail) error {
+	if err := cl.Mail(from); err != nil {
 		return fmt.Errorf("mail from: %w", err)
 	}
-	for _, a := range ec.To {
-		if err := cl.Rcpt(a.Address); err != nil {
-			return fmt.Errorf("rcpt to %s: %w", a.Address, err)
+	for _, a := range m.to {
+		if err := cl.Rcpt(a); err != nil {
+			return fmt.Errorf("rcpt to %s: %w", a, err)
 		}
 	}
 	w, err := cl.Data()
 	if err != nil {
 		return fmt.Errorf("data: %w", err)
 	}
-	if _, err := w.Write(buildEmail(ec, e, time.Now())); err != nil {
+	if _, err := w.Write(m.data); err != nil {
 		return fmt.Errorf("data: %w", err)
 	}
 	if err := w.Close(); err != nil {
 		return fmt.Errorf("data: %w", err)
 	}
-	_ = cl.Quit()
 	return nil
 }
 
