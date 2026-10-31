@@ -992,10 +992,17 @@ func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.Use
 
 // hubURL is the public URL of the hub: the configured one, or guessed from the request.
 func (h *Hub) hubURL(r *http.Request) string {
-	if u := h.generalSettings().PublicURL; u != "" {
-		return u
+	u := h.generalSettings().PublicURL
+	if u == "" {
+		return requestURL(r)
 	}
-	return requestURL(r)
+	// A URL seeded without a scheme (e.g. PINGTXT_PUBLIC_URL=status.example.com):
+	// take the scheme of the current request until it is fixed in settings.
+	if !strings.Contains(u, "://") {
+		scheme, _, _ := strings.Cut(requestURL(r), "://")
+		return scheme + "://" + u
+	}
+	return u
 }
 
 func requestURL(r *http.Request) string {

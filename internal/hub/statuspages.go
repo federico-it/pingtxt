@@ -126,7 +126,7 @@ func (h *Hub) validateStatusPage(r *http.Request, p *store.StatusPage) error {
 		}
 		// Pointing a page at the hub's own host would hide the admin UI.
 		own := []string{normalizeHost(r.Host)}
-		if u, err := url.Parse(h.generalSettings().PublicURL); err == nil && u.Host != "" {
+		if u, err := url.Parse(h.hubURL(r)); err == nil && u.Host != "" {
 			own = append(own, normalizeHost(u.Host))
 		}
 		for _, o := range own {
