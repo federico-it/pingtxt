@@ -505,6 +505,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 	m.TimeoutMs = min(max(m.TimeoutMs, 500), 60000)
 	m.Retries = min(max(m.Retries, 1), 10)
+	if m.DegradedPct < 0 || m.DegradedPct > maxDegradedPct {
+		return fmt.Errorf("degraded threshold must be between 1%% and %d%% (0 = instance default)", maxDegradedPct)
+	}
 	if m.Headers == nil {
 		m.Headers = map[string]string{}
 	}
