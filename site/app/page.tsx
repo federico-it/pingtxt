@@ -35,7 +35,7 @@ const features: { title: string; body: string }[] = [
   },
   {
     title: "notifications",
-    body: "Webhook, Discord, Slack, Telegram, ntfy and email (SMTP). Test any channel before saving.",
+    body: "Webhook, Discord, Slack, Telegram, ntfy and email (SMTP). Test any channel before saving. Weekly or monthly email reports per group.",
   },
   {
     title: "groups and tags",

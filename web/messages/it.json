@@ -594,6 +594,39 @@
       "commaSeparated": "separati da virgola"
     }
   },
+  "reports": {
+    "title": "report periodici",
+    "intro": "Un'email con l'uptime e gli incidenti dell'ultima settimana o dell'ultimo mese, per gruppo di monitor, inviata tramite i tuoi canali email.",
+    "kinds": {
+      "weekly": "report settimanale, ogni lunedì per la settimana precedente",
+      "monthly": "report mensile, il giorno 1 per il mese precedente"
+    },
+    "next": "prossimo {date}",
+    "last": "ultimo invio {date}",
+    "channels": "canali email",
+    "channelsHint": "Ogni canale selezionato invia il report ai suoi destinatari. I canali disattivati vengono saltati.",
+    "noEmail": "Nessun canale email: aggiungine uno qui sopra per ricevere i report.",
+    "disabled": "disattivato",
+    "groups": "gruppi",
+    "groupsHint": "Scegli dei gruppi per limitare il report a quelli.",
+    "allMonitors": "tutti i monitor",
+    "hour": "ora",
+    "hourHint": "Ora del giorno (0-23) in cui vengono inviati i report.",
+    "timezone": "fuso orario",
+    "save": "salva",
+    "saved": "salvato",
+    "error": "errore",
+    "preview": {
+      "weekly": "anteprima settimanale",
+      "monthly": "anteprima mensile"
+    },
+    "sendNow": "invia ora",
+    "sending": "invio del report...",
+    "sent": "report inviato a {count, plural, one {# canale} other {# canali}}",
+    "sentPartly": "report inviato a {count, plural, one {# canale} other {# canali}}, alcuni non riusciti: {error}",
+    "close": "chiudi",
+    "previewHint": "L'anteprima usa le impostazioni salvate."
+  },
   "statusPages": {
     "title": "status page",
     "new": "nuova",

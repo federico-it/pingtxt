@@ -137,6 +137,10 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/notifiers/{id}", auth(h.deleteNotifier))
 	mux.HandleFunc("POST /api/notifiers/test", auth(h.testDraftNotifier))
 	mux.HandleFunc("POST /api/notifiers/{id}/test", auth(h.testNotifier))
+	mux.HandleFunc("GET /api/reports", auth(h.getReports))
+	mux.HandleFunc("PUT /api/reports", auth(h.putReports))
+	mux.HandleFunc("GET /api/reports/preview", auth(h.previewReport))
+	mux.HandleFunc("POST /api/reports/send", auth(h.sendReportNow))
 
 	mux.HandleFunc("GET /api/status-pages", auth(h.listStatusPages))
 	mux.HandleFunc("POST /api/status-pages", auth(h.saveStatusPage))

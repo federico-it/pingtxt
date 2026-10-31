@@ -147,6 +147,11 @@ func (n *Notifier) sendEmail(ctx context.Context, c map[string]string, e Event) 
 	if err != nil {
 		return err
 	}
+	return n.deliverEmail(ctx, ec, buildEmail(ec, e, time.Now()))
+}
+
+// deliverEmail sends a complete message to the recipients of ec over SMTP.
+func (n *Notifier) deliverEmail(ctx context.Context, ec *emailConfig, msg []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, emailTimeout)
 	defer cancel()
 
@@ -217,7 +222,7 @@ func (n *Notifier) sendEmail(ctx context.Context, c map[string]string, e Event) 
 	if err != nil {
 		return fmt.Errorf("data: %w", err)
 	}
-	if _, err := w.Write(buildEmail(ec, e, time.Now())); err != nil {
+	if _, err := w.Write(msg); err != nil {
 		return fmt.Errorf("data: %w", err)
 	}
 	if err := w.Close(); err != nil {

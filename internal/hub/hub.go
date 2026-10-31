@@ -109,6 +109,8 @@ type Hub struct {
 	updates      agentUpdates
 	releases     releaseChecker
 
+	reports reportRunner // periodic email reports
+
 	backupMu sync.Mutex // one snapshot at a time
 	importMu sync.Mutex // one configuration import at a time
 }
@@ -168,6 +170,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.maintenance(ctx)
 	go h.expiryLoop(ctx)
 	go h.backupLoop(ctx)
+	go h.reportLoop(ctx)
 	go h.releaseLoop(ctx)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()

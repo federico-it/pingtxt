@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -490,30 +491,38 @@ func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
 // does not lower it. Checks taken during maintenance windows are left out. History older than the raw results comes
 // from the hourly rollups, with hour precision.
 func (s *Store) Uptime(monitorID, since int64) (float64, float64, error) {
+	return s.UptimeBetween(monitorID, since, math.MaxInt64)
+}
+
+// UptimeBetween is Uptime over the checks in [from, to). Rollup hours are
+// counted when they start in that range.
+func (s *Store) UptimeBetween(monitorID, from, to int64) (float64, float64, error) {
 	var total, ok, latN int64
 	var latSum float64
 	w := s.RollupUntil()
-	if since < w {
+	if from < w {
 		var t, o, n sql.NullInt64
 		var l sql.NullFloat64
 		err := s.db.QueryRow(`SELECT SUM(total), SUM(up), SUM(up_lat_sum), SUM(up_lat_n) FROM result_rollups
-			WHERE monitor_id = ? AND start >= ? AND start < ?`, monitorID, since-since%RollupHour, w).Scan(&t, &o, &l, &n)
+			WHERE monitor_id = ? AND start >= ? AND start < ?`, monitorID, from-from%RollupHour, min(w, to)).Scan(&t, &o, &l, &n)
 		if err != nil {
 			return -1, 0, err
 		}
 		total, ok, latSum, latN = t.Int64, o.Int64, l.Float64, n.Int64
 	}
-	var t, o, n sql.NullInt64
-	var l sql.NullFloat64
-	err := s.db.QueryRow(`SELECT COUNT(*), SUM(CASE WHEN mon_state < 2 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 THEN latency_ms END), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END)
-		FROM results WHERE monitor_id = ? AND ts >= ? AND maint = 0`, monitorID, max(since, w)).Scan(&t, &o, &l, &n)
-	if err != nil {
-		return -1, 0, err
+	if to > w {
+		var t, o, n sql.NullInt64
+		var l sql.NullFloat64
+		err := s.db.QueryRow(`SELECT COUNT(*), SUM(CASE WHEN mon_state < 2 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 THEN latency_ms END), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END)
+			FROM results WHERE monitor_id = ? AND ts >= ? AND ts < ? AND maint = 0`, monitorID, max(from, w), to).Scan(&t, &o, &l, &n)
+		if err != nil {
+			return -1, 0, err
+		}
+		total += t.Int64
+		ok += o.Int64
+		latSum += l.Float64
+		latN += n.Int64
 	}
-	total += t.Int64
-	ok += o.Int64
-	latSum += l.Float64
-	latN += n.Int64
 	if total == 0 {
 		return -1, 0, nil
 	}
@@ -766,6 +775,26 @@ func (s *Store) ListIncidents(monitorID int64, limit int) ([]*Incident, error) {
 	q += ` ORDER BY i.started_at DESC LIMIT ?`
 	args = append(args, limit)
 	rows, err := s.db.Query(q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*Incident{}
+	for rows.Next() {
+		i := &Incident{}
+		if err := rows.Scan(&i.ID, &i.MonitorID, &i.MonitorName, &i.StartedAt, &i.ResolvedAt, &i.Cause); err != nil {
+			return nil, err
+		}
+		out = append(out, i)
+	}
+	return out, rows.Err()
+}
+
+// IncidentsBetween returns the incidents that were open at some point in
+// [from, to), oldest first.
+func (s *Store) IncidentsBetween(from, to int64) ([]*Incident, error) {
+	rows, err := s.db.Query(`SELECT i.id, i.monitor_id, m.name, i.started_at, i.resolved_at, i.cause FROM incidents i JOIN monitors m ON m.id = i.monitor_id
+		WHERE i.started_at < ? AND (i.resolved_at = 0 OR i.resolved_at >= ?) ORDER BY i.started_at, i.id`, to, from)
 	if err != nil {
 		return nil, err
 	}
