@@ -355,6 +355,12 @@ func (h *Hub) servePublicPage(w http.ResponseWriter, r *http.Request, slug strin
 		passwordRequired(w, page)
 		return
 	}
+	// Published pages are public: any site may read them, for example to
+	// show a status dot. "*" never carries cookies, so drafts and unlocked
+	// password pages stay out of reach of other sites.
+	if page.Published && page.passHash == "" {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
 	writeJSON(w, 200, page)
 }
 

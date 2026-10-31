@@ -1,5 +1,6 @@
 import Link from "next/link"
 
+import { StatusLine, StatusLink } from "@/components/status-dot"
 import { ThemeToggle } from "@/components/theme"
 
 export const REPO = "https://github.com/federico-it/pingtxt"
@@ -25,6 +26,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               {n.label}
             </Link>
           ))}
+          <StatusLink className="px-1.5 py-0.5 transition-colors hover:bg-accent hover:text-foreground" />
         </nav>
         <div className="ml-auto">
           <ThemeToggle />
@@ -50,6 +52,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             security
           </a>
         </span>
+        <StatusLine />
         <span>
           press <kbd className="border px-1">d</kbd> to toggle theme
         </span>

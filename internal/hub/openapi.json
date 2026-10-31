@@ -3718,7 +3718,7 @@
         ],
         "summary": "Public status page data",
         "operationId": "publicStatus",
-        "description": "What /status/<slug> shows. Drafts answer 404 unless a user is logged in. Cached for 15 seconds.\n\n**Access:** No authentication.",
+        "description": "What /status/<slug> shows. Drafts answer 404 unless a user is logged in. Cached for 15 seconds.\n\nPublished pages without a password answer with `Access-Control-Allow-Origin: *`, so any website can read them from the browser (for example to show a status dot).\n\n**Access:** No authentication.",
         "x-pingtxt-access": "public",
         "security": [],
         "parameters": [

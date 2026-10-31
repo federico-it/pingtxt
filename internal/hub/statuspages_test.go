@@ -183,3 +183,28 @@ func itoa(n int64) string {
 	b, _ := json.Marshal(n)
 	return string(b)
 }
+
+// Other sites (pingtxt.com shows the state of its own status page) can read
+// published pages without a password.
+func TestPublicStatusCORS(t *testing.T) {
+	h, st := newTestHub(t)
+	sp := &store.StatusPage{Title: "Acme", Slug: "acme", Published: true}
+	if err := st.CreateStatusPage(sp); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h.Handler(fstest.MapFS{}))
+	defer srv.Close()
+	get := func() *http.Response {
+		req, _ := http.NewRequest("GET", srv.URL+"/api/public/status/acme", nil)
+		req.Header.Set("Origin", "https://pingtxt.com")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res
+	}
+	if res := get(); res.StatusCode != 200 || res.Header.Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("published: %d, allow origin %q", res.StatusCode, res.Header.Get("Access-Control-Allow-Origin"))
+	}
+}
