@@ -145,3 +145,58 @@ func TestRollupKeepsHistory(t *testing.T) {
 		t.Fatalf("%d old rollups left", left)
 	}
 }
+
+// Migration 15 turns failed checks stored before migration 14 back into
+// uptime when most locations of the same round were fine, in the raw
+// results and in the rollup hours they still cover.
+func TestRecomputeOldMonState(t *testing.T) {
+	s := openTest(t)
+	m := &Monitor{Name: "m", Type: "http", Target: "http://x", IntervalSec: 60, Locations: []string{"local"}}
+	if err := s.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UnixMilli()
+	now -= now % RollupHour
+	h := now - 2*RollupHour
+	locs := []string{"local", "agent:1", "agent:2"}
+	var rows []*ResultRow
+	for i := range 60 {
+		ts := h + int64(i)*60_000 + 5_000
+		for j, loc := range locs {
+			// Round 10: one location fails. Round 20: two of three fail.
+			ok := !(i == 10 && j == 0) && !(i == 20 && j < 2)
+			r := &ResultRow{MonitorID: m.ID, Location: loc, TS: ts + int64(j)*1000, OK: ok, LatencyMs: 1}
+			if !ok {
+				r.MonState = MonDown // as migration 14 left them
+			}
+			rows = append(rows, r)
+		}
+	}
+	if err := s.InsertResults(rows); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RollupResults(time.UnixMilli(now).Add(RollupLag), nil); err != nil {
+		t.Fatal(err)
+	}
+	if up, _, _ := s.Uptime(m.ID, h); up != 177.0/180 {
+		t.Fatalf("before: uptime %v, want %v", up, 177.0/180)
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.execScript(laterMigrations[len(laterMigrations)-1].text(s.db.driver)); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	// Only the down round (two failed rows) still counts.
+	if up, _, _ := s.Uptime(m.ID, h); up != 178.0/180 {
+		t.Fatalf("after: uptime %v, want %v", up, 178.0/180)
+	}
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM results WHERE mon_state = 2`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("down rows: %d %v", n, err)
+	}
+}

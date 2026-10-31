@@ -247,6 +247,25 @@ var laterMigrations = []migration{
 	ALTER TABLE result_rollups ADD COLUMN up INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE result_rollups ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0;
 	UPDATE result_rollups SET up = ok;`},
+	// 15: migration 14 marked every failed check stored before it as
+	// downtime. Recompute those still in the raw results with the majority
+	// rule: a failed check is downtime only when more than half of the
+	// checks of that monitor within half an interval of it failed. Then
+	// recompute up for the rollup hours whose raw results are all still there.
+	// The derived table x lets MariaDB/MySQL read the table it updates.
+	{sqlite: `UPDATE results SET mon_state = 0 WHERE id IN (SELECT id FROM (
+		SELECT r.id AS id FROM results r
+		JOIN monitors m ON m.id = r.monitor_id
+		JOIN results o ON o.monitor_id = r.monitor_id AND o.ts >= r.ts - m.interval_sec * 500 AND o.ts < r.ts + m.interval_sec * 500
+		WHERE r.ok = 0 AND r.mon_state = 2
+		GROUP BY r.id
+		HAVING 2 * SUM(CASE WHEN o.ok = 0 THEN 1 ELSE 0 END) <= COUNT(*)) x);
+	UPDATE result_rollups SET up = (SELECT SUM(CASE WHEN r.mon_state < 2 AND r.maint = 0 THEN 1 ELSE 0 END) FROM results r
+		WHERE r.monitor_id = result_rollups.monitor_id AND r.location = result_rollups.location
+		AND r.ts >= result_rollups.start AND r.ts < result_rollups.start + 3600000)
+		WHERE start > (SELECT MIN(ts) FROM results) - 3600000 AND total + maint = (SELECT COUNT(*) FROM results r
+		WHERE r.monitor_id = result_rollups.monitor_id AND r.location = result_rollups.location
+		AND r.ts >= result_rollups.start AND r.ts < result_rollups.start + 3600000);`},
 }
 
 func sqliteOnly(list []string) []migration {
