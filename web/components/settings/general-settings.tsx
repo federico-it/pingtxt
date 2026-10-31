@@ -9,7 +9,15 @@ import { Field } from "@/components/settings/field"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
-import { api, type GeneralSettings, type Settings } from "@/lib/api"
+import { UPGRADE_DOCS } from "@/components/update-notice"
+import {
+  api,
+  useApi,
+  type GeneralSettings,
+  type Settings,
+  type VersionStatus,
+} from "@/lib/api"
+import { ago } from "@/lib/format"
 
 export function GeneralSettingsForm({
   settings,
@@ -228,6 +236,21 @@ export function GeneralSettingsForm({
         </div>
       </Section>
 
+      <Section title={t("updates")}>
+        <div className="grid gap-4">
+          <Field label={t("updateCheck")} hint={t("updateCheckHint")}>
+            <label className="flex h-8 items-center gap-2 text-xs">
+              <Switch
+                checked={!g.update_check.disabled}
+                onCheckedChange={(v) => set("update_check", { disabled: !v })}
+              />
+              {g.update_check.disabled ? t("disabled") : t("enabled")}
+            </label>
+          </Field>
+          <UpdateStatus />
+        </div>
+      </Section>
+
       <Section title={t("defaults")}>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label={t("interval")} htmlFor="d_interval">
@@ -274,6 +297,62 @@ export function GeneralSettingsForm({
         </div>
       </Section>
     </form>
+  )
+}
+
+/** Current version, latest release and a "check now" button. */
+function UpdateStatus() {
+  const t = useTranslations("update")
+  const v = useApi<VersionStatus>("/api/version", { refreshInterval: 60_000 })
+  const [busy, setBusy] = useState(false)
+  if (!v.data) return null
+  const s = v.data
+
+  async function checkNow() {
+    setBusy(true)
+    try {
+      await v.mutate(await api<VersionStatus>("/api/version/check", { method: "POST" }), {
+        revalidate: false,
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  let line: React.ReactNode
+  if (s.check_disabled) line = t("off")
+  else if (!s.check_enabled) line = t("devBuild")
+  else if (s.error) line = <span className="text-down">{t("failed", { error: s.error })}</span>
+  else if (!s.latest) line = t("notYet")
+  else if (s.update_available)
+    line = (
+      <span className="text-info">
+        {t("newer", { latest: s.latest.version })}{" "}
+        <a href={s.latest.url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+          {t("notes")}
+        </a>{" "}
+        ·{" "}
+        <a href={UPGRADE_DOCS} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+          {t("how")}
+        </a>
+      </span>
+    )
+  else line = <span className="text-up">{t("upToDate")}</span>
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-muted-foreground">
+      <span>
+        {t("running", { current: s.current || "dev" })} · {line}
+        {s.checked_at > 0 && <> · {t("checked", { ago: ago(s.checked_at) })}</>}
+      </span>
+      {s.check_enabled && (
+        <Button type="button" size="xs" variant="outline" disabled={busy} onClick={checkNow}>
+          {busy ? "..." : t("checkNow")}
+        </Button>
+      )}
+    </div>
   )
 }
 

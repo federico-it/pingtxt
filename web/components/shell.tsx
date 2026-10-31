@@ -6,6 +6,7 @@ import { useTranslations } from "use-intl"
 
 import { LanguagePicker } from "@/components/language-picker"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { UpdateNotice, useVersionStatus } from "@/components/update-notice"
 import { Button } from "@/components/ui/button"
 import { api, useApi, type Me, type Overview } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -28,6 +29,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const tc = useTranslations("common")
   const me = useApi<Me>("/api/auth/me", { refreshInterval: 60_000 })
   const ov = useApi<Overview>(me.data ? "/api/overview" : null)
+  const ver = useVersionStatus(me.data?.user.role === "admin")
+  const tu = useTranslations("update")
 
   async function logout() {
     await api("/api/auth/logout", { method: "POST" }).catch(() => {})
@@ -90,9 +93,25 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       </header>
+      <UpdateNotice status={ver.data} />
       <main className="flex-1 py-8">{children}</main>
       <footer className="flex justify-between border-t border-dashed py-3 text-xs text-muted-foreground">
-        <span>pingtxt {me.data.version}</span>
+        <span>
+          pingtxt {me.data.version}
+          {ver.data?.update_available && ver.data.latest && (
+            <>
+              {" · "}
+              <a
+                href={ver.data.latest.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-info underline underline-offset-4"
+              >
+                {tu("footer", { latest: ver.data.latest.version })}
+              </a>
+            </>
+          )}
+        </span>
         <span>{t.rich("themeHint", { kbd: (c) => <kbd className="border px-1">{c}</kbd> })}</span>
       </footer>
     </div>

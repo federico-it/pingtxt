@@ -527,6 +527,11 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             use <a href="#database" className="text-foreground underline underline-offset-4">pg_dump or mariadb-dump</a>.
             Agents installed with the script follow the hub version on their own.
           </p>
+          <p>
+            Release builds ask GitHub for the latest release every 12 hours and show admins a notice when a newer one is out.
+            Turn it off in <b className="text-foreground">settings → updates</b>, or start the hub with{" "}
+            <C>PINGTXT_DISABLE_UPDATE_CHECK=true</C> so it never contacts GitHub.
+          </p>
         </Section>
 
         <Section id="build" title="build from source">
