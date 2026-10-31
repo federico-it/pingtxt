@@ -33,7 +33,7 @@ export const reportImpactText: Record<ReportImpact, string> = {
 }
 
 export function ReportStatusText({ status, className }: { status: ReportStatus; className?: string }) {
-  const t = useTranslations("reports.status")
+  const t = useTranslations("pageIncidents.status")
   return <span className={cn(reportStatusClass[status] ?? "text-muted-foreground", className)}>{t(status)}</span>
 }
 
@@ -45,7 +45,7 @@ export function ReportTimeline({
   incident: PageIncident
   onDelete?: (u: PageIncidentUpdate) => void
 }) {
-  const t = useTranslations("reports")
+  const t = useTranslations("pageIncidents")
   return (
     <ol className="grid gap-3">
       {incident.updates.map((u) => (

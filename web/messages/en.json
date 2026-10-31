@@ -1072,7 +1072,7 @@
     "checked": "checked {ago}",
     "checkNow": "check now"
   },
-  "reports": {
+  "pageIncidents": {
     "pageTitle": "incidents: {name}",
     "intro": "Tell visitors what is going on: open an incident and post updates until it is resolved. They show on the public page.",
     "introSubscribers": "Tell visitors what is going on: open an incident and post updates until it is resolved. They show on the public page and are emailed to subscribers.",

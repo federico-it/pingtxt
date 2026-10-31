@@ -61,8 +61,8 @@ function Choice<T extends string>({
 }
 
 function useChoices() {
-  const ts = useTranslations("reports.status")
-  const ti = useTranslations("reports.impact")
+  const ts = useTranslations("pageIncidents.status")
+  const ti = useTranslations("pageIncidents.impact")
   return {
     statusItems: reportStatuses.map((s) => ({ value: s, label: ts(s) })),
     impactItems: reportImpacts.map((s) => ({ value: s, label: ti(s) })),
@@ -75,12 +75,12 @@ function nextStatus(s: ReportStatus): ReportStatus {
   return reportStatuses[Math.min(i + 1, reportStatuses.length - 1)]
 }
 
-function toastSaved(t: ReturnType<typeof useTranslations<"reports">>, r: Saved) {
+function toastSaved(t: ReturnType<typeof useTranslations<"pageIncidents">>, r: Saved) {
   toast.success(r.notified > 0 ? t("postedNotified", { count: r.notified }) : t("posted"))
 }
 
 function NewIncident({ base, subscribers, onDone }: { base: string; subscribers: boolean; onDone: () => void }) {
-  const t = useTranslations("reports")
+  const t = useTranslations("pageIncidents")
   const { statusItems, impactItems } = useChoices()
   const [title, setTitle] = useState("")
   const [impact, setImpact] = useState<ReportImpact>("minor")
@@ -131,7 +131,7 @@ function NewIncident({ base, subscribers, onDone }: { base: string; subscribers:
 }
 
 function NotifyBox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  const t = useTranslations("reports")
+  const t = useTranslations("pageIncidents")
   return (
     <label className="flex cursor-pointer items-center gap-2 text-xs">
       <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} />
@@ -153,8 +153,8 @@ function IncidentCard({
   subscribers: boolean
   onChange: () => void
 }) {
-  const t = useTranslations("reports")
-  const ti = useTranslations("reports.impact")
+  const t = useTranslations("pageIncidents")
+  const ti = useTranslations("pageIncidents.impact")
   const { statusItems, impactItems } = useChoices()
   const url = `${base}/incidents/${incident.id}`
   const [status, setStatus] = useState<ReportStatus>(nextStatus(incident.status))
@@ -286,7 +286,7 @@ function IncidentCard({
 }
 
 function Subscribers({ base }: { base: string }) {
-  const t = useTranslations("reports")
+  const t = useTranslations("pageIncidents")
   const { data, mutate } = useApi<{ subscribers: PageSubscriber[]; enabled: boolean }>(`${base}/subscribers`, { refreshInterval: 0 })
   if (!data) return null
   const confirmed = data.subscribers.filter((s) => s.confirmed_at).length
@@ -332,7 +332,7 @@ function Subscribers({ base }: { base: string }) {
 }
 
 function Incidents() {
-  const t = useTranslations("reports")
+  const t = useTranslations("pageIncidents")
   const tc = useTranslations("common")
   const id = Number(useSearchParams().get("id")) || 0
   const base = `/api/status-pages/${id}`

@@ -1072,7 +1072,7 @@
     "checked": "controllato {ago}",
     "checkNow": "controlla ora"
   },
-  "reports": {
+  "pageIncidents": {
     "pageTitle": "incidenti: {name}",
     "intro": "Spiega ai visitatori cosa succede: apri un incidente e pubblica aggiornamenti fino alla risoluzione. Compaiono sulla pagina pubblica.",
     "introSubscribers": "Spiega ai visitatori cosa succede: apri un incidente e pubblica aggiornamenti fino alla risoluzione. Compaiono sulla pagina pubblica e arrivano via email agli iscritti.",

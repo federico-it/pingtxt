@@ -228,7 +228,7 @@ function GroupHeader({ page, name }: { page: PublicStatusPage; name: string }) {
 /** An open incident written on the page, with its updates. */
 function Report({ report }: { report: PageIncident }) {
   const t = useTranslations("statusPublic")
-  const ti = useTranslations("reports.impact")
+  const ti = useTranslations("pageIncidents.impact")
   return (
     <div className={cn("border px-4 py-3", reportImpactBorder[report.impact])}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
