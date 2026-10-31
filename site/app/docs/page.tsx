@@ -17,6 +17,7 @@ const toc = [
   ["agents", "add a location"],
   ["agent-updates", "agent updates"],
   ["checks", "check types"],
+  ["response-checks", "response checks (JSON)"],
   ["heartbeat", "heartbeat monitors"],
   ["status-pages", "status pages"],
   ["maintenance", "maintenance"],
@@ -236,7 +237,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
           <Table
             head={["type", "target", "what is checked"]}
             rows={[
-              ["http(s)", <C key="h">https://example.com</C>, "status codes, headers, body, TLS expiry"],
+              ["http(s)", <C key="h">https://example.com</C>, "status codes, headers, body, JSON rules, TLS expiry"],
               ["keyword", "url + text", "the response body contains (or not) a keyword"],
               ["tcp port", <C key="t">host:port</C>, "connection opens"],
               ["ping", "host", "ICMP echo (agents need NET_RAW)"],
@@ -256,6 +257,43 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             <C>/var/run/docker.sock</C> on the hub or agent that runs them (add{" "}
             <C>-v /var/run/docker.sock:/var/run/docker.sock:ro</C>).
           </p>
+        </Section>
+
+        <Section id="response-checks" title="response checks (JSON)">
+          <p>
+            HTTP and keyword monitors can check the JSON body of the response, e.g. a health endpoint that returns{" "}
+            <C>{`{"status": "ready", "checks": {"redis": {"status": "ok", "latencyMs": 3}}}`}</C>. Add rules under{" "}
+            <b className="text-foreground">response checks</b> in the monitor form: all must pass, otherwise the check fails and
+            the result, the incident and the notification say which rule broke, e.g.{" "}
+            <C>checks.redis.status: expected &quot;ok&quot;, got &quot;error&quot;</C>.
+          </p>
+          <Table
+            head={["path", "operator", "value"]}
+            rows={[
+              [<C key="1">status</C>, "equals", <C key="1v">ready</C>],
+              [<C key="2">checks.redis.status</C>, "equals", <C key="2v">ok</C>],
+              [<C key="3">checks.worker.ageMs</C>, "<", <C key="3v">60000</C>],
+              [<C key="4">items[0].id</C>, "exists", ""],
+            ]}
+          />
+          <ul>
+            <li>
+              Paths use dots and brackets: <C>a.b</C>, <C>items[0]</C> (or <C>items.0</C>, <C>items[-1]</C> for the last one),{" "}
+              <C>{`["key.with.dots"]`}</C>. A leading <C>$.</C> is allowed.
+            </li>
+            <li>
+              Operators: equals, not equals, contains (substring, array element or object key), not contains, exists, not
+              exists, &gt;, &gt;=, &lt;, &lt;= (numbers) and matches (regular expression).
+            </li>
+            <li>
+              Values are compared by type: numbers numerically (<C>3</C> equals <C>3.0</C>), <C>true</C>/<C>false</C>/
+              <C>null</C> by name, objects and arrays as JSON.
+            </li>
+            <li>
+              Rules run on agents too. Agents older than this feature report the check as failed with &quot;update it&quot;
+              instead of passing it unchecked.
+            </li>
+          </ul>
         </Section>
 
         <Section id="heartbeat" title="heartbeat monitors (cron jobs)">

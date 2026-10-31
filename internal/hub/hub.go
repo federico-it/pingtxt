@@ -266,6 +266,7 @@ func jobFor(m *store.Monitor) check.Job {
 		IgnoreTLS:      m.IgnoreTLS,
 		Headers:        m.Headers,
 		Body:           m.Body,
+		Assertions:     m.Assertions,
 	}
 }
 
@@ -386,6 +387,12 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		return
 	}
 	m := st.m
+	// An agent built before response rules existed ignores them and would
+	// report the monitor up: fail instead, so the problem is visible.
+	if r.OK && len(m.Assertions) > 0 && r.Asserted < len(m.Assertions) && loc != LocalLocation {
+		r.OK = false
+		r.Message = "this agent cannot check response rules: update it"
+	}
 	ls := st.locs[loc]
 	if ls == nil {
 		ls = &locState{}

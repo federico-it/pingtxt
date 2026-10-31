@@ -433,6 +433,20 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	if err := h.checkGroupsTags(groups, m.TagIDs); err != nil {
 		return err
 	}
+	if m.Type != check.TypeHTTP && m.Type != check.TypeKeyword {
+		m.Assertions = []check.Assertion{}
+	}
+	if m.Assertions == nil {
+		m.Assertions = []check.Assertion{}
+	}
+	if len(m.Assertions) > check.MaxAssertions {
+		return fmt.Errorf("at most %d response rules", check.MaxAssertions)
+	}
+	for i := range m.Assertions {
+		if err := check.ValidateAssertion(&m.Assertions[i]); err != nil {
+			return fmt.Errorf("response rule %d: %w", i+1, err)
+		}
+	}
 	if m.Type == check.TypePush {
 		return validatePush(m)
 	}
@@ -543,7 +557,7 @@ func validatePush(m *store.Monitor) error {
 	*m = store.Monitor{
 		ID: m.ID, Name: m.Name, Type: m.Type, IntervalSec: m.IntervalSec, GraceSec: m.GraceSec,
 		TimeoutMs: 10000, Retries: 1, Method: "GET", Headers: map[string]string{},
-		Locations: []string{PushLocation}, Paused: m.Paused,
+		Locations: []string{PushLocation}, Paused: m.Paused, Assertions: []check.Assertion{},
 		GroupID: m.GroupID, TagIDs: m.TagIDs,
 	}
 	return nil

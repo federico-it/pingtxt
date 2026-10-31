@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/federico-it/pingtxt/internal/check"
 )
 
 func now() int64 { return time.Now().UnixMilli() }
@@ -215,11 +217,13 @@ type Monitor struct {
 	IgnoreTLS      bool              `json:"ignore_tls"`
 	Headers        map[string]string `json:"headers"`
 	Body           string            `json:"body"`
-	PushToken      string            `json:"push_token"`
-	GraceSec       int               `json:"grace_sec"`
-	Locations      []string          `json:"locations"`
-	GroupID        int64             `json:"group_id"` // 0 = no group
-	TagIDs         []int64           `json:"tag_ids"`
+	// Assertions are rules on the JSON body of http/keyword responses.
+	Assertions []check.Assertion `json:"assertions"`
+	PushToken  string            `json:"push_token"`
+	GraceSec   int               `json:"grace_sec"`
+	Locations  []string          `json:"locations"`
+	GroupID    int64             `json:"group_id"` // 0 = no group
+	TagIDs     []int64           `json:"tag_ids"`
 	// Expiry alerts: TLS certificate (https targets) and domain registration.
 	CertExpiryAlert   bool   `json:"cert_expiry_alert"`
 	DomainExpiryAlert bool   `json:"domain_expiry_alert"`
@@ -229,13 +233,13 @@ type Monitor struct {
 	CreatedAt         int64  `json:"created_at"`
 }
 
-const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id`
+const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, assertions`
 
 func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	m := &Monitor{}
-	var headers, locations string
+	var headers, locations, assertions string
 	var group sql.NullInt64
-	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group)
+	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group, &assertions)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -246,6 +250,10 @@ func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	m.TagIDs = []int64{}
 	_ = json.Unmarshal([]byte(headers), &m.Headers)
 	_ = json.Unmarshal([]byte(locations), &m.Locations)
+	_ = json.Unmarshal([]byte(assertions), &m.Assertions)
+	if m.Assertions == nil {
+		m.Assertions = []check.Assertion{}
+	}
 	if m.Headers == nil {
 		m.Headers = map[string]string{}
 	}
@@ -321,9 +329,9 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 		return err
 	}
 	defer tx.Rollback()
-	id, err := s.db.insert(tx, `INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt, nullID(m.GroupID))
+	id, err := s.db.insert(tx, `INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, assertions)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt, nullID(m.GroupID), assertionsJSON(m.Assertions))
 	if err != nil {
 		return err
 	}
@@ -342,8 +350,8 @@ func (s *Store) UpdateMonitor(m *Monitor) error {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ?, group_id = ? WHERE id = ?`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), nullID(m.GroupID), m.ID)
+	_, err = tx.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ?, group_id = ?, assertions = ? WHERE id = ?`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), nullID(m.GroupID), assertionsJSON(m.Assertions), m.ID)
 	if err != nil {
 		return err
 	}
@@ -351,6 +359,14 @@ func (s *Store) UpdateMonitor(m *Monitor) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func assertionsJSON(a []check.Assertion) string {
+	if len(a) == 0 {
+		return "[]"
+	}
+	b, _ := json.Marshal(a)
+	return string(b)
 }
 
 // MonitorByPushToken returns the push monitor owning a heartbeat token.

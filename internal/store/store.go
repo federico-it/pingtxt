@@ -170,7 +170,11 @@ var migrations = append(sqliteOnly(sqliteMigrations), laterMigrations...)
 //
 //	{sqlite: `ALTER TABLE monitors ADD COLUMN notes TEXT NOT NULL DEFAULT ''`,
 //	 mysql: `ALTER TABLE monitors ADD COLUMN notes TEXT NOT NULL DEFAULT ('')`},
-var laterMigrations = []migration{}
+var laterMigrations = []migration{
+	// 11: rules on the JSON body of HTTP responses.
+	{sqlite: `ALTER TABLE monitors ADD COLUMN assertions TEXT NOT NULL DEFAULT '[]'`,
+		mysql: `ALTER TABLE monitors ADD COLUMN assertions TEXT NOT NULL DEFAULT ('[]')`},
+}
 
 func sqliteOnly(list []string) []migration {
 	out := make([]migration, len(list))

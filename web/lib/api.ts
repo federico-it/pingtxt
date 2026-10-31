@@ -16,6 +16,26 @@ export type MonitorType =
   | "grpc"
   | "smtp"
 
+export type AssertionOp =
+  | "eq"
+  | "ne"
+  | "contains"
+  | "not_contains"
+  | "exists"
+  | "not_exists"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "matches"
+
+/** A rule on the JSON body of an http/keyword response. */
+export interface Assertion {
+  path: string
+  op: AssertionOp
+  value?: string
+}
+
 export interface Monitor {
   id: number
   name: string
@@ -34,6 +54,7 @@ export interface Monitor {
   ignore_tls: boolean
   headers: Record<string, string>
   body: string
+  assertions: Assertion[]
   push_token: string
   grace_sec: number
   locations: string[]

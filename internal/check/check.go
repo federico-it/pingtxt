@@ -54,6 +54,8 @@ type Job struct {
 	IgnoreTLS      bool              `json:"ignore_tls,omitempty"`
 	Headers        map[string]string `json:"headers,omitempty"`
 	Body           string            `json:"body,omitempty"`
+	// Assertions are rules on the JSON body of http/keyword responses.
+	Assertions []Assertion `json:"assertions,omitempty"`
 }
 
 // Result is the outcome of a Job.
@@ -65,7 +67,10 @@ type Result struct {
 	StatusCode int     `json:"status_code,omitempty"`
 	Message    string  `json:"message,omitempty"`
 	CertExpiry int64   `json:"cert_expiry,omitempty"` // unix seconds
-	At         int64   `json:"at"`                    // unix milliseconds
+	// Asserted is how many response rules passed. The hub uses it to spot
+	// agents too old to check them.
+	Asserted int   `json:"asserted,omitempty"`
+	At       int64 `json:"at"` // unix milliseconds
 }
 
 // Run executes the job and always returns a Result.
@@ -150,7 +155,7 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 	}
 
 	var content []byte
-	if j.Type == TypeKeyword {
+	if j.Type == TypeKeyword || len(j.Assertions) > 0 {
 		content, _ = io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	} else {
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
@@ -169,6 +174,14 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 			} else {
 				r.Message = fmt.Sprintf("keyword %q not found", j.Keyword)
 			}
+			return r
+		}
+	}
+	if len(j.Assertions) > 0 {
+		var msg string
+		r.Asserted, msg = CheckAssertions(content, j.Assertions)
+		if msg != "" {
+			r.Message = msg
 			return r
 		}
 	}
