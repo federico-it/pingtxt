@@ -235,9 +235,14 @@ func TestEmailNotifierAPI(t *testing.T) {
 	if to := msg.Header.Get("To"); !strings.Contains(to, `"Bob" <bob@example.com>`) {
 		t.Fatalf("to: %q", to)
 	}
-	b, _ := io.ReadAll(msg.Body)
-	if !strings.Contains(string(b), "this is a test notification") {
-		t.Fatalf("body: %s", b)
+	pm := parseMail(t, m)
+	for _, part := range []string{pm.body, pm.html} {
+		if !strings.Contains(part, "this is a test notification") || !strings.Contains(part, "https://example.com") {
+			t.Fatalf("body: %s", part)
+		}
+	}
+	if !strings.Contains(pm.body, "$ pingtxt notify --test\n[DOWN] example.com") || !strings.Contains(pm.html, "color-scheme") {
+		t.Fatalf("layout: %s", pm.body)
 	}
 
 	// A wrong password is reported to the caller.

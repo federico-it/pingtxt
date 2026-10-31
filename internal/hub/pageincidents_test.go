@@ -3,6 +3,8 @@ package hub
 import (
 	"encoding/json"
 	"io"
+	"mime"
+	"mime/multipart"
 	"mime/quotedprintable"
 	"net/http"
 	"net/http/httptest"
@@ -53,20 +55,45 @@ func waitMails(t *testing.T, s *fakeSMTP, n int) []fakeMail {
 
 type parsedMail struct {
 	header mail.Header
-	body   string
+	body   string // the plain text part
+	html   string // the HTML part, if any
 }
 
+// parseMail decodes a message: a plain text one, or multipart/alternative.
 func parseMail(t *testing.T, m fakeMail) parsedMail {
 	t.Helper()
 	msg, err := mail.ReadMessage(strings.NewReader(m.data))
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := io.ReadAll(quotedprintable.NewReader(msg.Body))
-	if err != nil {
-		t.Fatal(err)
+	pm := parsedMail{header: msg.Header}
+	mt, params, _ := mime.ParseMediaType(msg.Header.Get("Content-Type"))
+	if mt != "multipart/alternative" {
+		b, err := io.ReadAll(quotedprintable.NewReader(msg.Body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		pm.body = string(b)
+		return pm
 	}
-	return parsedMail{header: msg.Header, body: string(b)}
+	mr := multipart.NewReader(msg.Body, params["boundary"])
+	for {
+		p, err := mr.NextPart()
+		if err != nil {
+			break
+		}
+		b, _ := io.ReadAll(p) // quoted-printable is decoded by the reader
+		switch strings.SplitN(p.Header.Get("Content-Type"), ";", 2)[0] {
+		case "text/plain":
+			pm.body = strings.ReplaceAll(string(b), "\r\n", "\n")
+		case "text/html":
+			pm.html = string(b)
+		}
+	}
+	if pm.body == "" || pm.html == "" {
+		t.Fatalf("multipart message without a text or html part: %s", m.data)
+	}
+	return pm
 }
 
 var tokenRe = regexp.MustCompile(`[?&](confirm|unsubscribe)=([0-9a-f]{48})`)
@@ -175,7 +202,7 @@ func TestPageIncidentsAndSubscribers(t *testing.T) {
 	if s := pm.header.Get("Subject"); s != "[Acme] Identified: Slow API" {
 		t.Fatalf("update subject: %q", s)
 	}
-	if !strings.Contains(pm.body, "A database node is slow.") || !strings.Contains(pm.body, "Impact:  major") {
+	if !strings.Contains(pm.body, "A database node is slow.") || !strings.Contains(pm.body, "impact       major") || !strings.Contains(pm.html, "A database node is slow.") {
 		t.Fatalf("update body: %s", pm.body)
 	}
 	oneClick := pm.header.Get("List-Unsubscribe")

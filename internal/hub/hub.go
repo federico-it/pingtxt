@@ -129,6 +129,7 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 		localQueue: make(chan check.Job, localQueueSize),
 	}
 	h.general, h.auth = defaultGeneral(cfg), defaultAuth()
+	h.notify.publicURL = func() string { return h.generalSettings().PublicURL }
 	h.httpClient = &http.Client{Timeout: 15 * time.Second}
 	h.releases.wake = make(chan struct{}, 1)
 	h.expiry.domains = expiry.NewDomains(h.httpClient)

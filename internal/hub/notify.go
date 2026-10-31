@@ -173,6 +173,8 @@ type Notifier struct {
 	client *http.Client
 	// tlsConfig overrides the TLS config used for SMTP (tests only).
 	tlsConfig *tls.Config
+	// publicURL returns the public URL setting, to link the hub from emails.
+	publicURL func() string
 }
 
 func NewNotifier(st *store.Store, log *slog.Logger) *Notifier {

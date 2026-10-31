@@ -1,14 +1,11 @@
 package hub
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"mime"
-	"mime/quotedprintable"
 	"net/http"
 	"net/mail"
 	"slices"
@@ -632,62 +629,72 @@ func reportStatusText(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-type emailHeaders struct {
-	to, subject, unsubscribe string
-}
-
-// writeEmail renders a plain text message from the channel's sender.
-func writeEmail(ec *emailConfig, hd emailHeaders, body string, now time.Time) []byte {
-	domain := ec.From.Address[strings.LastIndexByte(ec.From.Address, '@')+1:]
-	var b bytes.Buffer
-	hdr := func(k, v string) { b.WriteString(k + ": " + v + "\r\n") }
-	hdr("From", ec.From.String())
-	hdr("To", hd.to)
-	hdr("Subject", mime.QEncoding.Encode("utf-8", hd.subject))
-	hdr("Date", now.Format(time.RFC1123Z))
-	hdr("Message-ID", newMessageID(domain))
-	hdr("MIME-Version", "1.0")
-	hdr("Content-Type", "text/plain; charset=utf-8")
-	hdr("Content-Transfer-Encoding", "quoted-printable")
-	hdr("Auto-Submitted", "auto-generated")
-	if hd.unsubscribe != "" {
-		// RFC 8058 one-click unsubscribe, offered by mail clients.
-		hdr("List-Unsubscribe", "<"+hd.unsubscribe+">")
-		hdr("List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
-	}
-	b.WriteString("\r\n")
-	qp := quotedprintable.NewWriter(&b)
-	_, _ = qp.Write([]byte(strings.ReplaceAll(body, "\n", "\r\n")))
-	_ = qp.Close()
-	return b.Bytes()
-}
-
 // oneLine keeps user text out of header syntax.
 func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
 func buildConfirmEmail(ec *emailConfig, p *store.StatusPage, s *store.PageSubscriber, l pageLinks, now time.Time) []byte {
-	body := fmt.Sprintf("Confirm that you want to get incident updates of %s by email:\n\n%s\n\n"+
-		"The link expires in 7 days. If you did not ask for this, ignore this email: you will not get anything else.\n\n-- \nsent by pingtxt\n",
-		oneLine(p.Title), l.confirm(s.Token))
-	return writeEmail(ec, emailHeaders{to: s.Email, subject: "Confirm your subscription to " + oneLine(p.Title)}, body, now)
+	title := oneLine(p.Title)
+	link := l.confirm(s.Token)
+	v := mailView{
+		Preheader: "Confirm that you want incident updates of " + title + " by email.",
+		Command:   "pingtxt subscribe " + title,
+		Title:     "Confirm your subscription",
+		Lead:      "Confirm that you want to get incident updates of " + title + " by email.",
+		Rows:      []mailRow{{Key: "status page", Value: title, Href: l.page}, {Key: "email", Value: s.Email}},
+		Action:    &mailLink{Label: "confirm subscription", Href: link},
+		Footer: []string{
+			"Or open this link: " + link,
+			"The link expires in 7 days. If you did not ask for this, ignore this email: you will not get anything else.",
+		},
+	}
+	return writeMail(ec, mailHeaders{to: s.Email, subject: "Confirm your subscription to " + title}, v.renderText(""), v.renderHTML(nil), now)
+}
+
+// updateTone colors an incident update: resolved is green, monitoring blue,
+// the rest by impact.
+func updateTone(status, impact string) string {
+	switch {
+	case status == store.ReportResolved:
+		return toneUp
+	case status == store.ReportMonitoring:
+		return toneInfo
+	case impact == store.ImpactMajor || impact == store.ImpactCritical:
+		return toneDown
+	}
+	return toneWarn
 }
 
 func buildUpdateEmail(ec *emailConfig, p *store.StatusPage, inc *store.PageIncident, u store.PageIncidentUpdate, s *store.PageSubscriber, l pageLinks, now time.Time) []byte {
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s: %s\n\n", reportStatusText(u.Status), inc.Title)
-	b.WriteString(u.Message)
-	b.WriteString("\n\n")
+	title := oneLine(p.Title)
+	status := reportStatusText(u.Status)
+	v := mailView{
+		Preheader: status + ": " + oneLine(u.Message),
+		Command:   "pingtxt incidents " + title,
+		Tone:      updateTone(u.Status, inc.Impact),
+		Badge:     strings.ToUpper(u.Status),
+		Title:     inc.Title,
+		Note:      u.Message,
+		Rows:      []mailRow{{Key: "status page", Value: title, Href: l.page}},
+		Action:    &mailLink{Label: "view status page", Href: l.page},
+		Footer:    []string{"You get this email because you subscribed to " + title + "."},
+		FootLinks: []mailLink{{Label: "unsubscribe", Href: l.unsubscribe(s.Token)}},
+	}
 	if inc.Impact != store.ImpactNone {
-		fmt.Fprintf(&b, "Impact:  %s\n", inc.Impact)
+		tone := toneWarn
+		if inc.Impact == store.ImpactMajor || inc.Impact == store.ImpactCritical {
+			tone = toneDown
+		}
+		v.Rows = append(v.Rows, mailRow{Key: "impact", Value: inc.Impact, Tone: tone})
 	}
-	fmt.Fprintf(&b, "Started: %s\n", time.UnixMilli(inc.CreatedAt).UTC().Format("2006-01-02 15:04 UTC"))
+	v.Rows = append(v.Rows, mailRow{Key: "started", Value: time.UnixMilli(inc.CreatedAt).UTC().Format("2006-01-02 15:04 UTC")})
 	if u.Status == store.ReportResolved && inc.ResolvedAt > 0 {
-		fmt.Fprintf(&b, "Resolved: %s\n", time.UnixMilli(inc.ResolvedAt).UTC().Format("2006-01-02 15:04 UTC"))
+		v.Rows = append(v.Rows, mailRow{Key: "resolved", Value: time.UnixMilli(inc.ResolvedAt).UTC().Format("2006-01-02 15:04 UTC"), Tone: toneUp})
 	}
-	fmt.Fprintf(&b, "\nStatus page: %s\n\n-- \nYou get this email because you subscribed to %s.\nUnsubscribe: %s\n",
-		l.page, oneLine(p.Title), l.unsubscribe(s.Token))
-	subject := fmt.Sprintf("[%s] %s: %s", oneLine(p.Title), reportStatusText(u.Status), inc.Title)
-	return writeEmail(ec, emailHeaders{to: s.Email, subject: subject, unsubscribe: l.oneClick(s.Token)}, b.String(), now)
+	if len([]rune(v.Preheader)) > 140 {
+		v.Preheader = clip(v.Preheader, 140)
+	}
+	subject := fmt.Sprintf("[%s] %s: %s", title, status, inc.Title)
+	return writeMail(ec, mailHeaders{to: s.Email, subject: subject, unsubscribe: l.oneClick(s.Token)}, v.renderText(""), v.renderHTML(nil), now)
 }
