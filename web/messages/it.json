@@ -146,8 +146,8 @@
     "maint": "manut",
     "waitingFirst": "in attesa del primo controllo...",
     "degradedAt": "degradato dal {pct}%",
-    "ipv4Only": "solo IPv4",
-    "ipv6Only": "solo IPv6",
+    "ipv4Only": "Solo IPv4",
+    "ipv6Only": "Solo IPv6",
     "degradedAtDefault": "degradato dalla soglia predefinita"
   },
   "monitorForm": {
@@ -164,11 +164,11 @@
       },
       "tcp": {
         "label": "porta tcp",
-        "hint": "apre una connessione TCP. IPv6 tra parentesi: [2001:db8::1]:443"
+        "hint": "apre una connessione TCP"
       },
       "ping": {
         "label": "ping (icmp)",
-        "hint": "invia richieste ICMP echo (ICMPv6 per gli indirizzi IPv6)"
+        "hint": "invia richieste ICMP echo"
       },
       "dns": {
         "label": "dns",
@@ -298,10 +298,10 @@
     "degradedPctPlaceholder": "predefinito",
     "ipFamily": {
       "label": "versione ip",
-      "hint": "solo IPv4 o solo IPv6, per accorgersi se uno dei due non funziona su un host dual-stack",
+      "hint": "Solo IPv4 o IPv6, per catturare uno di loro rotto su un dual-stack host",
       "v0": "IPv4 o IPv6",
-      "v4": "solo IPv4",
-      "v6": "solo IPv6"
+      "v4": "Solo IPv4",
+      "v6": "Solo IPv6"
     },
     "responseRules": {
       "title": "controlli sulla risposta",
