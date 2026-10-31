@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -323,5 +324,55 @@ func TestUptimeFollowsMonitorStatus(t *testing.T) {
 	}
 	if total != 30 || ok != 28 || s.Uptime24h != 28.0/30 {
 		t.Fatalf("bars: %d/%d ok, uptime %v", ok, total, s.Uptime24h)
+	}
+}
+
+func TestIPv6Locations(t *testing.T) {
+	h, st := newTestHub(t)
+	noV6, _ := st.CreateAgent("ams", "Amsterdam", "h1")
+	v6, _ := st.CreateAgent("fra", "Frankfurt", "h2")
+	old, _ := st.CreateAgent("old", "old", "h3")
+	h.agents[noV6.ID] = &agentConn{agent: noV6, done: make(chan struct{})}
+	h.agents[noV6.ID].ipv6.Store(check.IPv6No)
+	h.agents[v6.ID] = &agentConn{agent: v6, done: make(chan struct{})}
+	h.agents[v6.ID].ipv6.Store(check.IPv6Yes)
+	h.localIPv6.Set(check.IPv6No)
+	_ = st.SetAgentIPv6(old.ID, int(check.IPv6Unknown))
+
+	// Either family: IPv4 where IPv6 does not work.
+	if f := h.ipFamilyAt(LocalLocation, check.IPAny); f != check.IPv4 {
+		t.Errorf("local: %d", f)
+	}
+	if f := h.ipFamilyAt(AgentLocation(v6.ID), check.IPAny); f != check.IPAny {
+		t.Errorf("ipv6 agent: %d", f)
+	}
+	if f := h.ipFamilyAt(AgentLocation(old.ID), check.IPAny); f != check.IPAny {
+		t.Errorf("unknown agent: %d", f)
+	}
+	if f := h.ipFamilyAt(LocalLocation, check.IPv6); f != check.IPv6 {
+		t.Errorf("IPv6 only must not change: %d", f)
+	}
+
+	// IPv6 only is refused where IPv6 does not work.
+	m := &store.Monitor{Name: "m", Type: "ping", Target: "example.com", IPFamily: check.IPv6,
+		Locations: []string{AgentLocation(v6.ID), AgentLocation(old.ID)}}
+	if err := h.checkIPv6Locations(m); err != nil {
+		t.Errorf("ipv6 and unknown locations: %v", err)
+	}
+	m.Locations = append(m.Locations, AgentLocation(noV6.ID), LocalLocation)
+	err := h.checkIPv6Locations(m)
+	if err == nil || !strings.Contains(err.Error(), "ams · Amsterdam") || !strings.Contains(err.Error(), "hub") {
+		t.Errorf("want refusal naming both, got %v", err)
+	}
+	m.IPFamily = check.IPAny
+	if err := h.checkIPv6Locations(m); err != nil {
+		t.Errorf("either family: %v", err)
+	}
+
+	// An offline agent keeps its last reported state.
+	_ = st.SetAgentIPv6(noV6.ID, int(check.IPv6No))
+	delete(h.agents, noV6.ID)
+	if s := h.locationIPv6(AgentLocation(noV6.ID)); s != check.IPv6No {
+		t.Errorf("offline agent: %d", s)
 	}
 }

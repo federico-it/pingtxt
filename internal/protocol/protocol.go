@@ -18,6 +18,9 @@ const (
 	// successful update needs no message: the agent reconnects with the new
 	// version.
 	TypeUpdateStatus = "update_status"
+	// TypeNetwork reports the agent's network capabilities (agent -> hub),
+	// after connecting and whenever they change. Older agents never send it.
+	TypeNetwork = "network"
 )
 
 // Path is the WebSocket endpoint on the hub.
@@ -33,6 +36,13 @@ type Message struct {
 
 	Update       *Update       `json:"update,omitempty"`
 	UpdateStatus *UpdateStatus `json:"update_status,omitempty"`
+	Network      *Network      `json:"network,omitempty"`
+}
+
+// Network describes what the agent's network can reach.
+type Network struct {
+	// IPv6 is true when the agent reaches the Internet over IPv6.
+	IPv6 bool `json:"ipv6"`
 }
 
 // Hello is sent by an agent right after connecting.

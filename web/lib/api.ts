@@ -187,6 +187,8 @@ export interface Agent {
   hostname: string
   platform: string
   remote_addr: string
+  /** IPv6 connectivity: 0 unknown (older agent), 1 available, 2 not available */
+  ipv6: 0 | 1 | 2
   last_seen: number
   created_at: number
   online: boolean
@@ -205,6 +207,8 @@ export interface Location {
   name: string
   online: boolean
   kind: "local" | "agent"
+  // IPv6 connectivity: 0 unknown (older agent), 1 available, 2 not available
+  ipv6: 0 | 1 | 2
 }
 
 export type MaintenanceKind = "once" | "daily" | "weekly" | "monthly"

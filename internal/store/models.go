@@ -125,13 +125,16 @@ type Agent struct {
 	RemoteAddr string `json:"remote_addr"`
 	LastSeen   int64  `json:"last_seen"`
 	CreatedAt  int64  `json:"created_at"`
+	// IPv6 is the agent's IPv6 connectivity as last reported: 0 unknown
+	// (never reported, older agent), 1 yes, 2 no.
+	IPv6 int `json:"ipv6"`
 }
 
-const agentCols = `id, name, location, token_hash, version, hostname, platform, remote_addr, last_seen, created_at`
+const agentCols = `id, name, location, token_hash, version, hostname, platform, remote_addr, last_seen, created_at, ipv6`
 
 func scanAgent(sc interface{ Scan(...any) error }) (*Agent, error) {
 	a := &Agent{}
-	err := sc.Scan(&a.ID, &a.Name, &a.Location, &a.TokenHash, &a.Version, &a.Hostname, &a.Platform, &a.RemoteAddr, &a.LastSeen, &a.CreatedAt)
+	err := sc.Scan(&a.ID, &a.Name, &a.Location, &a.TokenHash, &a.Version, &a.Hostname, &a.Platform, &a.RemoteAddr, &a.LastSeen, &a.CreatedAt, &a.IPv6)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -185,6 +188,12 @@ func (s *Store) SetAgentToken(id int64, tokenHash string) error {
 
 func (s *Store) TouchAgent(id int64, version, hostname, platform, remote string) error {
 	_, err := s.db.Exec(`UPDATE agents SET version = ?, hostname = ?, platform = ?, remote_addr = ?, last_seen = ? WHERE id = ?`, version, hostname, platform, remote, now(), id)
+	return err
+}
+
+// SetAgentIPv6 stores the IPv6 connectivity an agent reported.
+func (s *Store) SetAgentIPv6(id int64, v int) error {
+	_, err := s.db.Exec(`UPDATE agents SET ipv6 = ? WHERE id = ?`, v, id)
 	return err
 }
 

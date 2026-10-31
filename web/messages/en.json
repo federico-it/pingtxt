@@ -279,6 +279,9 @@
     "builtIn": "built-in",
     "online": "online",
     "offline": "offline",
+    "noIPv6": "no IPv6",
+    "noIPv6Hint": "This location has no IPv6 connectivity: it cannot run IPv6-only checks. With IPv4 or IPv6 it checks over IPv4.",
+    "noIPv6Selected": "Some selected locations have no IPv6: remove them or choose IPv4 or IPv6.",
     "method": "method",
     "acceptedStatus": "accepted status",
     "acceptedStatusHint": "e.g. 200-299,301 or 2xx. empty = 200-399",
@@ -298,7 +301,7 @@
     "degradedPctPlaceholder": "default",
     "ipFamily": {
       "label": "ip version",
-      "hint": "IPv4 or IPv6 only, to catch one of them broken on a dual-stack host",
+      "hint": "IPv4 or IPv6 only, to catch one of them broken on a dual-stack host. Locations without IPv6 check over IPv4 and cannot be used for IPv6 only.",
       "v0": "IPv4 or IPv6",
       "v4": "IPv4 only",
       "v6": "IPv6 only"
@@ -553,6 +556,8 @@
     "online": "online",
     "offline": "offline",
     "neverConnected": "never connected",
+    "ipv6Yes": "IPv6",
+    "ipv6No": "no IPv6",
     "now": "now",
     "update": "update",
     "edit": "edit",

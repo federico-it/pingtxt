@@ -413,6 +413,8 @@ var laterMigrations = []migration{
 		AND r.ts >= result_rollups.start AND r.ts < result_rollups.start + 3600000);`},
 	// 19: checks over IPv4 only (4), IPv6 only (6) or either (0).
 	{sqlite: `ALTER TABLE monitors ADD COLUMN ip_family INTEGER NOT NULL DEFAULT 0`},
+	// 20: IPv6 connectivity of each agent: 0 unknown, 1 yes, 2 no.
+	{sqlite: `ALTER TABLE agents ADD COLUMN ipv6 INTEGER NOT NULL DEFAULT 0`},
 }
 
 func sqliteOnly(list []string) []migration {

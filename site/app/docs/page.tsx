@@ -323,6 +323,11 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             monitors cover both). Agents older than this version cannot do it and report the check as failed: update them.
           </p>
           <p>
+            The hub and agents check whether they reach IPv6 at start and every 10 minutes (agents page and monitor form
+            show it). A location without IPv6 cannot be chosen for <i>IPv6 only</i>, and <i>IPv4 or IPv6</i> checks run over
+            IPv4 there. <C>PINGTXT_IPV6=on</C> or <C>off</C> skips the probe.
+          </p>
+          <p>
             The hub listens on IPv4 and IPv6 (<C>:8090</C>). Docker containers get no IPv6 by default, so checks to IPv6
             targets fail from a container until IPv6 is enabled on its network (Docker 27 or later, and IPv6 on the server):
           </p>

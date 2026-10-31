@@ -312,6 +312,13 @@ host goes unnoticed. Set **ip version** on the monitor to *IPv4 only* or *IPv6 o
 so the hub reports their checks as failed with "update it". TLS certificate expiry is still read over
 either family.
 
+The hub and every agent check whether they reach the Internet over IPv6 (a TCP connection to
+well-known IPv6 resolvers at start and every 10 minutes); the agents page and the monitor form show
+the result. A location without IPv6 cannot be chosen for an *IPv6 only* monitor, and monitors set to
+*IPv4 or IPv6* check over IPv4 there instead of failing on hosts that have both. Set `PINGTXT_IPV6=on`
+or `off` on the hub or agent to skip the probe (for networks that block those addresses). Agents
+older than this version never report it and can be chosen.
+
 The hub listens on IPv4 and IPv6 (`PINGTXT_ADDR=:8090`), and agents connect to IPv6 hubs too
 (`PINGTXT_HUB=http://[2001:db8::1]:8090`). Login rate limits count IPv6 clients per /64.
 

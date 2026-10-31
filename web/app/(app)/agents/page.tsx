@@ -130,6 +130,9 @@ export default function AgentsPage() {
                 <TableCell>{a.location || <span className="text-muted-foreground">--</span>}</TableCell>
                 <TableCell className="hidden text-muted-foreground md:table-cell">
                   {a.hostname ? `${a.hostname} · ${a.platform} · ${a.remote_addr}` : t("neverConnected")}
+                  {a.ipv6 > 0 && (
+                    <span className={a.ipv6 === 1 ? "text-up" : undefined}> · {t(a.ipv6 === 1 ? "ipv6Yes" : "ipv6No")}</span>
+                  )}
                 </TableCell>
                 <TableCell className="hidden text-muted-foreground md:table-cell">
                   <VersionCell agent={a} hubVersion={data?.hub_version ?? ""} />

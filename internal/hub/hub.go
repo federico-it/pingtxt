@@ -90,6 +90,7 @@ type Hub struct {
 	warmUntil int64
 
 	localQueue chan check.Job
+	localIPv6  check.IPv6Watcher            // IPv6 connectivity of the built-in location
 	skipped    atomic.Int64                 // local checks skipped: previous still running or pool full
 	writer     atomic.Pointer[resultWriter] // batches result inserts while Run is active
 
@@ -175,6 +176,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.reportLoop(ctx)
 	go h.releaseLoop(ctx)
 	go h.escalationLoop(ctx)
+	go h.localIPv6.Run(ctx, 10*time.Minute)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for {
@@ -326,6 +328,7 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 		h.HandleResult(PushLocation, r)
 	}
 	for _, w := range work {
+		w.job.IPFamily = h.ipFamilyAt(w.loc, w.job.IPFamily)
 		if w.loc == LocalLocation {
 			if !h.localEnabled() {
 				h.setIdle(w.job.MonitorID)
@@ -353,6 +356,38 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 		job := w.job
 		ac.send(protocol.Message{Type: protocol.TypeJob, Job: &job})
 	}
+}
+
+// locationIPv6 returns the IPv6 connectivity of a location (check.IPv6Yes,
+// IPv6No or IPv6Unknown). Offline agents keep the last reported state.
+func (h *Hub) locationIPv6(loc string) int32 {
+	if loc == LocalLocation {
+		return h.localIPv6.State()
+	}
+	id, ok := parseAgentLocation(loc)
+	if !ok {
+		return check.IPv6Unknown
+	}
+	h.mu.Lock()
+	ac := h.agents[id]
+	h.mu.Unlock()
+	if ac != nil {
+		return int32(ac.ipv6.Load())
+	}
+	if a, err := h.store.Agent(id); err == nil {
+		return int32(a.IPv6)
+	}
+	return check.IPv6Unknown
+}
+
+// ipFamilyAt is the IP family a check runs with at a location: a monitor
+// that may use either one checks over IPv4 where IPv6 does not work, instead
+// of failing on hosts that resolve to both.
+func (h *Hub) ipFamilyAt(loc string, family int) int {
+	if family == check.IPAny && h.locationIPv6(loc) == check.IPv6No {
+		return check.IPv4
+	}
+	return family
 }
 
 // localWorker runs checks for the hub's built-in location. A fixed pool of
