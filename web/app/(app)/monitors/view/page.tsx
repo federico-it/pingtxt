@@ -138,6 +138,12 @@ function View() {
               retries: d.retries,
               hl: (c) => <span className="text-foreground">{c}</span>,
             })}
+            {d.locations.length > 1 &&
+              ` · ${
+                d.degraded_pct
+                  ? t("degradedAt", { pct: d.degraded_pct })
+                  : t("degradedAtDefault")
+              }`}
           </>
         )}
       </div>

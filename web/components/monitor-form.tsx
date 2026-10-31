@@ -173,6 +173,7 @@ export const emptyMonitor: MonitorInput = {
   headers: {},
   body: "",
   grace_sec: 300,
+  degraded_pct: 0,
   locations: ["local"],
   group_id: 0,
   tag_ids: [],
@@ -586,6 +587,26 @@ export function MonitorForm({
           <p className="mb-3 text-xs text-muted-foreground">
             {tr("locationsHint")}
           </p>
+          <div className="mb-4 max-w-xs">
+            <Field
+              label={tr("degradedPct")}
+              hint={tr("degradedPctHint")}
+            >
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                placeholder={tr("degradedPctPlaceholder")}
+                value={m.degraded_pct || ""}
+                onChange={(e) =>
+                  set(
+                    "degraded_pct",
+                    Math.min(Math.max(Number(e.target.value) || 0, 0), 50)
+                  )
+                }
+              />
+            </Field>
+          </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {(locations.data ?? []).map((l) => (
               <label

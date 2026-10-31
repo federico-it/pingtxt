@@ -141,7 +141,9 @@
     "noIncidents": "no incidents. nice.",
     "log": "log",
     "maint": "maint",
-    "waitingFirst": "waiting for the first check..."
+    "waitingFirst": "waiting for the first check...",
+    "degradedAt": "degraded at {pct}%",
+    "degradedAtDefault": "degraded at default"
   },
   "monitorForm": {
     "newTitle": "new monitor",
@@ -252,7 +254,7 @@
     "timeout": "timeout (ms)",
     "retries": "retries",
     "retriesHint": "consecutive failures before a location is down",
-    "locationsHint": "The monitor is down when the majority of online locations fail, degraded when only some do.",
+    "locationsHint": "The monitor is down when more than half of the online locations fail, degraded when at least the threshold below fails.",
     "builtIn": "built-in",
     "online": "online",
     "offline": "offline",
@@ -269,7 +271,10 @@
     "domainExpiryHint": "(rdap / whois, not for ip addresses)",
     "saving": "saving...",
     "save": "save",
-    "create": "create monitor"
+    "create": "create monitor",
+    "degradedPct": "degraded at (% of locations)",
+    "degradedPctHint": "empty = instance default (settings)",
+    "degradedPctPlaceholder": "default"
   },
   "pushInfo": {
     "title": "push url",
@@ -688,7 +693,11 @@
     "timeout": "timeout (ms)",
     "retries": "retries",
     "save": "save",
-    "unsaved": "unsaved changes"
+    "unsaved": "unsaved changes",
+    "missingScheme": "no http:// or https:// in front: pick one",
+    "status": "status",
+    "degradedPct": "degraded at (% of locations)",
+    "degradedPctHint": "degraded when at least this share of a monitor's online locations fails, down when more than half do. monitors can override it"
   },
   "authSettings": {
     "title": "authentication",

@@ -33,6 +33,9 @@ type GeneralSettings struct {
 	MonitorDefaults  MonitorDefaults `json:"monitor_defaults"`
 	Expiry           ExpirySettings  `json:"expiry"`
 	Metrics          MetricsSettings `json:"metrics"`
+	// DegradedPct is the default share of failing locations (percent) from
+	// which a monitor is degraded. Monitors can override it.
+	DegradedPct int `json:"degraded_pct"`
 }
 
 // ExpirySettings set when certificate and domain expiry alerts are sent:
@@ -137,6 +140,10 @@ func (g *GeneralSettings) normalize() {
 	}
 	d.TimeoutMs = min(max(d.TimeoutMs, 500), 60000)
 	d.Retries = min(max(d.Retries, 1), 10)
+	if g.DegradedPct == 0 {
+		g.DegradedPct = defaultDegradedPct
+	}
+	g.DegradedPct = min(max(g.DegradedPct, 1), maxDegradedPct)
 	g.Expiry.CertDays = normalizeDays(g.Expiry.CertDays, defaultCertDays)
 	g.Expiry.DomainDays = normalizeDays(g.Expiry.DomainDays, defaultDomainDays)
 }

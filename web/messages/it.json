@@ -141,7 +141,9 @@
     "noIncidents": "nessun incidente. ottimo.",
     "log": "log",
     "maint": "manut",
-    "waitingFirst": "in attesa del primo controllo..."
+    "waitingFirst": "in attesa del primo controllo...",
+    "degradedAt": "degradato dal {pct}%",
+    "degradedAtDefault": "degradato dalla soglia predefinita"
   },
   "monitorForm": {
     "newTitle": "nuovo monitor",
@@ -252,7 +254,7 @@
     "timeout": "timeout (ms)",
     "retries": "tentativi",
     "retriesHint": "errori consecutivi prima che una località sia down",
-    "locationsHint": "Il monitor è down quando fallisce la maggioranza delle località online, degradato quando ne fallisce solo qualcuna.",
+    "locationsHint": "Il monitor è down quando fallisce più della metà delle località online, degradato quando fallisce almeno la soglia qui sotto.",
     "builtIn": "integrata",
     "online": "online",
     "offline": "offline",
@@ -269,7 +271,10 @@
     "domainExpiryHint": "(rdap / whois, non per indirizzi ip)",
     "saving": "salvataggio...",
     "save": "salva",
-    "create": "crea monitor"
+    "create": "crea monitor",
+    "degradedPct": "degradato da (% di località)",
+    "degradedPctHint": "vuoto = valore predefinito dell'istanza (impostazioni)",
+    "degradedPctPlaceholder": "predefinito"
   },
   "pushInfo": {
     "title": "url push",
@@ -688,7 +693,11 @@
     "timeout": "timeout (ms)",
     "retries": "tentativi",
     "save": "salva",
-    "unsaved": "modifiche non salvate"
+    "unsaved": "modifiche non salvate",
+    "missingScheme": "manca http:// o https:// davanti: scegline uno",
+    "status": "stato",
+    "degradedPct": "degradato da (% di località)",
+    "degradedPctHint": "degradato quando fallisce almeno questa quota delle località online di un monitor, down quando ne fallisce più della metà. ogni monitor può cambiarla"
   },
   "authSettings": {
     "title": "autenticazione",
