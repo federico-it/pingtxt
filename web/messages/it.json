@@ -352,6 +352,7 @@
     "title": "badge",
     "hint": "Immagini SVG per un README, servite senza login tramite la status page \"{page}\". Si aggiornano ogni minuto e mostrano solo ciò che la pagina mostra già.",
     "pageHint": "Immagine SVG con lo stato generale di questa pagina, per un README. Si aggiorna ogni minuto.",
+    "protectedHint": "",
     "needsPage": "I badge richiedono una status page pubblicata che mostri questo monitor. Aggiungilo a una in <link>status page</link>.",
     "kinds": {
       "status": "stato",
@@ -735,6 +736,14 @@
     "channelDisabled": "disattivato",
     "subscribeHint": "I visitatori possono iscriversi via email agli incidenti che pubblichi. Le email partono dal server SMTP e dal mittente di questo canale email, non ai suoi destinatari.",
     "subscribeNoChannel": "Aggiungi un canale email nelle notifiche per far iscrivere i visitatori.",
+    "passwordTitle": "",
+    "protected": "",
+    "protectedHint": "",
+    "password": "",
+    "newPassword": "",
+    "passwordPlaceholder": "",
+    "passwordSet": "",
+    "passwordNew": "",
     "incidents": "incidenti"
   },
   "statusPublic": {
@@ -780,6 +789,15 @@
       "confirmed": "{email} è iscritto: riceverai gli aggiornamenti sugli incidenti via email.",
       "unsubscribed": "{email} è disiscritto: non riceverai altre email.",
       "badLink": "questo link non è più valido."
+    },
+    "locked": {
+      "title": "",
+      "hint": "",
+      "password": "",
+      "submit": "",
+      "checking": "",
+      "wrong": "",
+      "error": ""
     }
   },
   "settings": {
