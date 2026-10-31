@@ -64,6 +64,23 @@ Only a few env vars are read at startup:
 `PINGTXT_PUBLIC_URL`, `PINGTXT_RETENTION_DAYS`, `PINGTXT_LOCAL_NAME` and `PINGTXT_DISABLE_LOCAL`
 still work, but only seed the settings on the first start. After that, change them in the UI.
 
+### Non-root container
+
+The hub and agent images run pingtxt as the user `pingtxt` (uid/gid 10001), not as root. The
+container starts as root only for its entrypoint, which:
+
+- gives `/data` to `pingtxt` when some files there belong to another user. Volumes created by older
+  versions were written by root: the first start after the upgrade fixes them, nothing to do by hand;
+- adds `pingtxt` to the group of a mounted Docker socket (for "docker container" monitors);
+- drops to `pingtxt` with no capabilities except `CAP_NET_RAW` (for ping), and `no-new-privileges`.
+
+To skip the root step entirely, set the user yourself (`--user 10001:10001` or `user: "10001:10001"`
+in compose). The data folder must then belong to that user (`sudo chown -R 10001:10001 ./data`),
+and a Docker socket needs `group_add: ["<gid of /var/run/docker.sock>"]`. If the entrypoint cannot
+change the owner of `/data` (for example an NFS share), it logs a warning and runs as root as before.
+
+Run CLI commands as the same user: `docker exec -u pingtxt pingtxt pingtxt -backup ...`.
+
 ### Update check
 
 Release builds ask GitHub for the latest pingtxt release every 12 hours. When a newer one is out,
@@ -82,7 +99,7 @@ The generic OpenID Connect option works with Authentik, Keycloak, Authelia, Pock
 - Turn on *create accounts on first single sign-on* to let new people in, optionally limited to some email domains.
   New accounts get the role picked there (read-only by default).
 - You can turn off password login once a provider works. If you lock yourself out, run
-  `pingtxt -enable-password-login` (in Docker: `docker exec pingtxt pingtxt -enable-password-login`, then restart).
+  `pingtxt -enable-password-login` (in Docker: `docker exec -u pingtxt pingtxt pingtxt -enable-password-login`, then restart).
 - Set the **public URL** in settings when the hub is behind a reverse proxy, so callback URLs are right.
 
 ### Two-factor authentication
@@ -92,7 +109,7 @@ In **settings → two-factor authentication** scan the QR code with an authentic
 recovery codes. After that, password logins ask for a code; single sign-on logins rely on the provider's own MFA.
 
 - Lost phone and recovery codes: an admin can click **reset 2fa** in **settings → users**, or run
-  `pingtxt -reset-2fa you@example.com` on the server (in Docker: `docker exec pingtxt pingtxt -reset-2fa you@example.com`).
+  `pingtxt -reset-2fa you@example.com` on the server (in Docker: `docker exec -u pingtxt pingtxt pingtxt -reset-2fa you@example.com`).
 
 ### Users and roles
 
@@ -328,7 +345,8 @@ database user. Postgres, MySQL and MongoDB TLS default to "use it when the serve
 
 Docker checks talk to the Docker Engine of the location that runs them: the hub or the agent needs
 `/var/run/docker.sock` (or `DOCKER_HOST`). With Docker, add
-`-v /var/run/docker.sock:/var/run/docker.sock:ro` to the hub or agent container. For an agent
+`-v /var/run/docker.sock:/var/run/docker.sock:ro` to the hub or agent container (the entrypoint lets
+the `pingtxt` user use it, see [non-root container](#non-root-container)). For an agent
 installed with systemd, allow it with `sudo systemctl edit pingtxt-agent`:
 
 ```ini
@@ -427,7 +445,7 @@ pingtxt -restore /data/backups/pingtxt-auto-20261030-020000.db
 
 The replaced database is kept as `pingtxt-pre-restore-*.db`. Backups from older versions are migrated on
 start; backups from a newer version are refused. To take a backup from cron instead:
-`pingtxt -backup /path/to/file.db` (safe while the hub runs; in Docker `docker exec pingtxt pingtxt -backup /data/backups/x.db`).
+`pingtxt -backup /path/to/file.db` (safe while the hub runs; in Docker `docker exec -u pingtxt pingtxt pingtxt -backup /data/backups/x.db`).
 
 Settings → **configuration export** downloads a JSON file with monitors, groups, tags, notification
 channels, maintenance windows, status pages, agents and instance settings — no history and no user
@@ -572,9 +590,12 @@ Run the hub from the repository folder, or point it at the data and agent folder
 PINGTXT_DATA=/var/lib/pingtxt PINGTXT_AGENT_DIR=/usr/local/share/pingtxt/agents /usr/local/bin/pingtxt
 ```
 
-Outside Docker, ICMP **ping** checks need raw sockets: `sudo setcap cap_net_raw+ep /usr/local/bin/pingtxt`
-(same for `pingtxt-agent`), or set `PINGTXT_UNPRIVILEGED_PING=1` and allow the user's group in
-`net.ipv4.ping_group_range`. A minimal systemd unit for the hub:
+ICMP **ping** checks use a raw socket when the process has `CAP_NET_RAW`, and otherwise an
+unprivileged ICMP socket, which needs the process group in `net.ipv4.ping_group_range` (Docker allows
+all groups inside containers, most systemd distributions do too). Outside Docker, give the binary the
+capability with `sudo setcap cap_net_raw+ep /usr/local/bin/pingtxt` (same for `pingtxt-agent`) or
+`AmbientCapabilities=CAP_NET_RAW`. `PINGTXT_UNPRIVILEGED_PING=1` always uses the unprivileged socket,
+`PINGTXT_UNPRIVILEGED_PING=0` always the raw one. A minimal systemd unit for the hub:
 
 ```ini
 # /etc/systemd/system/pingtxt.service
