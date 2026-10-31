@@ -297,8 +297,9 @@ func (a *agent) session(ctx context.Context) error {
 				return errRestart
 			}
 			log.Error("update failed", "err", err)
+			var soon *retrySoonError
 			select {
-			case statuses <- protocol.UpdateStatus{Version: version, Error: err.Error()}:
+			case statuses <- protocol.UpdateStatus{Version: version, Error: err.Error(), RetrySoon: errors.As(err, &soon)}:
 			default:
 			}
 			continue

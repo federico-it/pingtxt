@@ -508,7 +508,8 @@ The hub bundles agent binaries built with its own version. When you upgrade the 
 download path and the SHA-256 of the binary for the agent's platform, the agent downloads it
 from the hub, checks the checksum and that the new binary reports the expected version, swaps
 the file and restarts in place. A failed update leaves the old binary running and is shown on
-the agents page.
+the agents page. The hub retries failed updates automatically: after 6 hours, or after a few
+minutes when the release files were still being uploaded.
 
 - **agents → update agents automatically** turns this on or off (on by default). Each outdated
   agent also gets an **update** button.
@@ -523,7 +524,9 @@ the agents page.
   the GitHub release of that version (the hub bundles the same, reproducibly built binaries).
   A mismatch, or a release with no checksum for the platform, refuses the update, so a hub
   that was tampered with cannot push its own binary. `-verify-update` (`PINGTXT_VERIFY_UPDATE`)
-  sets how strict this is:
+  sets how strict this is. A new hub waits until its release on GitHub has `SHA256SUMS` (the
+  release workflow uploads it a few minutes after the Docker image is out) before updating agents,
+  for up to 30 minutes; with the update check turned off it does not ask GitHub and updates right away.
   - `auto` (default): checks release versions; if GitHub cannot be reached the update goes
     ahead with a warning in the agent log, and development builds are not checked.
   - `strict`: installs only published releases whose checksum matches. Use it when agents can

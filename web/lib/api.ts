@@ -312,7 +312,7 @@ export async function api<T = unknown>(
   path: string,
   init?: { method?: string; body?: unknown }
 ): Promise<T> {
-  const res = await fetch(path, {
+  const res = await hubFetch(path, {
     method: init?.method ?? "GET",
     credentials: "same-origin",
     headers:
@@ -680,7 +680,7 @@ export async function apiRaw<T = unknown>(
   body: BodyInit,
   contentType: string
 ): Promise<T> {
-  const res = await fetch(path, {
+  const res = await hubFetch(path, {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": contentType },
@@ -695,4 +695,27 @@ export async function apiRaw<T = unknown>(
   }
   if (!res.ok) throw new ApiError(res.status, data?.error ?? res.statusText)
   return data as T
+}
+
+/**
+ * Fired on window when the hub does not answer (no connection, or 502/503/504
+ * from the hub or a proxy): the hub is probably restarting or updating.
+ * components/hub-offline.tsx shows a waiting screen.
+ */
+export const HUB_OFFLINE_EVENT = "pingtxt:hub-offline"
+
+function signalOffline() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(HUB_OFFLINE_EVENT))
+}
+
+async function hubFetch(path: string, init: RequestInit): Promise<Response> {
+  let res: Response
+  try {
+    res = await fetch(path, init)
+  } catch (err) {
+    signalOffline()
+    throw err
+  }
+  if (res.status === 502 || res.status === 503 || res.status === 504) signalOffline()
+  return res
 }

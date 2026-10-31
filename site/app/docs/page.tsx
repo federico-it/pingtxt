@@ -628,6 +628,13 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Agents installed with the script follow the hub version on their own.
           </p>
           <p>
+            While the hub restarts or updates, browsers show a <b className="text-foreground">pingtxt is updating</b> page
+            that follows the migrations and reloads by itself when the hub is ready, and <C>/api/health</C> answers 503. Open
+            tabs wait on the same screen instead of failing. When the container is fully down (pulling the new image), browsers
+            that opened pingtxt before over https still show it from their cache; the first visit ever gets the reverse proxy&apos;s
+            error until the hub listens again.
+          </p>
+          <p>
             Release builds ask GitHub for the latest release every 12 hours and show admins a notice when a newer one is out.
             Turn it off in <b className="text-foreground">settings → updates</b>, or start the hub with{" "}
             <C>PINGTXT_DISABLE_UPDATE_CHECK=true</C> so it never contacts GitHub.

@@ -175,6 +175,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.backupLoop(ctx)
 	go h.reportLoop(ctx)
 	go h.releaseLoop(ctx)
+	go h.agentUpdateLoop(ctx)
 	go h.escalationLoop(ctx)
 	go h.localIPv6.Run(ctx, 10*time.Minute)
 	t := time.NewTicker(time.Second)

@@ -78,6 +78,9 @@ type Update struct {
 type UpdateStatus struct {
 	Version string `json:"version"`
 	Error   string `json:"error,omitempty"`
+	// RetrySoon marks a failure that should clear up by itself within
+	// minutes, such as a release whose files are still being uploaded.
+	RetrySoon bool `json:"retry_soon,omitempty"`
 }
 
 // Reasons an agent cannot update itself.

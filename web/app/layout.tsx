@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import "@fontsource-variable/jetbrains-mono"
 
 import "./globals.css"
+import { HubOffline, ServiceWorker } from "@/components/hub-offline"
 import { I18nProvider } from "@/lib/i18n"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
@@ -25,6 +26,8 @@ export default function RootLayout({
           <I18nProvider>
             <TooltipProvider delay={150}>{children}</TooltipProvider>
             <Toaster position="bottom-right" />
+            <HubOffline />
+            <ServiceWorker />
           </I18nProvider>
         </ThemeProvider>
       </body>

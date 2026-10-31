@@ -1091,6 +1091,21 @@
     "checked": "checked {ago}",
     "checkNow": "check now"
   },
+  "hubOffline": {
+    "starting": "pingtxt is starting",
+    "updating": "pingtxt is updating",
+    "restarting": "pingtxt is restarting",
+    "hint": "getting ready, this page goes on by itself",
+    "unreachable": "the hub is not reachable yet, this page goes on by itself when it is back",
+    "waiting": "waiting",
+    "steps": {
+      "restore": "restoring the backup",
+      "database": "opening the database",
+      "migrate": "updating the database",
+      "starting": "starting monitors and agents",
+      "wait": "waiting for the hub"
+    }
+  },
   "pageIncidents": {
     "pageTitle": "incidents: {name}",
     "intro": "Tell visitors what is going on: open an incident and post updates until it is resolved. They show on the public page.",

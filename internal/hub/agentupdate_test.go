@@ -1,10 +1,14 @@
 package hub
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/federico-it/pingtxt/internal/protocol"
 	"github.com/federico-it/pingtxt/internal/store"
@@ -107,5 +111,83 @@ func TestAutoUpdateSetting(t *testing.T) {
 	h.updates.settings = nil // force a reload from the database
 	if h.agentUpdateSettings().AutoUpdate {
 		t.Fatal("setting not persisted")
+	}
+}
+
+func TestUpdateRetrySoon(t *testing.T) {
+	h, _ := newTestHub(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "pingtxt-agent-linux-amd64"), []byte("bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	h.cfg.AgentDir = dir
+	h.cfg.Version = "v1.1.0"
+	ac := testConn(1, protocol.Hello{Version: "v1.0.0", OS: "linux", Arch: "amd64", SelfUpdate: true})
+
+	if err := h.offerUpdate(ac, true); err != nil {
+		t.Fatal(err)
+	}
+	<-ac.out
+	for name, st := range map[string]protocol.UpdateStatus{
+		"retry_soon flag":    {Version: "v1.0.0", Error: "release v1.1.0 has no SHA256SUMS yet", RetrySoon: true},
+		"old agent's string": {Version: "v1.0.0", Error: "release v1.1.0 publishes no checksum for pingtxt-agent-linux-amd64, update refused"},
+	} {
+		h.updateFailed(1, st)
+		if err := h.offerUpdate(ac, false); err == nil {
+			t.Fatalf("%s: automatic retry right after the failure", name)
+		}
+		h.updates.mu.Lock()
+		h.updates.state[1].started = time.Now().Add(-updateRetrySoon - time.Second)
+		h.updates.mu.Unlock()
+		if err := h.offerUpdate(ac, false); err != nil {
+			t.Fatalf("%s: no automatic retry after %s: %v", name, updateRetrySoon, err)
+		}
+		<-ac.out
+	}
+
+	// Other failures wait hours.
+	h.updateFailed(1, protocol.UpdateStatus{Version: "v1.0.0", Error: "checksum mismatch"})
+	h.updates.mu.Lock()
+	h.updates.state[1].started = time.Now().Add(-updateRetrySoon - time.Second)
+	h.updates.mu.Unlock()
+	if err := h.offerUpdate(ac, false); err == nil {
+		t.Fatal("automatic retry minutes after a hard failure")
+	}
+}
+
+func TestReleasePublished(t *testing.T) {
+	h, _ := newTestHub(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1.1.0/SHA256SUMS":
+			w.WriteHeader(http.StatusOK)
+		case "/v1.3.0/SHA256SUMS":
+			http.Error(w, "boom", http.StatusBadGateway)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	old := releaseDownloadURL
+	releaseDownloadURL = srv.URL + "/"
+	defer func() { releaseDownloadURL = old }()
+
+	ctx := context.Background()
+	for _, c := range []struct {
+		version string
+		waited  time.Duration
+		want    bool
+	}{
+		{"v1.1.0", 0, true},               // published
+		{"v1.2.0", 0, false},              // still uploading
+		{"v1.2.0", releaseSumsWait, true}, // waited long enough
+		{"v1.3.0", 0, true},               // GitHub error: the agents decide
+		{"main-abc1234", 0, true},         // not a release
+		{"v1.2.0-rc1", 0, true},           // not a release
+	} {
+		h.cfg.Version = c.version
+		if got := h.releasePublished(ctx, c.waited); got != c.want {
+			t.Errorf("%s after %s: got %v, want %v", c.version, c.waited, got, c.want)
+		}
 	}
 }
