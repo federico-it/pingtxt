@@ -173,6 +173,68 @@ var migrations = append(sqliteOnly(sqliteMigrations), laterMigrations...)
 var laterMigrations = []migration{
 	// 11: share of failing locations that marks a monitor degraded (0 = instance default).
 	{sqlite: `ALTER TABLE monitors ADD COLUMN degraded_pct INTEGER NOT NULL DEFAULT 0`},
+	// 12: OAuth 2.1 for MCP clients: registered clients and the grants users gave them.
+	{
+		sqlite: `CREATE TABLE oauth_clients (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		redirect_uris TEXT NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+	CREATE TABLE oauth_grants (
+		id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		client_id TEXT NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
+		scope TEXT NOT NULL,
+		access_hash TEXT NOT NULL UNIQUE,
+		access_expires INTEGER NOT NULL,
+		refresh_hash TEXT NOT NULL UNIQUE,
+		refresh_expires INTEGER NOT NULL,
+		created_at INTEGER NOT NULL,
+		last_used_at INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX oauth_grants_user ON oauth_grants(user_id);`,
+		postgres: `CREATE TABLE oauth_clients (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		redirect_uris TEXT NOT NULL,
+		created_at BIGINT NOT NULL
+	);
+	CREATE TABLE oauth_grants (
+		id BIGSERIAL PRIMARY KEY,
+		user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		client_id TEXT NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
+		scope TEXT NOT NULL,
+		access_hash TEXT NOT NULL UNIQUE,
+		access_expires BIGINT NOT NULL,
+		refresh_hash TEXT NOT NULL UNIQUE,
+		refresh_expires BIGINT NOT NULL,
+		created_at BIGINT NOT NULL,
+		last_used_at BIGINT NOT NULL DEFAULT 0
+	);
+	CREATE INDEX oauth_grants_user ON oauth_grants(user_id);`,
+		mysql: `CREATE TABLE oauth_clients (
+		id VARCHAR(64) PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		redirect_uris TEXT NOT NULL,
+		created_at BIGINT NOT NULL
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+	CREATE TABLE oauth_grants (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		user_id BIGINT NOT NULL,
+		client_id VARCHAR(64) NOT NULL,
+		scope VARCHAR(32) NOT NULL,
+		access_hash VARCHAR(128) NOT NULL UNIQUE,
+		access_expires BIGINT NOT NULL,
+		refresh_hash VARCHAR(128) NOT NULL UNIQUE,
+		refresh_expires BIGINT NOT NULL,
+		created_at BIGINT NOT NULL,
+		last_used_at BIGINT NOT NULL DEFAULT 0,
+		INDEX oauth_grants_user (user_id),
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+		FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

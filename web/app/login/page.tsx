@@ -10,6 +10,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { api, ApiError, type AuthOptions, type LoginResult } from "@/lib/api"
 
+// After login, go back to an OAuth authorization request (an AI assistant
+// asking for access) when there is one, otherwise to the dashboard.
+function nextPath() {
+  if (typeof window === "undefined") return ""
+  const next = new URLSearchParams(window.location.search).get("next") ?? ""
+  return next.startsWith("/oauth/authorize?") ? next : ""
+}
+
 export default function LoginPage() {
   const t = useTranslations("login")
   const [setup, setSetup] = useState<boolean | null>(null)
@@ -26,7 +34,12 @@ export default function LoginPage() {
     // Errors from a single sign-on round trip come back as ?error=
     const ssoError = new URLSearchParams(window.location.search).get("error")
     if (ssoError)
-      window.history.replaceState(null, "", window.location.pathname)
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname +
+          (nextPath() ? `?next=${encodeURIComponent(nextPath())}` : "")
+      )
     api<{ needs_setup: boolean }>("/api/setup")
       .then((r) => setSetup(r.needs_setup))
       .catch(() => setSetup(false))
@@ -63,8 +76,7 @@ export default function LoginPage() {
           return
         }
       }
-      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = "/"
+      window.location.href = nextPath() || "/"
     } catch (err) {
       if (err instanceof ApiError && err.status === 410) {
         // Too many attempts or too slow: start again from the password.
@@ -151,7 +163,11 @@ export default function LoginPage() {
                 key={p.id}
                 type="button"
                 variant="outline"
-                render={<a href={`/api/auth/oauth/${p.id}/start`} />}
+                render={
+                  <a
+                    href={`/api/auth/oauth/${p.id}/start${nextPath() ? `?next=${encodeURIComponent(nextPath())}` : ""}`}
+                  />
+                }
                 nativeButton={false}
               >
                 {t("continueWith", { provider: p.label })}
