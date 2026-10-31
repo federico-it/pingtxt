@@ -424,6 +424,42 @@ var laterMigrations = []migration{
 	// 22: bcrypt hash of the password visitors need to open a status page.
 	{sqlite: `ALTER TABLE status_pages ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`,
 		mysql: `ALTER TABLE status_pages ADD COLUMN password_hash VARCHAR(100) NOT NULL DEFAULT ''`},
+	// 23: phones that get push notifications through the push relay. One
+	// handle per OAuth sign-in of the app: revoking the sign-in removes it.
+	{
+		sqlite: `CREATE TABLE push_devices (
+		id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		grant_id INTEGER NOT NULL UNIQUE REFERENCES oauth_grants(id) ON DELETE CASCADE,
+		handle TEXT NOT NULL,
+		name TEXT NOT NULL,
+		created_at INTEGER NOT NULL,
+		last_seen_at INTEGER NOT NULL
+	);
+	CREATE INDEX push_devices_user ON push_devices(user_id);`,
+		postgres: `CREATE TABLE push_devices (
+		id BIGSERIAL PRIMARY KEY,
+		user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		grant_id BIGINT NOT NULL UNIQUE REFERENCES oauth_grants(id) ON DELETE CASCADE,
+		handle TEXT NOT NULL,
+		name TEXT NOT NULL,
+		created_at BIGINT NOT NULL,
+		last_seen_at BIGINT NOT NULL
+	);
+	CREATE INDEX push_devices_user ON push_devices(user_id);`,
+		mysql: `CREATE TABLE push_devices (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		user_id BIGINT NOT NULL,
+		grant_id BIGINT NOT NULL UNIQUE,
+		handle TEXT NOT NULL,
+		name VARCHAR(255) NOT NULL,
+		created_at BIGINT NOT NULL,
+		last_seen_at BIGINT NOT NULL,
+		INDEX push_devices_user (user_id),
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+		FOREIGN KEY (grant_id) REFERENCES oauth_grants(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

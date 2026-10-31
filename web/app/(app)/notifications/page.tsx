@@ -31,7 +31,7 @@ type Field = {
   options?: string[]
   half?: boolean
   required?: boolean
-  hint?: "commaSeparated"
+  hint?: "commaSeparated" | "appUsers"
 }
 
 // Kind labels are in notifications.kinds.<type>.
@@ -66,6 +66,8 @@ const kinds: Record<NotifierType, { fields: Field[] }> = {
       { key: "to", label: "to", placeholder: "ops@example.com, oncall@example.com", required: true, hint: "commaSeparated" },
     ],
   },
+  // Phones signed in with the pingtxt app, see Settings → mobile app.
+  app: { fields: [{ key: "users", label: "users", placeholder: "alice@example.com, bob@example.com", hint: "appUsers" }] },
 }
 
 const portFor: Record<string, string> = { starttls: "587", tls: "465", none: "25" }

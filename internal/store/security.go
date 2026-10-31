@@ -154,6 +154,8 @@ type APIToken struct {
 	CreatedAt  int64  `json:"created_at"`
 	LastUsedAt int64  `json:"last_used_at"`
 	ExpiresAt  int64  `json:"expires_at"`
+	// GrantID is set for OAuth access tokens (MCP clients, the mobile app).
+	GrantID int64 `json:"-"`
 }
 
 const tokenCols = `id, user_id, name, token_hash, hint, scope, created_at, last_used_at, expires_at`

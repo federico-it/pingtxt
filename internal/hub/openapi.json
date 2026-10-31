@@ -6787,6 +6787,423 @@
           }
         }
       }
+    },
+    "/api/settings/push": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Get mobile app push settings",
+        "operationId": "getPushSettings",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Push settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Save mobile app push settings",
+        "operationId": "putPushSettings",
+        "description": "Turning push on registers the hub with the relay the first time. A different relay URL drops the registration and every phone (they enroll again).\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "relay_url": {
+                    "type": "string"
+                  },
+                  "registration_token": {
+                    "type": "string",
+                    "description": "Only for relays that require one to register (RELAY_REGISTRATION=token). Not stored."
+                  }
+                }
+              },
+              "example": {
+                "enabled": true,
+                "relay_url": "https://push.pingtxt.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          }
+        }
+      }
+    },
+    "/api/settings/push/register": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Register with the push relay again",
+        "operationId": "registerPush",
+        "description": "Gets a new hub id and token from the relay and removes every phone: the apps enroll again on their next start.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "registration_token": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Registered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          }
+        }
+      }
+    },
+    "/api/settings/push/test": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Test the push relay",
+        "operationId": "testPush",
+        "description": "Checks the hub token at the relay and that the relay can reach Firebase.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The relay accepts this hub.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "hub_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          }
+        }
+      }
+    },
+    "/api/mobile/config": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Push config for the mobile app",
+        "operationId": "getMobileConfig",
+        "description": "Where the app enrolls its phone: it sends hub_id and its FCM token to {relay_url}/v1/devices and gives the handle it gets to POST /api/mobile/devices. enabled is false (and the other fields empty) when push is off.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Config.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "relay_url": {
+                      "type": "string"
+                    },
+                    "hub_id": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "enabled": true,
+                  "relay_url": "https://push.pingtxt.com",
+                  "hub_id": "PrBlwRm8tbClvg8f5PEy4w"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/mobile/devices": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "List my phones",
+        "operationId": "listMobileDevices",
+        "description": "**Access:** Any logged-in user or token, also read-only users and read-only tokens: phones are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Phones of the current user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PushDevice"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Register my phone",
+        "operationId": "saveMobileDevice",
+        "description": "Stores the device handle (prd_...) from the push relay for the app's sign-in. Only OAuth access tokens (pma_...) can call it; each sign-in keeps one handle, a new one replaces it. Revoking the sign-in removes the phone.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: phones are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "device"
+                ],
+                "properties": {
+                  "device": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                }
+              },
+              "example": {
+                "device": "prd_AeYWsf5y...",
+                "name": "Federico's iPhone"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                "example": {
+                  "id": 3
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/mobile/devices/{id}": {
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Remove my phone",
+        "operationId": "deleteMobileDevice",
+        "description": "The phone stops getting notifications from this hub.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: phones are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the phone."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7918,7 +8335,8 @@
               "slack",
               "telegram",
               "ntfy",
-              "email"
+              "email",
+              "app"
             ]
           },
           "config": {
@@ -7926,7 +8344,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "webhook, discord, slack, ntfy: {url}. telegram: {bot_token, chat_id}. email: {host, port, security (starttls|tls|none), username, password, from, to}. The email password is write-only: responses carry password_set=\"true\" instead, and an empty password on update keeps the stored one. Read-only users see secrets as ********."
+            "description": "webhook, discord, slack, ntfy: {url}. telegram: {bot_token, chat_id}. email: {host, port, security (starttls|tls|none), username, password, from, to}. app: {users}, emails of the users whose phones get the alerts, comma separated (empty = every user). The email password is write-only: responses carry password_set=\"true\" instead, and an empty password on update keeps the stored one. Read-only users see secrets as ********."
           },
           "enabled": {
             "type": "boolean"
@@ -8565,6 +8983,10 @@
             "type": "integer",
             "format": "int64",
             "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "push_device": {
+            "type": "string",
+            "description": "Name of the phone that gets push notifications through this sign-in, if any."
           }
         }
       },
@@ -9081,6 +9503,54 @@
               "read",
               "write"
             ]
+          }
+        }
+      },
+      "PushSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Alerts can be sent to the mobile app."
+          },
+          "relay_url": {
+            "type": "string",
+            "description": "Base URL of the push relay.",
+            "default": "https://push.pingtxt.com"
+          },
+          "hub_id": {
+            "type": "string",
+            "description": "Id of this hub at the relay (public: the app sends it to the relay)."
+          },
+          "registered": {
+            "type": "boolean",
+            "description": "The hub has a token from the relay. The token itself is never returned."
+          },
+          "devices": {
+            "type": "integer",
+            "description": "Phones registered by all users."
+          }
+        }
+      },
+      "PushDevice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "last_seen_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
           }
         }
       }

@@ -275,7 +275,7 @@ export interface Tag {
 }
 
 export type NotifierType =
-  "webhook" | "discord" | "slack" | "telegram" | "ntfy" | "email"
+  "webhook" | "discord" | "slack" | "telegram" | "ntfy" | "email" | "app"
 
 export interface Notifier {
   id: number
@@ -598,6 +598,18 @@ export interface BackupFile {
   kind: BackupKind
   size: number
   created_at: number
+}
+
+/** Push notifications to the mobile app through the push relay. */
+export interface PushSettings {
+  enabled: boolean
+  relay_url: string
+  /** Id of this hub at the relay ("" until registered). */
+  hub_id: string
+  /** The hub has a token from the relay (never returned). */
+  registered: boolean
+  /** Phones registered by all users. */
+  devices: number
 }
 
 export interface BackupSettings {

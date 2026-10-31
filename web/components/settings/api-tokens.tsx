@@ -38,6 +38,8 @@ type OAuthGrant = {
   scope: TokenScope
   created_at: number
   last_used_at: number
+  /** Phone that gets push notifications through this sign-in. */
+  push_device?: string
 }
 
 function date(ms: number) {
@@ -277,6 +279,7 @@ export function ApiTokens() {
                     {g.last_used_at
                       ? tt("lastUsed", { date: date(g.last_used_at) })
                       : tt("neverUsed")}
+                    {g.push_device && <> · {tt("pushDevice", { name: g.push_device })}</>}
                   </span>
                 </div>
                 <Confirm
