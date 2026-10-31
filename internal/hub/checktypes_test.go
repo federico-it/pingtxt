@@ -41,6 +41,34 @@ func TestValidateNewMonitorTypes(t *testing.T) {
 	}
 }
 
+func TestValidateMCP(t *testing.T) {
+	h, _ := newTestHub(t)
+	cases := []struct {
+		target, method, keyword, min string
+		ok                           bool
+		wantMethod, wantKW, wantMin  string
+	}{
+		{"https://mcp.example.com/mcp", "", "", "", true, "auto", "", ""},
+		{"http://localhost:3000/sse", "SSE", " a ,, b ", "0", true, "sse", "a, b", ""},
+		{"https://x/mcp", "streamable", "", "5", true, "streamable", "", "5"},
+		{"mcp.example.com", "", "", "", false, "", "", ""},
+		{"https://x/mcp", "websocket", "", "", false, "", "", ""},
+		{"https://x/mcp", "", "", "-1", false, "", "", ""},
+		{"https://x/mcp", "", "", "many", false, "", "", ""},
+	}
+	for _, c := range cases {
+		m := &store.Monitor{Name: "x", Type: check.TypeMCP, Target: c.target, Method: c.method, Keyword: c.keyword, ExpectedStatus: c.min}
+		err := h.validateMonitor(m)
+		if (err == nil) != c.ok {
+			t.Errorf("%q: err = %v, want ok=%v", c.target, err, c.ok)
+			continue
+		}
+		if c.ok && (m.Method != c.wantMethod || m.Keyword != c.wantKW || m.ExpectedStatus != c.wantMin) {
+			t.Errorf("%q: got %q %q %q", c.target, m.Method, m.Keyword, m.ExpectedStatus)
+		}
+	}
+}
+
 func TestEventTargetRedactsPassword(t *testing.T) {
 	m := &store.Monitor{Type: check.TypePostgres, Target: "postgres://app:hunter2@db/app"}
 	if got := eventTarget(m); got != "postgres://app:xxxxx@db/app" {

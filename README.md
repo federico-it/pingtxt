@@ -8,7 +8,7 @@ but plain text, monospace, light and dark.
   dials *out* to the hub over WebSocket. No open ports, works behind NAT. Install with one command.
 - Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**,
   databases (**PostgreSQL**, **MySQL/MariaDB**, **Redis**, **MongoDB**), **Docker containers**, **gRPC health**, **SMTP**,
-  and **heartbeat (push)** monitors for cron jobs and workers.
+  remote **MCP servers** (handshake, tools), and **heartbeat (push)** monitors for cron jobs and workers.
 - Status across locations: **down** when more than half of the online locations fail, **degraded** when at least 35% fail (configurable in settings and per monitor).
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
@@ -236,6 +236,25 @@ docker start pingtxt
 
 To move an existing SQLite hub to PostgreSQL or MariaDB, export the configuration *with secrets* from the
 old hub and import it in the new one (history is not moved).
+
+## MCP servers
+
+A monitor of type **mcp server** checks a remote [Model Context Protocol](https://modelcontextprotocol.io) server:
+
+| setting | |
+| --- | --- |
+| target | URL of the endpoint, e.g. `https://mcp.example.com/mcp` |
+| transport | `auto` (default): streamable HTTP, falling back to the legacy HTTP+SSE transport (2024-11-05) when the POST is rejected with 400/404/405/406/415; or force `streamable` / `sse` |
+| headers | sent with every request, e.g. `Authorization: Bearer <token>`; hidden from read-only users |
+| required tools | optional, comma-separated: down when one of them is not in `tools/list` |
+| minimum tools | optional: down when `tools/list` returns fewer tools |
+
+Each check runs `initialize`, sends `notifications/initialized`, then `tools/list` (all pages) when the server
+advertises tools or a tool condition is set, and finally deletes the session. Tools are never called. The check
+message shows the server name and version, the negotiated protocol version, the transport and the tool count,
+e.g. `my-server 1.4.0 · mcp 2025-06-18 · streamable · 12 tools`; the response time covers the whole handshake.
+https endpoints get certificate expiry alerts. Agents older than this version report `unknown monitor type: mcp`:
+update them.
 
 ## Backups and configuration export
 

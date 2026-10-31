@@ -32,6 +32,7 @@ const (
 	TypeDocker   = "docker"
 	TypeGRPC     = "grpc"
 	TypeSMTP     = "smtp"
+	TypeMCP      = "mcp"
 	// TypePush is a heartbeat monitor: the monitored job calls the hub, so
 	// it is never probed and Run does not handle it.
 	TypePush = "push"
@@ -99,6 +100,8 @@ func Run(ctx context.Context, j Job) Result {
 		r = runGRPC(ctx, j, timeout)
 	case TypeSMTP:
 		r = runSMTP(ctx, j)
+	case TypeMCP:
+		r = runMCP(ctx, j, timeout)
 	default:
 		r = Result{Message: "unknown monitor type: " + j.Type}
 	}
