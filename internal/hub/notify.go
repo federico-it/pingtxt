@@ -18,7 +18,7 @@ import (
 )
 
 // Notifier types.
-var NotifierTypes = []string{"webhook", "discord", "slack", "telegram", "ntfy", "email"}
+var NotifierTypes = []string{"webhook", "discord", "slack", "telegram", "ntfy", "email", "app"}
 
 // Event kinds. Status events have an empty kind for compatibility.
 const (
@@ -175,6 +175,8 @@ type Notifier struct {
 	tlsConfig *tls.Config
 	// publicURL returns the public URL setting, to link the hub from emails.
 	publicURL func() string
+	// pushRetry overrides the waits before retrying failed phones (tests only).
+	pushRetry []time.Duration
 }
 
 func NewNotifier(st *store.Store, log *slog.Logger) *Notifier {
@@ -244,6 +246,8 @@ func (n *Notifier) Deliver(ctx context.Context, nt *store.Notifier, e Event) err
 		return n.post(ctx, c["url"], "text/plain", []byte(text), hdr)
 	case "email":
 		return n.sendEmail(ctx, c, e)
+	case "app":
+		return n.sendApp(ctx, c, e)
 	}
 	return fmt.Errorf("unknown notifier type %q", nt.Type)
 }

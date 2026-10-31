@@ -116,6 +116,7 @@ type Hub struct {
 
 	backupMu sync.Mutex // one snapshot at a time
 	importMu sync.Mutex // one configuration import at a time
+	pushMu   sync.Mutex // one push relay registration at a time
 }
 
 // New creates a hub.

@@ -622,7 +622,8 @@
       "slack": "slack",
       "telegram": "telegram",
       "ntfy": "ntfy",
-      "email": "email (smtp)"
+      "email": "email (smtp)",
+      "app": "pingtxt app (push)"
     },
     "fields": {
       "url": "url",
@@ -637,7 +638,8 @@
       "username": "username (optional)",
       "password": "password",
       "from": "from",
-      "to": "to"
+      "to": "to",
+      "users": "users (emails)"
     },
     "options": {
       "starttls": "starttls (587)",
@@ -645,7 +647,8 @@
       "none": "none (25, local relay)"
     },
     "hints": {
-      "commaSeparated": "comma separated"
+      "commaSeparated": "comma separated",
+      "appUsers": "Comma separated. Empty = every user. Each user gets the alerts on the phones signed in with the pingtxt app; push must be on in settings."
     }
   },
   "reports": {
@@ -961,7 +964,30 @@
     "disconnected": "{name} disconnected",
     "disconnectTitle": "disconnect {name}?",
     "disconnectText": "The app loses access right away and has to sign in again.",
-    "apiDocs": "API reference: <docs>interactive docs</docs> and the <spec>OpenAPI document</spec>."
+    "apiDocs": "API reference: <docs>interactive docs</docs> and the <spec>OpenAPI document</spec>.",
+    "pushDevice": "push notifications on {name}"
+  },
+  "mobileApp": {
+    "title": "mobile app",
+    "intro": "Send alerts to the pingtxt app on your team's phones. Notifications go through a push relay, which holds the app's Firebase key: monitor names and errors pass through it in the message text but are not stored there.",
+    "enabled": "push notifications to the mobile app",
+    "relayUrl": "push relay",
+    "relayHint": "The official relay works with the app from the App Store.",
+    "relayChanged": "A different relay registers this hub again: every phone has to enroll again (the app does it on its next start).",
+    "registrationToken": "registration token (optional)",
+    "registrationTokenHint": "Only for a self-hosted relay that requires one. Not stored.",
+    "status": "registered as {hub} · {count, plural, =0 {no phones yet} one {1 phone} other {# phones}}",
+    "notRegistered": "Not registered: turning push on registers this hub with the relay.",
+    "save": "save",
+    "saved": "saved",
+    "error": "error",
+    "test": "test relay",
+    "testOk": "the relay accepts this hub",
+    "register": "register again",
+    "registerTitle": "register this hub again?",
+    "registerText": "The hub gets a new id from the relay and forgets every phone. The apps enroll again on their next start.",
+    "registered": "registered again",
+    "channelHint": "Then add a \"pingtxt app\" channel in notifications to choose who gets the alerts."
   },
   "users": {
     "roles": {

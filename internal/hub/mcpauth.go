@@ -601,7 +601,7 @@ func (h *Hub) oauthAccessToken(t string) (*store.User, *store.APIToken, error) {
 	if now-g.LastUsedAt > time.Minute.Milliseconds() {
 		_ = h.store.TouchOAuthGrant(g.ID, now)
 	}
-	return u, &store.APIToken{UserID: u.ID, Name: g.ClientName, Scope: g.Scope}, nil
+	return u, &store.APIToken{UserID: u.ID, Name: g.ClientName, Scope: g.Scope, GrantID: g.ID}, nil
 }
 
 // cleanOAuth drops expired grants and clients nobody authorized.
@@ -622,7 +622,26 @@ func (h *Hub) listGrants(w http.ResponseWriter, r *http.Request, u *store.User) 
 		h.internalErr(w, err)
 		return
 	}
-	writeJSON(w, 200, list)
+	// The phone that gets push notifications through each sign-in of the app.
+	devices, err := h.store.UserPushDevices(u.ID)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	type grantView struct {
+		*store.OAuthGrant
+		PushDevice string `json:"push_device,omitempty"`
+	}
+	out := make([]grantView, len(list))
+	for i, g := range list {
+		out[i].OAuthGrant = g
+		for _, d := range devices {
+			if d.GrantID == g.ID {
+				out[i].PushDevice = d.Name
+			}
+		}
+	}
+	writeJSON(w, 200, out)
 }
 
 func (h *Hub) deleteGrant(w http.ResponseWriter, r *http.Request, u *store.User) {

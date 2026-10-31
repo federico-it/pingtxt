@@ -10,6 +10,7 @@ import { ApiTokens } from "@/components/settings/api-tokens"
 import { AuthSettingsForm } from "@/components/settings/auth-settings"
 import { ConfigTransfer, DatabaseBackups } from "@/components/settings/backups"
 import { GeneralSettingsForm } from "@/components/settings/general-settings"
+import { MobileAppSettings } from "@/components/settings/mobile-app"
 import { TwoFactor } from "@/components/settings/two-factor"
 import { UsersList } from "@/components/settings/users"
 import { Confirm } from "@/components/confirm"
@@ -139,6 +140,8 @@ export default function SettingsPage() {
             />
           </>
         )}
+
+        {isAdmin && <MobileAppSettings />}
 
         {isAdmin && me.data && (
           <Section title={t("users")}>

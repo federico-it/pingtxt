@@ -42,9 +42,10 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 // that each /api route is documented there.
 func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux := http.NewServeMux()
-	auth := h.requireAuth       // session or API token
-	session := h.requireSession // browser session only
-	admin := h.requireAdmin     // browser session of an admin
+	auth := h.requireAuth         // session or API token
+	session := h.requireSession   // browser session only
+	admin := h.requireAdmin       // browser session of an admin
+	personal := h.requirePersonal // any signed-in user, for their own data
 
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "version": h.cfg.Version})
@@ -90,6 +91,15 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/backups/{name}", admin(h.deleteBackup))
 	mux.HandleFunc("POST /api/backups/{name}/restore", admin(h.stageRestore))
 	mux.HandleFunc("PUT /api/settings/backups", admin(h.putBackupSettings))
+	// Push notifications to the mobile app, see apppush.go.
+	mux.HandleFunc("GET /api/settings/push", admin(h.getPushSettings))
+	mux.HandleFunc("PUT /api/settings/push", admin(h.putPushSettings))
+	mux.HandleFunc("POST /api/settings/push/register", admin(h.registerPush))
+	mux.HandleFunc("POST /api/settings/push/test", admin(h.testPush))
+	mux.HandleFunc("GET /api/mobile/config", auth(h.mobileConfig))
+	mux.HandleFunc("GET /api/mobile/devices", personal(h.listMobileDevices))
+	mux.HandleFunc("POST /api/mobile/devices", personal(h.saveMobileDevice))
+	mux.HandleFunc("DELETE /api/mobile/devices/{id}", personal(h.deleteMobileDevice))
 	mux.HandleFunc("GET /api/config/export", auth(h.exportConfig)) // secrets only with a session
 	mux.HandleFunc("POST /api/config/import", admin(h.importConfig))
 
@@ -1326,6 +1336,9 @@ func validateNotifier(n *store.Notifier) error {
 			return errors.New("bot token and chat id are required")
 		}
 		return nil
+	}
+	if n.Type == "app" {
+		return validateAppConfig(n.Config)
 	}
 	if n.Type == "email" {
 		delete(n.Config, "password_set")
