@@ -148,6 +148,7 @@
     "degradedAt": "degradato dal {pct}%",
     "ipv4Only": "solo IPv4",
     "ipv6Only": "solo IPv6",
+    "ipBoth": "",
     "degradedAtDefault": "degradato dalla soglia predefinita"
   },
   "monitorForm": {
@@ -279,6 +280,9 @@
     "builtIn": "integrata",
     "online": "online",
     "offline": "offline",
+    "noIPv6": "",
+    "noIPv6Hint": "",
+    "noIPv6Selected": "",
     "method": "metodo",
     "acceptedStatus": "stati accettati",
     "acceptedStatusHint": "ad es. 200-299,301 o 2xx. vuoto = 200-399",
@@ -299,9 +303,11 @@
     "ipFamily": {
       "label": "versione ip",
       "hint": "solo IPv4 o solo IPv6, per accorgersi se uno dei due non funziona su un host dual-stack",
-      "v0": "IPv4 o IPv6",
+      "default": "",
+      "either": "",
       "v4": "solo IPv4",
-      "v6": "solo IPv6"
+      "v6": "solo IPv6",
+      "both": ""
     },
     "responseRules": {
       "title": "controlli sulla risposta",
@@ -553,6 +559,8 @@
     "online": "online",
     "offline": "offline",
     "neverConnected": "mai collegato",
+    "ipv6Yes": "",
+    "ipv6No": "",
     "now": "ora",
     "update": "aggiorna",
     "edit": "modifica",
@@ -840,7 +848,9 @@
     "missingScheme": "manca http:// o https:// davanti: scegline uno",
     "status": "stato",
     "degradedPct": "degradato da (% di località)",
-    "degradedPctHint": "degradato quando fallisce almeno questa quota delle località online di un monitor, down quando ne fallisce più della metà. ogni monitor può cambiarla"
+    "degradedPctHint": "degradato quando fallisce almeno questa quota delle località online di un monitor, down quando ne fallisce più della metà. ogni monitor può cambiarla",
+    "ipFamily": "",
+    "ipFamilyHint": ""
   },
   "authSettings": {
     "title": "autenticazione",
@@ -1080,6 +1090,21 @@
     "upToDate": "aggiornato",
     "checked": "controllato {ago}",
     "checkNow": "controlla ora"
+  },
+  "hubOffline": {
+    "starting": "",
+    "updating": "",
+    "restarting": "",
+    "hint": "",
+    "unreachable": "",
+    "waiting": "",
+    "steps": {
+      "restore": "",
+      "database": "",
+      "migrate": "",
+      "starting": "",
+      "wait": ""
+    }
   },
   "pageIncidents": {
     "pageTitle": "incidenti: {name}",
