@@ -76,4 +76,5 @@ const (
 	NoUpdateDisabled    = "disabled"     // turned off on the agent
 	NoUpdateNotWritable = "not_writable" // the binary or its folder is read-only
 	NoUpdateUnsupported = "unsupported"  // OS not supported
+	NoUpdateInsecure    = "insecure_hub" // hub reached over plain http on a public address
 )
