@@ -1,6 +1,6 @@
 module github.com/federico-it/pingtxt
 
-go 1.26.0
+go 1.26.10
 
 require (
 	github.com/coder/websocket v1.8.15
@@ -8,7 +8,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/prometheus-community/pro-bing v0.9.1
 	golang.org/x/crypto v0.58.0
-	golang.org/x/net v0.60.0
+	golang.org/x/net v0.62.0
 	golang.org/x/oauth2 v0.37.0
 	modernc.org/sqlite v1.61.0
 )

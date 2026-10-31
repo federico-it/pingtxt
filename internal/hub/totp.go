@@ -204,7 +204,13 @@ func (h *Hub) loginSecondFactor(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusGone, "login expired, enter your password again")
 		return
 	}
+	if h.codeBlocked(w, uid) {
+		return
+	}
 	if err := h.verifySecondFactor(uid, in.Code, true); err != nil {
+		if errors.Is(err, errBadCode) {
+			h.codeFailed(uid)
+		}
 		time.Sleep(400 * time.Millisecond)
 		writeErr(w, 401, err.Error())
 		return
@@ -277,7 +283,13 @@ func (h *Hub) disableTwoFactor(w http.ResponseWriter, r *http.Request, u *store.
 		writeErr(w, 400, "invalid body")
 		return
 	}
+	if h.codeBlocked(w, u.ID) {
+		return
+	}
 	if err := h.verifySecondFactor(u.ID, in.Code, true); err != nil {
+		if errors.Is(err, errBadCode) {
+			h.codeFailed(u.ID)
+		}
 		writeErr(w, 400, err.Error())
 		return
 	}
@@ -295,7 +307,13 @@ func (h *Hub) regenerateRecoveryCodes(w http.ResponseWriter, r *http.Request, u 
 		writeErr(w, 400, "invalid body")
 		return
 	}
+	if h.codeBlocked(w, u.ID) {
+		return
+	}
 	if err := h.verifySecondFactor(u.ID, in.Code, false); err != nil {
+		if errors.Is(err, errBadCode) {
+			h.codeFailed(u.ID)
+		}
 		writeErr(w, 400, err.Error())
 		return
 	}

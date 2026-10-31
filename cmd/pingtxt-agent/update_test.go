@@ -87,3 +87,21 @@ func TestToHTTP(t *testing.T) {
 		}
 	}
 }
+
+func TestSecureHub(t *testing.T) {
+	for u, want := range map[string]bool{
+		"wss://status.example.com/api/agent/ws": true,
+		"ws://status.example.com/api/agent/ws":  false,
+		"ws://203.0.113.5:8090/api/agent/ws":    false,
+		"ws://127.0.0.1:8090/api/agent/ws":      true,
+		"ws://localhost:8090/api/agent/ws":      true,
+		"ws://192.168.1.10:8090/api/agent/ws":   true,
+		"ws://10.0.0.2/api/agent/ws":            true,
+		"ws://[fd00::1]:8090/api/agent/ws":      true,
+		"ws://pingtxt.lan:8090/api/agent/ws":    false,
+	} {
+		if got := secureHub(u); got != want {
+			t.Errorf("%s: got %v want %v", u, got, want)
+		}
+	}
+}

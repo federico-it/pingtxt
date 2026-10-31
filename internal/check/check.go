@@ -5,6 +5,7 @@ package check
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -143,7 +144,7 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 		TLSHandshakeTimeout: timeout,
 	}
 	defer tr.CloseIdleConnections()
-	client := &http.Client{Transport: tr, Timeout: timeout}
+	client := &http.Client{Transport: tr, Timeout: timeout, CheckRedirect: dropHeadersOnRedirect(j.Headers)}
 
 	start := time.Now()
 	resp, err := client.Do(req)
@@ -191,6 +192,23 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 	r.OK = true
 	r.Message = resp.Status
 	return r
+}
+
+// dropHeadersOnRedirect keeps the monitor's own request headers (API keys,
+// tokens) from following a redirect to another host. Go already drops
+// Authorization and Cookie there, but not custom headers like X-Api-Key.
+func dropHeadersOnRedirect(hdr map[string]string) func(*http.Request, []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		if !strings.EqualFold(req.URL.Host, via[0].URL.Host) {
+			for k := range hdr {
+				req.Header.Del(k)
+			}
+		}
+		return nil
+	}
 }
 
 // StatusMatches checks a status code against a spec like "200-299,301".
