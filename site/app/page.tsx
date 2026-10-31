@@ -46,8 +46,8 @@ const features: { title: string; body: string }[] = [
     body: "Password + TOTP, GitHub, Google or any OpenID Connect provider. Personal API tokens, read or read+write.",
   },
   {
-    title: "prometheus",
-    body: "/metrics with status, latency per location, uptime, expiry and agent connectivity.",
+    title: "prometheus + mcp",
+    body: "/metrics for Prometheus, and an MCP server so Claude and other AI assistants can check status and manage monitors.",
   },
   {
     title: "self-updating agents",

@@ -14,6 +14,8 @@ but plain text, monospace, light and dark.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
+- **MCP server** on `/mcp`: Claude and other AI assistants can read status and incidents and, with a write token,
+  manage monitors and maintenance windows.
 - **Groups and tags**: a monitor sits in one group and has any number of colored tags. Filter the dashboard by
   them, show groups as sections on the dashboard and on status pages, and pick monitors by group or tag in
   maintenance windows.
@@ -107,6 +109,57 @@ curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/monitors
 
 `GET /api/monitors` accepts `?group=<id>` (or `group=none`) and `?tag=<id>` filters. Groups and tags are managed at
 `/api/groups` and `/api/tags`; `PUT /api/groups/<id>/monitors` with `{"monitor_ids": [...]}` sets a group's members.
+
+### MCP server (Claude and other AI assistants)
+
+The hub is also an [MCP](https://modelcontextprotocol.io) server at `/mcp` (Streamable HTTP), so an AI assistant can
+answer "what is down right now?", look at incidents and response times, or create a monitor or a maintenance window
+for you. It uses the same API tokens:
+
+- a **read only** token (or the token of a read-only user) gets the read tools only;
+- a **read + write** token of an admin also gets the tools that change data.
+
+Roles, validation and hidden secrets are exactly those of the REST API.
+
+Claude Code:
+
+```sh
+claude mcp add --transport http pingtxt https://status.example.com/mcp \
+  --header "Authorization: Bearer ptk_..."
+```
+
+Claude Desktop (`claude_desktop_config.json`, through [mcp-remote](https://www.npmjs.com/package/mcp-remote)):
+
+```json
+{
+  "mcpServers": {
+    "pingtxt": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://status.example.com/mcp", "--header", "Authorization:${PINGTXT_AUTH}"],
+      "env": { "PINGTXT_AUTH": "Bearer ptk_..." }
+    }
+  }
+}
+```
+
+Cursor, Windsurf and other clients that take a URL and headers:
+
+```json
+{ "mcpServers": { "pingtxt": { "url": "https://status.example.com/mcp", "headers": { "Authorization": "Bearer ptk_..." } } } }
+```
+
+| tool | does |
+| --- | --- |
+| `get_overview` | monitors by status, agents online, open incidents |
+| `list_monitors` | status, 24h uptime, response time and last check; filter by status, group, tag or name |
+| `get_monitor`, `get_monitor_results` | settings, uptime 24h/7d/30d, status per location, expiry; latest check results |
+| `list_incidents`, `list_maintenances` | incidents (open only, per monitor), maintenance windows with next occurrence |
+| `list_groups`, `list_tags`, `list_agents`, `list_status_pages` | everything else a model needs to find ids |
+| `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | write token of an admin only |
+| `create_maintenance`, `delete_maintenance` | write token of an admin only; times in ISO 8601 |
+
+Times in tool results are ISO 8601 (UTC). The server is stateless (no sessions, no event stream), so it works behind
+any reverse proxy and with several hub replicas.
 
 ### Prometheus
 

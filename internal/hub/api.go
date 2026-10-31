@@ -134,6 +134,13 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 	mux.HandleFunc("GET /api/public/status/{slug}", h.publicStatus)
 
 	mux.HandleFunc("GET /metrics", h.metrics)
+	mux.HandleFunc(mcpPath, h.serveMCP(mux)) // MCP server for AI assistants, see mcp.go
+	// No OAuth for MCP clients (they send an API token): answer discovery
+	// with 404 instead of the web UI.
+	for _, p := range []string{"oauth-protected-resource", "oauth-authorization-server", "openid-configuration"} {
+		mux.HandleFunc("/.well-known/"+p, http.NotFound)
+		mux.HandleFunc("/.well-known/"+p+"/", http.NotFound)
+	}
 
 	mux.HandleFunc("GET "+protocol.Path, h.ServeAgent)
 	mux.HandleFunc("GET /install-agent.sh", func(w http.ResponseWriter, r *http.Request) {

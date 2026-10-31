@@ -5,7 +5,7 @@ import { Prompt, REPO, SectionTitle } from "@/components/site-shell"
 
 export const metadata: Metadata = {
   title: "docs",
-  description: "Install and configure pingtxt: hub, agents, login, notifications, status pages, API and Prometheus.",
+  description: "Install and configure pingtxt: hub, agents, login, notifications, status pages, API, MCP and Prometheus.",
 }
 
 const RAW = "https://raw.githubusercontent.com/federico-it/pingtxt/main"
@@ -25,6 +25,7 @@ const toc = [
   ["sso", "single sign-on"],
   ["2fa", "two-factor auth"],
   ["api", "api tokens"],
+  ["mcp", "mcp server"],
   ["prometheus", "prometheus"],
   ["upgrade", "upgrade + backup"],
   ["build", "build from source"],
@@ -339,6 +340,58 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             <C>GET /api/monitors</C> accepts <C>?group=&lt;id&gt;</C> and <C>?tag=&lt;id&gt;</C>. Tokens never reach account
             endpoints (password, 2FA, tokens, users, instance settings).
           </p>
+        </Section>
+
+        <Section id="mcp" title="mcp server">
+          <p>
+            The hub is an <a href="https://modelcontextprotocol.io" className="text-foreground underline underline-offset-4">MCP</a>{" "}
+            server at <C>/mcp</C> (Streamable HTTP): Claude and other AI assistants can tell you what is down, read incidents and
+            response times, and create monitors or maintenance windows. It uses API tokens: read tokens get the read tools, a
+            read + write token of an admin also gets the tools that change data. Roles and hidden secrets are the same as the API.
+          </p>
+          <CopyBlock
+            label="claude code"
+            code={`claude mcp add --transport http pingtxt https://status.example.com/mcp \\
+  --header "Authorization: Bearer ptk_..."`}
+          />
+          <CopyBlock
+            label="claude desktop · claude_desktop_config.json"
+            code={`{
+  "mcpServers": {
+    "pingtxt": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://status.example.com/mcp",
+               "--header", "Authorization:\${PINGTXT_AUTH}"],
+      "env": { "PINGTXT_AUTH": "Bearer ptk_..." }
+    }
+  }
+}`}
+          />
+          <CopyBlock
+            label="cursor, windsurf and other url + headers clients"
+            code={`{
+  "mcpServers": {
+    "pingtxt": {
+      "url": "https://status.example.com/mcp",
+      "headers": { "Authorization": "Bearer ptk_..." }
+    }
+  }
+}`}
+          />
+          <Table
+            head={["tool", "does"]}
+            rows={[
+              [<C key="1">get_overview</C>, "monitors by status, agents online, open incidents"],
+              [<C key="2">list_monitors</C>, "status, uptime, response time; filter by status, group, tag, name"],
+              [<C key="3">get_monitor</C>, "settings, uptime 24h/7d/30d, status per location, expiry"],
+              [<C key="4">get_monitor_results</C>, "latest check results"],
+              [<C key="5">list_incidents</C>, "incidents, open only or per monitor"],
+              [<C key="6">list_maintenances</C>, "maintenance windows and next occurrence"],
+              [<C key="7">list_groups · list_tags · list_agents · list_status_pages</C>, "ids for everything else"],
+              [<C key="8">create / update / pause / delete_monitor</C>, "admin write token"],
+              [<C key="9">create / delete_maintenance</C>, "admin write token, ISO 8601 times"],
+            ]}
+          />
         </Section>
 
         <Section id="prometheus" title="prometheus">

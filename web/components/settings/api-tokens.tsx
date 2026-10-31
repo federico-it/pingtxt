@@ -88,8 +88,10 @@ export function ApiTokens() {
   return (
     <div className="grid gap-4">
       <p className="text-xs text-muted-foreground">
-        tokens let scripts and tools use the API. they cannot change accounts or
-        settings.
+        tokens let scripts and tools use the API, and AI assistants (Claude,
+        Cursor…) use the MCP server at{" "}
+        <span className="text-foreground">{origin}/mcp</span>. they cannot
+        change accounts or settings.
       </p>
 
       {created ? (
@@ -100,6 +102,12 @@ export function ApiTokens() {
           <CopyBlock code={created} />
           <CopyBlock
             code={`curl -H "Authorization: Bearer ${created}" ${origin}/api/monitors`}
+          />
+          <p className="text-xs text-muted-foreground">
+            connect Claude Code to the MCP server:
+          </p>
+          <CopyBlock
+            code={`claude mcp add --transport http pingtxt ${origin}/mcp --header "Authorization: Bearer ${created}"`}
           />
           <div>
             <Button variant="outline" onClick={() => setCreated(null)}>
