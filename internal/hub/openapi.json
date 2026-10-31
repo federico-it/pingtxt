@@ -5833,9 +5833,6 @@
                 "required": [
                   "password"
                 ]
-              },
-              "example": {
-                "password": "s3cret-page"
               }
             }
           }
