@@ -214,8 +214,8 @@ printf "DB_PASSWORD=%s\nDB_ROOT_PASSWORD=%s\n" $(openssl rand -hex 16) $(openssl
 docker compose -f docker-compose.mariadb.yml up -d
 ```
 
-Set the passwords before the first start: the database container uses them only when it creates the
-database. Special characters in a password must be URL-encoded in `PINGTXT_DB_URL`. Everything works the
+The compose files refuse to start without the passwords in `.env`; the database container uses them only
+when it first creates the database, so set them before the first start. Special characters in a password must be URL-encoded in `PINGTXT_DB_URL`. Everything works the
 same on the three databases (history rollups, Prometheus metrics, configuration export/import), except
 the built-in **database backups**, which are SQLite files: with PostgreSQL or MariaDB back up the server
 with its own tools.

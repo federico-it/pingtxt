@@ -1,6 +1,6 @@
 # pingtxt hub + MariaDB. Start with:
 #   docker compose -f docker-compose.mariadb.yml up -d
-# Set DB_PASSWORD and DB_ROOT_PASSWORD in a .env file next to this file
+# Needs DB_PASSWORD and DB_ROOT_PASSWORD in a .env file next to this file
 # before the first start (letters and digits only, or URL-encode the
 # password in PINGTXT_DB_URL).
 services:
@@ -12,7 +12,7 @@ services:
     ports:
       - "8090:8090"
     environment:
-      PINGTXT_DB_URL: mariadb://pingtxt:${DB_PASSWORD:-pingtxt}@db:3306/pingtxt
+      PINGTXT_DB_URL: mariadb://pingtxt:${DB_PASSWORD:?set DB_PASSWORD in .env}@db:3306/pingtxt
     depends_on:
       db:
         condition: service_healthy
@@ -27,8 +27,8 @@ services:
     environment:
       MARIADB_DATABASE: pingtxt
       MARIADB_USER: pingtxt
-      MARIADB_PASSWORD: ${DB_PASSWORD:-pingtxt}
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-pingtxt-root}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
     volumes:
       - mariadb:/var/lib/mysql
     healthcheck:
