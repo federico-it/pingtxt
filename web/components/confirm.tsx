@@ -1,5 +1,7 @@
 "use client"
 
+import { useTranslations } from "use-intl"
+
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -15,7 +17,7 @@ export function Confirm({
   trigger,
   title,
   description,
-  action = "delete",
+  action,
   onConfirm,
 }: {
   trigger: React.ReactElement
@@ -24,6 +26,7 @@ export function Confirm({
   action?: string
   onConfirm: () => void | Promise<void>
 }) {
+  const t = useTranslations("common")
   return (
     <AlertDialog>
       <AlertDialogTrigger render={trigger} />
@@ -33,9 +36,9 @@ export function Confirm({
           {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>cancel</AlertDialogCancel>
+          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
           <AlertDialogCancel variant="destructive" onClick={() => onConfirm()}>
-            {action}
+            {action ?? t("delete")}
           </AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>

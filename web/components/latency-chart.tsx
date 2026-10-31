@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useTranslations } from "use-intl"
 
 import type { Series } from "@/lib/api"
 import { datetime, ms } from "@/lib/format"
@@ -20,6 +21,7 @@ export function LatencyChart({ series }: { series: Series }) {
   const ref = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(600)
   const [hover, setHover] = useState<number | null>(null)
+  const t = useTranslations("latencyChart")
 
   useEffect(() => {
     const el = ref.current
@@ -76,17 +78,17 @@ export function LatencyChart({ series }: { series: Series }) {
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * yMax)
 
   if (series.locations.length === 0) {
-    return <div className="flex h-[180px] items-center justify-center border border-dashed text-muted-foreground">no data yet</div>
+    return <div className="flex h-[180px] items-center justify-center border border-dashed text-muted-foreground">{t("noData")}</div>
   }
 
   return (
     <div ref={ref} className="relative w-full select-none">
       <svg width={w} height={H} onMouseMove={onMove} onMouseLeave={() => setHover(null)} className="block">
-        {ticks.map((t) => (
-          <g key={t}>
-            <line x1={PAD.l} x2={w - PAD.r} y1={y(t)} y2={y(t)} stroke="var(--border)" strokeDasharray="2 3" />
-            <text x={PAD.l - 6} y={y(t) + 3} textAnchor="end" fontSize={10} fill="var(--muted-foreground)">
-              {ms(t) === "--" ? "0" : ms(t)}
+        {ticks.map((v) => (
+          <g key={v}>
+            <line x1={PAD.l} x2={w - PAD.r} y1={y(v)} y2={y(v)} stroke="var(--border)" strokeDasharray="2 3" />
+            <text x={PAD.l - 6} y={y(v) + 3} textAnchor="end" fontSize={10} fill="var(--muted-foreground)">
+              {ms(v) === "--" ? "0" : ms(v)}
             </text>
           </g>
         ))}
@@ -117,7 +119,7 @@ export function LatencyChart({ series }: { series: Series }) {
           {datetime(series.from)}
         </text>
         <text x={w - PAD.r} y={H - 2} fontSize={10} textAnchor="end" fill="var(--muted-foreground)">
-          now
+          {t("now")}
         </text>
       </svg>
       {hover !== null && (
@@ -132,7 +134,7 @@ export function LatencyChart({ series }: { series: Series }) {
               <span>{ms(byLoc[l.id][hover] ?? 0)}</span>
             </div>
           ))}
-          {failSlots[hover] > 0 && <div className="text-down">{failSlots[hover]} failed checks</div>}
+          {failSlots[hover] > 0 && <div className="text-down">{t("failed", { count: failSlots[hover] })}</div>}
         </div>
       )}
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">

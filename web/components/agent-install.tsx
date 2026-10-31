@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "use-intl"
 
 import { CopyBlock } from "@/components/copy-block"
 import { cn } from "@/lib/utils"
@@ -27,23 +28,24 @@ export function AgentInstall({ hub, token }: { hub: string; token: string }) {
 PINGTXT_HUB=${hub} PINGTXT_TOKEN=${token} ./pingtxt-agent`,
   }
   const [tab, setTab] = useState<keyof typeof tabs>("docker")
+  const t = useTranslations("agentInstall")
   return (
     <div className="grid min-w-0 gap-2">
       <div className="flex gap-1 text-xs">
-        {(Object.keys(tabs) as (keyof typeof tabs)[]).map((t) => (
+        {(Object.keys(tabs) as (keyof typeof tabs)[]).map((k) => (
           <button
-            key={t}
+            key={k}
             type="button"
-            onClick={() => setTab(t)}
-            className={cn("px-2 py-0.5 text-muted-foreground hover:text-foreground", tab === t && "bg-accent text-foreground")}
+            onClick={() => setTab(k)}
+            className={cn("px-2 py-0.5 text-muted-foreground hover:text-foreground", tab === k && "bg-accent text-foreground")}
           >
-            {t}
+            {k}
           </button>
         ))}
       </div>
       <CopyBlock code={tabs[tab]} />
       <p className="text-[11px] text-muted-foreground">
-        The agent only dials out to the hub over HTTPS/WebSocket: no ports to open. The token is shown only now; rotate it to get a new one.
+        {t("hint")}
       </p>
     </div>
   )

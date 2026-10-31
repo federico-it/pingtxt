@@ -171,7 +171,9 @@ var migrations = append(sqliteOnly(sqliteMigrations), laterMigrations...)
 //	{sqlite: `ALTER TABLE monitors ADD COLUMN notes TEXT NOT NULL DEFAULT ''`,
 //	 mysql: `ALTER TABLE monitors ADD COLUMN notes TEXT NOT NULL DEFAULT ('')`},
 var laterMigrations = []migration{
-	// 11: rules on the JSON body of HTTP responses.
+	// 11: share of failing locations that marks a monitor degraded (0 = instance default).
+	{sqlite: `ALTER TABLE monitors ADD COLUMN degraded_pct INTEGER NOT NULL DEFAULT 0`},
+	// 12: rules on the JSON body of HTTP responses.
 	{sqlite: `ALTER TABLE monitors ADD COLUMN assertions TEXT NOT NULL DEFAULT '[]'`,
 		mysql: `ALTER TABLE monitors ADD COLUMN assertions TEXT NOT NULL DEFAULT ('[]')`},
 }

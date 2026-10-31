@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
@@ -30,98 +31,71 @@ import {
 import { interval } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
+// Labels and hints are in messages: monitorForm.types.<value>.
 const types: {
   value: MonitorType
-  label: string
-  hint: string
   placeholder: string
-  /** Label of the target field; defaults to "host". */
-  target?: string
+  /** Label of the target field (monitorForm.target.<key>); defaults to "host". */
+  target?: "url" | "container" | "address" | "server"
 }[] = [
   {
     value: "http",
-    label: "http(s)",
-    hint: "request a URL and check the status code",
     placeholder: "https://example.com/health",
   },
   {
     value: "keyword",
-    label: "keyword",
-    hint: "request a URL and look for a string in the body",
     placeholder: "https://example.com",
   },
   {
     value: "tcp",
-    label: "tcp port",
-    hint: "open a TCP connection",
     placeholder: "db.example.com:5432",
   },
   {
     value: "ping",
-    label: "ping (icmp)",
-    hint: "send ICMP echo requests",
     placeholder: "1.1.1.1",
   },
   {
     value: "dns",
-    label: "dns",
-    hint: "resolve a record and optionally match the answer",
     placeholder: "example.com",
   },
   {
     value: "postgres",
-    label: "postgresql",
-    hint: "connect and run a query",
     placeholder: "postgres://user:password@db.example.com:5432/app",
-    target: "connection url",
+    target: "url",
   },
   {
     value: "mysql",
-    label: "mysql / mariadb",
-    hint: "connect and run a query",
     placeholder: "mysql://user:password@db.example.com:3306/app",
-    target: "connection url",
+    target: "url",
   },
   {
     value: "redis",
-    label: "redis",
-    hint: "authenticate and send PING",
     placeholder: "redis://:password@cache.example.com:6379/0",
-    target: "connection url",
+    target: "url",
   },
   {
     value: "mongodb",
-    label: "mongodb",
-    hint: "authenticate (SCRAM) and run ping",
     placeholder:
       "mongodb://user:password@db.example.com:27017/?authSource=admin",
-    target: "connection url",
+    target: "url",
   },
   {
     value: "docker",
-    label: "docker container",
-    hint: "down when the container is not running or unhealthy",
     placeholder: "my-app-web-1",
-    target: "container name or id",
+    target: "container",
   },
   {
     value: "grpc",
-    label: "grpc health",
-    hint: "call grpc.health.v1.Health/Check",
     placeholder: "grpcs://api.example.com:443/my.Service",
     target: "address",
   },
   {
     value: "smtp",
-    label: "smtp",
-    hint: "read the greeting, EHLO and STARTTLS when offered",
     placeholder: "smtp://mail.example.com:587",
     target: "server",
   },
   {
     value: "push",
-    label: "heartbeat (push)",
-    hint: "your cron job or service calls a URL; down when the calls stop",
     placeholder: "",
   },
 ]
@@ -152,7 +126,7 @@ const pushIntervals = [
 ]
 
 const graces = [
-  { value: "0", label: "none" },
+  { value: "0", label: "" },
   { value: "60", label: "1m" },
   { value: "300", label: "5m" },
   { value: "900", label: "15m" },
@@ -161,13 +135,17 @@ const graces = [
   { value: "21600", label: "6h" },
 ]
 
-/** Adds the current value to a preset list so the select can show it. */
+/**
+ * Adds the current value to a preset list so the select can show it, with
+ * labels in the units of the current language.
+ */
 function withValue(list: { value: string; label: string }[], sec: number) {
-  return list.some((x) => x.value === String(sec))
+  const all = list.some((x) => x.value === String(sec))
     ? list
-    : [...list, { value: String(sec), label: interval(sec) }].sort(
+    : [...list, { value: String(sec), label: "" }].sort(
         (a, b) => Number(a.value) - Number(b.value)
       )
+  return all.map((x) => (x.value === "0" ? x : { ...x, label: interval(Number(x.value)) }))
 }
 
 const methods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
@@ -197,6 +175,7 @@ export const emptyMonitor: MonitorInput = {
   body: "",
   assertions: [],
   grace_sec: 300,
+  degraded_pct: 0,
   locations: ["local"],
   group_id: 0,
   tag_ids: [],
@@ -258,8 +237,10 @@ export function MonitorForm({
     refreshInterval: 15_000,
   })
   const labels = useLabels()
+  const tr = useTranslations("monitorForm")
+  const tc = useTranslations("common")
   const groupItems = [
-    { value: "0", label: "no group" },
+    { value: "0", label: tr("noGroup") },
     ...(labels.groups.data ?? []).map((g) => ({
       value: String(g.id),
       label: g.name,
@@ -284,7 +265,8 @@ export function MonitorForm({
   const ivList = isPush
     ? withValue(pushIntervals, m.interval_sec)
     : withValue(intervals, m.interval_sec)
-  const graceList = withValue(graces, m.grace_sec)
+  const graceList = withValue(graces, m.grace_sec).map((g) => (g.value === "0" ? { ...g, label: tr("noGrace") } : g))
+  const typeItems = types.map((x) => ({ value: x.value, label: tr(`types.${x.value}.label`) }))
 
   function setType(type: MonitorType) {
     setM((p) => {
@@ -319,29 +301,29 @@ export function MonitorForm({
         id ? `/api/monitors/${id}` : "/api/monitors",
         { method: id ? "PUT" : "POST", body }
       )
-      toast.success(id ? "monitor updated" : "monitor created")
+      toast.success(id ? tr("updated") : tr("created"))
       router.push(`/monitors/view/?id=${res.id}`)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : tr("error"))
       setBusy(false)
     }
   }
 
   return (
     <form onSubmit={submit} className="max-w-3xl">
-      <Section title="target" className="mt-0">
+      <Section title={tr("sections.target")} className="mt-0">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="name">
+          <Field label={tr("name")}>
             <Input
               required
               value={m.name}
               onChange={(e) => set("name", e.target.value)}
-              placeholder="api production"
+              placeholder={tr("namePlaceholder")}
             />
           </Field>
-          <Field label="type" hint={t.hint}>
+          <Field label={tr("type")} hint={tr(`types.${t.value}.hint`)}>
             <Select
-              items={types.map((x) => ({ value: x.value, label: x.label }))}
+              items={typeItems}
               value={m.type}
               onValueChange={(v) => v && setType(v as MonitorType)}
             >
@@ -349,7 +331,7 @@ export function MonitorForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {types.map((x) => (
+                {typeItems.map((x) => (
                   <SelectItem key={x.value} value={x.value}>
                     {x.label}
                   </SelectItem>
@@ -359,19 +341,16 @@ export function MonitorForm({
           </Field>
           {isPush ? (
             <p className="text-xs text-muted-foreground sm:col-span-2">
-              pingtxt gives this monitor a secret URL. Call it at the end of
-              every run of your job: the monitor goes down when no call arrives
-              within the expected period plus the grace time. The URL is shown
-              after saving.
+              {tr("pushHint")}
             </p>
           ) : (
             <Field
               label={
                 isHTTP
-                  ? "url"
+                  ? tr("target.url")
                   : m.type === "tcp"
-                    ? "host:port"
-                    : (t.target ?? "host")
+                    ? tr("target.hostPort")
+                    : tr(`target.${t.target ?? "host"}`)
               }
               className="sm:col-span-2"
             >
@@ -385,23 +364,19 @@ export function MonitorForm({
           )}
           {m.type === "docker" && (
             <p className="text-xs text-muted-foreground sm:col-span-2">
-              Checked on the docker engine of each selected location: the hub or
-              agent needs access to /var/run/docker.sock (or DOCKER_HOST). With
-              docker, mount it with -v
-              /var/run/docker.sock:/var/run/docker.sock:ro.
+              {tr("dockerHint")}
             </p>
           )}
           {m.type === "grpc" && (
             <p className="text-xs text-muted-foreground sm:col-span-2">
-              grpc:// for plaintext, grpcs:// for TLS. The path is the service
-              name to check; leave it out to check the whole server.
+              {tr("grpcHint")}
             </p>
           )}
           {isSQL && (
             <>
               <Field
-                label="query"
-                hint="optional, default SELECT 1"
+                label={tr("query")}
+                hint={tr("queryHint")}
                 className="sm:col-span-2"
               >
                 <Textarea
@@ -412,8 +387,8 @@ export function MonitorForm({
                 />
               </Field>
               <Field
-                label="expected value"
-                hint="optional: first column of the first row must equal this"
+                label={tr("expectedValue")}
+                hint={tr("expectedValueHint")}
                 className="sm:col-span-2"
               >
                 <Input
@@ -430,14 +405,14 @@ export function MonitorForm({
                 checked={m.ignore_tls}
                 onCheckedChange={(v) => set("ignore_tls", v)}
               />
-              ignore TLS certificate errors
+              {tr("ignoreTls")}
             </label>
           )}
           {m.type === "keyword" && (
             <>
               <Field
-                label="keyword"
-                hint="case-sensitive substring of the response body"
+                label={tr("keyword")}
+                hint={tr("keywordHint")}
               >
                 <Input
                   required
@@ -446,20 +421,20 @@ export function MonitorForm({
                   placeholder="ok"
                 />
               </Field>
-              <Field label="invert">
+              <Field label={tr("invert")}>
                 <label className="flex h-8 items-center gap-2 text-xs text-muted-foreground">
                   <Switch
                     checked={m.keyword_invert}
                     onCheckedChange={(v) => set("keyword_invert", v)}
                   />
-                  fail when the keyword is present
+                  {tr("invertHint")}
                 </label>
               </Field>
             </>
           )}
           {m.type === "dns" && (
             <>
-              <Field label="record">
+              <Field label={tr("record")}>
                 <Select
                   items={records.map((r) => ({ value: r, label: r }))}
                   value={m.dns_record || "A"}
@@ -477,7 +452,7 @@ export function MonitorForm({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="resolver" hint="empty = system resolver">
+              <Field label={tr("resolver")} hint={tr("resolverHint")}>
                 <Input
                   value={m.dns_server}
                   onChange={(e) => set("dns_server", e.target.value)}
@@ -485,8 +460,8 @@ export function MonitorForm({
                 />
               </Field>
               <Field
-                label="expected answer"
-                hint="optional: fail if no answer contains this"
+                label={tr("expectedAnswer")}
+                hint={tr("expectedAnswerHint")}
                 className="sm:col-span-2"
               >
                 <Input
@@ -500,11 +475,11 @@ export function MonitorForm({
         </div>
       </Section>
 
-      <Section title="group & tags">
+      <Section title={tr("sections.labels")}>
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <Field
-            label="group"
-            hint="groups show as sections on the dashboard and status pages"
+            label={tr("group")}
+            hint={tr("groupHint")}
           >
             <Select
               items={groupItems}
@@ -524,8 +499,8 @@ export function MonitorForm({
             </Select>
           </Field>
           <Field
-            label="tags"
-            hint="type a name and press enter to create a tag"
+            label={tr("tags")}
+            hint={tr("tagsHint")}
           >
             <TagPicker
               value={m.tag_ids ?? []}
@@ -537,11 +512,11 @@ export function MonitorForm({
         </div>
       </Section>
 
-      <Section title="schedule">
+      <Section title={tr("sections.schedule")}>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field
-            label={isPush ? "expected every" : "interval"}
-            hint={isPush ? "how often your job runs" : undefined}
+            label={isPush ? tr("expectedEvery") : tr("interval")}
+            hint={isPush ? tr("expectedEveryHint") : undefined}
           >
             <Select
               items={ivList}
@@ -562,8 +537,8 @@ export function MonitorForm({
           </Field>
           {isPush && (
             <Field
-              label="grace time"
-              hint="extra wait before the monitor goes down, e.g. for slow runs"
+              label={tr("grace")}
+              hint={tr("graceHint")}
             >
               <Select
                 items={graceList}
@@ -585,7 +560,7 @@ export function MonitorForm({
           )}
           {!isPush && (
             <>
-              <Field label="timeout (ms)">
+              <Field label={tr("timeout")}>
                 <Input
                   type="number"
                   min={500}
@@ -596,8 +571,8 @@ export function MonitorForm({
                 />
               </Field>
               <Field
-                label="retries"
-                hint="consecutive failures before a location is down"
+                label={tr("retries")}
+                hint={tr("retriesHint")}
               >
                 <Input
                   type="number"
@@ -613,11 +588,30 @@ export function MonitorForm({
       </Section>
 
       {!isPush && (
-        <Section title="locations">
+        <Section title={tr("sections.locations")}>
           <p className="mb-3 text-xs text-muted-foreground">
-            The monitor is down when the majority of online locations fail,
-            degraded when only some do.
+            {tr("locationsHint")}
           </p>
+          <div className="mb-4 max-w-xs">
+            <Field
+              label={tr("degradedPct")}
+              hint={tr("degradedPctHint")}
+            >
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                placeholder={tr("degradedPctPlaceholder")}
+                value={m.degraded_pct || ""}
+                onChange={(e) =>
+                  set(
+                    "degraded_pct",
+                    Math.min(Math.max(Number(e.target.value) || 0, 0), 50)
+                  )
+                }
+              />
+            </Field>
+          </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {(locations.data ?? []).map((l) => (
               <label
@@ -636,10 +630,10 @@ export function MonitorForm({
                   )}
                 >
                   {l.kind === "local"
-                    ? "built-in"
+                    ? tr("builtIn")
                     : l.online
-                      ? "online"
-                      : "offline"}
+                      ? tr("online")
+                      : tr("offline")}
                 </span>
               </label>
             ))}
@@ -650,7 +644,7 @@ export function MonitorForm({
       {isHTTP && (
         <Section title="http">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="method">
+            <Field label={tr("method")}>
               <Select
                 items={methods.map((x) => ({ value: x, label: x }))}
                 value={m.method || "GET"}
@@ -669,8 +663,8 @@ export function MonitorForm({
               </Select>
             </Field>
             <Field
-              label="accepted status"
-              hint="e.g. 200-299,301 or 2xx. empty = 200-399"
+              label={tr("acceptedStatus")}
+              hint={tr("acceptedStatusHint")}
             >
               <Input
                 value={m.expected_status}
@@ -679,8 +673,8 @@ export function MonitorForm({
               />
             </Field>
             <Field
-              label="headers"
-              hint="one per line: Name: value"
+              label={tr("headers")}
+              hint={tr("headersHint")}
               className="sm:col-span-2"
             >
               <Textarea
@@ -691,7 +685,7 @@ export function MonitorForm({
               />
             </Field>
             {!["GET", "HEAD"].includes(m.method) && (
-              <Field label="body" className="sm:col-span-2">
+              <Field label={tr("body")} className="sm:col-span-2">
                 <Textarea
                   rows={3}
                   value={m.body}
@@ -704,14 +698,14 @@ export function MonitorForm({
                 checked={m.ignore_tls}
                 onCheckedChange={(v) => set("ignore_tls", v)}
               />
-              ignore TLS certificate errors
+              {tr("ignoreTls")}
             </label>
           </div>
         </Section>
       )}
 
       {isHTTP && (
-        <Section title="response checks">
+        <Section title={tr("responseRules.title")}>
           <ResponseRules
             value={m.assertions}
             onChange={(v) => set("assertions", v)}
@@ -720,10 +714,9 @@ export function MonitorForm({
       )}
 
       {!isPush && (
-        <Section title="expiry alerts">
+        <Section title={tr("sections.expiry")}>
           <p className="mb-3 text-xs text-muted-foreground">
-            Notify before the TLS certificate or the domain registration
-            expires. Thresholds are set in settings.
+            {tr("expiryHint")}
           </p>
           <div className="grid gap-2">
             <label
@@ -736,17 +729,17 @@ export function MonitorForm({
                 checked={m.cert_expiry_alert}
                 onCheckedChange={(v) => set("cert_expiry_alert", v)}
               />
-              tls certificate
-              {!isHTTPS && <span>(only for https urls)</span>}
+              {tr("certExpiry")}
+              {!isHTTPS && <span>{tr("certExpiryOnlyHttps")}</span>}
             </label>
             <label className="flex items-center gap-2 text-xs">
               <Switch
                 checked={m.domain_expiry_alert}
                 onCheckedChange={(v) => set("domain_expiry_alert", v)}
               />
-              domain registration
+              {tr("domainExpiry")}
               <span className="text-muted-foreground">
-                (rdap / whois, not for ip addresses)
+                {tr("domainExpiryHint")}
               </span>
             </label>
           </div>
@@ -755,10 +748,10 @@ export function MonitorForm({
 
       <div className="mt-8 flex gap-2 border-t border-dashed pt-4">
         <Button type="submit" disabled={busy}>
-          {busy ? "saving..." : id ? "save" : "create monitor"}
+          {busy ? tr("saving") : id ? tr("save") : tr("create")}
         </Button>
         <Button type="button" variant="ghost" onClick={() => router.back()}>
-          cancel
+          {tc("cancel")}
         </Button>
       </div>
     </form>

@@ -1,6 +1,7 @@
 "use client"
 
 import { PlusIcon, XIcon } from "lucide-react"
+import { useTranslations } from "use-intl"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,18 +14,18 @@ import {
 } from "@/components/ui/select"
 import type { Assertion, AssertionOp } from "@/lib/api"
 
-export const assertionOps: { value: AssertionOp; label: string }[] = [
-  { value: "eq", label: "equals" },
-  { value: "ne", label: "not equals" },
-  { value: "contains", label: "contains" },
-  { value: "not_contains", label: "not contains" },
-  { value: "exists", label: "exists" },
-  { value: "not_exists", label: "not exists" },
-  { value: "gt", label: ">" },
-  { value: "gte", label: ">=" },
-  { value: "lt", label: "<" },
-  { value: "lte", label: "<=" },
-  { value: "matches", label: "matches regex" },
+const assertionOps: AssertionOp[] = [
+  "eq",
+  "ne",
+  "contains",
+  "not_contains",
+  "exists",
+  "not_exists",
+  "gt",
+  "gte",
+  "lt",
+  "lte",
+  "matches",
 ]
 
 const noValue: AssertionOp[] = ["exists", "not_exists"]
@@ -40,16 +41,17 @@ export function ResponseRules({
   value: Assertion[]
   onChange: (v: Assertion[]) => void
 }) {
+  const t = useTranslations("monitorForm.responseRules")
+  const opItems = assertionOps.map((o) => ({ value: o, label: t(`ops.${o}`) }))
   const update = (i: number, patch: Partial<Assertion>) =>
     onChange(value.map((a, j) => (j === i ? { ...a, ...patch } : a)))
 
   return (
     <div className="grid gap-2">
       <p className="text-xs text-muted-foreground">
-        Rules on the JSON body. All must pass, otherwise the check fails and the
-        alert says which rule broke. Paths look like{" "}
-        <code className="font-mono">checks.redis.status</code> or{" "}
-        <code className="font-mono">items[0].id</code>.
+        {t.rich("hint", {
+          code: (c) => <code className="font-mono">{c}</code>,
+        })}
       </p>
       {value.map((a, i) => (
         <div
@@ -57,7 +59,7 @@ export function ResponseRules({
           className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 border-b border-dashed pb-2 sm:grid-cols-[minmax(0,2fr)_9rem_minmax(0,1.5fr)_auto] sm:border-0 sm:pb-0"
         >
           <Input
-            aria-label="json path"
+            aria-label={t("path")}
             className="col-span-2 font-mono sm:col-span-1"
             required
             value={a.path}
@@ -68,14 +70,14 @@ export function ResponseRules({
             type="button"
             variant="ghost"
             size="icon"
-            aria-label="remove rule"
+            aria-label={t("remove")}
             className="sm:order-last"
             onClick={() => onChange(value.filter((_, j) => j !== i))}
           >
             <XIcon />
           </Button>
           <Select
-            items={assertionOps}
+            items={opItems}
             value={a.op}
             onValueChange={(v) =>
               v &&
@@ -85,11 +87,11 @@ export function ResponseRules({
               })
             }
           >
-            <SelectTrigger className="w-full" aria-label="operator">
+            <SelectTrigger className="w-full" aria-label={t("operator")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {assertionOps.map((o) => (
+              {opItems.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
                   {o.label}
                 </SelectItem>
@@ -100,7 +102,7 @@ export function ResponseRules({
             <span />
           ) : (
             <Input
-              aria-label="expected value"
+              aria-label={t("value")}
               className="font-mono"
               inputMode={numeric.includes(a.op) ? "decimal" : undefined}
               required={numeric.includes(a.op)}
@@ -128,7 +130,7 @@ export function ResponseRules({
             }
           >
             <PlusIcon />
-            add rule
+            {t("add")}
           </Button>
         </div>
       )}

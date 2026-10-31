@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTranslations } from "use-intl"
 
+import { LanguagePicker } from "@/components/language-picker"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { api, ApiError, type AuthOptions, type LoginResult } from "@/lib/api"
 
 export default function LoginPage() {
+  const t = useTranslations("login")
   const [setup, setSetup] = useState<boolean | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -68,14 +71,15 @@ export default function LoginPage() {
         setChallenge("")
         setPassword("")
       }
-      setError(err instanceof Error ? err.message : "error")
+      setError(err instanceof Error ? err.message : t("error"))
       setBusy(false)
     }
   }
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center px-4">
-      <div className="absolute top-3 right-3">
+      <div className="absolute top-3 right-3 flex items-center gap-1">
+        <LanguagePicker />
         <ThemeToggle />
       </div>
       <form
@@ -104,13 +108,13 @@ export default function LoginPage() {
         </div>
         {setup && (
           <p className="mb-4 text-xs text-muted-foreground">
-            First run: create the admin account for this instance.
+            {t("firstRun")}
           </p>
         )}
         {challenge ? (
           <div className="grid gap-4">
             <div className="grid gap-1.5">
-              <Label htmlFor="code">authenticator code</Label>
+              <Label htmlFor="code">{t("code")}</Label>
               <Input
                 id="code"
                 inputMode="numeric"
@@ -122,12 +126,12 @@ export default function LoginPage() {
                 onChange={(e) => setCode(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground">
-                lost your phone? type one of your recovery codes instead.
+                {t("recoveryHint")}
               </p>
             </div>
             {error && <div className="text-xs text-down">! {error}</div>}
             <Button type="submit" disabled={busy}>
-              {busy ? "..." : "verify"}
+              {busy ? "..." : t("verify")}
             </Button>
             <Button
               type="button"
@@ -137,7 +141,7 @@ export default function LoginPage() {
                 setError("")
               }}
             >
-              back
+              {t("back")}
             </Button>
           </div>
         ) : (
@@ -150,20 +154,20 @@ export default function LoginPage() {
                 render={<a href={`/api/auth/oauth/${p.id}/start`} />}
                 nativeButton={false}
               >
-                continue with {p.label}
+                {t("continueWith", { provider: p.label })}
               </Button>
             ))}
             {providers.length > 0 && showPassword && (
               <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                 <span className="h-px flex-1 border-t border-dashed" />
-                or
+                {t("or")}
                 <span className="h-px flex-1 border-t border-dashed" />
               </div>
             )}
             {showPassword && (
               <>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="email">email</Label>
+                  <Label htmlFor="email">{t("email")}</Label>
                   <Input
                     id="email"
                     type="email"
@@ -174,7 +178,7 @@ export default function LoginPage() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="password">password</Label>
+                  <Label htmlFor="password">{t("password")}</Label>
                   <Input
                     id="password"
                     type="password"
@@ -190,7 +194,7 @@ export default function LoginPage() {
             {error && <div className="text-xs text-down">! {error}</div>}
             {showPassword && (
               <Button type="submit" disabled={busy || setup === null}>
-                {busy ? "..." : setup ? "create account" : "login"}
+                {busy ? "..." : setup ? t("createAccount") : t("login")}
               </Button>
             )}
           </div>

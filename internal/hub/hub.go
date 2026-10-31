@@ -370,6 +370,7 @@ func (h *Hub) setIdle(id int64) {
 
 // HandleResult stores a result and re-evaluates the monitor status.
 func (h *Hub) HandleResult(loc string, r check.Result) {
+	defPct := h.generalSettings().DegradedPct
 	h.mu.Lock()
 	st, ok := h.monitors[r.MonitorID]
 	if !ok || st.m.Paused {
@@ -392,6 +393,10 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	if r.OK && len(m.Assertions) > 0 && r.Asserted < len(m.Assertions) && loc != LocalLocation {
 		r.OK = false
 		r.Message = "this agent cannot check response rules: update it"
+	}
+	pct := m.DegradedPct
+	if pct == 0 {
+		pct = defPct
 	}
 	ls := st.locs[loc]
 	if ls == nil {
@@ -423,13 +428,7 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 			causes = append(causes, h.locationNameLocked(l)+": "+s.lastMsg)
 		}
 	}
-	status := StatusUp
-	switch {
-	case down > 0 && down*2 > n:
-		status = StatusDown
-	case down > 0:
-		status = StatusDegraded
-	}
+	status := classify(n, down, pct)
 	st.real = status
 	inMaint := st.inMaint
 	display := status
@@ -464,6 +463,27 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		h.log.Info("status change", "monitor", name, "from", prev, "to", display)
 	}
 	h.raise(m, alert, strings.Join(causes, "; "), r.At)
+}
+
+// Share of failing locations that marks a monitor degraded.
+const (
+	defaultDegradedPct = 35
+	maxDegradedPct     = 50 // above half of the locations the monitor is down
+)
+
+// classify gives a monitor's status from how many of its n reachable
+// locations are failing: down when more than half fail, degraded when at
+// least pct percent fail, up otherwise.
+func classify(n, down, pct int) string {
+	switch {
+	case down == 0:
+		return StatusUp
+	case down*2 > n:
+		return StatusDown
+	case down*100 >= pct*n:
+		return StatusDegraded
+	}
+	return StatusUp
 }
 
 // alertLocked decides whether an incident must be opened ("down") or

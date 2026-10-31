@@ -2,10 +2,12 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { CopyBlock } from "@/components/copy-block"
 import { Section } from "@/components/page-header"
 import { Field } from "@/components/settings/field"
+import { useRoles } from "@/components/settings/users"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -18,7 +20,6 @@ import {
 import { Switch } from "@/components/ui/switch"
 import {
   api,
-  roles,
   type AuthSettings,
   type Role,
   type ProviderId,
@@ -27,42 +28,22 @@ import {
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-const help: Record<ProviderId, React.ReactNode> = {
-  github: (
-    <>
-      create an OAuth app at{" "}
-      <a
-        className="underline"
-        href="https://github.com/settings/developers"
-        target="_blank"
-        rel="noreferrer"
-      >
-        github.com/settings/developers
-      </a>{" "}
-      and use this callback url.
-    </>
-  ),
-  google: (
-    <>
-      in{" "}
-      <a
-        className="underline"
-        href="https://console.cloud.google.com/apis/credentials"
-        target="_blank"
-        rel="noreferrer"
-      >
-        Google Cloud → Credentials
-      </a>{" "}
-      create an OAuth client ID of type &quot;web application&quot; and add this
-      redirect URI.
-    </>
-  ),
-  oidc: (
-    <>
-      any OpenID Connect provider: Authentik, Keycloak, Authelia, Pocket ID,
-      Zitadel, Okta, Entra ID... register a client with this redirect URI.
-    </>
-  ),
+// Setup help per provider (authSettings.help.<id>); <link> opens the console.
+const helpLinks: Record<ProviderId, string> = {
+  github: "https://github.com/settings/developers",
+  google: "https://console.cloud.google.com/apis/credentials",
+  oidc: "",
+}
+
+function ProviderHelp({ id }: { id: ProviderId }) {
+  const t = useTranslations("authSettings.help")
+  return t.rich(id, {
+    link: (c) => (
+      <a className="underline" href={helpLinks[id]} target="_blank" rel="noreferrer">
+        {c}
+      </a>
+    ),
+  })
 }
 
 function Toggle({
@@ -94,6 +75,8 @@ export function AuthSettingsForm({
     settings.auth.allowed_domains.join(", ")
   )
   const [busy, setBusy] = useState(false)
+  const t = useTranslations("authSettings")
+  const roles = useRoles()
   const setP = (id: ProviderId, patch: Partial<ProviderSettings>) =>
     setA((p) => ({
       ...p,
@@ -131,10 +114,10 @@ export function AuthSettingsForm({
         method: "PUT",
         body,
       })
-      toast.success("authentication settings saved")
+      toast.success(t("saved"))
       onSaved(s)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     } finally {
       setBusy(false)
     }
@@ -142,17 +125,16 @@ export function AuthSettingsForm({
 
   return (
     <form onSubmit={save}>
-      <Section title="authentication">
+      <Section title={t("title")}>
         <div className="grid gap-3">
           <Toggle
             checked={a.password_login}
             onChange={(v) => setA((p) => ({ ...p, password_login: v }))}
             label={
               <>
-                email + password login
+                {t("passwordLogin")}
                 <span className="block text-[11px] text-muted-foreground">
-                  turn off to allow only single sign-on. recovery:{" "}
-                  <code>pingtxt -enable-password-login</code>
+                  {t.rich("passwordLoginHint", { code: (c) => <code>{c}</code> })}
                 </span>
               </>
             }
@@ -162,10 +144,9 @@ export function AuthSettingsForm({
             onChange={(v) => setA((p) => ({ ...p, allow_signup: v }))}
             label={
               <>
-                create accounts on first single sign-on
+                {t("signup")}
                 <span className="block text-[11px] text-muted-foreground">
-                  off: only people who already have an account (same email) can
-                  log in with a provider
+                  {t("signupHint")}
                 </span>
               </>
             }
@@ -173,9 +154,9 @@ export function AuthSettingsForm({
           {a.allow_signup && (
             <div className="grid gap-3 sm:grid-cols-2">
               <Field
-                label="allowed email domains"
+                label={t("domains")}
                 htmlFor="domains"
-                hint="comma separated, e.g. example.com. empty: any verified email"
+                hint={t("domainsHint")}
               >
                 <Input
                   id="domains"
@@ -185,7 +166,7 @@ export function AuthSettingsForm({
                 />
               </Field>
               <Field
-                label="role of new accounts"
+                label={t("defaultRole")}
                 hint={roles.find((r) => r.value === a.default_role)?.hint}
               >
                 <Select
@@ -226,7 +207,7 @@ export function AuthSettingsForm({
                     {p.id === "oidc" ? "OpenID Connect" : p.label}
                   </span>
                   <span className="text-muted-foreground">
-                    {p.enabled ? " · enabled" : " · off"}
+                    {p.enabled ? ` · ${t("enabled")}` : ` · ${t("off")}`}
                   </span>
                 </span>
                 <Switch
@@ -237,14 +218,14 @@ export function AuthSettingsForm({
               {p.enabled && (
                 <div className="grid gap-4 border-t border-dashed p-3 sm:grid-cols-2">
                   <p className="text-[11px] text-muted-foreground sm:col-span-2">
-                    {help[p.id]}
+                    <ProviderHelp id={p.id} />
                   </p>
-                  <Field label="callback url" className="sm:col-span-2">
+                  <Field label={t("callbackUrl")} className="sm:col-span-2">
                     <CopyBlock code={p.callback_url} />
                   </Field>
                   {p.id === "oidc" && (
                     <>
-                      <Field label="button label" htmlFor={`${p.id}-name`}>
+                      <Field label={t("buttonLabel")} htmlFor={`${p.id}-name`}>
                         <Input
                           id={`${p.id}-name`}
                           placeholder="SSO"
@@ -253,9 +234,9 @@ export function AuthSettingsForm({
                         />
                       </Field>
                       <Field
-                        label="issuer url"
+                        label={t("issuer")}
                         htmlFor={`${p.id}-issuer`}
-                        hint="must serve /.well-known/openid-configuration"
+                        hint={t("issuerHint")}
                       >
                         <Input
                           id={`${p.id}-issuer`}
@@ -270,7 +251,7 @@ export function AuthSettingsForm({
                       </Field>
                     </>
                   )}
-                  <Field label="client id" htmlFor={`${p.id}-cid`}>
+                  <Field label={t("clientId")} htmlFor={`${p.id}-cid`}>
                     <Input
                       id={`${p.id}-cid`}
                       required
@@ -282,11 +263,11 @@ export function AuthSettingsForm({
                     />
                   </Field>
                   <Field
-                    label="client secret"
+                    label={t("clientSecret")}
                     htmlFor={`${p.id}-secret`}
                     hint={
                       p.client_secret_set
-                        ? "saved. leave empty to keep it."
+                        ? t("secretSaved")
                         : undefined
                     }
                   >
@@ -304,9 +285,9 @@ export function AuthSettingsForm({
                   </Field>
                   {p.id === "oidc" && (
                     <Field
-                      label="scopes"
+                      label={t("scopes")}
                       htmlFor={`${p.id}-scopes`}
-                      hint="default: openid email profile"
+                      hint={t("scopesHint")}
                       className="sm:col-span-2"
                     >
                       <Input
@@ -325,16 +306,16 @@ export function AuthSettingsForm({
 
         {!a.password_login && !anyProvider && (
           <div className="mt-3 text-xs text-down">
-            ! enable a provider before turning off password login
+            ! {t("needProvider")}
           </div>
         )}
         <div className="mt-4 flex items-center gap-3">
           <Button type="submit" variant="outline" disabled={busy || !dirty}>
-            {busy ? "..." : "save"}
+            {busy ? "..." : t("save")}
           </Button>
           {dirty && (
             <span className="text-[11px] text-muted-foreground">
-              unsaved changes
+              {t("unsaved")}
             </span>
           )}
         </div>
