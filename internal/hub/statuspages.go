@@ -20,6 +20,7 @@ type statusPages struct {
 	mu      sync.RWMutex
 	domains map[string]string // domain -> slug
 	cache   map[string]cachedPage
+	badges  map[string]cachedBadge // see badges.go
 }
 
 type cachedPage struct {
@@ -38,6 +39,7 @@ func (h *Hub) reloadPageDomains() {
 	h.pages.mu.Lock()
 	h.pages.domains = d
 	h.pages.cache = nil
+	h.pages.badges = nil
 	h.pages.mu.Unlock()
 }
 
@@ -80,7 +82,9 @@ func (h *Hub) customDomains(next http.Handler, ui fs.FS) http.Handler {
 		switch {
 		case p == "/api/public/status" || p == "/api/public/status/":
 			h.servePublicPage(w, r, slug, true)
-		case p == "/api/health", strings.HasPrefix(p, "/_next/"), p == "/icon.svg":
+		case p == "/api/health", strings.HasPrefix(p, "/_next/"), p == "/icon.svg",
+			strings.HasPrefix(p, "/api/badge/"+slug+"/"): // badges of this page only
+
 			next.ServeHTTP(w, r)
 		case strings.HasPrefix(p, "/api/"), strings.HasPrefix(p, "/download/"), p == "/install-agent.sh":
 			writeErr(w, http.StatusNotFound, "not found")
@@ -299,42 +303,49 @@ func (h *Hub) publicStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Hub) servePublicPage(w http.ResponseWriter, r *http.Request, slug string, byDomain bool) {
-	notFound := func() { writeErr(w, 404, "status page not found") }
-	if !slugRe.MatchString(slug) {
-		notFound()
+	page, err := h.cachedPublicPage(slug)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, "status page not found")
 		return
+	} else if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	// Drafts are visible to logged-in users only (preview from the admin UI).
+	if !page.Published && (byDomain || h.currentUser(r) == nil) {
+		writeErr(w, 404, "status page not found")
+		return
+	}
+	writeJSON(w, 200, page)
+}
+
+// cachedPublicPage returns the payload of a status page, drafts included,
+// built at most every publicCacheTTL.
+func (h *Hub) cachedPublicPage(slug string) (*publicPage, error) {
+	if !slugRe.MatchString(slug) {
+		return nil, store.ErrNotFound
 	}
 	h.pages.mu.RLock()
 	c, ok := h.pages.cache[slug]
 	h.pages.mu.RUnlock()
-	page := c.page
-	if !ok || time.Since(c.at) > publicCacheTTL {
-		sp, err := h.store.StatusPageBySlug(slug)
-		if errors.Is(err, store.ErrNotFound) {
-			notFound()
-			return
-		} else if err != nil {
-			h.internalErr(w, err)
-			return
-		}
-		page, err = h.buildPublicPage(sp)
-		if err != nil {
-			h.internalErr(w, err)
-			return
-		}
-		h.pages.mu.Lock()
-		if h.pages.cache == nil {
-			h.pages.cache = map[string]cachedPage{}
-		}
-		h.pages.cache[slug] = cachedPage{at: time.Now(), page: page}
-		h.pages.mu.Unlock()
+	if ok && time.Since(c.at) <= publicCacheTTL {
+		return c.page, nil
 	}
-	// Drafts are visible to logged-in users only (preview from the admin UI).
-	if !page.Published && (byDomain || h.currentUser(r) == nil) {
-		notFound()
-		return
+	sp, err := h.store.StatusPageBySlug(slug)
+	if err != nil {
+		return nil, err
 	}
-	writeJSON(w, 200, page)
+	page, err := h.buildPublicPage(sp)
+	if err != nil {
+		return nil, err
+	}
+	h.pages.mu.Lock()
+	if h.pages.cache == nil {
+		h.pages.cache = map[string]cachedPage{}
+	}
+	h.pages.cache[slug] = cachedPage{at: time.Now(), page: page}
+	h.pages.mu.Unlock()
+	return page, nil
 }
 
 // publicDays is how many daily bars a page shows: the retention period,

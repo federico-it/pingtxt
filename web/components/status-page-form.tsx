@@ -6,6 +6,7 @@ import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
+import { PageBadge } from "@/components/badge-info"
 import { GroupToggle, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
 import { Field } from "@/components/settings/field"
@@ -266,6 +267,8 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
           </div>
         )}
       </Section>
+
+      {initial?.published && <PageBadge page={initial} />}
 
       <div className="mt-8 flex flex-wrap gap-2">
         <Button type="submit" disabled={busy}>

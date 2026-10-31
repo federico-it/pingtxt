@@ -14,7 +14,7 @@ but plain text, monospace, light and dark.
   several does not lower it.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
-- Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
+- Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain, plus SVG badges for READMEs.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
 - **MCP server** on `/mcp`: Claude and other AI assistants can read status and incidents and, with a write token,
   manage monitors and maintenance windows.
@@ -227,6 +227,18 @@ times, never targets, locations or error messages. Drafts are visible only to lo
 For a **custom domain** (e.g. `status.example.com`), set it on the page, point its DNS at the hub and route the host
 to pingtxt in your reverse proxy (with its own TLS certificate). On that host pingtxt serves only the status page at
 `/`; the admin UI and API are not reachable there. The history covers the retention period, up to 90 days.
+
+**README badges.** Each published page has shields-style SVG badges, with no login: the page state at
+`/api/badge/<slug>/status.svg`, and for each monitor it shows `/api/badge/<slug>/<monitor id>/status.svg`,
+`uptime.svg` and `response.svg` (`?period=24h|7d|30d|90d`, defaults 30d for uptime and 24h for response time).
+`?label=` changes the left text and `?style=flat-square` drops the rounded corners. Copy the Markdown from the
+monitor page or the status page editor:
+
+```markdown
+[![uptime](https://pingtxt.example.com/api/badge/acme/12/uptime.svg)](https://pingtxt.example.com/status/acme/)
+```
+
+A badge never shows more than its page: drafts and monitors that are not on the page answer a grey "not found".
 ## Heartbeat monitors (cron jobs)
 
 For jobs that run on a schedule (backups, cron, queues) create a monitor of type **heartbeat (push)**. It gets a secret URL; the job calls it at the end of every run, with any HTTP method:

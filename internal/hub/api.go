@@ -144,6 +144,8 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("PUT /api/status-pages/{id}", auth(h.saveStatusPage))
 	mux.HandleFunc("DELETE /api/status-pages/{id}", auth(h.deleteStatusPage))
 	mux.HandleFunc("GET /api/public/status/{slug}", h.publicStatus)
+	mux.HandleFunc("GET /api/badge/{slug}/{kind}", h.pageBadge) // README badges, see badges.go
+	mux.HandleFunc("GET /api/badge/{slug}/{monitor}/{kind}", h.monitorBadge)
 
 	mux.HandleFunc("GET /metrics", h.metrics)
 	mux.HandleFunc(mcpPath, h.serveMCP(mux)) // MCP server for AI assistants, see mcp.go
