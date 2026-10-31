@@ -64,9 +64,10 @@ type monState struct {
 	locs     map[string]*locState
 	lastPing time.Time // push monitors only
 
-	real     string // status computed from the checks, ignoring maintenance
-	inMaint  bool   // a maintenance window currently covers the monitor
-	incident bool   // an incident is open (alerted as down)
+	real     string      // status computed from the checks, ignoring maintenance
+	inMaint  bool        // a maintenance window currently covers the monitor
+	incident bool        // an incident is open (alerted as down)
+	alerts   *alertState // alerts sent for the open incident, see escalation.go
 
 	busy  bool      // a local check is queued or running
 	stats *monStats // last 24h of results, for the dashboard
@@ -172,6 +173,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.backupLoop(ctx)
 	go h.reportLoop(ctx)
 	go h.releaseLoop(ctx)
+	go h.escalationLoop(ctx)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for {
@@ -192,11 +194,8 @@ func (h *Hub) reloadAll() error {
 	if err := h.MaintenancesChanged(); err != nil {
 		return err
 	}
-	open := map[int64]bool{}
-	for _, m := range ms {
-		open[m.ID], _ = h.store.HasOpenIncident(m.ID)
-	}
 	now := time.Now()
+	open := h.loadAlerts(now.UnixMilli())
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.warmUntil = now.UnixMilli()
@@ -206,7 +205,7 @@ func (h *Hub) reloadAll() error {
 			// Give jobs a full period after a restart before calling them late.
 			next = now.Add(pushWindow(m))
 		}
-		h.monitors[m.ID] = &monState{m: m, next: next, locs: map[string]*locState{}, incident: open[m.ID], stats: &monStats{since: h.warmUntil}}
+		h.monitors[m.ID] = &monState{m: m, next: next, locs: map[string]*locState{}, incident: open[m.ID] != nil, alerts: open[m.ID], stats: &monStats{since: h.warmUntil}}
 	}
 	return nil
 }
@@ -241,6 +240,7 @@ func (h *Hub) MonitorChanged(id int64) {
 			st.locs = map[string]*locState{}
 			st.real = ""
 			st.incident = false // pausing resolves open incidents
+			st.alerts = nil
 		}
 		// Re-evaluate maintenance on the next tick (pause/resume resets status).
 		st.inMaint = false
@@ -440,6 +440,9 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	}
 	status := classify(n, down, pct)
 	st.real = status
+	if status == StatusDown && st.alerts != nil {
+		st.alerts.cause = strings.Join(causes, "; ") // reminders carry the latest cause
+	}
 	// Uptime is computed from the status kept with each result. Locations
 	// that have not answered yet since the start count as not failing, so a
 	// failing agent that happens to answer first does not count as downtime.
@@ -541,15 +544,19 @@ func (h *Hub) alertLocked(st *monState) string {
 	return ""
 }
 
-// raise opens or resolves the incident and sends notifications.
+// raise opens or resolves the incident and sends notifications. Channels
+// with a delay or repeat interval are then served by escalationLoop.
 func (h *Hub) raise(m *store.Monitor, alert, cause string, at int64) {
 	switch alert {
 	case StatusDown:
-		_ = h.store.OpenIncident(m.ID, at, cause)
-		h.notify.Send(Event{MonitorID: m.ID, Monitor: m.Name, Target: eventTarget(m), Status: StatusDown, Cause: cause, At: at})
+		id, err := h.store.OpenIncident(m.ID, at, cause)
+		if err != nil {
+			h.log.Error("open incident", "err", err)
+		}
+		h.openAlerts(m, id, at, cause)
 	case StatusUp:
 		_ = h.store.ResolveIncident(m.ID, at)
-		h.notify.Send(Event{MonitorID: m.ID, Monitor: m.Name, Target: eventTarget(m), Status: StatusUp, At: at})
+		h.closeAlerts(m, at)
 	}
 }
 

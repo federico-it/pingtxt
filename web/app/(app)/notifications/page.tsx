@@ -70,7 +70,21 @@ const kinds: Record<NotifierType, { fields: Field[] }> = {
 
 const portFor: Record<string, string> = { starttls: "587", tls: "465", none: "25" }
 
-type Draft = { id?: number; name: string; type: NotifierType; config: Record<string, string>; enabled: boolean }
+type Draft = {
+  id?: number
+  name: string
+  type: NotifierType
+  config: Record<string, string>
+  enabled: boolean
+  delay_min: number
+  repeat_min: number
+}
+
+// Same limits as the hub: repeat at least every 5 minutes, at most one week.
+const minRepeat = 5
+const maxMinutes = 7 * 24 * 60
+
+const minutes = (v: string) => Math.min(maxMinutes, Math.max(0, Math.trunc(Number(v)) || 0))
 
 export default function NotificationsPage() {
   const { data, mutate } = useApi<Notifier[]>("/api/notifiers", { refreshInterval: 0 })
@@ -140,7 +154,7 @@ export default function NotificationsPage() {
     <>
       <PageHeader cmd="pingtxt notify ls" title={t("title")}>
         {isAdmin && (
-          <Button onClick={() => setDraft({ name: "", type: "webhook", config: {}, enabled: true })}>
+          <Button onClick={() => setDraft({ name: "", type: "webhook", config: {}, enabled: true, delay_min: 0, repeat_min: 0 })}>
             <PlusIcon /> {t("add")}
           </Button>
         )}
@@ -158,7 +172,15 @@ export default function NotificationsPage() {
               <Switch checked={n.enabled} onCheckedChange={(v) => toggle(n, v)} disabled={!isAdmin} />
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{n.name}</div>
-                <div className="text-xs text-muted-foreground">{kinds[n.type] ? t(`kinds.${n.type}`) : n.type}</div>
+                <div className="text-xs text-muted-foreground">
+                  {[
+                    kinds[n.type] ? t(`kinds.${n.type}`) : n.type,
+                    n.delay_min > 0 && t("afterDown", { min: n.delay_min }),
+                    n.repeat_min > 0 && t("everyMin", { min: n.repeat_min }),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
               </div>
               {isAdmin && (
                 <>
@@ -187,7 +209,7 @@ export default function NotificationsPage() {
       {data && isAdmin !== undefined && <PeriodicReports notifiers={data} isAdmin={isAdmin} />}
 
       <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
           <form onSubmit={save} className="grid gap-4">
             <DialogHeader>
               <DialogTitle>{draft?.id ? t("editTitle") : t("add")}</DialogTitle>
@@ -222,6 +244,18 @@ export default function NotificationsPage() {
               {kind?.fields.map((f) => (
                 <NotifierField key={`${draft?.type}-${f.key}`} field={f} config={draft?.config ?? {}} onChange={setConfig} />
               ))}
+            </div>
+            <div className="grid grid-cols-2 gap-4 border-t border-dashed pt-4">
+              <div className="col-span-2 grid content-start gap-1.5 sm:col-span-1">
+                <Label htmlFor="n-delay">{t("delayMin")}</Label>
+                <Input id="n-delay" type="number" min={0} max={maxMinutes} value={draft?.delay_min ?? 0} onChange={(e) => setDraft((p) => p && { ...p, delay_min: minutes(e.target.value) })} />
+                <p className="text-xs text-muted-foreground">{t("delayHint")}</p>
+              </div>
+              <div className="col-span-2 grid content-start gap-1.5 sm:col-span-1">
+                <Label htmlFor="n-repeat">{t("repeatMin")}</Label>
+                <Input id="n-repeat" type="number" min={0} max={maxMinutes} value={draft?.repeat_min ?? 0} onChange={(e) => setDraft((p) => p && { ...p, repeat_min: minutes(e.target.value) })} />
+                <p className="text-xs text-muted-foreground">{t("repeatHint", { min: minRepeat })}</p>
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={testDraft}>

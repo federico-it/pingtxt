@@ -755,8 +755,71 @@ type Incident struct {
 	Cause       string `json:"cause"`
 }
 
-func (s *Store) OpenIncident(monitorID int64, at int64, cause string) error {
-	_, err := s.db.Exec(`INSERT INTO incidents (monitor_id, started_at, cause) VALUES (?, ?, ?)`, monitorID, at, cause)
+// OpenIncident starts an incident and returns its id.
+func (s *Store) OpenIncident(monitorID int64, at int64, cause string) (int64, error) {
+	return s.db.insert(s.db, `INSERT INTO incidents (monitor_id, started_at, cause) VALUES (?, ?, ?)`, monitorID, at, cause)
+}
+
+// OpenIncidentAlerts returns the unresolved incidents with the alerts sent
+// for each of them so far, keyed by monitor id (the latest incident wins).
+func (s *Store) OpenIncidentAlerts() (map[int64]*IncidentAlerts, error) {
+	rows, err := s.db.Query(`SELECT id, monitor_id, started_at, cause FROM incidents WHERE resolved_at = 0 ORDER BY started_at`)
+	if err != nil {
+		return nil, err
+	}
+	out := map[int64]*IncidentAlerts{}
+	byID := map[int64]*IncidentAlerts{}
+	for rows.Next() {
+		a := &IncidentAlerts{Sent: map[int64]AlertSent{}}
+		if err := rows.Scan(&a.IncidentID, &a.MonitorID, &a.StartedAt, &a.Cause); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out[a.MonitorID] = a
+		byID[a.IncidentID] = a
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil || len(out) == 0 {
+		return out, err
+	}
+	rows, err = s.db.Query(`SELECT a.incident_id, a.notifier_id, a.sent_at, a.count FROM incident_alerts a JOIN incidents i ON i.id = a.incident_id WHERE i.resolved_at = 0`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var inc, nt int64
+		var sent AlertSent
+		if err := rows.Scan(&inc, &nt, &sent.At, &sent.Count); err != nil {
+			return nil, err
+		}
+		if a := byID[inc]; a != nil {
+			a.Sent[nt] = sent
+		}
+	}
+	return out, rows.Err()
+}
+
+// IncidentAlerts is an open incident and the alerts its channels received.
+type IncidentAlerts struct {
+	IncidentID int64
+	MonitorID  int64
+	StartedAt  int64
+	Cause      string
+	Sent       map[int64]AlertSent // by notifier id
+}
+
+// AlertSent is the last alert a channel received for an incident.
+type AlertSent struct {
+	At    int64 // unix ms
+	Count int   // alerts sent so far: the first one, then reminders
+}
+
+// RecordIncidentAlert stores that a channel was alerted about an incident.
+func (s *Store) RecordIncidentAlert(incidentID, notifierID int64, sent AlertSent) error {
+	_, err := s.db.Exec(`INSERT INTO incident_alerts (incident_id, notifier_id, sent_at, count) VALUES (?, ?, ?, ?)
+		ON CONFLICT(incident_id, notifier_id) DO UPDATE SET sent_at = excluded.sent_at, count = excluded.count`,
+		incidentID, notifierID, sent.At, sent.Count)
 	return err
 }
 
@@ -831,16 +894,22 @@ func (s *Store) OpenIncidentMonitors() (map[int64]bool, error) {
 // ---------- notifiers ----------
 
 type Notifier struct {
-	ID        int64             `json:"id"`
-	Name      string            `json:"name"`
-	Type      string            `json:"type"`
-	Config    map[string]string `json:"config"`
-	Enabled   bool              `json:"enabled"`
-	CreatedAt int64             `json:"created_at"`
+	ID      int64             `json:"id"`
+	Name    string            `json:"name"`
+	Type    string            `json:"type"`
+	Config  map[string]string `json:"config"`
+	Enabled bool              `json:"enabled"`
+	// DelayMin waits this many minutes of downtime before the first alert
+	// (0 = right away), so the channel can be an escalation contact.
+	DelayMin int `json:"delay_min"`
+	// RepeatMin repeats the alert every this many minutes while the monitor
+	// stays down (0 = once).
+	RepeatMin int   `json:"repeat_min"`
+	CreatedAt int64 `json:"created_at"`
 }
 
 func (s *Store) ListNotifiers() ([]*Notifier, error) {
-	rows, err := s.db.Query(`SELECT id, name, type, config, enabled, created_at FROM notifiers ORDER BY name`)
+	rows, err := s.db.Query(`SELECT id, name, type, config, enabled, delay_min, repeat_min, created_at FROM notifiers ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -849,7 +918,7 @@ func (s *Store) ListNotifiers() ([]*Notifier, error) {
 	for rows.Next() {
 		n := &Notifier{}
 		var cfg string
-		if err := rows.Scan(&n.ID, &n.Name, &n.Type, &cfg, &n.Enabled, &n.CreatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.Name, &n.Type, &cfg, &n.Enabled, &n.DelayMin, &n.RepeatMin, &n.CreatedAt); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(cfg), &n.Config)
@@ -877,7 +946,7 @@ func (s *Store) Notifier(id int64) (*Notifier, error) {
 func (s *Store) CreateNotifier(n *Notifier) error {
 	cfg, _ := json.Marshal(n.Config)
 	n.CreatedAt = now()
-	id, err := s.db.insert(s.db, `INSERT INTO notifiers (name, type, config, enabled, created_at) VALUES (?, ?, ?, ?, ?)`, n.Name, n.Type, string(cfg), b2i(n.Enabled), n.CreatedAt)
+	id, err := s.db.insert(s.db, `INSERT INTO notifiers (name, type, config, enabled, delay_min, repeat_min, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, n.Name, n.Type, string(cfg), b2i(n.Enabled), n.DelayMin, n.RepeatMin, n.CreatedAt)
 	if err != nil {
 		return err
 	}
@@ -887,7 +956,7 @@ func (s *Store) CreateNotifier(n *Notifier) error {
 
 func (s *Store) UpdateNotifier(n *Notifier) error {
 	cfg, _ := json.Marshal(n.Config)
-	_, err := s.db.Exec(`UPDATE notifiers SET name = ?, type = ?, config = ?, enabled = ? WHERE id = ?`, n.Name, n.Type, string(cfg), b2i(n.Enabled), n.ID)
+	_, err := s.db.Exec(`UPDATE notifiers SET name = ?, type = ?, config = ?, enabled = ?, delay_min = ?, repeat_min = ? WHERE id = ?`, n.Name, n.Type, string(cfg), b2i(n.Enabled), n.DelayMin, n.RepeatMin, n.ID)
 	return err
 }
 

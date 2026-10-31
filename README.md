@@ -13,7 +13,8 @@ but plain text, monospace, light and dark.
   Uptime follows that status: a check counts as downtime only while the monitor is down, so one failing location among
   several does not lower it.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
-- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
+- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI),
+  with **escalation** (a channel alerted only after X minutes down) and **reminders** while a monitor stays down.
 - **Periodic email reports**, weekly (Mondays) or monthly (on the 1st): uptime, incidents and downtime per monitor group,
   compared with the period before, sent through your email channels at the hour and in the time zone you pick.
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain, plus SVG badges for READMEs.
@@ -241,6 +242,20 @@ monitor page or the status page editor:
 ```
 
 A badge never shows more than its page: drafts and monitors that are not on the page answer a grey "not found".
+
+## Escalation and reminders
+
+Each notification channel has two optional settings, in minutes:
+
+- **send after**: the channel gets the alert only if the monitor is still down after this time (0 = right away).
+  Add a second channel (e.g. the on-call phone or a manager's email) with 15 or 30 minutes to escalate long outages;
+  short blips never reach it, and it gets the recovery message only if it got the alert.
+- **repeat every**: the channel gets a `STILL DOWN` reminder at this interval while the monitor stays down
+  (0 = once, at least 5). Webhooks carry `reminder` (1, 2, ...) and `down_since` (unix ms).
+
+Times count from when the incident opened. Nothing is sent during a maintenance window: due alerts go out when it ends.
+What each channel received is stored with the incident, so a restart does not repeat or skip alerts.
+
 ## Heartbeat monitors (cron jobs)
 
 For jobs that run on a schedule (backups, cron, queues) create a monitor of type **heartbeat (push)**. It gets a secret URL; the job calls it at the end of every run, with any HTTP method:

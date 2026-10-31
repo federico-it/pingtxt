@@ -100,10 +100,12 @@ func reportFixture(t *testing.T, st *store.Store, from time.Time) (prod, staging
 	rows = append(rows, &store.ResultRow{MonitorID: api.ID, Location: "hub", TS: f - 3600_000, OK: true, LatencyMs: 100})
 	must(t, st.InsertResults(rows))
 	h := int64(time.Hour / time.Millisecond)
-	must(t, st.OpenIncident(api.ID, f+10*h, "timeout"))
+	_, err := st.OpenIncident(api.ID, f+10*h, "timeout")
+	must(t, err)
 	must(t, st.ResolveIncident(api.ID, f+17*h))
 	// Started the week before, resolved 30 minutes into this one.
-	must(t, st.OpenIncident(web.ID, f-2*h, "502"))
+	_, err = st.OpenIncident(web.ID, f-2*h, "502")
+	must(t, err)
 	must(t, st.ResolveIncident(web.ID, f+h/2))
 	return prod, staging
 }

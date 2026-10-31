@@ -1217,6 +1217,12 @@ func validateNotifier(n *store.Notifier) error {
 	if n.Config == nil {
 		n.Config = map[string]string{}
 	}
+	if n.DelayMin < 0 || n.DelayMin > maxAlertMin {
+		return fmt.Errorf("delay must be between 0 and %d minutes", maxAlertMin)
+	}
+	if n.RepeatMin != 0 && (n.RepeatMin < minRepeatMin || n.RepeatMin > maxAlertMin) {
+		return fmt.Errorf("repeat interval must be 0 (off) or between %d and %d minutes", minRepeatMin, maxAlertMin)
+	}
 	if n.Type == "telegram" {
 		if n.Config["bot_token"] == "" || n.Config["chat_id"] == "" {
 			return errors.New("bot token and chat id are required")
