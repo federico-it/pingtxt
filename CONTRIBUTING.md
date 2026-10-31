@@ -92,10 +92,11 @@ How it works, for developers:
 - Messages use ICU syntax: `{name}` for values, `{count, plural, one {# monitor} other {# monitors}}`
   for plurals and `<code>...</code>` tags rendered with `t.rich`. Keep commands, URLs and product names
   out of the strings when you can.
-- When you add or change text, update `en.json` only, in the namespace of the page you touched.
-  Missing keys in a translation fall back to English. `tsc` fails on a key that doesn't exist in `en.json`.
+- When you add or change text, update `en.json` only, in the namespace of the page you touched, and
+  translate it on Crowdin. Missing keys in a translation fall back to English. `tsc` fails on a key that doesn't exist in `en.json`.
 - [`crowdin.yml`](crowdin.yml) maps `web/messages/en.json` to `web/messages/<lang>.json`. Crowdin uploads
-  the source on every push to `main` and opens a pull request with the translations.
+  the source on every push to `main` and opens a pull request from `l10n_main` with the translations.
+  It exports only translated strings, so an untranslated key is left out and falls back to English.
 - A language shows up in the picker once it is listed in `locales` and `loaders` in
   [`web/lib/i18n.tsx`](web/lib/i18n.tsx). Add it there when its file is reasonably complete.
 - The language is chosen per browser (saved in `localStorage`, otherwise taken from the browser
