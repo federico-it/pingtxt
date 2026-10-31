@@ -20,6 +20,9 @@ func SchemaVersion() int { return len(migrations) }
 // It reads through its own connection, so the hub keeps writing results
 // while the copy is made (WAL mode). dst must not exist.
 func (s *Store) Snapshot(dst string) error {
+	if s.db.driver != DriverSQLite {
+		return errors.New("snapshots need SQLite: use pg_dump or mariadb-dump")
+	}
 	return SnapshotFile(s.path, dst)
 }
 

@@ -2,13 +2,24 @@ package store
 
 import (
 	"math"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
+// openTest opens an empty store: SQLite in a temp dir, or a scratch
+// database on the server of PINGTXT_TEST_DB_URL (postgres:// or mysql://).
 func openTest(t *testing.T) *Store {
 	t.Helper()
+	if u := os.Getenv("PINGTXT_TEST_DB_URL"); u != "" {
+		s, drop, err := OpenScratch(u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(drop)
+		return s
+	}
 	s, err := Open(filepath.Join(t.TempDir(), "t.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +133,7 @@ func TestRollupKeepsHistory(t *testing.T) {
 		t.Fatalf("prune rollups: %d %v", n, err)
 	}
 	var left int
-	_ = s.DB().QueryRow(`SELECT COUNT(*) FROM result_rollups WHERE start < ?`, now-3*24*RollupHour).Scan(&left)
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM result_rollups WHERE start < ?`, now-3*24*RollupHour).Scan(&left)
 	if left != 0 {
 		t.Fatalf("%d old rollups left", left)
 	}

@@ -2,6 +2,8 @@ package store
 
 import (
 	"database/sql"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -81,14 +83,25 @@ func (s *Store) rollupHour(h int64) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(`INSERT OR REPLACE INTO result_rollups
+	// The hour is a trusted integer: written inline so that PostgreSQL knows its type.
+	q := `INSERT INTO result_rollups
 		(monitor_id, location, start, total, ok, maint, lat_sum, lat_n, up_lat_sum, up_lat_n, lat_min, lat_max)
-		SELECT monitor_id, location, ?, SUM(maint = 0), SUM(ok AND maint = 0), SUM(maint),
-			COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(ok = 1),
-			COALESCE(SUM(CASE WHEN ok = 1 AND maint = 0 THEN latency_ms END), 0), SUM(ok = 1 AND maint = 0),
+		SELECT monitor_id, location, ` + strconv.FormatInt(h, 10) + `, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
+			COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END),
+			COALESCE(SUM(CASE WHEN ok = 1 AND maint = 0 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END),
 			COALESCE(MIN(CASE WHEN ok = 1 THEN latency_ms END), 0), COALESCE(MAX(CASE WHEN ok = 1 THEN latency_ms END), 0)
-		FROM results INDEXED BY results_ts WHERE ts >= ? AND ts < ? GROUP BY monitor_id, location`,
-		h, h, h+RollupHour); err != nil {
+		FROM results INDEXED BY results_ts WHERE ts >= ? AND ts < ? GROUP BY monitor_id, location`
+	switch s.db.driver {
+	case DriverSQLite:
+		q = strings.Replace(q, "INSERT INTO", "INSERT OR REPLACE INTO", 1)
+	case DriverMySQL:
+		q = strings.Replace(q, "INSERT INTO", "REPLACE INTO", 1)
+	case DriverPostgres:
+		q += ` ON CONFLICT (monitor_id, start, location) DO UPDATE SET total = excluded.total, ok = excluded.ok,
+			maint = excluded.maint, lat_sum = excluded.lat_sum, lat_n = excluded.lat_n, up_lat_sum = excluded.up_lat_sum,
+			up_lat_n = excluded.up_lat_n, lat_min = excluded.lat_min, lat_max = excluded.lat_max`
+	}
+	if _, err := tx.Exec(q, h, h+RollupHour); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -102,8 +115,12 @@ func (s *Store) rollupHour(h int64) error {
 func (s *Store) PruneRollups(before int64) (int64, error) {
 	var total int64
 	for {
-		res, err := s.db.Exec(`DELETE FROM result_rollups WHERE (monitor_id, start, location) IN
-			(SELECT monitor_id, start, location FROM result_rollups WHERE start < ? LIMIT 5000)`, before)
+		q := `DELETE FROM result_rollups WHERE (monitor_id, start, location) IN
+			(SELECT monitor_id, start, location FROM result_rollups WHERE start < ? LIMIT 5000)`
+		if s.db.driver == DriverMySQL {
+			q = `DELETE FROM result_rollups WHERE start < ? LIMIT 5000`
+		}
+		res, err := s.db.Exec(q, before)
 		if err != nil {
 			return total, err
 		}

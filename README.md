@@ -51,6 +51,7 @@ Only a few env vars are read at startup:
 | --- | --- | --- |
 | `PINGTXT_ADDR` | `:8090` | listen address |
 | `PINGTXT_DATA` | `/data` | SQLite database directory |
+| `PINGTXT_DB_URL` | | PostgreSQL or MariaDB/MySQL instead of SQLite, see below |
 
 `PINGTXT_PUBLIC_URL`, `PINGTXT_RETENTION_DAYS`, `PINGTXT_LOCAL_NAME` and `PINGTXT_DISABLE_LOCAL`
 still work, but only seed the settings on the first start. After that, change them in the UI.
@@ -188,9 +189,57 @@ Access to the Docker socket is equivalent to root on that machine (`:ro` does no
 pingtxt only reads `GET /containers/<name>/json`, but enable it only where you need container checks.
 Agents older than this version report these types as `unknown monitor type`: update them.
 
+### PostgreSQL or MariaDB
+
+SQLite is the default and needs nothing else. To keep the data in PostgreSQL or MariaDB/MySQL instead,
+set `PINGTXT_DB_URL`. The database must exist and be empty (or hold a pingtxt schema); tables are created
+and migrated at start.
+
+```sh
+# PostgreSQL 13+
+PINGTXT_DB_URL=postgres://pingtxt:secret@db:5432/pingtxt?sslmode=disable
+# MariaDB 10.6+ or MySQL 8.0.13+
+PINGTXT_DB_URL=mariadb://pingtxt:secret@db:3306/pingtxt     # mysql://... works too
+```
+
+Ready-made compose files start the hub and the database with one command:
+
+```sh
+curl -O https://raw.githubusercontent.com/federico-it/pingtxt/main/docker-compose.postgres.yml
+echo "DB_PASSWORD=$(openssl rand -hex 16)" > .env
+docker compose -f docker-compose.postgres.yml up -d
+
+curl -O https://raw.githubusercontent.com/federico-it/pingtxt/main/docker-compose.mariadb.yml
+printf "DB_PASSWORD=%s\nDB_ROOT_PASSWORD=%s\n" $(openssl rand -hex 16) $(openssl rand -hex 16) > .env
+docker compose -f docker-compose.mariadb.yml up -d
+```
+
+The compose files refuse to start without the passwords in `.env`; the database container uses them only
+when it first creates the database, so set them before the first start. Special characters in a password must be URL-encoded in `PINGTXT_DB_URL`. Everything works the
+same on the three databases (history rollups, Prometheus metrics, configuration export/import), except
+the built-in **database backups**, which are SQLite files: with PostgreSQL or MariaDB back up the server
+with its own tools.
+
+```sh
+# PostgreSQL
+docker exec pingtxt-postgres pg_dump -U pingtxt -Fc pingtxt > pingtxt.dump
+docker stop pingtxt
+docker exec -i pingtxt-postgres pg_restore -U pingtxt -d pingtxt --clean --if-exists < pingtxt.dump
+docker start pingtxt
+
+# MariaDB
+docker exec pingtxt-mariadb sh -c 'mariadb-dump -u pingtxt -p"$MARIADB_PASSWORD" --single-transaction pingtxt' > pingtxt.sql
+docker stop pingtxt
+docker exec -i pingtxt-mariadb sh -c 'mariadb -u pingtxt -p"$MARIADB_PASSWORD" pingtxt' < pingtxt.sql
+docker start pingtxt
+```
+
+To move an existing SQLite hub to PostgreSQL or MariaDB, export the configuration *with secrets* from the
+old hub and import it in the new one (history is not moved).
+
 ## Backups and configuration export
 
-Settings → **database backups** takes a consistent copy of the whole SQLite database (settings, users,
+With SQLite, settings → **database backups** takes a consistent copy of the whole database (settings, users,
 secrets, history) while the hub keeps running. Turn on **scheduled backups** to take one every N hours and
 keep the last N. Files live in `<data>/backups` (`/data/backups` in Docker) and can be downloaded or
 uploaded from the same page. A backup is also taken automatically before every configuration import and
@@ -281,7 +330,7 @@ plus the Docker images for that tag.
 
 ```
             ┌──────────────── hub container ────────────────┐
- browser ──▶│  Go http server ─ /api/*  ─ SQLite (WAL)      │
+ browser ──▶│  Go http server ─ /api/*  ─ SQLite/PG/MariaDB │
             │        │          /        ─ Next.js export   │
             │   scheduler ──▶ local probe ("hub" location)  │
             │        │                                       │
@@ -295,7 +344,9 @@ plus the Docker images for that tag.
 - `internal/check` – probe implementations, shared by hub and agents.
 - `internal/expiry` – certificate and domain (RDAP / WHOIS) expiry lookups, run by the hub.
 - `internal/hub` – scheduler, status evaluation, incidents, notifications, HTTP API, agent WebSocket.
-- `internal/store` – SQLite (pure Go driver `modernc.org/sqlite`, no CGO).
+- `internal/store` – SQLite (pure Go driver `modernc.org/sqlite`, no CGO), PostgreSQL (`lib/pq`) and
+  MariaDB/MySQL (`go-sql-driver/mysql`). Queries are written once for SQLite and rewritten for the other
+  two; PostgreSQL and MariaDB start from one base schema plus the later migrations.
 - `web/` – Next.js 16 (App Router, static export), shadcn/ui on Base UI, Tailwind 4.
 
 **Why Go for the backend:** the agent must be a tiny static binary that runs anywhere
@@ -311,6 +362,21 @@ make dev-web          # next dev on :3000, proxies /api to :8090
 make test lint
 make web hub agents   # production build into ./dist
 ```
+
+The store and hub tests run on SQLite by default. To run them on a database server (each test creates and
+drops its own scratch database, so the user needs `CREATE DATABASE`):
+
+```sh
+docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pingtxt postgres:17-alpine
+PINGTXT_TEST_DB_URL="postgres://postgres:pingtxt@127.0.0.1:5432/postgres?sslmode=disable" go test ./internal/store/... ./internal/hub/...
+
+docker run -d --name maria -p 3306:3306 -e MARIADB_ROOT_PASSWORD=pingtxt mariadb:11
+PINGTXT_TEST_DB_URL="mariadb://root:pingtxt@127.0.0.1:3306/mysql" go test ./internal/store/... ./internal/hub/...
+```
+
+A schema change is a new entry at the end of `migrations` in `internal/store/store.go`, with a
+`postgres` / `mysql` variant when the SQLite text does not work there. CI runs the tests on SQLite,
+PostgreSQL, MariaDB and MySQL.
 
 ## Contributing
 

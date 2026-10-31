@@ -29,7 +29,7 @@ type Tag struct {
 
 func (s *Store) ListGroups() ([]*Group, error) {
 	rows, err := s.db.Query(`SELECT g.id, g.name, g.description, g.created_at, (SELECT COUNT(*) FROM monitors m WHERE m.group_id = g.id)
-		FROM monitor_groups g ORDER BY g.name COLLATE NOCASE`)
+		FROM monitor_groups g ORDER BY LOWER(g.name)`)
 	if err != nil {
 		return nil, err
 	}
@@ -57,11 +57,11 @@ func (s *Store) Group(id int64) (*Group, error) {
 
 func (s *Store) CreateGroup(g *Group) error {
 	g.CreatedAt = now()
-	res, err := s.db.Exec(`INSERT INTO monitor_groups (name, description, created_at) VALUES (?, ?, ?)`, g.Name, g.Description, g.CreatedAt)
+	id, err := s.db.insert(s.db, `INSERT INTO monitor_groups (name, description, created_at) VALUES (?, ?, ?)`, g.Name, g.Description, g.CreatedAt)
 	if err != nil {
 		return uniqueErr(err)
 	}
-	g.ID, _ = res.LastInsertId()
+	g.ID = id
 	return nil
 }
 
@@ -115,7 +115,7 @@ func (s *Store) SetGroupMembers(groupID int64, ids []int64) error {
 
 func (s *Store) ListTags() ([]*Tag, error) {
 	rows, err := s.db.Query(`SELECT t.id, t.name, t.color, t.created_at, (SELECT COUNT(*) FROM monitor_tags mt WHERE mt.tag_id = t.id)
-		FROM tags t ORDER BY t.name COLLATE NOCASE`)
+		FROM tags t ORDER BY LOWER(t.name)`)
 	if err != nil {
 		return nil, err
 	}
@@ -143,11 +143,11 @@ func (s *Store) Tag(id int64) (*Tag, error) {
 
 func (s *Store) CreateTag(t *Tag) error {
 	t.CreatedAt = now()
-	res, err := s.db.Exec(`INSERT INTO tags (name, color, created_at) VALUES (?, ?, ?)`, t.Name, t.Color, t.CreatedAt)
+	id, err := s.db.insert(s.db, `INSERT INTO tags (name, color, created_at) VALUES (?, ?, ?)`, t.Name, t.Color, t.CreatedAt)
 	if err != nil {
 		return uniqueErr(err)
 	}
-	t.ID, _ = res.LastInsertId()
+	t.ID = id
 	return nil
 }
 
@@ -189,7 +189,7 @@ func nullID(id int64) any {
 
 // dropMaintRef removes an id from a JSON id list column of maintenances, so
 // a later group or tag reusing the id is not covered by accident.
-func dropMaintRef(tx *sql.Tx, col string, id int64) error {
+func dropMaintRef(tx *tx, col string, id int64) error {
 	rows, err := tx.Query(`SELECT id, ` + col + ` FROM maintenances`)
 	if err != nil {
 		return err
@@ -260,7 +260,7 @@ func (s *Store) loadMonitorTags(m *Monitor) error {
 	return rows.Err()
 }
 
-func setMonitorTags(tx *sql.Tx, monitorID int64, tagIDs []int64) error {
+func setMonitorTags(tx *tx, monitorID int64, tagIDs []int64) error {
 	if _, err := tx.Exec(`DELETE FROM monitor_tags WHERE monitor_id = ?`, monitorID); err != nil {
 		return err
 	}

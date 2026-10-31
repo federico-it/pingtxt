@@ -22,11 +22,7 @@ import (
 func newDataHub(t *testing.T) (*Hub, *store.Store) {
 	t.Helper()
 	dir := t.TempDir()
-	st, err := store.Open(filepath.Join(dir, "pingtxt.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { st.Close() })
+	st := openTestStore(t, dir)
 	h := New(Config{LocalName: "hub", DataDir: dir}, st, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err := h.reloadAll(); err != nil {
 		t.Fatal(err)
@@ -332,11 +328,14 @@ func TestConfigAPI(t *testing.T) {
 	}
 	var res ImportResult
 	code, b, _ := c.do("POST", "/api/config/import?mode=merge", "application/json", body, &res)
-	if code != 200 || res.Backup == "" || res.Updated["monitors"] != 3 {
+	if code != 200 || res.Updated["monitors"] != 3 || (h.FileBackups() && res.Backup == "") {
 		t.Fatalf("import: %d %s", code, b)
 	}
-	if !fileExists(filepath.Join(h.backupDir(), res.Backup)) {
+	if h.FileBackups() && !fileExists(filepath.Join(h.backupDir(), res.Backup)) {
 		t.Fatal("no backup before import")
+	}
+	if !h.FileBackups() && len(res.Warnings) == 0 {
+		t.Fatal("no warning about the missing backup")
 	}
 	if code := c.json("POST", "/api/config/import", `{"format":"other"}`, nil); code != 400 {
 		t.Fatalf("bad document: want 400, got %d", code)
@@ -378,6 +377,7 @@ func TestConfigAPI(t *testing.T) {
 
 func TestBackupAPI(t *testing.T) {
 	h, st := newDataHub(t)
+	sqliteOnly(t, st)
 	seedConfig(t, h, st)
 	c := newAPIClient(t, h, st)
 
@@ -442,6 +442,7 @@ func TestBackupAPI(t *testing.T) {
 
 func TestScheduledBackupsRetention(t *testing.T) {
 	h, st := newDataHub(t)
+	sqliteOnly(t, st)
 	must(t, st.SetSetting(keyBackups, BackupSettings{Enabled: true, IntervalHours: 1, Keep: 2}))
 	now := time.Now()
 	h.scheduledBackup(now)
@@ -511,5 +512,29 @@ func TestRestoreStagedBackup(t *testing.T) {
 	}
 	if fileExists(PendingRestorePath(dbPath)) || !fileExists(PendingRestorePath(dbPath)+".failed") {
 		t.Fatal("failed restore not moved away")
+	}
+}
+
+// With PostgreSQL or MariaDB/MySQL the hub makes no backup files.
+func TestBackupsNeedSQLite(t *testing.T) {
+	h, st := newDataHub(t)
+	if h.FileBackups() {
+		t.Skip("SQLite: backups work")
+	}
+	c := newAPIClient(t, h, st)
+	var list backupsView
+	if code := c.json("GET", "/api/backups", "", &list); code != 200 || list.FileBackups || list.Driver != st.Driver() {
+		t.Fatalf("list: %d %+v", code, list)
+	}
+	if code := c.json("POST", "/api/backups", "", nil); code != 400 {
+		t.Fatalf("create: want 400, got %d", code)
+	}
+	if code, _, _ := c.do("POST", "/api/backups/upload", "application/octet-stream", []byte("x"), nil); code != 400 {
+		t.Fatalf("upload: want 400, got %d", code)
+	}
+	must(t, h.store.SetSetting(keyBackups, BackupSettings{Enabled: true, IntervalHours: 1, Keep: 2}))
+	h.scheduledBackup(time.Now())
+	if l, _ := h.ListBackups(); len(l) != 0 {
+		t.Fatalf("scheduled backup written: %+v", l)
 	}
 }

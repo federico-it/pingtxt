@@ -1,14 +1,20 @@
-// Package store persists hub data in SQLite (pure Go driver, no CGO).
+// Package store persists hub data in SQLite (pure Go driver, no CGO), or in
+// PostgreSQL or MariaDB/MySQL when a database URL is given.
 package store
 
 import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
+	"github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq" // registers the "postgres" driver
 	_ "modernc.org/sqlite"
 )
 
@@ -20,42 +26,162 @@ var ErrConflict = errors.New("already exists")
 
 // Store wraps the database handle.
 type Store struct {
-	db   *sql.DB
-	path string
+	db   *db
+	path string // SQLite file, "" for PostgreSQL and MariaDB/MySQL
 
 	rmu         sync.RWMutex
 	rollupUntil int64 // results before this are summarized in result_rollups
 }
 
-// Open opens (and migrates) the database at path.
-func Open(path string) (*Store, error) {
-	if dir := filepath.Dir(path); dir != "" {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return nil, err
-		}
-	}
-	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)", path)
-	db, err := sql.Open("sqlite", dsn)
+// Open opens (and migrates) a database. dsn is either the path of a SQLite
+// file or a URL: postgres://user:pass@host:5432/db?sslmode=disable or
+// mysql://user:pass@host:3306/db (mariadb:// works too).
+func Open(dsn string) (*Store, error) {
+	driver, conn, err := parseDSN(dsn)
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1) // SQLite: one writer, avoids SQLITE_BUSY
-	s := &Store{db: db, path: path}
+	s := &Store{}
+	var sdb *sql.DB
+	switch driver {
+	case DriverSQLite:
+		if dir := filepath.Dir(conn); dir != "" {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return nil, err
+			}
+		}
+		s.path = conn
+		sdb, err = sql.Open("sqlite", fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)", conn))
+		if err != nil {
+			return nil, err
+		}
+		sdb.SetMaxOpenConns(1) // SQLite: one writer, avoids SQLITE_BUSY
+	default:
+		sdb, err = sql.Open(driver, conn)
+		if err != nil {
+			return nil, err
+		}
+		sdb.SetMaxOpenConns(16)
+		sdb.SetMaxIdleConns(4)
+		sdb.SetConnMaxLifetime(30 * time.Minute)
+		if err := waitReady(sdb, 30*time.Second); err != nil {
+			sdb.Close()
+			return nil, fmt.Errorf("connect to %s: %w", driver, err)
+		}
+	}
+	s.db = &db{DB: sdb, driver: driver}
 	if err := s.migrate(); err != nil {
-		db.Close()
+		sdb.Close()
 		return nil, err
 	}
 	if err := s.loadRollupUntil(); err != nil {
-		db.Close()
+		sdb.Close()
 		return nil, err
 	}
 	return s, nil
 }
 
+// waitReady pings the server until it answers: with docker compose the
+// database container may still be starting.
+func waitReady(sdb *sql.DB, wait time.Duration) error {
+	deadline := time.Now().Add(wait)
+	for {
+		err := sdb.Ping()
+		if err == nil || time.Now().After(deadline) {
+			return err
+		}
+		time.Sleep(time.Second)
+	}
+}
+
+// parseDSN returns the driver and its connection string.
+func parseDSN(dsn string) (driver, conn string, err error) {
+	scheme, _, ok := strings.Cut(dsn, "://")
+	if !ok {
+		return DriverSQLite, strings.TrimPrefix(dsn, "sqlite:"), nil
+	}
+	switch strings.ToLower(scheme) {
+	case "sqlite", "file":
+		return DriverSQLite, strings.TrimPrefix(dsn, scheme+"://"), nil
+	case "postgres", "postgresql":
+		return DriverPostgres, dsn, nil
+	case "mysql", "mariadb":
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", "", fmt.Errorf("database url: %w", err)
+		}
+		c := mysql.NewConfig()
+		c.Net = "tcp"
+		c.Addr = u.Host
+		if u.Port() == "" {
+			c.Addr = u.Hostname() + ":3306"
+		}
+		c.User = u.User.Username()
+		c.Passwd, _ = u.User.Password()
+		c.DBName = strings.TrimPrefix(u.Path, "/")
+		c.ClientFoundRows = true // RowsAffected counts matched rows, like SQLite and PostgreSQL
+		c.Params = map[string]string{"charset": "utf8mb4"}
+		for k, v := range u.Query() {
+			if len(v) > 0 {
+				if k == "tls" {
+					c.TLSConfig = v[0]
+					continue
+				}
+				c.Params[k] = v[0]
+			}
+		}
+		return DriverMySQL, c.FormatDSN(), nil
+	}
+	return "", "", fmt.Errorf("database url: unknown scheme %q (use postgres://, mysql://, mariadb:// or a SQLite file path)", scheme)
+}
+
+// Driver returns the database kind: DriverSQLite, DriverPostgres or DriverMySQL.
+func (s *Store) Driver() string { return s.db.driver }
+
 // Close closes the database.
 func (s *Store) Close() error { return s.db.Close() }
 
-var migrations = []string{
+// migrations are applied in order on SQLite; schema_version holds how many
+// ran. PostgreSQL and MariaDB/MySQL start from baseSchema (the result of the
+// first baseVersion migrations) and then run the later migrations, using the
+// postgres/mysql variant when the SQLite text does not fit them.
+//
+// To change the schema, append a migration (never edit an old one) and test
+// it on all three databases (see Development in the README).
+type migration struct {
+	sqlite   string
+	postgres string // "" = same as sqlite
+	mysql    string // "" = same as sqlite
+}
+
+func (m migration) text(driver string) string {
+	switch {
+	case driver == DriverPostgres && m.postgres != "":
+		return m.postgres
+	case driver == DriverMySQL && m.mysql != "":
+		return m.mysql
+	}
+	return m.sqlite
+}
+
+var migrations = append(sqliteOnly(sqliteMigrations), laterMigrations...)
+
+// laterMigrations come after baseVersion and run on every database, e.g.
+//
+//	{sqlite: `ALTER TABLE monitors ADD COLUMN notes TEXT NOT NULL DEFAULT ''`,
+//	 mysql: `ALTER TABLE monitors ADD COLUMN notes TEXT NOT NULL DEFAULT ('')`},
+var laterMigrations = []migration{}
+
+func sqliteOnly(list []string) []migration {
+	out := make([]migration, len(list))
+	for i, q := range list {
+		out[i] = migration{sqlite: q}
+	}
+	return out
+}
+
+// Migrations 1 to baseVersion, SQLite only (PostgreSQL and MariaDB/MySQL use baseSchema).
+var sqliteMigrations = []string{
 	`CREATE TABLE users (
 		id INTEGER PRIMARY KEY,
 		email TEXT NOT NULL UNIQUE,
@@ -284,24 +410,36 @@ func (s *Store) migrate() error {
 	} else if err != nil {
 		return err
 	}
+	if v == 0 && s.db.driver != DriverSQLite {
+		if err := s.applyMigration(baseSchema(s.db.driver), baseVersion); err != nil {
+			return fmt.Errorf("create schema: %w", err)
+		}
+		v = baseVersion
+	}
 	for i := v; i < len(migrations); i++ {
-		tx, err := s.db.Begin()
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(migrations[i]); err != nil {
-			tx.Rollback()
+		if err := s.applyMigration(migrations[i].text(s.db.driver), i+1); err != nil {
 			return fmt.Errorf("migration %d: %w", i+1, err)
-		}
-		if _, err := tx.Exec(`UPDATE schema_version SET version = ?`, i+1); err != nil {
-			tx.Rollback()
-			return err
-		}
-		if err := tx.Commit(); err != nil {
-			return err
 		}
 	}
 	return nil
+}
+
+// applyMigration runs a migration and records the new version. MariaDB/MySQL
+// cannot roll back schema changes, so a failed migration there may need
+// manual cleanup.
+func (s *Store) applyMigration(text string, version int) error {
+	t, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer t.Rollback()
+	if err := t.execScript(text); err != nil {
+		return err
+	}
+	if _, err := t.Exec(`UPDATE schema_version SET version = ?`, version); err != nil {
+		return err
+	}
+	return t.Commit()
 }
 
 func b2i(b bool) int {
@@ -311,5 +449,6 @@ func b2i(b bool) int {
 	return 0
 }
 
-// DB exposes the handle for tests and tools.
-func (s *Store) DB() *sql.DB { return s.db }
+// DB exposes the handle for tests and tools. Queries on it are not rewritten
+// for PostgreSQL or MariaDB/MySQL.
+func (s *Store) DB() *sql.DB { return s.db.DB }

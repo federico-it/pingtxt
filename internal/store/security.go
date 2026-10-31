@@ -33,10 +33,22 @@ func (s *Store) TwoFactorEnabled(userID int64) bool {
 
 // SetPendingTOTP stores a new, not yet confirmed secret (replacing a previous pending one).
 func (s *Store) SetPendingTOTP(userID int64, secret string) error {
-	_, err := s.db.Exec(`INSERT INTO user_totp (user_id, secret, enabled, last_step, created_at) VALUES (?, ?, 0, 0, ?)
-		ON CONFLICT(user_id) DO UPDATE SET secret = excluded.secret, enabled = 0, last_step = 0, created_at = excluded.created_at
-		WHERE user_totp.enabled = 0`, userID, secret, now())
-	return err
+	t, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer t.Rollback()
+	res, err := t.Exec(`UPDATE user_totp SET secret = ?, last_step = 0, created_at = ? WHERE user_id = ? AND enabled = 0`, secret, now(), userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		// No pending secret yet; an enabled one is left alone.
+		if _, err := t.Exec(`INSERT OR IGNORE INTO user_totp (user_id, secret, enabled, last_step, created_at) VALUES (?, ?, 0, 0, ?)`, userID, secret, now()); err != nil {
+			return err
+		}
+	}
+	return t.Commit()
 }
 
 // EnableTOTP confirms the pending secret and stores fresh recovery codes.
@@ -99,7 +111,7 @@ func (s *Store) ReplaceRecoveryCodes(userID int64, codeHashes []string) error {
 	return tx.Commit()
 }
 
-func replaceRecoveryCodes(tx *sql.Tx, userID int64, codeHashes []string) error {
+func replaceRecoveryCodes(tx *tx, userID int64, codeHashes []string) error {
 	if _, err := tx.Exec(`DELETE FROM recovery_codes WHERE user_id = ?`, userID); err != nil {
 		return err
 	}
@@ -158,12 +170,12 @@ func scanToken(sc interface{ Scan(...any) error }) (*APIToken, error) {
 // CreateAPIToken stores a token and fills its id and creation time.
 func (s *Store) CreateAPIToken(t *APIToken) error {
 	t.CreatedAt = now()
-	res, err := s.db.Exec(`INSERT INTO api_tokens (user_id, name, token_hash, hint, scope, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+	id, err := s.db.insert(s.db, `INSERT INTO api_tokens (user_id, name, token_hash, hint, scope, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		t.UserID, t.Name, t.TokenHash, t.Hint, t.Scope, t.CreatedAt, t.ExpiresAt)
 	if err != nil {
 		return err
 	}
-	t.ID, _ = res.LastInsertId()
+	t.ID = id
 	return nil
 }
 

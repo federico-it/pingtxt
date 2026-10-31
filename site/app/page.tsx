@@ -7,7 +7,7 @@ import { Prompt, REPO, SectionTitle } from "@/components/site-shell"
 const features: { title: string; body: string }[] = [
   {
     title: "one container",
-    body: "Go API, scheduler, SQLite and the web UI in a ~25 MB image. No Node runtime, no external database.",
+    body: "Go API, scheduler, SQLite and the web UI in a ~25 MB image. No Node runtime; PostgreSQL or MariaDB only if you want them.",
   },
   {
     title: "multi-location agents",
@@ -189,7 +189,7 @@ export default function Home() {
       <section className="space-y-6">
         <SectionTitle>how it works</SectionTitle>
         <pre className="overflow-x-auto border border-dashed bg-muted/50 p-4 text-[12px] leading-snug">{`            ┌──────────────── hub container ────────────────┐
- browser ──>│  Go http server ─ /api/*  ─ SQLite (WAL)      │
+ browser ──>│  Go http server ─ /api/*  ─ SQLite/PG/MariaDB │
             │        │          /        ─ web UI            │
             │   scheduler ──> local probe ("hub" location)  │
             │        │                                       │

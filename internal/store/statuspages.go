@@ -67,7 +67,7 @@ func (s *Store) loadPageMonitors(p *StatusPage) error {
 }
 
 func (s *Store) ListStatusPages() ([]*StatusPage, error) {
-	rows, err := s.db.Query(`SELECT ` + statusPageCols + ` FROM status_pages ORDER BY title COLLATE NOCASE`)
+	rows, err := s.db.Query(`SELECT ` + statusPageCols + ` FROM status_pages ORDER BY LOWER(title)`)
 	if err != nil {
 		return nil, err
 	}
@@ -117,13 +117,13 @@ func (s *Store) StatusPageByDomain(domain string) (*StatusPage, error) {
 }
 
 func uniqueErr(err error) error {
-	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
+	if isUnique(err) {
 		return ErrConflict
 	}
 	return err
 }
 
-func setPageMonitors(tx *sql.Tx, p *StatusPage) error {
+func setPageMonitors(tx *tx, p *StatusPage) error {
 	if _, err := tx.Exec(`DELETE FROM status_page_monitors WHERE page_id = ?`, p.ID); err != nil {
 		return err
 	}
@@ -150,12 +150,12 @@ func (s *Store) CreateStatusPage(p *StatusPage) error {
 		return err
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec(`INSERT INTO status_pages (slug, title, description, domain, published, show_incidents, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+	id, err := s.db.insert(tx, `INSERT INTO status_pages (slug, title, description, domain, published, show_incidents, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		p.Slug, p.Title, p.Description, p.Domain, b2i(p.Published), b2i(p.ShowIncidents), p.CreatedAt)
 	if err != nil {
 		return uniqueErr(err)
 	}
-	p.ID, _ = res.LastInsertId()
+	p.ID = id
 	if err := setPageMonitors(tx, p); err != nil {
 		return err
 	}
