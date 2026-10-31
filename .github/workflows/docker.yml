@@ -20,6 +20,9 @@ jobs:
   image:
     runs-on: ubuntu-latest
     strategy:
+      # A failure in one image (often a registry hiccup) must not cancel
+      # the other one.
+      fail-fast: false
       matrix:
         include:
           - name: pingtxt
@@ -55,7 +58,25 @@ jobs:
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
-      - id: build
+      # Registries (Docker Hub for the base images) sometimes answer 5xx for
+      # a minute: try the build once more before failing.
+      - id: build1
+        continue-on-error: true
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ steps.ver.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - if: steps.build1.outcome == 'failure'
+        run: sleep 60
+      - id: build2
+        if: steps.build1.outcome == 'failure'
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -72,5 +93,5 @@ jobs:
       - uses: sigstore/cosign-installer@v4.1.2
       - name: Sign image
         env:
-          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}@${{ steps.build1.outputs.digest || steps.build2.outputs.digest }}
         run: cosign sign --yes "$IMAGE"
