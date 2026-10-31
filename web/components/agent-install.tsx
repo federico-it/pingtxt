@@ -14,6 +14,7 @@ export function AgentInstall({ hub, token }: { hub: string; token: string }) {
   --cap-add NET_RAW \\
   -e PINGTXT_HUB=${hub} \\
   -e PINGTXT_TOKEN=${token} \\
+  -v pingtxt-agent:/data \\
   ${AGENT_IMAGE}`,
     compose: `services:
   pingtxt-agent:
@@ -22,7 +23,11 @@ export function AgentInstall({ hub, token }: { hub: string; token: string }) {
     cap_add: [NET_RAW]
     environment:
       PINGTXT_HUB: ${hub}
-      PINGTXT_TOKEN: ${token}`,
+      PINGTXT_TOKEN: ${token}
+    volumes:
+      - pingtxt-agent:/data # keeps self-updates
+volumes:
+  pingtxt-agent:`,
     linux: `curl -fsSL ${hub}/install-agent.sh | sudo sh -s -- --hub ${hub} --token ${token}`,
     binary: `curl -fsSLo pingtxt-agent ${hub}/download/pingtxt-agent-linux-amd64 && chmod +x pingtxt-agent
 PINGTXT_HUB=${hub} PINGTXT_TOKEN=${token} ./pingtxt-agent`,

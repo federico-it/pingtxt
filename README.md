@@ -429,7 +429,7 @@ In the UI go to **agents → add agent**: you get a token and ready-to-paste com
 # Docker
 docker run -d --name pingtxt-agent --restart unless-stopped --cap-add NET_RAW \
   -e PINGTXT_HUB=https://status.example.com -e PINGTXT_TOKEN=pt_xxx \
-  ghcr.io/federico-it/pingtxt-agent:latest
+  -v pingtxt-agent:/data ghcr.io/federico-it/pingtxt-agent:latest
 
 # Linux + systemd (binary downloaded from your hub)
 curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --hub https://status.example.com --token pt_xxx
@@ -443,7 +443,7 @@ agents; agents are stateless and reconnect with backoff.
 ### Agent updates
 
 The hub bundles agent binaries built with its own version. When you upgrade the hub, agents
-installed with the script update themselves as soon as they reconnect: the hub sends the
+(installed with the script or in Docker) update themselves as soon as they reconnect: the hub sends the
 download path and the SHA-256 of the binary for the agent's platform, the agent downloads it
 from the hub, checks the checksum and that the new binary reports the expected version, swaps
 the file and restarts in place. A failed update leaves the old binary running and is shown on
@@ -469,17 +469,23 @@ the agents page.
     reach github.com.
   - `off`: trusts the hub, for forks and private builds (or point `-release-url` /
     `PINGTXT_RELEASE_URL` at your own release downloads).
-- **Docker agents** never replace their own binary: pull the new image, or let
-  [Watchtower](https://containrrr.dev/watchtower/) (or a similar image updater) do it:
-
-  ```sh
-  docker run -d --name watchtower --restart unless-stopped \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    containrrr/watchtower pingtxt-agent --interval 3600
-  ```
+- **Docker agents** keep the new binary in the `/data` volume (`PINGTXT_UPDATE_DIR`) and run
+  it from there on every restart, so no Docker socket is needed. Mount a named volume
+  (`-v pingtxt-agent:/data`) to keep updates when the container is recreated; without one,
+  Docker creates an anonymous volume that lasts as long as the container. When you pull a new
+  image, its own binary starts again, the volume is cleared and the hub updates it if needed.
+  Images from before this change cannot update themselves: pull `:latest` once.
+- To keep containers immutable instead (Kubernetes, read-only file system), start the agent with
+  `PINGTXT_NO_AUTO_UPDATE=1` and let an image updater pull `:latest`, such as
+  [What's Up Docker](https://github.com/getwud/wud) or the maintained
+  [Watchtower fork](https://github.com/nicholas-fedor/watchtower). They need the Docker socket,
+  and the agent then follows the latest release rather than the hub's version.
+- Docker tags: `:latest` is the newest release, `:1.2.3` a given release, `:main` the latest
+  build of the main branch.
 
 Pushing a `v*` tag publishes a GitHub release with the hub and agent binaries and `SHA256SUMS`,
-plus the Docker images for that tag.
+plus the Docker images for that tag, which also become `:latest` (pre-releases excepted).
+Merges on main only update the `:main` images.
 
 ### Verify a release
 

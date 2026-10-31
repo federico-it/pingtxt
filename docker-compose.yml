@@ -24,3 +24,5 @@ services:
   #   environment:
   #     PINGTXT_HUB: https://status.example.com
   #     PINGTXT_TOKEN: pt_xxx
+  #   volumes:
+  #     - ./agent-data:/data   # keeps the agent's self-updates
