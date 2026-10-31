@@ -4,13 +4,9 @@ import (
 	"bytes"
 	"cmp"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"html/template"
-	"mime"
-	"mime/quotedprintable"
 	"net/http"
 	"slices"
 	"strings"
@@ -575,67 +571,117 @@ func reportText(r *Report, from, to time.Time) string {
 			}
 		}
 	}
-	if r.URL != "" {
-		fmt.Fprintf(&b, "\ndashboard: %s\n", r.URL)
+	if u := publicBase(r.URL); u != "" {
+		fmt.Fprintf(&b, "\ndashboard: %s/\n", u)
 	}
 	return b.String()
 }
 
-var reportHTML = template.Must(template.New("report").Funcs(template.FuncMap{
+// uptimeTone colors an uptime: green from 99.9%, yellow from 99%, else red.
+func uptimeTone(v float64) string {
+	switch {
+	case v < 0:
+		return ""
+	case v >= 0.999:
+		return toneUp
+	case v >= 0.99:
+		return toneWarn
+	}
+	return toneDown
+}
+
+// reportMailHTML adds the group tables to the email layout.
+var reportMailHTML = template.Must(template.Must(mailLayout.Clone()).Funcs(template.FuncMap{
 	"pct":      pct,
 	"duration": shortDuration,
 	"when":     incidentWhen,
 	"length":   incidentLength,
 	"clip":     clip,
+	"utone":    uptimeTone,
+	"plural":   plural,
 	"avg": func(v float64) string {
-		if v <= 0 {
+		switch {
+		case v <= 0:
 			return "-"
+		case v < 10:
+			return fmt.Sprintf("%.1f", v)
 		}
 		return fmt.Sprintf("%.0f", v)
 	},
-	"bad": func(v float64) bool { return v >= 0 && v < 0.999 },
 	"more": func(l []ReportIncident) int {
 		return len(l) - maxReportIncidents
 	},
 	"cap": func(l []ReportIncident) []ReportIncident { return l[:min(len(l), maxReportIncidents)] },
-}).Parse(`<!doctype html>
-<html><body style="margin:0;padding:24px;background:#ffffff;color:#111111;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.5">
-<div style="max-width:760px">
-<div style="color:#666666">$ pingtxt report --{{.R.Kind}}</div>
-<h1 style="font-size:18px;margin:4px 0 16px">{{.Title}}</h1>
-{{if eq .R.Monitors 0}}<p>No monitor has data for this period.</p>{{else}}
-<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:8px">
-<tr><td style="padding:2px 16px 2px 0;color:#666666">uptime</td><td style="padding:2px 0"><b>{{pct .R.Uptime}}</b> <span style="color:#666666">({{.Prev}}: {{pct .R.PrevUptime}})</span></td></tr>
-<tr><td style="padding:2px 16px 2px 0;color:#666666">incidents</td><td style="padding:2px 0">{{.R.Incidents}}, {{duration .R.DowntimeMs}} down</td></tr>
-<tr><td style="padding:2px 16px 2px 0;color:#666666">monitors</td><td style="padding:2px 0">{{.R.Monitors}}</td></tr>
-</table>{{end}}
-{{range .R.Groups}}
-<h2 style="font-size:14px;margin:24px 0 4px;border-bottom:1px dashed #cccccc;padding-bottom:4px">{{.Name}}</h2>
-<div style="color:#666666;margin-bottom:8px">uptime <b style="color:{{if bad .Uptime}}#c2410c{{else}}#15803d{{end}}">{{pct .Uptime}}</b> (prev {{pct .PrevUptime}}) &middot; {{.Incidents}} incidents &middot; {{duration .DowntimeMs}} down</div>
-<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%">
-<tr style="color:#666666;text-align:right"><td style="text-align:left;padding:3px 8px 3px 0">monitor</td><td style="padding:3px 8px">uptime</td><td style="padding:3px 8px">prev</td><td style="padding:3px 8px">avg ms</td><td style="padding:3px 8px">incidents</td><td style="padding:3px 0 3px 8px">down</td></tr>
-{{range .Monitors}}<tr style="text-align:right;border-top:1px dashed #e5e5e5"><td style="text-align:left;padding:3px 8px 3px 0">{{clip .Name 48}}</td><td style="padding:3px 8px;color:{{if bad .Uptime}}#c2410c{{else}}#15803d{{end}}">{{pct .Uptime}}</td><td style="padding:3px 8px;color:#666666">{{pct .PrevUptime}}</td><td style="padding:3px 8px">{{avg .AvgMs}}</td><td style="padding:3px 8px">{{.Incidents}}</td><td style="padding:3px 0 3px 8px">{{duration .DowntimeMs}}</td></tr>
-{{end}}</table>
-{{if .IncidentList}}<div style="color:#666666;margin:12px 0 4px">incidents</div>
-<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%">
-{{range cap .IncidentList}}<tr style="border-top:1px dashed #e5e5e5"><td style="padding:3px 8px 3px 0;white-space:nowrap;color:#666666">{{when . $.Loc}}</td><td style="padding:3px 8px">{{clip .Monitor 48}}</td><td style="padding:3px 8px;white-space:nowrap;text-align:right">{{length .}}</td><td style="padding:3px 0 3px 8px;color:#666666">{{clip .Cause 120}}</td></tr>
-{{end}}</table>{{if gt (more .IncidentList) 0}}<div style="color:#666666">... and {{more .IncidentList}} more</div>{{end}}{{end}}
-{{end}}
-<p style="margin-top:32px;color:#666666;font-size:12px">{{if .R.URL}}<a href="{{.R.URL}}" style="color:#666666">{{.R.URL}}</a> &middot; {{end}}sent by pingtxt &middot; times in {{.R.Timezone}}</p>
-</div></body></html>`))
+}).Parse(`{{define "extra"}}{{$loc := .Loc}}{{range .R.Groups}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:32px 0 0">
+<tr><td class="pt-fg" style="font-weight:700;font-size:14px;color:#171613;word-break:break-word">## {{.Name}}</td>
+<td align="right" class="pt-{{utone .Uptime}}" style="font-weight:700;font-size:14px;white-space:nowrap;color:{{tone (utone .Uptime)}}">{{pct .Uptime}}</td></tr>
+<tr><td colspan="2" class="pt-mu" style="color:#6a6966;font-size:12px;padding:2px 0 8px">prev {{pct .PrevUptime}} &middot; {{plural .Incidents "incident"}} &middot; {{duration .DowntimeMs}} down</td></tr>
+</table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr class="pt-mu" style="color:#6a6966;font-size:11px;letter-spacing:0.04em">
+<td class="pt-bd" width="100%" style="padding:6px 8px 6px 0;border-top:1px dashed #d8d7d4">NAME</td>
+<td class="pt-bd" align="right" style="padding:6px 8px;border-top:1px dashed #d8d7d4">UPTIME</td>
+<td class="pt-bd pt-hide" align="right" style="padding:6px 8px;border-top:1px dashed #d8d7d4">PREV</td>
+<td class="pt-bd pt-hide" align="right" style="padding:6px 8px;border-top:1px dashed #d8d7d4">AVG</td>
+<td class="pt-bd" align="right" style="padding:6px 8px;border-top:1px dashed #d8d7d4">INC</td>
+<td class="pt-bd" align="right" style="padding:6px 0 6px 8px;border-top:1px dashed #d8d7d4">DOWN</td></tr>
+{{range .Monitors}}<tr>
+<td class="pt-bd" style="padding:7px 8px 7px 0;border-top:1px dashed #d8d7d4;word-break:break-word"><span class="pt-{{utone .Uptime}}" style="color:{{tone (utone .Uptime)}}">&#9679;</span> {{clip .Name 48}}</td>
+<td class="pt-bd pt-{{utone .Uptime}}" align="right" style="padding:7px 8px;border-top:1px dashed #d8d7d4;white-space:nowrap;color:{{tone (utone .Uptime)}}">{{pct .Uptime}}</td>
+<td class="pt-bd pt-mu pt-hide" align="right" style="padding:7px 8px;border-top:1px dashed #d8d7d4;white-space:nowrap;color:#6a6966">{{pct .PrevUptime}}</td>
+<td class="pt-bd pt-hide" align="right" style="padding:7px 8px;border-top:1px dashed #d8d7d4;white-space:nowrap">{{avg .AvgMs}}{{if gt .AvgMs 0.0}}<span class="pt-mu" style="color:#6a6966">ms</span>{{end}}</td>
+<td class="pt-bd" align="right" style="padding:7px 8px;border-top:1px dashed #d8d7d4">{{.Incidents}}</td>
+<td class="pt-bd" align="right" style="padding:7px 0 7px 8px;border-top:1px dashed #d8d7d4;white-space:nowrap">{{duration .DowntimeMs}}</td></tr>
+{{end}}<tr><td class="pt-bd" colspan="6" style="border-top:1px dashed #d8d7d4;font-size:0;line-height:0">&nbsp;</td></tr>
+</table>
+{{if .IncidentList}}<div class="pt-mu" style="color:#6a6966;font-size:11px;letter-spacing:0.04em;margin:16px 0 0;padding-bottom:6px">INCIDENTS</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+{{range cap .IncidentList}}<tr>
+<td class="pt-bd pt-mu" valign="top" style="padding:7px 12px 7px 0;border-top:1px dashed #d8d7d4;white-space:nowrap;color:#6a6966">{{when . $loc}}</td>
+<td class="pt-bd" valign="top" width="100%" style="padding:7px 8px;border-top:1px dashed #d8d7d4;word-break:break-word">{{clip .Monitor 48}}{{if .Cause}}<div class="pt-mu" style="color:#6a6966;font-size:12px">&gt; {{clip .Cause 120}}</div>{{end}}</td>
+<td class="pt-bd{{if not .ResolvedAt}} pt-down{{end}}" valign="top" align="right" style="padding:7px 0 7px 8px;border-top:1px dashed #d8d7d4;white-space:nowrap{{if not .ResolvedAt}};color:#d72828{{end}}">{{length .}}</td></tr>
+{{end}}<tr><td class="pt-bd" colspan="3" style="border-top:1px dashed #d8d7d4;font-size:0;line-height:0">&nbsp;</td></tr>
+</table>{{if gt (more .IncidentList) 0}}<div class="pt-mu" style="color:#6a6966;padding-top:6px">... and {{more .IncidentList}} more</div>{{end}}{{end}}
+{{end}}{{end}}`))
 
-func reportHTMLBody(r *Report, from, to time.Time) (string, error) {
+// reportMailView lays out a report email.
+func reportMailView(r *Report, from, to time.Time) mailView {
 	what := "Weekly"
 	if r.Kind == ReportMonthly {
 		what = "Monthly"
 	}
+	period := periodLabel(r.Kind, from, to)
+	v := mailView{
+		Preheader: fmt.Sprintf("%s uptime, %s, %s down", pct(r.Uptime), plural(r.Incidents, "incident"), shortDuration(r.DowntimeMs)),
+		Command:   "pingtxt report --" + r.Kind,
+		Title:     what + " report",
+		Lead:      period,
+		Tone:      uptimeTone(r.Uptime),
+		Footer:    []string{"Times in " + r.Timezone + "."},
+		Data:      map[string]any{"R": r, "Loc": from.Location()},
+	}
+	if r.Monitors == 0 {
+		v.Lead = period + ": no monitor has data for this period."
+		v.Preheader = "No monitor has data for this period."
+	} else {
+		v.Rows = []mailRow{
+			{Key: "uptime", Value: pct(r.Uptime), Tone: uptimeTone(r.Uptime)},
+			{Key: prevWord(r.Kind), Value: pct(r.PrevUptime)},
+			{Key: "incidents", Value: fmt.Sprint(r.Incidents)},
+			{Key: "downtime", Value: shortDuration(r.DowntimeMs)},
+			{Key: "monitors", Value: fmt.Sprint(r.Monitors)},
+		}
+	}
+	if base := publicBase(r.URL); base != "" {
+		v.Action = &mailLink{Label: "open dashboard", Href: base + "/"}
+	}
+	return v
+}
+
+func reportHTMLBody(r *Report, from, to time.Time) (string, error) {
 	var b bytes.Buffer
-	err := reportHTML.Execute(&b, map[string]any{
-		"R":     r,
-		"Title": what + " report: " + periodLabel(r.Kind, from, to),
-		"Prev":  prevWord(r.Kind),
-		"Loc":   from.Location(),
-	})
+	err := reportMailHTML.Execute(&b, reportMailView(r, from, to))
 	return b.String(), err
 }
 
@@ -645,34 +691,7 @@ func buildReportEmail(ec *emailConfig, subject, text, html string, now time.Time
 	for i, a := range ec.To {
 		to[i] = a.String()
 	}
-	domain := ec.From.Address[strings.LastIndexByte(ec.From.Address, '@')+1:]
-	rb := make([]byte, 12)
-	_, _ = rand.Read(rb)
-	boundary := "pingtxt-" + hex.EncodeToString(rb)
-	var b bytes.Buffer
-	hdr := func(k, v string) { b.WriteString(k + ": " + v + "\r\n") }
-	hdr("From", ec.From.String())
-	hdr("To", strings.Join(to, ", "))
-	hdr("Subject", mime.QEncoding.Encode("utf-8", subject))
-	hdr("Date", now.Format(time.RFC1123Z))
-	hdr("Message-ID", newMessageID(domain))
-	hdr("MIME-Version", "1.0")
-	hdr("Content-Type", `multipart/alternative; boundary="`+boundary+`"`)
-	hdr("Auto-Submitted", "auto-generated")
-	b.WriteString("\r\n")
-	part := func(ctype, body string) {
-		b.WriteString("--" + boundary + "\r\n")
-		b.WriteString("Content-Type: " + ctype + "; charset=utf-8\r\n")
-		b.WriteString("Content-Transfer-Encoding: quoted-printable\r\n\r\n")
-		qp := quotedprintable.NewWriter(&b)
-		_, _ = qp.Write([]byte(strings.ReplaceAll(strings.ReplaceAll(body, "\r\n", "\n"), "\n", "\r\n")))
-		_ = qp.Close()
-		b.WriteString("\r\n")
-	}
-	part("text/plain", text+"\n-- \nsent by pingtxt\n")
-	part("text/html", html)
-	b.WriteString("--" + boundary + "--\r\n")
-	return b.Bytes()
+	return writeMail(ec, mailHeaders{to: strings.Join(to, ", "), subject: subject}, text+"\n-- \nsent by pingtxt\n", html, now)
 }
 
 // sendReport builds the report of [from, to) and emails it to the channels

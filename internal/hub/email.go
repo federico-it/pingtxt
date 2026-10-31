@@ -1,15 +1,12 @@
 package hub
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"mime"
-	"mime/quotedprintable"
 	"net"
 	"net/mail"
 	"net/smtp"
@@ -107,35 +104,97 @@ func newMessageID(host string) string {
 	return "<" + hex.EncodeToString(b) + "@" + host + ">"
 }
 
-// buildEmail renders a plain text, quoted-printable encoded message.
-func buildEmail(ec *emailConfig, e Event, now time.Time) []byte {
+// buildEmail renders the alert email of an event. base is the hub address
+// (publicBase), used to link the monitor; it can be empty.
+func buildEmail(ec *emailConfig, e Event, base string, now time.Time) []byte {
 	to := make([]string, len(ec.To))
 	for i, a := range ec.To {
 		to[i] = a.String()
 	}
-	domain := ec.From.Address[strings.LastIndexByte(ec.From.Address, '@')+1:]
-	var b bytes.Buffer
-	hdr := func(k, v string) { b.WriteString(k + ": " + v + "\r\n") }
-	hdr("From", ec.From.String())
-	hdr("To", strings.Join(to, ", "))
-	hdr("Subject", mime.QEncoding.Encode("utf-8", emailSubject(e)))
-	hdr("Date", now.Format(time.RFC1123Z))
-	hdr("Message-ID", newMessageID(domain))
-	hdr("MIME-Version", "1.0")
-	hdr("Content-Type", "text/plain; charset=utf-8")
-	hdr("Content-Transfer-Encoding", "quoted-printable")
-	hdr("Auto-Submitted", "auto-generated")
-	b.WriteString("\r\n")
+	v := eventMailView(e, base)
+	return writeMail(ec, mailHeaders{to: strings.Join(to, ", "), subject: emailSubject(e)}, v.renderText(""), v.renderHTML(nil), now)
+}
 
-	body := e.Text()
-	if e.Target != "" {
-		body += "\n\nmonitor: " + e.Monitor + "\ntarget:  " + e.Target
+// eventMailView lays out a status or expiry event.
+func eventMailView(e Event, base string) mailView {
+	v := mailView{Preheader: e.Text()}
+	if i := strings.IndexByte(v.Preheader, '\n'); i > 0 {
+		v.Preheader = v.Preheader[:i]
 	}
-	body += "\n\n-- \nsent by pingtxt\n"
-	qp := quotedprintable.NewWriter(&b)
-	_, _ = qp.Write([]byte(strings.ReplaceAll(body, "\n", "\r\n")))
-	_ = qp.Close()
-	return b.Bytes()
+	if e.Kind == KindCert || e.Kind == KindDomain {
+		expiryMailView(&v, e)
+	} else {
+		statusMailView(&v, e)
+	}
+	if e.Test {
+		v.Command = "pingtxt notify --test"
+		v.Footer = append(v.Footer, "This is a test notification: nothing is down.")
+	} else if u := monitorURL(base, e.MonitorID); u != "" {
+		v.Action = &mailLink{Label: "open monitor", Href: u}
+	}
+	if base != "" {
+		v.FootLinks = append(v.FootLinks, mailLink{Label: strings.TrimPrefix(strings.TrimPrefix(base, "https://"), "http://"), Href: base})
+	}
+	return v
+}
+
+func statusMailView(v *mailView, e Event) {
+	v.Command = "pingtxt status " + e.Monitor
+	v.Title = e.Monitor
+	v.Badge = e.statusWord()
+	v.Note = e.Cause
+	v.Rows = append(v.Rows, mailRow{Key: "monitor", Value: e.Monitor}, mailRow{Key: "target", Value: e.Target})
+	if e.Status == StatusDown {
+		v.Tone = toneDown
+		since := e.At
+		if e.DownSince > 0 {
+			since = e.DownSince
+		}
+		v.Rows = append(v.Rows, mailRow{Key: "down since", Value: mailTime(since)})
+		if d := e.downFor(); d != "" {
+			v.Rows = append(v.Rows, mailRow{Key: "down for", Value: d, Tone: toneDown})
+		}
+		if e.Reminder > 0 {
+			v.Rows = append(v.Rows, mailRow{Key: "reminder", Value: fmt.Sprintf("#%d", e.Reminder)})
+		}
+		return
+	}
+	v.Tone = toneUp
+	v.Rows = append(v.Rows, mailRow{Key: "up since", Value: mailTime(e.At)})
+	if d := e.downFor(); d != "" {
+		v.Rows = append(v.Rows, mailRow{Key: "was down", Value: d})
+	}
+}
+
+func expiryMailView(v *mailView, e Event) {
+	tag, what := "CERT", "TLS certificate"
+	v.Command = "pingtxt cert " + e.Subject
+	if e.Kind == KindDomain {
+		tag, what = "DOMAIN", "domain registration"
+		v.Command = "pingtxt whois " + e.Subject
+	}
+	date := time.UnixMilli(e.ExpiresAt).UTC().Format("2006-01-02")
+	days := 0
+	if e.DaysLeft != nil {
+		days = *e.DaysLeft
+	}
+	v.Title = e.Subject
+	v.Rows = []mailRow{{Key: "expires", Value: date}}
+	switch e.Status {
+	case ExpiryExpired:
+		v.Tone, v.Badge = toneDown, tag+" EXPIRED"
+		v.Lead = fmt.Sprintf("The %s of %s expired on %s.", what, e.Subject, date)
+		v.Rows[0].Tone = toneDown
+	case ExpiryRenewed:
+		v.Tone, v.Badge = toneUp, tag+" OK"
+		v.Lead = fmt.Sprintf("The %s of %s was renewed.", what, e.Subject)
+		v.Rows[0].Key = "valid until"
+	default:
+		v.Tone, v.Badge = toneWarn, tag
+		v.Lead = fmt.Sprintf("The %s of %s expires in %s.", what, e.Subject, plural(days, "day"))
+		v.Rows = append(v.Rows, mailRow{Key: "days left", Value: fmt.Sprint(days), Tone: toneWarn})
+	}
+	v.Rows = append(v.Rows, mailRow{Key: "monitor", Value: e.Monitor}, mailRow{Key: "target", Value: e.Target})
 }
 
 // sendEmail delivers the event over SMTP.
@@ -148,7 +207,11 @@ func (n *Notifier) sendEmail(ctx context.Context, c map[string]string, e Event) 
 	if err != nil {
 		return err
 	}
-	return n.deliverEmail(ctx, ec, buildEmail(ec, e, time.Now()))
+	base := ""
+	if n.publicURL != nil {
+		base = publicBase(n.publicURL())
+	}
+	return n.deliverEmail(ctx, ec, buildEmail(ec, e, base, time.Now()))
 }
 
 // deliverEmail sends a complete message to the recipients of ec over SMTP.
