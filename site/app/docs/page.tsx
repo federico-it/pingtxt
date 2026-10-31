@@ -383,6 +383,13 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Webhook (JSON), Discord, Slack, Telegram, ntfy and email (SMTP with STARTTLS/TLS). Add them under{" "}
             <b className="text-foreground">notify</b>, test them before saving, and attach them to monitors.
           </p>
+          <p>
+            Escalation and reminders are set per channel. <b className="text-foreground">send after</b> N minutes alerts the
+            channel only if the monitor is still down by then (an on-call phone, a manager), so short outages never reach it.{" "}
+            <b className="text-foreground">repeat every</b> N minutes sends a STILL DOWN reminder while the monitor stays down
+            (at least 5). Webhooks carry <C>reminder</C> and <C>down_since</C>. Nothing is sent during maintenance
+            windows; due alerts go out when the window ends.
+          </p>
         </Section>
 
         <Section id="sso" title="single sign-on">

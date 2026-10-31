@@ -13,7 +13,8 @@ but plain text, monospace, light and dark.
   Uptime follows that status: a check counts as downtime only while the monitor is down, so one failing location among
   several does not lower it.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
-- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
+- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI),
+  with **escalation** (a channel alerted only after X minutes down) and **reminders** while a monitor stays down.
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
 - **MCP server** on `/mcp`: Claude and other AI assistants can read status and incidents and, with a write token,
@@ -227,6 +228,20 @@ times, never targets, locations or error messages. Drafts are visible only to lo
 For a **custom domain** (e.g. `status.example.com`), set it on the page, point its DNS at the hub and route the host
 to pingtxt in your reverse proxy (with its own TLS certificate). On that host pingtxt serves only the status page at
 `/`; the admin UI and API are not reachable there. The history covers the retention period, up to 90 days.
+
+## Escalation and reminders
+
+Each notification channel has two optional settings, in minutes:
+
+- **send after**: the channel gets the alert only if the monitor is still down after this time (0 = right away).
+  Add a second channel (e.g. the on-call phone or a manager's email) with 15 or 30 minutes to escalate long outages;
+  short blips never reach it, and it gets the recovery message only if it got the alert.
+- **repeat every**: the channel gets a `STILL DOWN` reminder at this interval while the monitor stays down
+  (0 = once, at least 5). Webhooks carry `reminder` (1, 2, ...) and `down_since` (unix ms).
+
+Times count from when the incident opened. Nothing is sent during a maintenance window: due alerts go out when it ends.
+What each channel received is stored with the incident, so a restart does not repeat or skip alerts.
+
 ## Heartbeat monitors (cron jobs)
 
 For jobs that run on a schedule (backups, cron, queues) create a monitor of type **heartbeat (push)**. It gets a secret URL; the job calls it at the end of every run, with any HTTP method:
