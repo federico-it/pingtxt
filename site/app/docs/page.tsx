@@ -30,6 +30,7 @@ const toc = [
   ["mcp", "mcp server"],
   ["prometheus", "prometheus"],
   ["upgrade", "upgrade + backup"],
+  ["verify", "verify a release"],
   ["build", "build from source"],
   ["contributing", "contributing"],
 ] as const
@@ -238,6 +239,12 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             <li>
               Agents update themselves only from an https hub (or plain http on a loopback or private IP address).
               To allow it over plain http anyway, use <C>-insecure-update</C> (<C>PINGTXT_INSECURE_UPDATE=1</C>).
+            </li>
+            <li>
+              Agents also check the hub&apos;s checksum against the <C>SHA256SUMS</C> of the GitHub release of that version, so a
+              tampered hub cannot push its own binary. <C>-verify-update</C> (<C>PINGTXT_VERIFY_UPDATE</C>) is{" "}
+              <C>auto</C> by default (skipped with a warning if GitHub is unreachable), <C>strict</C> to install only matching
+              published releases, or <C>off</C> for forks and private builds.
             </li>
             <li>Docker agents never replace their binary: pull the new image or use Watchtower.</li>
           </ul>
@@ -543,6 +550,28 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Turn it off in <b className="text-foreground">settings → updates</b>, or start the hub with{" "}
             <C>PINGTXT_DISABLE_UPDATE_CHECK=true</C> so it never contacts GitHub.
           </p>
+        </Section>
+
+        <Section id="verify" title="verify a release">
+          <p>
+            Releases after v0.1.0 are signed with <a href="https://docs.sigstore.dev/" className="text-foreground underline underline-offset-4">cosign</a>{" "}
+            in keyless mode, tied to the GitHub workflow that built them. Each release ships <C>SHA256SUMS</C> and its signature{" "}
+            <C>SHA256SUMS.sigstore.json</C>; images on ghcr.io are signed by digest.
+          </p>
+          <CopyBlock
+            code={`V=v0.2.0
+base=https://github.com/federico-it/pingtxt/releases/download/$V
+curl -fsSLO $base/SHA256SUMS -O $base/SHA256SUMS.sigstore.json -O $base/pingtxt-agent-linux-amd64
+cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \\
+  --certificate-identity "https://github.com/federico-it/pingtxt/.github/workflows/release.yml@refs/tags/$V" \\
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+sha256sum --ignore-missing -c SHA256SUMS`}
+          />
+          <CopyBlock
+            code={`cosign verify ghcr.io/federico-it/pingtxt:\${V#v} \\
+  --certificate-identity "https://github.com/federico-it/pingtxt/.github/workflows/docker.yml@refs/tags/$V" \\
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com`}
+          />
         </Section>
 
         <Section id="build" title="build from source">

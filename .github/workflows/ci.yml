@@ -19,6 +19,15 @@ jobs:
           go-version-file: go.mod
       - run: go vet ./cmd/... ./internal/...
       - run: go test ./cmd/... ./internal/...
+      # Release binaries (setup-go reads go.mod) and the hub image must use the
+      # same Go, or the agents in the image stop matching the release checksums.
+      - name: Dockerfiles use the Go version of go.mod
+        run: |
+          want=$(awk '$1 == "go" { print $2 }' go.mod)
+          for f in Dockerfile Dockerfile.agent; do
+            got=$(sed -n 's/^ARG GO_VERSION=//p' "$f")
+            [ "$got" = "$want" ] || { echo "::error file=$f::ARG GO_VERSION=$got, go.mod says $want"; exit 1; }
+          done
 
   # The store and hub tests again, on real database servers. Each test gets
   # its own scratch database on the server of PINGTXT_TEST_DB_URL.
