@@ -290,7 +290,29 @@
     "create": "crea monitor",
     "degradedPct": "degradato da (% di località)",
     "degradedPctHint": "vuoto = valore predefinito dell'istanza (impostazioni)",
-    "degradedPctPlaceholder": "predefinito"
+    "degradedPctPlaceholder": "predefinito",
+    "responseRules": {
+      "title": "controlli sulla risposta",
+      "hint": "Regole sul corpo JSON. Devono passare tutte, altrimenti il controllo fallisce e l'avviso indica quale regola non è rispettata. I percorsi sono come <code>checks.redis.status</code> o <code>items[0].id</code>.",
+      "path": "percorso json",
+      "operator": "operatore",
+      "value": "valore atteso",
+      "remove": "rimuovi regola",
+      "add": "aggiungi regola",
+      "ops": {
+        "eq": "uguale a",
+        "ne": "diverso da",
+        "contains": "contiene",
+        "not_contains": "non contiene",
+        "exists": "esiste",
+        "not_exists": "non esiste",
+        "gt": ">",
+        "gte": ">=",
+        "lt": "<",
+        "lte": "<=",
+        "matches": "corrisponde alla regex"
+      }
+    }
   },
   "pushInfo": {
     "title": "url push",

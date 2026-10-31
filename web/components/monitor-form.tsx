@@ -7,6 +7,7 @@ import { useTranslations } from "use-intl"
 
 import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
+import { ResponseRules } from "@/components/response-rules"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -179,6 +180,7 @@ export const emptyMonitor: MonitorInput = {
   ignore_tls: false,
   headers: {},
   body: "",
+  assertions: [],
   grace_sec: 300,
   degraded_pct: 0,
   locations: ["local"],
@@ -232,7 +234,10 @@ export function MonitorForm({
   id?: number
 }) {
   const router = useRouter()
-  const [m, setM] = useState<MonitorInput>(initial)
+  const [m, setM] = useState<MonitorInput>({
+    ...initial,
+    assertions: initial.assertions ?? [],
+  })
   const [headers, setHeaders] = useState(headersToText(initial.headers))
   const [busy, setBusy] = useState(false)
   const locations = useApi<Location[]>("/api/locations", {
@@ -776,6 +781,15 @@ export function MonitorForm({
               {tr("ignoreTls")}
             </label>
           </div>
+        </Section>
+      )}
+
+      {isHTTP && (
+        <Section title={tr("responseRules.title")}>
+          <ResponseRules
+            value={m.assertions}
+            onChange={(v) => set("assertions", v)}
+          />
         </Section>
       )}
 

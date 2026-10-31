@@ -6,7 +6,7 @@ but plain text, monospace, light and dark.
 - **One container** for the hub: Go API + scheduler + SQLite + the Next.js UI, ~25 MB image.
 - **Agents** for multi-location checks: a ~8 MB static binary (or Docker image) that only
   dials *out* to the hub over WebSocket. No open ports, works behind NAT. Install with one command.
-- Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**,
+- Checks: **HTTP(S)** (status codes, headers, body, JSON response rules, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**,
   databases (**PostgreSQL**, **MySQL/MariaDB**, **Redis**, **MongoDB**), **Docker containers**, **gRPC health**, **SMTP**,
   remote **MCP servers** (handshake, tools), and **heartbeat (push)** monitors for cron jobs and workers.
 - Status across locations: **down** when more than half of the online locations fail, **degraded** when at least 35% fail (configurable in settings and per monitor).

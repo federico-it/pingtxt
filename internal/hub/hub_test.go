@@ -182,3 +182,55 @@ func TestDegradedPctSetting(t *testing.T) {
 		t.Fatalf("clamp: got %d", g.DegradedPct)
 	}
 }
+
+func TestResponseRulesNeedAnUpdatedAgent(t *testing.T) {
+	h, st := newTestHub(t)
+	a, err := st.CreateAgent("old", "old", "old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.agents[a.ID] = &agentConn{agent: a, done: make(chan struct{})}
+	loc := AgentLocation(a.ID)
+	m := &store.Monitor{Name: "m", Type: "http", Target: "http://x", Retries: 1, Locations: []string{loc},
+		Assertions: []check.Assertion{{Path: "status", Op: check.OpEquals, Value: "ready"}}}
+	if err := h.validateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.Monitor(m.ID); len(got.Assertions) != 1 || got.Assertions[0].Value != "ready" {
+		t.Fatalf("assertions not stored: %+v", got.Assertions)
+	}
+	h.MonitorChanged(m.ID)
+
+	// An old agent reports up without checking the rules.
+	h.HandleResult(loc, result(m.ID, true))
+	if s := status(t, st, m.ID); s != StatusDown {
+		t.Fatalf("want down, got %s", s)
+	}
+	rows, _ := st.RecentResults(m.ID, 1)
+	if len(rows) != 1 || rows[0].Message != "this agent cannot check response rules: update it" {
+		t.Fatalf("unexpected result: %+v", rows)
+	}
+	r := result(m.ID, true)
+	r.Asserted = 1
+	h.HandleResult(loc, r)
+	if s := status(t, st, m.ID); s != StatusUp {
+		t.Fatalf("want up, got %s", s)
+	}
+}
+
+func TestValidateResponseRules(t *testing.T) {
+	h, _ := newTestHub(t)
+	bad := &store.Monitor{Name: "m", Type: "http", Target: "http://x",
+		Assertions: []check.Assertion{{Path: "a", Op: check.OpLess, Value: "x"}}}
+	if err := h.validateMonitor(bad); err == nil {
+		t.Fatal("expected an error for a non-numeric bound")
+	}
+	tcp := &store.Monitor{Name: "m", Type: "tcp", Target: "x:1",
+		Assertions: []check.Assertion{{Path: "a", Op: check.OpExists}}}
+	if err := h.validateMonitor(tcp); err != nil || len(tcp.Assertions) != 0 {
+		t.Fatalf("tcp monitors drop rules: %v %+v", err, tcp.Assertions)
+	}
+}

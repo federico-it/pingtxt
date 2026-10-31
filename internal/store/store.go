@@ -235,6 +235,9 @@ var laterMigrations = []migration{
 		FOREIGN KEY (client_id) REFERENCES oauth_clients(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 13: rules on the JSON body of HTTP responses.
+	{sqlite: `ALTER TABLE monitors ADD COLUMN assertions TEXT NOT NULL DEFAULT '[]'`,
+		mysql: `ALTER TABLE monitors ADD COLUMN assertions TEXT NOT NULL DEFAULT ('[]')`},
 }
 
 func sqliteOnly(list []string) []migration {

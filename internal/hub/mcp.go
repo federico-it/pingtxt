@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/federico-it/pingtxt/internal/check"
 	"github.com/federico-it/pingtxt/internal/store"
 )
 
@@ -484,18 +485,27 @@ var idProp = map[string]any{"id": prop("integer", "Monitor id, from list_monitor
 // monitorFields describes the fields of create_monitor and update_monitor.
 func monitorFields() map[string]any {
 	return map[string]any{
-		"name":                prop("string", "Display name"),
-		"type":                map[string]any{"type": "string", "enum": validTypes, "description": "Check type"},
-		"target":              prop("string", "What to check: URL for http/keyword, host:port for tcp, host for ping/dns, connection URL for databases, container for docker, grpc://host:port, smtp://host. Empty for push."),
-		"interval_sec":        prop("integer", "Seconds between checks (10 to 86400, default 60). For push monitors: expected heartbeat period."),
-		"timeout_ms":          prop("integer", "Timeout in milliseconds (500 to 60000, default 10000)"),
-		"retries":             prop("integer", "Failed checks in a row before the monitor is down (1 to 10)"),
-		"method":              prop("string", "HTTP method (default GET)"),
-		"expected_status":     prop("string", "Accepted HTTP status codes, e.g. 200-299 or 200,301"),
-		"keyword":             prop("string", "Text the response must contain (keyword type)"),
-		"keyword_invert":      prop("boolean", "Fail when the keyword is present instead"),
-		"headers":             map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}, "description": "HTTP request headers"},
-		"body":                prop("string", "HTTP request body"),
+		"name":            prop("string", "Display name"),
+		"type":            map[string]any{"type": "string", "enum": validTypes, "description": "Check type"},
+		"target":          prop("string", "What to check: URL for http/keyword, host:port for tcp, host for ping/dns, connection URL for databases, container for docker, grpc://host:port, smtp://host. Empty for push."),
+		"interval_sec":    prop("integer", "Seconds between checks (10 to 86400, default 60). For push monitors: expected heartbeat period."),
+		"timeout_ms":      prop("integer", "Timeout in milliseconds (500 to 60000, default 10000)"),
+		"retries":         prop("integer", "Failed checks in a row before the monitor is down (1 to 10)"),
+		"method":          prop("string", "HTTP method (default GET)"),
+		"expected_status": prop("string", "Accepted HTTP status codes, e.g. 200-299 or 200,301"),
+		"keyword":         prop("string", "Text the response must contain (keyword type)"),
+		"keyword_invert":  prop("boolean", "Fail when the keyword is present instead"),
+		"headers":         map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}, "description": "HTTP request headers"},
+		"body":            prop("string", "HTTP request body"),
+		"assertions": map[string]any{"type": "array", "description": "http/keyword: rules on the JSON response body, all must pass", "items": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"path":  prop("string", "JSON path, e.g. checks.redis.status or items[0].id"),
+				"op":    map[string]any{"type": "string", "enum": check.AssertionOps},
+				"value": prop("string", "Expected value (not for exists/not_exists)"),
+			},
+			"required": []string{"path", "op"},
+		}},
 		"dns_record":          prop("string", "DNS record type, e.g. A, AAAA, MX, TXT"),
 		"dns_expected":        prop("string", "Expected DNS answer"),
 		"ignore_tls":          prop("boolean", "Ignore TLS certificate errors"),

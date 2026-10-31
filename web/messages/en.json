@@ -290,7 +290,29 @@
     "create": "create monitor",
     "degradedPct": "degraded at (% of locations)",
     "degradedPctHint": "empty = instance default (settings)",
-    "degradedPctPlaceholder": "default"
+    "degradedPctPlaceholder": "default",
+    "responseRules": {
+      "title": "response checks",
+      "hint": "Rules on the JSON body. All must pass, otherwise the check fails and the alert says which rule broke. Paths look like <code>checks.redis.status</code> or <code>items[0].id</code>.",
+      "path": "json path",
+      "operator": "operator",
+      "value": "expected value",
+      "remove": "remove rule",
+      "add": "add rule",
+      "ops": {
+        "eq": "equals",
+        "ne": "not equals",
+        "contains": "contains",
+        "not_contains": "not contains",
+        "exists": "exists",
+        "not_exists": "not exists",
+        "gt": ">",
+        "gte": ">=",
+        "lt": "<",
+        "lte": "<=",
+        "matches": "matches regex"
+      }
+    }
   },
   "pushInfo": {
     "title": "push url",
