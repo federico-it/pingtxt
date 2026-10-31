@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { PlusIcon } from "lucide-react"
+import { useTranslations } from "use-intl"
 
 import { ExpiryBadges } from "@/components/expiry"
 import { TagList, TagToggle, useLabels } from "@/components/labels"
@@ -36,6 +37,8 @@ const filters = [
 export default function MonitorsPage() {
   const { data, isLoading } = useApi<MonitorSummary[]>("/api/monitors")
   const isAdmin = useIsAdmin()
+  const t = useTranslations("dashboard")
+  const ts = useTranslations("status")
   const [q, setQ] = useState("")
   const [filter, setFilter] = useState<(typeof filters)[number]>("all")
   // "all", "none" (no group) or a group id
@@ -93,22 +96,22 @@ export default function MonitorsPage() {
       .filter((g) => by.has(g.id))
       .map((g) => ({ key: String(g.id), title: g.name, items: by.get(g.id)! }))
     if (by.has(0))
-      out.push({ key: "none", title: "ungrouped", items: by.get(0)! })
+      out.push({ key: "none", title: t("ungrouped"), items: by.get(0)! })
     return out
-  }, [list, hasGroups, groups.data, groupById])
+  }, [list, hasGroups, groups.data, groupById, t])
 
   return (
     <>
-      <PageHeader cmd="pingtxt monitors ls" title="monitors">
+      <PageHeader cmd="pingtxt monitors ls" title={t("title")}>
         <Input
-          placeholder="grep..."
+          placeholder={t("search")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="h-8 w-40"
         />
         {isAdmin && (
           <Button render={<Link href="/monitors/new/" />} nativeButton={false}>
-            <PlusIcon /> new
+            <PlusIcon /> {t("new")}
           </Button>
         )}
       </PageHeader>
@@ -123,7 +126,7 @@ export default function MonitorsPage() {
               filter === f && "bg-accent text-foreground"
             )}
           >
-            {f}:{counts[f] ?? 0}
+            {f === "all" ? t("all") : ts(f)}:{counts[f] ?? 0}
           </button>
         ))}
       </div>
@@ -132,14 +135,14 @@ export default function MonitorsPage() {
         <div className="-mt-2 mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
           {hasGroups && (
             <div className="flex flex-wrap items-center gap-1">
-              <span className="text-muted-foreground">group:</span>
+              <span className="text-muted-foreground">{t("group")}</span>
               {[
-                { k: "all", label: "all" },
+                { k: "all", label: t("all") },
                 ...(groups.data ?? []).map((g) => ({
                   k: String(g.id),
                   label: g.name,
                 })),
-                { k: "none", label: "ungrouped" },
+                { k: "none", label: t("ungrouped") },
               ].map((g) => (
                 <button
                   key={g.k}
@@ -156,13 +159,13 @@ export default function MonitorsPage() {
           )}
           {(tags.data?.length ?? 0) > 0 && (
             <div className="flex flex-wrap items-center gap-1">
-              <span className="text-muted-foreground">tag:</span>
-              {(tags.data ?? []).map((t) => (
+              <span className="text-muted-foreground">{t("tag")}</span>
+              {(tags.data ?? []).map((tg) => (
                 <TagToggle
-                  key={t.id}
-                  tag={t}
-                  on={tag === t.id}
-                  onChange={(on) => setTag(on ? t.id : null)}
+                  key={tg.id}
+                  tag={tg}
+                  on={tag === tg.id}
+                  onChange={(on) => setTag(on ? tg.id : null)}
                 />
               ))}
             </div>
@@ -172,32 +175,32 @@ export default function MonitorsPage() {
 
       {isLoading && !data ? (
         <div className="text-muted-foreground">
-          fetching<span className="cursor-blink">_</span>
+          {t("fetching")}<span className="cursor-blink">_</span>
         </div>
       ) : list.length === 0 ? (
         <Empty>
           {data?.length ? (
-            "no monitors match"
+            t("noMatch")
           ) : (
             <>
-              no monitors yet.{" "}
-              <Link
-                href="/monitors/new/"
-                className="text-primary underline underline-offset-4"
-              >
-                create the first one
-              </Link>
+              {t.rich("emptyState", {
+                link: (c) => (
+                  <Link href="/monitors/new/" className="text-primary underline underline-offset-4">
+                    {c}
+                  </Link>
+                ),
+              })}
             </>
           )}
         </Empty>
       ) : (
         <div className="border-t border-dashed">
           <div className="hidden grid-cols-[1fr_220px_72px_64px_80px] gap-4 border-b border-dashed px-2 py-1.5 text-[11px] text-muted-foreground uppercase md:grid">
-            <span>name</span>
-            <span>last 24h</span>
-            <span className="text-right">uptime</span>
-            <span className="text-right">avg</span>
-            <span className="text-right">checked</span>
+            <span>{t("cols.name")}</span>
+            <span>{t("cols.last24h")}</span>
+            <span className="text-right">{t("cols.uptime")}</span>
+            <span className="text-right">{t("cols.avg")}</span>
+            <span className="text-right">{t("cols.checked")}</span>
           </div>
           {sections.map((sec) => (
             <div key={sec.key}>
@@ -208,11 +211,8 @@ export default function MonitorsPage() {
                     {sec.items.length}
                     {sec.items.some((m) => m.status === "down") && (
                       <span className="text-down">
-                        {" "}
-                        · {
-                          sec.items.filter((m) => m.status === "down").length
-                        }{" "}
-                        down
+                        {" · "}
+                        {t("down", { count: sec.items.filter((m) => m.status === "down").length })}
                       </span>
                     )}
                   </span>
@@ -237,10 +237,9 @@ export default function MonitorsPage() {
                       </div>
                       <div className="truncate text-xs text-muted-foreground">
                         {m.type === "push"
-                          ? `heartbeat · expected every ${interval(m.interval_sec)}`
-                          : `${m.type} · ${displayTarget(m.target)} · every ${interval(m.interval_sec)}`}
-                        {m.locations.length > 1 &&
-                          ` · ${m.locations.length} locations`}
+                          ? t("heartbeatLine", { every: interval(m.interval_sec) })
+                          : t("monitorLine", { type: m.type, target: displayTarget(m.target), every: interval(m.interval_sec) })}
+                        {m.locations.length > 1 && ` · ${t("locations", { count: m.locations.length })}`}
                         <ExpiryBadges checks={m.expiry} now={now} />
                       </div>
                     </div>
@@ -265,7 +264,7 @@ export default function MonitorsPage() {
                     {ms(m.avg_ms_24h)}
                   </span>
                   <span className="hidden text-right text-xs text-muted-foreground md:block">
-                    {m.paused ? "paused" : ago(m.last?.ts)}
+                    {m.paused ? ts("paused") : ago(m.last?.ts)}
                   </span>
                 </Link>
               ))}

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { api, useApi, type Group, type Tag, type TagColor } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -141,6 +142,7 @@ export function TagPicker({
 }) {
   const [name, setName] = useState("")
   const [busy, setBusy] = useState(false)
+  const tl = useTranslations("labels")
 
   async function create() {
     const n = name.trim().replace(/^#/, "")
@@ -161,7 +163,7 @@ export function TagPicker({
       setName("")
       onCreated?.()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : tl("error"))
     } finally {
       setBusy(false)
     }
@@ -183,8 +185,8 @@ export function TagPicker({
         <input
           value={name}
           maxLength={32}
-          placeholder="new tag"
-          aria-label="new tag"
+          placeholder={tl("newTag")}
+          aria-label={tl("newTag")}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -196,7 +198,7 @@ export function TagPicker({
         />
         <button
           type="button"
-          aria-label="add tag"
+          aria-label={tl("addTag")}
           disabled={busy || !name.trim()}
           onClick={create}
           className="px-1 text-muted-foreground hover:text-foreground disabled:opacity-40"

@@ -117,8 +117,19 @@ func TestMajorityAcrossLocations(t *testing.T) {
 	h.HandleResult(LocalLocation, result(m.ID, true))
 	h.HandleResult(locs[0], result(m.ID, true))
 	h.HandleResult(locs[1], result(m.ID, false))
+	// 33% failing is below the default 35% threshold.
+	if s := status(t, st, m.ID); s != StatusUp {
+		t.Fatalf("1/3 failing: want up, got %s", s)
+	}
+	// A lower threshold on the monitor makes it degraded.
+	m.DegradedPct = 30
+	if err := st.UpdateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	h.MonitorChanged(m.ID)
+	h.HandleResult(locs[1], result(m.ID, false))
 	if s := status(t, st, m.ID); s != StatusDegraded {
-		t.Fatalf("1/3 failing: want degraded, got %s", s)
+		t.Fatalf("1/3 failing with 30%% threshold: want degraded, got %s", s)
 	}
 	h.HandleResult(locs[0], result(m.ID, false))
 	if s := status(t, st, m.ID); s != StatusDown {
@@ -127,7 +138,47 @@ func TestMajorityAcrossLocations(t *testing.T) {
 	// Results from a location not assigned to the monitor are ignored.
 	h.HandleResult("agent:999", result(m.ID, true))
 	rows, _ := st.RecentResults(m.ID, 100)
-	if len(rows) != 4 {
-		t.Fatalf("want 4 stored results, got %d", len(rows))
+	if len(rows) != 5 {
+		t.Fatalf("want 5 stored results, got %d", len(rows))
+	}
+}
+
+func TestClassify(t *testing.T) {
+	cases := []struct {
+		n, down, pct int
+		want         string
+	}{
+		{1, 0, 35, StatusUp},
+		{1, 1, 35, StatusDown},
+		{2, 1, 35, StatusDegraded}, // 50% is not a majority
+		{3, 1, 35, StatusUp},       // 33%
+		{3, 2, 35, StatusDown},
+		{4, 1, 35, StatusUp},       // 25%
+		{4, 2, 35, StatusDegraded}, // 50%
+		{10, 3, 35, StatusUp},
+		{10, 4, 35, StatusDegraded},
+		{10, 6, 35, StatusDown},
+		{20, 7, 35, StatusDegraded}, // exactly 35%
+		{3, 1, 30, StatusDegraded},
+		{4, 1, 25, StatusDegraded},
+		{0, 0, 35, StatusUp},
+	}
+	for _, c := range cases {
+		if got := classify(c.n, c.down, c.pct); got != c.want {
+			t.Errorf("classify(%d, %d, %d) = %s, want %s", c.n, c.down, c.pct, got, c.want)
+		}
+	}
+}
+
+func TestDegradedPctSetting(t *testing.T) {
+	g := GeneralSettings{}
+	g.normalize()
+	if g.DegradedPct != defaultDegradedPct {
+		t.Fatalf("default: got %d", g.DegradedPct)
+	}
+	g.DegradedPct = 90
+	g.normalize()
+	if g.DegradedPct != maxDegradedPct {
+		t.Fatalf("clamp: got %d", g.DegradedPct)
 	}
 }

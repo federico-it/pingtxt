@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { Confirm } from "@/components/confirm"
 import { Section } from "@/components/page-header"
@@ -20,6 +21,7 @@ import {
   type ImportResult,
 } from "@/lib/api"
 import { datetime } from "@/lib/format"
+import { tr } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 function bytes(n: number) {
@@ -30,7 +32,7 @@ function bytes(n: number) {
 }
 
 function errText(err: unknown) {
-  return err instanceof Error ? err.message : "error"
+  return err instanceof Error ? err.message : tr("backups.error")
 }
 
 const kinds = [
@@ -46,8 +48,8 @@ const kinds = [
 function counts(c: Record<string, number> | undefined) {
   const parts = kinds
     .filter((k) => c?.[k])
-    .map((k) => `${c![k]} ${k.replace("_", " ")}`)
-  return parts.length ? parts.join(", ") : "none"
+    .map((k) => tr(`backups.kinds.${k}`, { count: c![k] }))
+  return parts.length ? parts.join(", ") : tr("backups.none")
 }
 
 export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
@@ -59,6 +61,7 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
   const [result, setResult] = useState<ImportResult | null>(null)
   const input = useRef<HTMLInputElement>(null)
   const { data: backups } = useApi<Backups>("/api/backups")
+  const t = useTranslations("backups")
 
   async function pick(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -68,11 +71,11 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
     try {
       const text = await f.text()
       const doc = JSON.parse(text) as ConfigFile
-      if (doc.format !== "pingtxt-config") throw new Error("not a pingtxt configuration export")
+      if (doc.format !== "pingtxt-config") throw new Error(t("notExport"))
       setFile({ name: f.name, text, doc })
     } catch (err) {
       setFile(null)
-      toast.error(err instanceof SyntaxError ? "not a JSON file" : errText(err))
+      toast.error(err instanceof SyntaxError ? t("notJson") : errText(err))
     }
   }
 
@@ -84,7 +87,7 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
       const r = await apiRaw<ImportResult>(`/api/config/import?${q}`, file.text, "application/json")
       setResult(r)
       setFile(null)
-      toast.success("configuration imported")
+      toast.success(t("imported"))
       onImported?.()
     } catch (err) {
       toast.error(errText(err))
@@ -100,28 +103,24 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
 
   const importButton = (
     <Button variant={mode === "replace" ? "destructive" : "default"} disabled={busy}>
-      {busy ? "importing..." : "import"}
+      {busy ? t("importing") : t("import")}
     </Button>
   )
 
   return (
-    <Section title="configuration export">
+    <Section title={t("exportTitle")}>
       <div className="grid gap-6">
         <p className="text-xs text-muted-foreground">
-          monitors, groups, tags, notification channels, maintenance windows, status
-          pages, agents and instance settings as a JSON file. no history and no user
-          accounts: use a database backup for that.
+          {t("exportIntro")}
         </p>
 
         <div className="grid gap-3">
           <label className="flex items-center gap-2 text-xs">
             <Switch checked={secrets} onCheckedChange={setSecrets} />
-            include secrets
+            {t("includeSecrets")}
           </label>
           <p className="text-[11px] text-muted-foreground">
-            {secrets
-              ? "the file will hold passwords, bot tokens, secret webhook urls, login client secrets and agent tokens. keep it safe."
-              : "passwords, tokens and secret webhook urls are replaced by [redacted]. importing here keeps the stored values; on another hub those channels are skipped and those monitors paused until you fill them in."}
+            {secrets ? t("withSecretsHint") : t("withoutSecretsHint")}
           </p>
           <div>
             <Button
@@ -129,13 +128,13 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
               render={<a href={`/api/config/export${secrets ? "?secrets=1" : ""}`} download />}
               nativeButton={false}
             >
-              export json
+              {t("exportJson")}
             </Button>
           </div>
         </div>
 
         <div className="grid gap-3">
-          <div className="text-xs text-muted-foreground">import</div>
+          <div className="text-xs text-muted-foreground">{t("importTitle")}</div>
           <input
             ref={input}
             type="file"
@@ -146,7 +145,7 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
           {!file ? (
             <div>
               <Button variant="outline" onClick={() => input.current?.click()}>
-                choose file
+                {t("chooseFile")}
               </Button>
             </div>
           ) : (
@@ -154,19 +153,15 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
               <div className="grid gap-1 text-xs">
                 <div className="truncate text-foreground">{file.name}</div>
                 <div className="text-muted-foreground">
-                  pingtxt {doc!.hub_version || "?"} · exported{" "}
-                  {doc!.exported_at ? datetime(Date.parse(doc!.exported_at)) : "?"} ·{" "}
-                  {doc!.secrets ? "with secrets" : "without secrets"}
+                  pingtxt {doc!.hub_version || "?"} ·{" "}
+                  {t("exportedAt", { date: doc!.exported_at ? datetime(Date.parse(doc!.exported_at)) : "?" })} ·{" "}
+                  {doc!.secrets ? t("withSecrets") : t("withoutSecrets")}
                 </div>
                 <div className="text-muted-foreground">{counts(fileCounts)}</div>
               </div>
               <Field
-                label="mode"
-                hint={
-                  mode === "merge"
-                    ? "objects with the same name are updated, the others are added. nothing is deleted."
-                    : "deletes every monitor (with its history), group, tag, channel, maintenance window and status page first."
-                }
+                label={t("mode")}
+                hint={mode === "merge" ? t("mergeHint") : t("replaceHint")}
               >
                 <div className="flex gap-2">
                   {(["merge", "replace"] as const).map((m) => (
@@ -179,36 +174,34 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
                         mode === m && "border-solid border-primary text-primary"
                       )}
                     >
-                      {m}
+                      {t(`modes.${m}`)}
                     </button>
                   ))}
                 </div>
               </Field>
               <label className="flex items-center gap-2 text-xs">
                 <Switch checked={applySettings} onCheckedChange={setApplySettings} />
-                also apply instance settings (public url, login, retention...)
+                {t("applySettings")}
               </label>
               <p className="text-[11px] text-muted-foreground">
-                {backups && !backups.file_backups
-                  ? "no automatic backup with this database: back up the database server first if you may want to undo the import."
-                  : "a database backup is taken before importing."}
+                {backups && !backups.file_backups ? t("noAutoBackup") : t("autoBackup")}
               </p>
               <div className="flex gap-2">
                 {mode === "replace" ? (
                   <Confirm
                     trigger={importButton}
-                    title="replace the configuration?"
-                    description={`Every current monitor, with its history, and every group, tag, channel, maintenance window and status page will be deleted, then the file is imported.${backups && !backups.file_backups ? "" : " A backup is taken first."}`}
-                    action="replace"
+                    title={t("replaceTitle")}
+                    description={backups && !backups.file_backups ? t("replaceText") : `${t("replaceText")} ${t("replaceBackup")}`}
+                    action={t("modes.replace")}
                     onConfirm={runImport}
                   />
                 ) : (
                   <Button disabled={busy} onClick={runImport}>
-                    {busy ? "importing..." : "import"}
+                    {busy ? t("importing") : t("import")}
                   </Button>
                 )}
                 <Button variant="ghost" onClick={() => setFile(null)}>
-                  cancel
+                  {t("cancel")}
                 </Button>
               </div>
             </div>
@@ -217,19 +210,19 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
           {result && (
             <div className="grid gap-1 border border-dashed p-3 text-xs">
               <div>
-                <span className="text-primary">✓</span> imported ({result.mode})
+                <span className="text-primary">✓</span> {t("importedMode", { mode: result.mode === "replace" || result.mode === "merge" ? t(`modes.${result.mode}`) : result.mode })}
               </div>
               {Object.keys(result.deleted).length > 0 && (
-                <div className="text-muted-foreground">deleted: {counts(result.deleted)}</div>
+                <div className="text-muted-foreground">{t("deleted", { list: counts(result.deleted) })}</div>
               )}
-              <div className="text-muted-foreground">created: {counts(result.created)}</div>
-              <div className="text-muted-foreground">updated: {counts(result.updated)}</div>
+              <div className="text-muted-foreground">{t("created", { list: counts(result.created) })}</div>
+              <div className="text-muted-foreground">{t("updated", { list: counts(result.updated) })}</div>
               {Object.keys(result.skipped).length > 0 && (
-                <div className="text-muted-foreground">skipped: {counts(result.skipped)}</div>
+                <div className="text-muted-foreground">{t("skipped", { list: counts(result.skipped) })}</div>
               )}
               {result.backup && (
                 <div className="text-muted-foreground">
-                  backup before import: <span className="text-foreground">{result.backup}</span>
+                  {t.rich("backupBefore", { name: result.backup, hl: (c) => <span className="text-foreground">{c}</span> })}
                 </div>
               )}
               {result.warnings.length > 0 && (
@@ -251,12 +244,13 @@ export function DatabaseBackups() {
   const { data, mutate } = useApi<Backups>("/api/backups", { refreshInterval: 30_000 })
   const [busy, setBusy] = useState(false)
   const upload = useRef<HTMLInputElement>(null)
+  const t = useTranslations("backups")
 
   async function backupNow() {
     setBusy(true)
     try {
       const b = await api<BackupFile>("/api/backups", { method: "POST" })
-      toast.success(`backup ${b.name} created`)
+      toast.success(t("backupCreated", { name: b.name }))
       mutate()
     } catch (err) {
       toast.error(errText(err))
@@ -272,7 +266,7 @@ export function DatabaseBackups() {
     setBusy(true)
     try {
       await apiRaw("/api/backups/upload", f, "application/octet-stream")
-      toast.success(`${f.name} uploaded`)
+      toast.success(t("uploaded", { name: f.name }))
       mutate()
     } catch (err) {
       toast.error(errText(err))
@@ -284,7 +278,7 @@ export function DatabaseBackups() {
   async function restore(b: BackupFile) {
     try {
       await api(`/api/backups/${b.name}/restore`, { method: "POST" })
-      toast.success("restart the hub to finish the restore")
+      toast.success(t("restartToRestore"))
       mutate()
     } catch (err) {
       toast.error(errText(err))
@@ -294,7 +288,7 @@ export function DatabaseBackups() {
   async function cancelRestore() {
     try {
       await api("/api/backups/restore", { method: "DELETE" })
-      toast.success("restore cancelled")
+      toast.success(t("restoreCancelled"))
       mutate()
     } catch (err) {
       toast.error(errText(err))
@@ -304,7 +298,7 @@ export function DatabaseBackups() {
   async function remove(b: BackupFile) {
     try {
       await api(`/api/backups/${b.name}`, { method: "DELETE" })
-      toast.success(`${b.name} deleted`)
+      toast.success(t("fileDeleted", { name: b.name }))
       mutate()
     } catch (err) {
       toast.error(errText(err))
@@ -314,15 +308,14 @@ export function DatabaseBackups() {
   if (data && !data.file_backups) return <ServerBackups driver={data.driver} />
 
   return (
-    <Section title="database backups">
+    <Section title={t("dbTitle")}>
       <div className="grid gap-6">
         <p className="text-xs text-muted-foreground">
-          a backup is a full copy of the database: settings, users, secrets and
-          history. it is taken while the hub keeps running.
+          {t("dbIntro")}
           {data && (
             <>
               {" "}
-              files are kept in <span className="text-foreground">{data.dir}</span>.
+              {t.rich("dbDir", { dir: data.dir, hl: (c) => <span className="text-foreground">{c}</span> })}
             </>
           )}
         </p>
@@ -330,17 +323,16 @@ export function DatabaseBackups() {
         {data?.pending_restore && (
           <div className="grid gap-2 border border-primary p-3 text-xs">
             <div>
-              <span className="text-primary">!</span> restore pending:{" "}
-              <span className="text-foreground">
-                {data.pending_restore.name || "uploaded backup"}
-              </span>{" "}
-              replaces the database when the hub restarts. the current database is
-              kept as a pre-restore backup.
+              <span className="text-primary">!</span>{" "}
+              {t.rich("pending", {
+                name: data.pending_restore.name || t("uploadedBackup"),
+                hl: (c) => <span className="text-foreground">{c}</span>,
+              })}
             </div>
             <code className="text-muted-foreground">docker restart pingtxt</code>
             <div>
               <Button size="xs" variant="outline" onClick={cancelRestore}>
-                cancel restore
+                {t("cancelRestore")}
               </Button>
             </div>
           </div>
@@ -356,7 +348,7 @@ export function DatabaseBackups() {
 
         <div className="flex flex-wrap gap-2">
           <Button disabled={busy} onClick={backupNow}>
-            backup now
+            {t("backupNow")}
           </Button>
           <input
             ref={upload}
@@ -366,13 +358,13 @@ export function DatabaseBackups() {
             onChange={uploadFile}
           />
           <Button variant="outline" disabled={busy} onClick={() => upload.current?.click()}>
-            upload backup
+            {t("uploadBackup")}
           </Button>
         </div>
 
         {data && data.backups.length === 0 && (
           <div className="border border-dashed p-6 text-center text-xs text-muted-foreground">
-            no backups yet
+            {t("noBackups")}
           </div>
         )}
         {data && data.backups.length > 0 && (
@@ -385,7 +377,7 @@ export function DatabaseBackups() {
                 <div className="min-w-0">
                   <div className="truncate text-foreground">{datetime(b.created_at)}</div>
                   <div className="text-muted-foreground">
-                    {b.kind} · {bytes(b.size)}
+                    {t(`fileKinds.${b.kind}`)} · {bytes(b.size)}
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -395,26 +387,26 @@ export function DatabaseBackups() {
                     render={<a href={`/api/backups/${b.name}`} download={b.name} />}
                     nativeButton={false}
                   >
-                    download
+                    {t("download")}
                   </Button>
                   <Confirm
                     trigger={
                       <Button size="xs" variant="ghost">
-                        restore
+                        {t("restore")}
                       </Button>
                     }
-                    title="restore this backup?"
-                    description={`The database will be replaced by ${b.name} when the hub restarts. Everything after ${datetime(b.created_at)} is lost; the current database is kept as a pre-restore backup.`}
-                    action="restore"
+                    title={t("restoreTitle")}
+                    description={t("restoreText", { name: b.name, date: datetime(b.created_at) })}
+                    action={t("restore")}
                     onConfirm={() => restore(b)}
                   />
                   <Confirm
                     trigger={
                       <Button size="xs" variant="ghost">
-                        delete
+                        {t("delete")}
                       </Button>
                     }
-                    title="delete this backup?"
+                    title={t("deleteTitle")}
                     description={b.name}
                     onConfirm={() => remove(b)}
                   />
@@ -447,21 +439,19 @@ const dumpCommands = {
 /** With PostgreSQL or MariaDB/MySQL the database server is backed up with its own tools. */
 function ServerBackups({ driver }: { driver: "postgres" | "mysql" | "sqlite" }) {
   const c = dumpCommands[driver === "postgres" ? "postgres" : "mysql"]
+  const t = useTranslations("backups")
   return (
-    <Section title="database backups">
+    <Section title={t("dbTitle")}>
       <div className="grid gap-4 text-xs">
         <p className="text-muted-foreground">
-          this hub stores its data in {c.name}. back up the database server with its own
-          tools (or your provider&apos;s snapshots): the dump holds settings, users,
-          secrets and history. the configuration export above works too, without
-          history and users. with the docker compose files from the docs:
+          {t("serverIntro", { db: c.name })}
         </p>
         <div className="grid gap-1">
-          <div className="text-muted-foreground">backup</div>
+          <div className="text-muted-foreground">{t("backup")}</div>
           <pre className="overflow-x-auto border border-dashed p-3 text-[11px]">{c.backup}</pre>
         </div>
         <div className="grid gap-1">
-          <div className="text-muted-foreground">restore</div>
+          <div className="text-muted-foreground">{t("restore")}</div>
           <pre className="overflow-x-auto border border-dashed p-3 text-[11px]">{c.restore}</pre>
         </div>
       </div>
@@ -479,13 +469,14 @@ function ScheduleForm({
   const [s, setS] = useState(settings)
   const [busy, setBusy] = useState(false)
   const dirty = JSON.stringify(s) !== JSON.stringify(settings)
+  const t = useTranslations("backups")
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     try {
       await api("/api/settings/backups", { method: "PUT", body: s })
-      toast.success("backup schedule saved")
+      toast.success(t("scheduleSaved"))
       onSaved()
     } catch (err) {
       toast.error(errText(err))
@@ -496,16 +487,16 @@ function ScheduleForm({
 
   return (
     <form onSubmit={save} className="grid gap-4 sm:grid-cols-3">
-      <Field label="scheduled backups">
+      <Field label={t("scheduled")}>
         <label className="flex h-8 items-center gap-2 text-xs">
           <Switch
             checked={s.enabled}
             onCheckedChange={(v) => setS((p) => ({ ...p, enabled: v }))}
           />
-          {s.enabled ? "enabled" : "disabled"}
+          {s.enabled ? t("enabled") : t("disabled")}
         </label>
       </Field>
-      <Field label="every (hours)" htmlFor="backup_interval">
+      <Field label={t("everyHours")} htmlFor="backup_interval">
         <Input
           id="backup_interval"
           type="number"
@@ -516,7 +507,7 @@ function ScheduleForm({
           onChange={(e) => setS((p) => ({ ...p, interval_hours: Number(e.target.value) }))}
         />
       </Field>
-      <Field label="keep" htmlFor="backup_keep" hint="older scheduled backups are deleted">
+      <Field label={t("keep")} htmlFor="backup_keep" hint={t("keepHint")}>
         <Input
           id="backup_keep"
           type="number"
@@ -530,7 +521,7 @@ function ScheduleForm({
       {dirty && (
         <div className="sm:col-span-3">
           <Button type="submit" variant="outline" disabled={busy}>
-            save schedule
+            {t("saveSchedule")}
           </Button>
         </div>
       )}

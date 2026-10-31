@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { Confirm } from "@/components/confirm"
 import { CopyBlock } from "@/components/copy-block"
@@ -25,17 +26,9 @@ import {
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-const scopes: { value: TokenScope; label: string }[] = [
-  { value: "read", label: "read only" },
-  { value: "write", label: "read + write" },
-]
-
-const expiries = [
-  { value: "30", label: "30 days" },
-  { value: "90", label: "90 days" },
-  { value: "365", label: "1 year" },
-  { value: "0", label: "never" },
-]
+// Labels are in apiTokens.scopes.<scope> and apiTokens.expiries.<days>.
+const scopes: TokenScope[] = ["read", "write"]
+const expiries = ["30", "90", "365", "0"] as const
 
 function date(ms: number) {
   return new Date(ms).toLocaleDateString()
@@ -49,7 +42,9 @@ export function ApiTokens() {
   const [scope, setScope] = useState<TokenScope>("read")
   // A token never has more rights than its owner.
   const isAdmin = useIsAdmin()
-  const allowed = isAdmin ? scopes : scopes.filter((s) => s.value === "read")
+  const tt = useTranslations("apiTokens")
+  const allowed = (isAdmin ? scopes : scopes.filter((s) => s === "read")).map((value) => ({ value, label: tt(`scopes.${value}`) }))
+  const expiryItems = expiries.map((value) => ({ value, label: tt(`expiries.${value}`) }))
   const [expiry, setExpiry] = useState("90")
   const [created, setCreated] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -66,7 +61,7 @@ export function ApiTokens() {
       setName("")
       mutate()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : tt("error"))
     } finally {
       setBusy(false)
     }
@@ -75,10 +70,10 @@ export function ApiTokens() {
   async function revoke(t: ApiToken) {
     try {
       await api(`/api/tokens/${t.id}`, { method: "DELETE" })
-      toast.success(`${t.name} revoked`)
+      toast.success(tt("revoked", { name: t.name }))
       mutate()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : tt("error"))
     }
   }
 
@@ -88,14 +83,13 @@ export function ApiTokens() {
   return (
     <div className="grid gap-4">
       <p className="text-xs text-muted-foreground">
-        tokens let scripts and tools use the API. they cannot change accounts or
-        settings.
+        {tt("intro")}
       </p>
 
       {created ? (
         <div className="grid gap-3">
           <p className="text-xs">
-            copy the token now, it will not be shown again.
+            {tt("copyNow")}
           </p>
           <CopyBlock code={created} />
           <CopyBlock
@@ -103,13 +97,13 @@ export function ApiTokens() {
           />
           <div>
             <Button variant="outline" onClick={() => setCreated(null)}>
-              done
+              {tt("done")}
             </Button>
           </div>
         </div>
       ) : (
         <form onSubmit={create} className="grid gap-3 sm:grid-cols-3">
-          <Field label="name" htmlFor="token-name">
+          <Field label={tt("name")} htmlFor="token-name">
             <Input
               id="token-name"
               required
@@ -120,14 +114,8 @@ export function ApiTokens() {
             />
           </Field>
           <Field
-            label="access"
-            hint={
-              !isAdmin
-                ? "your account is read-only: tokens can only read"
-                : scope === "read"
-                  ? "view monitors, incidents, agents"
-                  : "also create, edit and delete"
-            }
+            label={tt("access")}
+            hint={!isAdmin ? tt("viewerHint") : scope === "read" ? tt("readHint") : tt("writeHint")}
           >
             <Select
               items={allowed}
@@ -146,9 +134,9 @@ export function ApiTokens() {
               </SelectContent>
             </Select>
           </Field>
-          <Field label="expires">
+          <Field label={tt("expires")}>
             <Select
-              items={expiries}
+              items={expiryItems}
               value={expiry}
               onValueChange={(v) => v && setExpiry(v)}
             >
@@ -156,7 +144,7 @@ export function ApiTokens() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {expiries.map((x) => (
+                {expiryItems.map((x) => (
                   <SelectItem key={x.value} value={x.value}>
                     {x.label}
                   </SelectItem>
@@ -166,7 +154,7 @@ export function ApiTokens() {
           </Field>
           <div className="sm:col-span-3">
             <Button type="submit" variant="outline" disabled={busy}>
-              create token
+              {tt("create")}
             </Button>
           </div>
         </form>
@@ -189,34 +177,29 @@ export function ApiTokens() {
                       t.scope === "write" && "text-warn"
                     )}
                   >
-                    [{t.scope}]
+                    [{t.scope === "write" || t.scope === "read" ? tt(`scopes.${t.scope}`) : t.scope}]
                   </span>
                   <span className="block text-[11px] text-muted-foreground">
-                    ptk_…{t.hint} · created {date(t.created_at)} ·{" "}
-                    {t.last_used_at
-                      ? `last used ${date(t.last_used_at)}`
-                      : "never used"}{" "}
-                    ·{" "}
+                    ptk_…{t.hint} · {tt("created", { date: date(t.created_at) })} ·{" "}
+                    {t.last_used_at ? tt("lastUsed", { date: date(t.last_used_at) }) : tt("neverUsed")} ·{" "}
                     {t.expires_at === 0 ? (
-                      "no expiry"
+                      tt("noExpiry")
                     ) : expired ? (
-                      <span className="text-down">
-                        expired {date(t.expires_at)}
-                      </span>
+                      <span className="text-down">{tt("expired", { date: date(t.expires_at) })}</span>
                     ) : (
-                      `expires ${date(t.expires_at)}`
+                      tt("expiresOn", { date: date(t.expires_at) })
                     )}
                   </span>
                 </div>
                 <Confirm
                   trigger={
                     <Button size="xs" variant="ghost">
-                      revoke
+                      {tt("revoke")}
                     </Button>
                   }
-                  title={`revoke ${t.name}?`}
-                  description="Scripts using this token stop working right away."
-                  action="revoke"
+                  title={tt("revokeTitle", { name: t.name })}
+                  description={tt("revokeText")}
+                  action={tt("revoke")}
                   onConfirm={() => revoke(t)}
                 />
               </div>

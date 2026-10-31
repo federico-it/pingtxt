@@ -9,7 +9,7 @@ but plain text, monospace, light and dark.
 - Checks: **HTTP(S)** (status codes, headers, body, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**,
   databases (**PostgreSQL**, **MySQL/MariaDB**, **Redis**, **MongoDB**), **Docker containers**, **gRPC health**, **SMTP**,
   remote **MCP servers** (handshake, tools), and **heartbeat (push)** monitors for cron jobs and workers.
-- Status across locations: **down** when the majority of online locations fail, **degraded** when only some do.
+- Status across locations: **down** when more than half of the online locations fail, **degraded** when at least 35% fail (configurable in settings and per monitor).
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
 - Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain.
