@@ -6,17 +6,19 @@ but plain text, monospace, light and dark.
 - **One container** for the hub: Go API + scheduler + SQLite + the Next.js UI, ~25 MB image.
 - **Agents** for multi-location checks: a ~8 MB static binary (or Docker image) that only
   dials *out* to the hub over WebSocket. No open ports, works behind NAT. Install with one command.
-- Checks: **HTTP(S)** (status codes, headers, body, JSON response rules, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**,
+- Checks: **HTTP(S)** (status codes, headers, body, JSON response rules, TLS expiry, response time per phase: DNS, connect, TLS, first byte), **keyword**, **TCP port**, **ICMP ping**, **DNS**,
   databases (**PostgreSQL**, **MySQL/MariaDB**, **Redis**, **MongoDB**), **Docker containers**, **gRPC health**, **SMTP**,
   remote **MCP servers** (handshake, tools), and **heartbeat (push)** monitors for cron jobs and workers.
 - Status across locations: **down** when more than half of the online locations fail, **degraded** when at least 35% fail (configurable in settings and per monitor).
   Uptime follows that status: a check counts as downtime only while the monitor is down, so one failing location among
   several does not lower it.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
-- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI).
+- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI),
+  with **escalation** (a channel alerted only after X minutes down) and **reminders** while a monitor stays down.
 - **Periodic email reports**, weekly (Mondays) or monthly (on the 1st): uptime, incidents and downtime per monitor group,
   compared with the period before, sent through your email channels at the hour and in the time zone you pick.
 - Public **status pages** with the monitors you pick, daily uptime history and incidents, on `/status/<slug>/` or a custom domain, plus SVG badges for READMEs.
+  Post incidents with written updates (investigating, identified, monitoring, resolved); visitors can subscribe by email.
 - Login with password (+ TOTP two-factor), GitHub, Google or any OpenID Connect provider. Personal API tokens.
 - **MCP server** on `/mcp`: Claude and other AI assistants can read status and incidents and, with a write token,
   manage monitors and maintenance windows.
@@ -210,6 +212,7 @@ scrape_configs:
 | `pingtxt_monitor_uptime_ratio` | + window (24h, 7d, 30d) | share of checks taken while the monitor was up or degraded, maintenance excluded |
 | `pingtxt_monitor_latency_avg_seconds` | + window | average response time of successful checks |
 | `pingtxt_check_up`, `pingtxt_check_latency_seconds`, `pingtxt_check_status_code`, `pingtxt_check_timestamp_seconds` | + location, location_name | last check from each location |
+| `pingtxt_check_phase_seconds` | + location, location_name, phase (dns, connect, tls, ttfb) | time per phase of the last HTTP check from each location |
 | `pingtxt_cert_expiry_days`, `pingtxt_domain_expiry_days` (and `_timestamp_seconds`) | + subject | days left before expiry |
 | `pingtxt_agent_connected`, `pingtxt_agent_last_seen_timestamp_seconds` | agent_id, agent, location, location_name, version | agent connectivity |
 | `pingtxt_monitors`, `pingtxt_agents`, `pingtxt_incidents_open`, `pingtxt_info` | | totals and hub version |
@@ -241,6 +244,34 @@ monitor page or the status page editor:
 ```
 
 A badge never shows more than its page: drafts and monitors that are not on the page answer a grey "not found".
+
+### Incidents and email subscribers
+
+Open **incidents** on a page (button on the status page list) to tell visitors what is going on: a title, an impact
+(none, minor, major, critical) and a timeline of updates, each with a status (*investigating*, *identified*,
+*monitoring*, *resolved*) and a message. Open incidents are shown at the top of the page, and their impact makes the
+page banner at least *degraded* (minor), *partial outage* (major) or *major outage* (critical). Resolved ones go to the
+history for the shown days.
+
+To let visitors **subscribe by email**, pick an email notification channel under *email subscriptions* in the page
+settings: its SMTP server and sender are used (not its recipients). Visitors enter their address on the page and confirm
+it through a link (valid 7 days); then every update posted with *email subscribers* checked reaches them. Each email has
+an unsubscribe link and a one-click `List-Unsubscribe` header. Admins see and remove subscribers under the incidents of
+the page. Links point to the custom domain of the page, or else to the public URL from the settings, so set it.
+
+## Escalation and reminders
+
+Each notification channel has two optional settings, in minutes:
+
+- **send after**: the channel gets the alert only if the monitor is still down after this time (0 = right away).
+  Add a second channel (e.g. the on-call phone or a manager's email) with 15 or 30 minutes to escalate long outages;
+  short blips never reach it, and it gets the recovery message only if it got the alert.
+- **repeat every**: the channel gets a `STILL DOWN` reminder at this interval while the monitor stays down
+  (0 = once, at least 5). Webhooks carry `reminder` (1, 2, ...) and `down_since` (unix ms).
+
+Times count from when the incident opened. Nothing is sent during a maintenance window: due alerts go out when it ends.
+What each channel received is stored with the incident, so a restart does not repeat or skip alerts.
+
 ## Heartbeat monitors (cron jobs)
 
 For jobs that run on a schedule (backups, cron, queues) create a monitor of type **heartbeat (push)**. It gets a secret URL; the job calls it at the end of every run, with any HTTP method:

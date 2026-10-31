@@ -10,10 +10,12 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	probing "github.com/prometheus-community/pro-bing"
@@ -74,10 +76,25 @@ type Result struct {
 	// Asserted is how many response rules passed. The hub uses it to spot
 	// agents too old to check them.
 	Asserted int `json:"asserted,omitempty"`
+	// Timing splits the latency of http/keyword checks into phases. Agents
+	// older than this field never send it.
+	Timing *Timing `json:"timing,omitempty"`
 	// IPFamily repeats the job's IP family, so the hub can tell agents that
 	// do not know the setting (and would use either family) from those that do.
 	IPFamily int   `json:"ip_family,omitempty"`
 	At       int64 `json:"at"` // unix milliseconds
+}
+
+// Timing is the time spent in each phase of an HTTP request, in ms. With
+// redirects the phases of every hop are added up. Whatever is left of the
+// total latency is reading the response body.
+type Timing struct {
+	DNSMs     float64 `json:"dns_ms"`
+	ConnectMs float64 `json:"connect_ms"`
+	TLSMs     float64 `json:"tls_ms"`
+	// TTFBMs is the wait from the connection being ready (request sent) to
+	// the first byte of the response.
+	TTFBMs float64 `json:"ttfb_ms"`
 }
 
 // Run executes the job and always returns a Result.
@@ -153,6 +170,8 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 	defer tr.CloseIdleConnections()
 	client := &http.Client{Transport: tr, Timeout: timeout, CheckRedirect: dropHeadersOnRedirect(j.Headers)}
 
+	pt := &phaseTracer{}
+	req = req.WithContext(httptrace.WithClientTrace(ctx, pt.trace()))
 	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
@@ -160,7 +179,7 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 	}
 	defer resp.Body.Close()
 
-	r := Result{StatusCode: resp.StatusCode}
+	r := Result{StatusCode: resp.StatusCode, Timing: pt.timing()}
 	if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
 		r.CertExpiry = resp.TLS.PeerCertificates[0].NotAfter.Unix()
 	}
@@ -199,6 +218,75 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 	r.OK = true
 	r.Message = resp.Status
 	return r
+}
+
+// phaseTracer adds up the phases of every request a check makes (one per
+// redirect hop). Dial callbacks can run on other goroutines (Happy
+// Eyeballs), hence the mutex.
+type phaseTracer struct {
+	mu                   sync.Mutex
+	dnsStart, connStart  time.Time
+	tlsStart, connReady  time.Time
+	dns, conn, tls, wait time.Duration
+	gotByte              bool
+}
+
+func (p *phaseTracer) trace() *httptrace.ClientTrace {
+	lock := func(f func()) { p.mu.Lock(); f(); p.mu.Unlock() }
+	return &httptrace.ClientTrace{
+		DNSStart: func(httptrace.DNSStartInfo) { lock(func() { p.dnsStart = time.Now() }) },
+		DNSDone: func(httptrace.DNSDoneInfo) {
+			lock(func() {
+				if !p.dnsStart.IsZero() {
+					p.dns += time.Since(p.dnsStart)
+					p.dnsStart = time.Time{}
+				}
+			})
+		},
+		ConnectStart: func(string, string) {
+			lock(func() {
+				if p.connStart.IsZero() { // first of parallel dials
+					p.connStart = time.Now()
+				}
+			})
+		},
+		ConnectDone: func(_, _ string, err error) {
+			lock(func() {
+				if err == nil && !p.connStart.IsZero() {
+					p.conn += time.Since(p.connStart)
+					p.connStart = time.Time{}
+				}
+			})
+		},
+		TLSHandshakeStart: func() { lock(func() { p.tlsStart = time.Now() }) },
+		TLSHandshakeDone: func(tls.ConnectionState, error) {
+			lock(func() {
+				if !p.tlsStart.IsZero() {
+					p.tls += time.Since(p.tlsStart)
+					p.tlsStart = time.Time{}
+				}
+			})
+		},
+		GotConn: func(httptrace.GotConnInfo) { lock(func() { p.connReady = time.Now() }) },
+		GotFirstResponseByte: func() {
+			lock(func() {
+				if !p.connReady.IsZero() {
+					p.wait += time.Since(p.connReady)
+					p.connReady = time.Time{}
+					p.gotByte = true
+				}
+			})
+		},
+	}
+}
+
+func (p *phaseTracer) timing() *Timing {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.gotByte {
+		return nil
+	}
+	return &Timing{DNSMs: ms(p.dns), ConnectMs: ms(p.conn), TLSMs: ms(p.tls), TTFBMs: ms(p.wait)}
 }
 
 // dropHeadersOnRedirect keeps the monitor's own request headers (API keys,

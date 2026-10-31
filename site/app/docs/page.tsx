@@ -17,6 +17,7 @@ const toc = [
   ["agents", "add a location"],
   ["agent-updates", "agent updates"],
   ["checks", "check types"],
+  ["phases", "response time per phase"],
   ["ipv6", "ipv6"],
   ["response-checks", "response checks (JSON)"],
   ["mcp", "mcp servers"],
@@ -278,6 +279,18 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
           </p>
         </Section>
 
+        <Section id="phases" title="response time per phase">
+          <p>
+            HTTP and keyword checks measure where the time goes: <b className="text-foreground">DNS</b> lookup,{" "}
+            <b className="text-foreground">connect</b>, <b className="text-foreground">TLS</b> handshake,{" "}
+            <b className="text-foreground">wait</b> for the first byte (TTFB, the server at work) and{" "}
+            <b className="text-foreground">transfer</b> of the body. On the monitor page switch the response time chart to{" "}
+            <b className="text-foreground">by phase</b>, per location or all together; hover a latency in the log for the
+            breakdown of that check. With redirects the phases of every hop are added up. Agents measure phases from this
+            version on: update older ones to see their data.
+          </p>
+        </Section>
+
         <Section id="ipv6" title="ipv6">
           <p>
             Every check type works over IPv6. Hosts with only AAAA records just work; write IPv6 addresses in brackets
@@ -392,6 +405,11 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             to pingtxt in your reverse proxy. On that host only the status page is served.
           </p>
           <p>
+            Post <b className="text-foreground">incidents</b> on a page with a timeline of written updates (investigating,
+            identified, monitoring, resolved). With an email channel picked under <i>email subscriptions</i>, visitors can
+            subscribe: they confirm through a link, then get every update by email, each with an unsubscribe link.
+          </p>
+          <p>
             <b className="text-foreground">README badges</b>: every published page has SVG badges for its overall state and for
             each monitor it shows (state, uptime, response time). Copy them from the monitor page or the status page editor:
           </p>
@@ -429,6 +447,13 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             downtime of the last week (every Monday) or month (on the 1st) per monitor group, compared with the period before.
             Pick the email channels, optionally some groups, the hour and the time zone; preview a report or send it now
             before turning it on.
+          </p>
+          <p>
+            Escalation and reminders are set per channel. <b className="text-foreground">send after</b> N minutes alerts the
+            channel only if the monitor is still down by then (an on-call phone, a manager), so short outages never reach it.{" "}
+            <b className="text-foreground">repeat every</b> N minutes sends a STILL DOWN reminder while the monitor stays down
+            (at least 5). Webhooks carry <C>reminder</C> and <C>down_since</C>. Nothing is sent during maintenance
+            windows; due alerts go out when the window ends.
           </p>
         </Section>
 
@@ -559,6 +584,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
               [<C key="1">pingtxt_monitor_up</C>, "1 up or degraded, 0 down"],
               [<C key="2">pingtxt_monitor_uptime_ratio</C>, "uptime per window (24h, 7d, 30d)"],
               [<C key="3">pingtxt_check_latency_seconds</C>, "last check per location"],
+              [<C key="3p">pingtxt_check_phase_seconds</C>, "DNS, connect, TLS and first byte of the last HTTP check"],
               [<C key="4">pingtxt_cert_expiry_days</C>, "days before the certificate expires"],
               [<C key="5">pingtxt_domain_expiry_days</C>, "days before the domain expires"],
               [<C key="6">pingtxt_agent_connected</C>, "agent connectivity"],
