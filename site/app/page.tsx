@@ -15,7 +15,7 @@ const features: { title: string; body: string }[] = [
   },
   {
     title: "majority vote status",
-    body: "Down when most online locations fail, degraded when only some do. Response time per location.",
+    body: "Down when most online locations fail, degraded from 35% (your threshold). Response time per location.",
   },
   {
     title: "lots of check types",

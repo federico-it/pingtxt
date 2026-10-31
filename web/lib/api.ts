@@ -36,6 +36,8 @@ export interface Monitor {
   body: string
   push_token: string
   grace_sec: number
+  /** percent of failing locations that marks the monitor degraded; 0 = instance default */
+  degraded_pct: number
   locations: string[]
   /** 0 = no group */
   group_id: number
@@ -348,6 +350,8 @@ export interface GeneralSettings {
   monitor_defaults: MonitorDefaults
   expiry: ExpirySettings
   metrics: MetricsSettings
+  /** default percent of failing locations that marks a monitor degraded */
+  degraded_pct: number
 }
 
 export interface MetricsSettings {

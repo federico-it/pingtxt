@@ -170,7 +170,10 @@ var migrations = append(sqliteOnly(sqliteMigrations), laterMigrations...)
 //
 //	{sqlite: `ALTER TABLE monitors ADD COLUMN notes TEXT NOT NULL DEFAULT ''`,
 //	 mysql: `ALTER TABLE monitors ADD COLUMN notes TEXT NOT NULL DEFAULT ('')`},
-var laterMigrations = []migration{}
+var laterMigrations = []migration{
+	// 11: share of failing locations that marks a monitor degraded (0 = instance default).
+	{sqlite: `ALTER TABLE monitors ADD COLUMN degraded_pct INTEGER NOT NULL DEFAULT 0`},
+}
 
 func sqliteOnly(list []string) []migration {
 	out := make([]migration, len(list))

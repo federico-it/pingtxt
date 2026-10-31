@@ -211,6 +211,25 @@ export function GeneralSettingsForm({
         </div>
       </Section>
 
+      <Section title="status">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="degraded at (% of locations)"
+            htmlFor="degraded_pct"
+            hint="degraded when at least this share of a monitor's online locations fails, down when more than half do. monitors can override it"
+          >
+            <Input
+              id="degraded_pct"
+              type="number"
+              min={1}
+              max={50}
+              value={g.degraded_pct}
+              onChange={(e) => set("degraded_pct", Number(e.target.value))}
+            />
+          </Field>
+        </div>
+      </Section>
+
       <Section title="new monitor defaults">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="interval (s)" htmlFor="d_interval">
