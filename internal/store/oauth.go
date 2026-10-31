@@ -53,10 +53,34 @@ func (s *Store) OAuthClient(id string) (*OAuthClient, error) {
 	return c, nil
 }
 
+// EnsureOAuthClient creates or updates a client the hub ships with (the
+// iOS app), keeping its grants.
+func (s *Store) EnsureOAuthClient(c *OAuthClient) error {
+	uris, _ := json.Marshal(c.RedirectURIs)
+	res, err := s.db.Exec(`UPDATE oauth_clients SET name = ?, redirect_uris = ? WHERE id = ?`, c.Name, string(uris), c.ID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		return nil
+	}
+	if _, err := s.OAuthClient(c.ID); err == nil {
+		return nil // unchanged (MySQL counts only changed rows)
+	}
+	return s.CreateOAuthClient(c)
+}
+
 // DeleteUnusedOAuthClients removes clients registered before t that no user
 // ever authorized: registration is open, so abandoned ones are cleaned up.
-func (s *Store) DeleteUnusedOAuthClients(before int64) error {
-	_, err := s.db.Exec(`DELETE FROM oauth_clients WHERE created_at < ? AND id NOT IN (SELECT client_id FROM oauth_grants)`, before)
+// Built-in clients (keep) are never removed.
+func (s *Store) DeleteUnusedOAuthClients(before int64, keep ...string) error {
+	q := `DELETE FROM oauth_clients WHERE created_at < ? AND id NOT IN (SELECT client_id FROM oauth_grants)`
+	args := []any{before}
+	for _, id := range keep {
+		q += ` AND id <> ?`
+		args = append(args, id)
+	}
+	_, err := s.db.Exec(q, args...)
 	return err
 }
 
@@ -90,11 +114,21 @@ func (s *Store) OAuthGrantByRefresh(hash string) (*OAuthGrant, error) {
 	return scanGrant(s.db.QueryRow(`SELECT `+grantCols+` FROM oauth_grants g JOIN oauth_clients c ON c.id = g.client_id WHERE g.refresh_hash = ?`, hash))
 }
 
+// OAuthGrantByPreviousRefresh finds the grant whose refresh token was hash
+// before the last rotation: seeing it again means it leaked.
+func (s *Store) OAuthGrantByPreviousRefresh(hash string) (*OAuthGrant, error) {
+	if hash == "" {
+		return nil, ErrNotFound
+	}
+	return scanGrant(s.db.QueryRow(`SELECT `+grantCols+` FROM oauth_grants g JOIN oauth_clients c ON c.id = g.client_id WHERE g.prev_refresh_hash = ?`, hash))
+}
+
 // RotateOAuthGrant replaces both tokens of a grant, only if the refresh token
-// is still the one presented (a reused refresh token loses the race).
+// is still the one presented (a reused refresh token loses the race). The
+// old refresh token is remembered to detect its reuse.
 func (s *Store) RotateOAuthGrant(id int64, oldRefresh, access string, accessExp int64, refresh string, refreshExp int64) error {
-	res, err := s.db.Exec(`UPDATE oauth_grants SET access_hash = ?, access_expires = ?, refresh_hash = ?, refresh_expires = ? WHERE id = ? AND refresh_hash = ?`,
-		access, accessExp, refresh, refreshExp, id, oldRefresh)
+	res, err := s.db.Exec(`UPDATE oauth_grants SET access_hash = ?, access_expires = ?, refresh_hash = ?, refresh_expires = ?, prev_refresh_hash = ? WHERE id = ? AND refresh_hash = ?`,
+		access, accessExp, refresh, refreshExp, oldRefresh, id, oldRefresh)
 	if err != nil {
 		return err
 	}

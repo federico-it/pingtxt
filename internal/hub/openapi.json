@@ -4,7 +4,7 @@
     "title": "pingtxt API",
     "version": "dev",
     "summary": "REST API of the pingtxt hub.",
-    "description": "Everything the web UI does goes through this API.\n\n## Authentication\n\nCreate a personal token in **settings → api tokens** and send it as a bearer token:\n\n```\ncurl -H \"Authorization: Bearer ptk_...\" https://status.example.com/api/monitors\n```\n\n- **read** tokens can call every `GET` endpoint marked *read*.\n- **write** tokens can also create, change and delete. Only admins can create them.\n- Account and instance settings (users, tokens, 2FA, settings, backups) need a browser session: tokens get `403`.\n\n## Roles\n\nAdmins can change everything. **Viewers** are read-only: every request that is not `GET` answers `403`, and secrets in monitors and notification channels are replaced by `********`.\n\n## Conventions\n\n- Bodies are JSON (`Content-Type: application/json`); other content types on writes get `415`.\n- Times are Unix milliseconds. Ids are integers.\n- Errors are `{\"error\": \"message\"}` with a 4xx/5xx status.\n- Browser requests from another origin are refused (`403`).\n\nAI assistants can use the same API through the MCP server on `/mcp`.",
+    "description": "Everything the web UI does goes through this API.\n\n## Authentication\n\nCreate a personal token in **settings → api tokens** and send it as a bearer token:\n\n```\ncurl -H \"Authorization: Bearer ptk_...\" https://status.example.com/api/monitors\n```\n\n- **read** tokens can call every `GET` endpoint marked *read*.\n- **write** tokens can also create, change and delete. Only admins can create them.\n- Account and instance settings (users, tokens, 2FA, settings, backups) need a browser session: tokens get `403`.\n\n## Native apps (OAuth 2.1)\n\nApps sign the user in with OAuth 2.1, authorization code + PKCE (S256), through the hub's own login page (password, 2FA, single sign-on), and get a bearer access token (`pma_...`) that works on the whole API like a token above.\n\n- The iOS app is the built-in public client `pingtxt-ios` with redirect URI `pingtxt://oauth` (no secret, no registration). Other clients register with `POST /oauth/register`.\n- Scopes: `read` or `write`. `write` is granted only to admins; viewers always get `read`. The scope the user picked is in the token response.\n- Access tokens last 1 hour. Refresh tokens last 30 days from their last use and rotate at every refresh: keep only the newest one. Presenting an already used refresh token revokes the sign-in.\n- Sign out with `POST /oauth/revoke`. Users see and disconnect apps in **settings → api tokens → connected apps**.\n- Metadata: `/.well-known/oauth-authorization-server` (RFC 8414) and `/.well-known/oauth-protected-resource/api` (RFC 9728).\n\n## Roles\n\nAdmins can change everything. **Viewers** are read-only: every request that is not `GET` answers `403`, and secrets in monitors and notification channels are replaced by `********`.\n\n## Conventions\n\n- Bodies are JSON (`Content-Type: application/json`); other content types on writes get `415`.\n- Times are Unix milliseconds. Ids are integers.\n- Errors are `{\"error\": \"message\"}` with a 4xx/5xx status.\n- Browser requests from another origin are refused (`403`).\n\nAI assistants can use the same API through the MCP server on `/mcp`.",
     "license": {
       "name": "AGPL-3.0-only",
       "identifier": "AGPL-3.0-only"
@@ -76,6 +76,10 @@
     {
       "name": "Backups",
       "description": "Database backups and configuration export/import."
+    },
+    {
+      "name": "OAuth",
+      "description": "OAuth 2.1 authorization server for native apps and MCP clients. Form bodies, OAuth error format."
     }
   ],
   "paths": {
@@ -3450,7 +3454,7 @@
         ],
         "summary": "List connected apps",
         "operationId": "listGrants",
-        "description": "Apps connected through OAuth (MCP clients).\n\n**Access:** Browser session only: API tokens get 403.",
+        "description": "Apps connected through OAuth (the iOS app, MCP clients): one entry per sign-in.\n\n**Access:** Browser session only: API tokens get 403.",
         "x-pingtxt-access": "session",
         "security": [
           {
@@ -6447,6 +6451,242 @@
           }
         }
       }
+    },
+    "/oauth/authorize": {
+      "get": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Start a sign-in",
+        "operationId": "oauthAuthorize",
+        "description": "Open in a browser (ASWebAuthenticationSession on iOS). The user logs in on the hub if needed and allows the app on a consent page; the browser then goes to `redirect_uri` with `code`, `state` and `iss`, or with `error`.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "`code`."
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "`pingtxt-ios` for the iOS app."
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "`pingtxt://oauth` for the iOS app."
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "BASE64URL(SHA256(code_verifier)), no padding."
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "`S256`."
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Random value, checked on return."
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "`read`, `write` or `read write`: write is preselected on the consent page for admins."
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional (RFC 8707): `<hub>/api` or `<hub>/mcp`."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consent page (HTML)."
+          },
+          "302": {
+            "description": "To the login page, or back to `redirect_uri`."
+          },
+          "400": {
+            "description": "Unknown client or redirect URI not registered (HTML, no redirect)."
+          }
+        }
+      }
+    },
+    "/oauth/token": {
+      "post": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Get or refresh tokens",
+        "operationId": "oauthToken",
+        "description": "`grant_type=authorization_code` exchanges the code (single use, 5 minutes) for tokens. `grant_type=refresh_token` returns a new access token **and a new refresh token**: the old one stops working, and using it again revokes the whole sign-in, so refresh one request at a time and store the new refresh token before using it.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "grant_type",
+                  "client_id"
+                ],
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "description": "`authorization_code` or `refresh_token`."
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "description": "`pingtxt-ios` for the iOS app."
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "authorization_code: the code from the redirect."
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "description": "authorization_code: same as in the authorization request."
+                  },
+                  "code_verifier": {
+                    "type": "string",
+                    "description": "authorization_code: the PKCE verifier."
+                  },
+                  "refresh_token": {
+                    "type": "string",
+                    "description": "refresh_token: the latest refresh token."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthTokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "OAuth error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth/revoke": {
+      "post": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Sign out",
+        "operationId": "oauthRevoke",
+        "description": "Ends the sign-in of the token (access or refresh token, RFC 7009). Always answers 200.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "client_id"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Refresh or access token."
+                  },
+                  "client_id": {
+                    "type": "string",
+                    "description": "`pingtxt-ios` for the iOS app."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done (also when the token was unknown)."
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-authorization-server": {
+      "get": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Authorization server metadata",
+        "operationId": "oauthServerMetadata",
+        "description": "RFC 8414 metadata: endpoints, scopes, PKCE methods.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6454,14 +6694,35 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "ptk_...",
-        "description": "Personal API token from settings → api tokens."
+        "bearerFormat": "ptk_... or pma_...",
+        "description": "Personal API token from settings → api tokens (ptk_...), or an OAuth access token (pma_...) of a native app or MCP client."
       },
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
         "name": "pingtxt_session",
         "description": "Browser session, set by login."
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "pingtxt_session",
+        "description": "Browser session, set by login."
+      },
+      "oauth2": {
+        "type": "oauth2",
+        "description": "Authorization code with PKCE (S256), public clients only. The iOS app uses client_id `pingtxt-ios` and redirect URI `pingtxt://oauth`.",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "/oauth/authorize",
+            "tokenUrl": "/oauth/token",
+            "refreshUrl": "/oauth/token",
+            "scopes": {
+              "read": "Read monitors, incidents, results and everything else a read token can.",
+              "write": "Also create, change and delete (admins only)."
+            }
+          }
+        }
       }
     },
     "responses": {
@@ -7470,7 +7731,11 @@
           },
           "ipv6": {
             "type": "integer",
-            "enum": [0, 1, 2],
+            "enum": [
+              0,
+              1,
+              2
+            ],
             "description": "IPv6 connectivity as last probed: 0 unknown (agents before this field), 1 available, 2 not available. IPv6-only monitors cannot use a location with 2, and monitors with ip_family 0 check over IPv4 there."
           },
           "location_id": {
@@ -7526,7 +7791,11 @@
           },
           "ipv6": {
             "type": "integer",
-            "enum": [0, 1, 2],
+            "enum": [
+              0,
+              1,
+              2
+            ],
             "description": "IPv6 connectivity as last probed: 0 unknown (agents before this field), 1 available, 2 not available. IPv6-only monitors cannot use a location with 2, and monitors with ip_family 0 check over IPv4 there."
           }
         }
@@ -7828,7 +8097,12 @@
           },
           "ip_family": {
             "type": "integer",
-            "enum": [1, 4, 6, 46],
+            "enum": [
+              1,
+              4,
+              6,
+              46
+            ],
             "description": "Default IP family of monitors with ip_family 0: 1 IPv4 or IPv6 (default), 4 IPv4 only, 6 IPv6 only, 46 IPv4 and IPv6. Locations without IPv6 check those monitors over IPv4."
           },
           "update_check": {
@@ -8656,6 +8930,48 @@
             "type": "integer",
             "format": "int64",
             "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        }
+      },
+      "OAuthError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "invalid_request, invalid_grant, unsupported_grant_type..."
+          },
+          "error_description": {
+            "type": "string"
+          }
+        }
+      },
+      "OAuthTokens": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "Bearer token for the API and /mcp (pma_...)."
+          },
+          "token_type": {
+            "type": "string",
+            "enum": [
+              "Bearer"
+            ]
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Seconds the access token lasts (3600)."
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Single use (pmr_...): every refresh returns a new one."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write"
+            ]
           }
         }
       }

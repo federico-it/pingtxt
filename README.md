@@ -156,8 +156,8 @@ for you. Two ways to sign in:
   **settings → connectors → add custom connector**; Claude Code: `claude mcp add --transport http pingtxt
   https://status.example.com/mcp`, then `/mcp` to log in). The assistant opens pingtxt in the browser, you log in as
   usual and pick **read only** or **read + write** (admins only). The hub supports discovery (RFC 9728 / RFC 8414),
-  dynamic client registration, PKCE (S256) and rotating refresh tokens. Access tokens last an hour and only work on
-  `/mcp`; connected apps are listed in **settings → api tokens**, where you can disconnect them.
+  dynamic client registration, PKCE (S256) and rotating refresh tokens. Access tokens last an hour and work on `/mcp`
+  and the REST API; connected apps are listed in **settings → api tokens**, where you can disconnect them.
 - **API token**: send `Authorization: Bearer ptk_...` (configs below). A **read only** token (or the token of a
   read-only user) gets the read tools only; a **read + write** token of an admin also gets the tools that change data.
 
@@ -205,6 +205,29 @@ Cursor, Windsurf and other clients that take a URL and headers:
 
 Times in tool results are ISO 8601 (UTC). The server is stateless (no sessions, no event stream), so it works behind
 any reverse proxy and with several hub replicas.
+
+### Native apps (iOS)
+
+The iOS app signs in with OAuth 2.1 through the hub's own login page, so passwords, 2FA and single sign-on (GitHub,
+Google, OpenID Connect) all work, and no password ever reaches the app. It is a built-in public client: no secret and no
+registration.
+
+| | |
+| --- | --- |
+| client_id | `pingtxt-ios` |
+| redirect URI | `pingtxt://oauth` |
+| authorize | `GET /oauth/authorize` with `response_type=code`, `code_challenge` + `code_challenge_method=S256`, `state`, `scope=read write` |
+| tokens | `POST /oauth/token` (form body): `grant_type=authorization_code` with `code`, `redirect_uri`, `code_verifier`, or `grant_type=refresh_token` with `refresh_token` |
+| sign out | `POST /oauth/revoke` with `token` and `client_id` |
+| metadata | `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource/api` |
+
+- Admins choose **read only** or **read + write** on the consent page; read-only users always get `read`. The token
+  response says which `scope` was granted.
+- Access tokens (`pma_...`) last an hour and work on the whole REST API like an API token of the same scope: never on
+  account endpoints (password, 2FA, tokens, users, settings).
+- Refresh tokens (`pmr_...`) last 30 days from their last use and rotate at every refresh. Using an old refresh token
+  again revokes the sign-in, so the app refreshes one request at a time and stores the new token before using it.
+- Each sign-in shows up in **settings → api tokens → connected apps**, where it can be disconnected.
 
 ### Prometheus
 

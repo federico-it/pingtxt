@@ -18,6 +18,9 @@ import (
 // A token never has more rights than its owner: the owner's role is checked
 // at every request, so the write token of a user who becomes read-only only reads.
 //
+// OAuth access tokens (pma_...) of MCP clients and the iOS app work the same
+// way, with the scope the user allowed on the consent page.
+//
 // Tokens never reach account endpoints (password, 2FA, tokens, users and
 // instance settings): those need a browser session, so a leaked token cannot
 // lock the owner out or mint more tokens.
@@ -34,9 +37,9 @@ const (
 func (h *Hub) authenticate(r *http.Request) (*store.User, *store.APIToken, error) {
 	if v := r.Header.Get("Authorization"); v != "" {
 		t := bearer(r)
-		// OAuth access tokens are bound to the MCP server: they never
-		// reach the REST API directly.
-		if strings.HasPrefix(t, oauthAccessPrefix) && isMCPRequest(r) {
+		// OAuth access tokens (MCP clients, the iOS app) follow the same
+		// rules as API tokens.
+		if strings.HasPrefix(t, oauthAccessPrefix) {
 			return h.oauthAccessToken(t)
 		}
 		if !strings.HasPrefix(t, apiTokenPrefix) {
