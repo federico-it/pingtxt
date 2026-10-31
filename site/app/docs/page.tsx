@@ -24,6 +24,7 @@ const toc = [
   ["api", "api tokens"],
   ["prometheus", "prometheus"],
   ["upgrade", "upgrade + backup"],
+  ["contributing", "contributing"],
 ] as const
 
 function C({ children }: { children: React.ReactNode }) {
@@ -320,6 +321,53 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Database migrations run on start. All state is one SQLite database, <C>/data/pingtxt.db</C>: to back it up, stop the
             container and copy the data folder. Agents installed with the script follow the hub version on their
             own.
+          </p>
+        </Section>
+
+        <Section id="contributing" title="contributing">
+          <p>
+            pingtxt is free software under the{" "}
+            <a href={`${REPO}/blob/main/LICENSE`} className="text-foreground underline underline-offset-4">
+              AGPL-3.0 license
+            </a>
+            : use it, self-host it and change it freely; if you distribute a modified version or run one as a service for
+            others, publish its source under the same license. Bug reports, fixes and new check types or notifiers are
+            welcome.
+          </p>
+          <ul>
+            <li>
+              <b className="text-foreground">bugs</b>: search the{" "}
+              <a href={`${REPO}/issues`} className="text-foreground underline underline-offset-4">issues</a> first, then open a{" "}
+              <a href={`${REPO}/issues/new?template=bug_report.yml`} className="text-foreground underline underline-offset-4">bug report</a>{" "}
+              with the version (shown in settings), how you run it, steps and logs.
+            </li>
+            <li>
+              <b className="text-foreground">ideas</b>: open a{" "}
+              <a href={`${REPO}/issues/new?template=feature_request.yml`} className="text-foreground underline underline-offset-4">feature request</a>.
+              For bigger changes, agree on the approach in an issue before writing code.
+            </li>
+            <li>
+              <b className="text-foreground">security</b>: never in a public issue.{" "}
+              <a href={`${REPO}/security/advisories/new`} className="text-foreground underline underline-offset-4">Report it privately</a>,
+              see <a href={`${REPO}/blob/main/SECURITY.md`} className="text-foreground underline underline-offset-4">SECURITY.md</a>.
+            </li>
+            <li>
+              <b className="text-foreground">pull requests</b>: fork, branch from <C>main</C>, run <C>make test lint</C>, open the PR
+              against <C>main</C>. It is merged by a maintainer once the <C>go</C> and <C>web</C> checks pass and the review is approved.
+            </li>
+          </ul>
+          <CopyBlock
+            label="dev setup"
+            code={`git clone https://github.com/<you>/pingtxt.git && cd pingtxt
+(cd web && npm ci)
+make dev-hub   # hub on :8090
+make dev-web   # UI on :3000, proxies /api`}
+          />
+          <p>
+            Everything else, commit style and code style included, is in{" "}
+            <a href={`${REPO}/blob/main/CONTRIBUTING.md`} className="text-foreground underline underline-offset-4">CONTRIBUTING.md</a>.
+            Everyone taking part follows the{" "}
+            <a href={`${REPO}/blob/main/CODE_OF_CONDUCT.md`} className="text-foreground underline underline-offset-4">code of conduct</a>.
           </p>
         </Section>
       </div>
