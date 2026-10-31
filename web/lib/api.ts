@@ -1,6 +1,7 @@
 import useSWR, { type SWRConfiguration } from "swr"
 
-export type Status = "pending" | "up" | "down" | "degraded" | "paused" | "maintenance"
+export type Status =
+  "pending" | "up" | "down" | "degraded" | "paused" | "maintenance"
 export type MonitorType =
   | "http"
   | "keyword"
@@ -15,6 +16,7 @@ export type MonitorType =
   | "docker"
   | "grpc"
   | "smtp"
+  | "mcp"
 
 export interface Monitor {
   id: number
@@ -199,7 +201,18 @@ export interface Group {
   created_at: number
 }
 
-export const tagColors = ["", "red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "gray"] as const
+export const tagColors = [
+  "",
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "cyan",
+  "blue",
+  "purple",
+  "pink",
+  "gray",
+] as const
 export type TagColor = (typeof tagColors)[number]
 
 export interface Tag {
@@ -296,8 +309,16 @@ export interface Identity {
 export type Role = "admin" | "viewer"
 
 export const roles: { value: Role; label: string; hint: string }[] = [
-  { value: "admin", label: "admin", hint: "changes monitors, settings and users" },
-  { value: "viewer", label: "read-only", hint: "sees everything but secrets, changes nothing" },
+  {
+    value: "admin",
+    label: "admin",
+    hint: "changes monitors, settings and users",
+  },
+  {
+    value: "viewer",
+    label: "read-only",
+    hint: "sees everything but secrets, changes nothing",
+  },
 ]
 
 export interface User {
@@ -409,7 +430,8 @@ export interface StatusPage {
   created_at: number
 }
 
-export type PageStatus = "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown"
+export type PageStatus =
+  "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown"
 
 export interface PublicMonitor {
   id: number
@@ -431,16 +453,27 @@ export interface PublicStatusPage {
   days: number
   monitors: PublicMonitor[]
   show_incidents: boolean
-  incidents: { id: number; monitor_name: string; started_at: number; resolved_at: number }[]
+  incidents: {
+    id: number
+    monitor_name: string
+    started_at: number
+    resolved_at: number
+  }[]
   updated_at: number
 }
 
 /** Public address of a status page. */
-export function statusPageURL(p: Pick<StatusPage, "slug" | "domain">, hubURL: string) {
-  return p.domain ? `https://${p.domain}/` : `${hubURL.replace(/\/$/, "")}/status/${p.slug}/`
+export function statusPageURL(
+  p: Pick<StatusPage, "slug" | "domain">,
+  hubURL: string
+) {
+  return p.domain
+    ? `https://${p.domain}/`
+    : `${hubURL.replace(/\/$/, "")}/status/${p.slug}/`
 }
 
-export type BackupKind = "auto" | "manual" | "pre-import" | "pre-restore" | "upload"
+export type BackupKind =
+  "auto" | "manual" | "pre-import" | "pre-restore" | "upload"
 
 export interface BackupFile {
   name: string

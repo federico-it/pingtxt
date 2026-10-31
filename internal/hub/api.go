@@ -400,7 +400,7 @@ func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.Us
 
 var validTypes = []string{
 	check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush,
-	check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo, check.TypeDocker, check.TypeGRPC, check.TypeSMTP,
+	check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo, check.TypeDocker, check.TypeGRPC, check.TypeSMTP, check.TypeMCP,
 }
 
 // urlSchemes lists the accepted target URL schemes of URL-based types.
@@ -483,6 +483,10 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 		if err != nil || (u.Scheme != "grpc" && u.Scheme != "grpcs") || u.Host == "" || u.Port() == "" {
 			return errors.New("target must be grpc://host:port or grpcs://host:port, optionally followed by /service")
 		}
+	case check.TypeMCP:
+		if err := validateMCP(m); err != nil {
+			return err
+		}
 	case check.TypeSMTP:
 		t := m.Target
 		if !strings.Contains(t, "://") {
@@ -524,6 +528,38 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	m.Locations = slices.Compact(locs)
 	if len(m.Locations) == 0 {
 		m.Locations = []string{LocalLocation}
+	}
+	return nil
+}
+
+// validateMCP normalizes an MCP monitor: the method field holds the
+// transport, keyword the required tools and expected_status the minimum
+// number of tools.
+func validateMCP(m *store.Monitor) error {
+	u, err := url.Parse(m.Target)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return errors.New("target must be the http(s) URL of the MCP endpoint")
+	}
+	switch strings.ToLower(strings.TrimSpace(m.Method)) {
+	case "", "get", check.MCPAuto:
+		m.Method = check.MCPAuto
+	case check.MCPStreamable:
+		m.Method = check.MCPStreamable
+	case check.MCPSSE:
+		m.Method = check.MCPSSE
+	default:
+		return errors.New("transport must be auto, streamable or sse")
+	}
+	m.Keyword = strings.Join(check.MCPToolNames(m.Keyword), ", ")
+	m.ExpectedStatus = strings.TrimSpace(m.ExpectedStatus)
+	if m.ExpectedStatus != "" {
+		n, err := strconv.Atoi(m.ExpectedStatus)
+		if err != nil || n < 0 || n > 10000 {
+			return errors.New("minimum tools must be a number between 0 and 10000")
+		}
+		if n == 0 {
+			m.ExpectedStatus = ""
+		}
 	}
 	return nil
 }

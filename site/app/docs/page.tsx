@@ -17,6 +17,7 @@ const toc = [
   ["agents", "add a location"],
   ["agent-updates", "agent updates"],
   ["checks", "check types"],
+  ["mcp", "mcp servers"],
   ["heartbeat", "heartbeat monitors"],
   ["status-pages", "status pages"],
   ["maintenance", "maintenance"],
@@ -248,6 +249,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
               ["docker container", "name or id", "down when not running, restarting, paused or unhealthy"],
               ["grpc health", <C key="g">grpc://host:port[/service]</C>, "grpc.health.v1 Check returns SERVING"],
               ["smtp", <C key="s">smtp://host:587</C>, "greeting, EHLO, STARTTLS when offered"],
+              ["mcp server", <C key="mc">https://host/mcp</C>, "initialize handshake, optional tools/list checks"],
               ["heartbeat", "push URL", "your job calls the URL; down when it stops"],
             ]}
           />
@@ -255,6 +257,36 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Passwords in connection URLs are hidden in the list and in notifications; use a read-only user. Docker checks need{" "}
             <C>/var/run/docker.sock</C> on the hub or agent that runs them (add{" "}
             <C>-v /var/run/docker.sock:/var/run/docker.sock:ro</C>).
+          </p>
+        </Section>
+
+        <Section id="mcp" title="mcp servers">
+          <p>
+            An <b className="text-foreground">mcp server</b> monitor checks a remote Model Context Protocol server: it runs the{" "}
+            <C>initialize</C> handshake and, when the server has tools, lists them with <C>tools/list</C>. The result shows the
+            server name and version, the negotiated protocol version, the transport and the number of tools.
+          </p>
+          <ul>
+            <li>
+              <b className="text-foreground">target</b>: the URL of the endpoint, e.g. <C>https://mcp.example.com/mcp</C>.
+            </li>
+            <li>
+              <b className="text-foreground">transport</b>: <C>auto</C> tries streamable HTTP and falls back to the legacy
+              HTTP+SSE transport (2024-11-05) when the POST is rejected; pick <C>streamable</C> or <C>sse</C> to force one.
+            </li>
+            <li>
+              <b className="text-foreground">headers</b>: sent with every request, e.g. <C>Authorization: Bearer &lt;token&gt;</C>.
+              A 401 or 403 makes the monitor go down. Read-only users don&apos;t see the values.
+            </li>
+            <li>
+              <b className="text-foreground">required tools</b> (comma-separated) and{" "}
+              <b className="text-foreground">minimum tools</b>: the monitor goes down when a tool disappears or the server
+              lists fewer tools.
+            </li>
+          </ul>
+          <p>
+            Tools are never called. https endpoints get TLS certificate expiry alerts like http monitors. Agents older than
+            this version report <C>unknown monitor type: mcp</C>: update them.
           </p>
         </Section>
 

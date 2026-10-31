@@ -111,6 +111,13 @@ const types: {
     target: "address",
   },
   {
+    value: "mcp",
+    label: "mcp server",
+    hint: "initialize handshake and tools/list on a remote MCP server",
+    placeholder: "https://mcp.example.com/mcp",
+    target: "endpoint url",
+  },
+  {
     value: "smtp",
     label: "smtp",
     hint: "read the greeting, EHLO and STARTTLS when offered",
@@ -171,6 +178,11 @@ function withValue(list: { value: string; label: string }[], sec: number) {
 
 const methods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 const records = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"]
+const mcpTransports = [
+  { value: "auto", label: "auto (streamable http, then legacy sse)" },
+  { value: "streamable", label: "streamable http" },
+  { value: "sse", label: "legacy http+sse" },
+]
 
 export type MonitorInput = Omit<
   Monitor,
@@ -265,7 +277,9 @@ export function MonitorForm({
     setM((p) => ({ ...p, [k]: v }))
   const t = types.find((x) => x.value === m.type) ?? types[0]
   const isHTTP = m.type === "http" || m.type === "keyword"
-  const isHTTPS = isHTTP && m.target.trim().toLowerCase().startsWith("https://")
+  const isMCP = m.type === "mcp"
+  const isHTTPS =
+    (isHTTP || isMCP) && m.target.trim().toLowerCase().startsWith("https://")
   const isPush = m.type === "push"
   const isSQL = m.type === "postgres" || m.type === "mysql"
   const hasTLS = [
@@ -275,6 +289,7 @@ export function MonitorForm({
     "mongodb",
     "grpc",
     "smtp",
+    "mcp",
   ].includes(m.type)
   const ivList = isPush
     ? withValue(pushIntervals, m.interval_sec)
@@ -284,6 +299,12 @@ export function MonitorForm({
   function setType(type: MonitorType) {
     setM((p) => {
       const next = { ...p, type }
+      if ((type === "mcp") !== (p.type === "mcp")) {
+        // mcp reuses method, keyword and expected_status for its own settings
+        next.method = type === "mcp" ? "auto" : "GET"
+        next.keyword = ""
+        next.expected_status = ""
+      }
       if (type === "push" && p.type !== "push") {
         next.interval_sec = 3600
         if (!p.grace_sec) next.grace_sec = 300
@@ -391,6 +412,67 @@ export function MonitorForm({
               grpc:// for plaintext, grpcs:// for TLS. The path is the service
               name to check; leave it out to check the whole server.
             </p>
+          )}
+          {isMCP && (
+            <>
+              <Field label="transport">
+                <Select
+                  items={mcpTransports}
+                  value={
+                    mcpTransports.some((x) => x.value === m.method)
+                      ? m.method
+                      : "auto"
+                  }
+                  onValueChange={(v) => v && set("method", v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mcpTransports.map((x) => (
+                      <SelectItem key={x.value} value={x.value}>
+                        {x.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field
+                label="minimum tools"
+                hint="optional: down when tools/list returns fewer"
+              >
+                <Input
+                  type="number"
+                  min={0}
+                  value={m.expected_status}
+                  onChange={(e) => set("expected_status", e.target.value)}
+                  placeholder="0"
+                />
+              </Field>
+              <Field
+                label="required tools"
+                hint="optional, comma-separated: down when one is missing"
+                className="sm:col-span-2"
+              >
+                <Input
+                  value={m.keyword}
+                  onChange={(e) => set("keyword", e.target.value)}
+                  placeholder="search, create_issue"
+                />
+              </Field>
+              <Field
+                label="headers"
+                hint="one per line, sent with every request. Hidden from read-only users"
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  rows={2}
+                  value={headers}
+                  onChange={(e) => setHeaders(e.target.value)}
+                  placeholder="Authorization: Bearer ..."
+                />
+              </Field>
+            </>
           )}
           {isSQL && (
             <>
