@@ -331,6 +331,22 @@
     "regenerate": "rigenera",
     "regenerateUrl": "rigenera url"
   },
+  "badges": {
+    "title": "badge",
+    "hint": "Immagini SVG per un README, servite senza login tramite la status page \"{page}\". Si aggiornano ogni minuto e mostrano solo ciò che la pagina mostra già.",
+    "pageHint": "Immagine SVG con lo stato generale di questa pagina, per un README. Si aggiorna ogni minuto.",
+    "needsPage": "I badge richiedono una status page pubblicata che mostri questo monitor. Aggiungilo a una in <link>status page</link>.",
+    "kinds": {
+      "status": "stato",
+      "uptime": "uptime",
+      "response": "tempo di risposta"
+    },
+    "formats": {
+      "markdown": "markdown",
+      "html": "html",
+      "url": "url"
+    }
+  },
   "expiry": {
     "unknown": "sconosciuta",
     "expiredAgo": "scaduto {days}g fa",

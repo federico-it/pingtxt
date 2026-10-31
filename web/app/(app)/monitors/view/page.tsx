@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
 import { Confirm } from "@/components/confirm"
+import { MonitorBadges } from "@/components/badge-info"
 import { ExpiryTable } from "@/components/expiry"
 import { PushInfo } from "@/components/push-info"
 import { LatencyChart } from "@/components/latency-chart"
@@ -291,6 +292,8 @@ function View() {
           </div>
         )}
       </Section>
+
+      <MonitorBadges monitorId={id} groupId={d.group_id} />
 
       <Section title={t("log")}>
         <div className="max-h-96 overflow-y-auto border bg-muted/30 p-3 text-xs leading-6">

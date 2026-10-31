@@ -331,6 +331,22 @@
     "regenerate": "regenerate",
     "regenerateUrl": "regenerate url"
   },
+  "badges": {
+    "title": "badges",
+    "hint": "SVG images for a README, served without login through the status page \"{page}\". They refresh every minute and show only what the page already shows.",
+    "pageHint": "SVG image with the overall state of this page, for a README. It refreshes every minute.",
+    "needsPage": "Badges need a published status page that shows this monitor. Add it to one in <link>status pages</link>.",
+    "kinds": {
+      "status": "status",
+      "uptime": "uptime",
+      "response": "response time"
+    },
+    "formats": {
+      "markdown": "markdown",
+      "html": "html",
+      "url": "url"
+    }
+  },
   "expiry": {
     "unknown": "unknown",
     "expiredAgo": "expired {days}d ago",

@@ -58,6 +58,7 @@ func (h *Hub) labelsChanged() {
 	h.afterMaintChange()
 	h.pages.mu.Lock()
 	h.pages.cache = nil
+	h.pages.badges = nil
 	h.pages.mu.Unlock()
 }
 
@@ -122,6 +123,7 @@ func (h *Hub) saveGroup(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	}
 	h.pages.mu.Lock()
 	h.pages.cache = nil // group names show on status pages
+	h.pages.badges = nil
 	h.pages.mu.Unlock()
 	got, err := h.store.Group(g.ID)
 	if err != nil {

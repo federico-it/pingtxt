@@ -361,6 +361,17 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             For a custom domain (e.g. <C>status.example.com</C>), set it on the page, point its DNS at the hub and route the host
             to pingtxt in your reverse proxy. On that host only the status page is served.
           </p>
+          <p>
+            <b className="text-foreground">README badges</b>: every published page has SVG badges for its overall state and for
+            each monitor it shows (state, uptime, response time). Copy them from the monitor page or the status page editor:
+          </p>
+          <CopyBlock
+            code={`[![uptime](https://status.example.com/api/badge/acme/12/uptime.svg?period=7d)](https://status.example.com/status/acme/)`}
+          />
+          <p>
+            Kinds: <C>status</C>, <C>uptime</C>, <C>response</C>; <C>period=</C> <C>24h</C>, <C>7d</C>, <C>30d</C> or{" "}
+            <C>90d</C>; optional <C>label=</C> and <C>style=flat-square</C>. Drafts and monitors not on the page have no badge.
+          </p>
         </Section>
 
         <Section id="maintenance" title="maintenance windows">

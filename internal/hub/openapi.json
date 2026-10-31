@@ -3736,6 +3736,199 @@
         }
       }
     },
+    "/api/badge/{slug}/{kind}": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Status page badge",
+        "operationId": "pageBadge",
+        "description": "SVG badge with the overall state of a status page (operational, degraded, partial outage, major outage), to embed in a README:\n\n```markdown\n![status](https://pingtxt.example.com/api/badge/acme/status.svg)\n```\n\n**Access:** No authentication. Only published status pages and the monitors they show have badges; anything else answers the same 404 badge. Also served on the page's custom domain. Cached for 60 seconds.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "Slug of a published status page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "description": "`status`, optionally with `.svg`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "status",
+                "status.svg"
+              ]
+            }
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "description": "Replaces the left text (up to 60 characters).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "style",
+            "in": "query",
+            "description": "`flat` (default) or `flat-square`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "flat",
+                "flat-square"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SVG badge.",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found badge.",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/badge/{slug}/{monitor}/{kind}": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Monitor badge",
+        "operationId": "monitorBadge",
+        "description": "SVG badge of one monitor shown on a published status page: its state (`status`), its uptime (`uptime`) or its average response time (`response`) over `period`. The label defaults to the monitor name, `uptime 30d` or `response 24h`.\n\n```markdown\n![uptime](https://pingtxt.example.com/api/badge/acme/12/uptime.svg?period=7d)\n```\n\n**Access:** No authentication. Only published status pages and the monitors they show have badges; anything else answers the same 404 badge. Also served on the page's custom domain. Cached for 60 seconds.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "Slug of a published status page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "monitor",
+            "in": "path",
+            "required": true,
+            "description": "Monitor id.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "description": "`status`, `uptime` or `response`, optionally with `.svg`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "status",
+                "uptime",
+                "response",
+                "status.svg",
+                "uptime.svg",
+                "response.svg"
+              ]
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "description": "Window for `uptime` (default 30d) and `response` (default 24h).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "24h",
+                "7d",
+                "30d",
+                "90d"
+              ]
+            }
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "description": "Replaces the left text (up to 60 characters).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "style",
+            "in": "query",
+            "description": "`flat` (default) or `flat-square`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "flat",
+                "flat-square"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SVG badge.",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad period badge.",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found badge.",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/push/{token}": {
       "get": {
         "tags": [
