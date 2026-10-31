@@ -278,6 +278,7 @@ func jobFor(m *store.Monitor) check.Job {
 		Headers:        m.Headers,
 		Body:           m.Body,
 		Assertions:     m.Assertions,
+		IPFamily:       m.IPFamily,
 	}
 }
 
@@ -404,6 +405,11 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	if r.OK && len(m.Assertions) > 0 && r.Asserted < len(m.Assertions) && loc != LocalLocation {
 		r.OK = false
 		r.Message = "this agent cannot check response rules: update it"
+	}
+	// Same for the IP family: an old agent would use either one.
+	if r.OK && m.IPFamily != check.IPAny && r.IPFamily != m.IPFamily && loc != LocalLocation {
+		r.OK = false
+		r.Message = "this agent cannot limit checks to IPv4 or IPv6: update it"
 	}
 	pct := m.DegradedPct
 	if pct == 0 {

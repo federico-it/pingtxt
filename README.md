@@ -282,6 +282,35 @@ For jobs that run on a schedule (backups, cron, queues) create a monitor of type
 
 The monitor goes down (incident + notifications) when no call arrives within the **expected period** plus the **grace time**, and back up at the next call. Optional query parameters: `status=down` reports a failed run, `msg=` stores a short note, `ping=` the run time in ms. The URL uses the public URL from settings and can be regenerated from the monitor page.
 
+## IPv6
+
+Every check type works over IPv6, and hosts with only AAAA records just work. Put IPv6 addresses in
+brackets when a port follows: `[2001:db8::1]:443` (tcp), `https://[2001:db8::1]/`,
+`redis://[2001:db8::1]:6379`, `grpc://[2001:db8::1]:50051`. Ping and dns take the bare address
+(`2001:db8::1`); ping uses ICMPv6.
+
+By default a check passes when IPv4 *or* IPv6 works (Go tries both), so a broken IPv6 on a dual-stack
+host goes unnoticed. Set **ip version** on the monitor to *IPv4 only* or *IPv6 only* (API:
+`"ip_family": 4` or `6`); make two monitors to watch both. Agents older than this version cannot do it,
+so the hub reports their checks as failed with "update it". TLS certificate expiry is still read over
+either family.
+
+The hub listens on IPv4 and IPv6 (`PINGTXT_ADDR=:8090`), and agents connect to IPv6 hubs too
+(`PINGTXT_HUB=http://[2001:db8::1]:8090`). Login rate limits count IPv6 clients per /64.
+
+**Docker:** containers get no IPv6 on the default network, so checks to IPv6 targets fail from the hub
+or agent container even when the server has IPv6. Enable it on the network (Docker 27 or later):
+
+```yaml
+# docker-compose.yml
+networks:
+  default:
+    enable_ipv6: true
+```
+
+With `docker run`, create a network with `docker network create --ipv6 pingtxt` and add
+`--network pingtxt`, or use `--network host`. Published ports already accept IPv6 clients either way.
+
 ## Databases, containers, gRPC and SMTP
 
 | type | target | what is checked |

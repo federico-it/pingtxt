@@ -117,3 +117,19 @@ func TestNotifierSecretBoundToServer(t *testing.T) {
 		t.Fatal("plain text: the stored password must not be reused")
 	}
 }
+
+func TestLimitAddrGroupsIPv6(t *testing.T) {
+	cases := map[string]string{
+		"203.0.113.7:1234":            "203.0.113.7",
+		"[2001:db8:1:2:aaaa::1]:1234": "2001:db8:1:2::/64",
+		"[2001:db8:1:2:bbbb::9]:5678": "2001:db8:1:2::/64",
+		"[::ffff:203.0.113.7]:1234":   "203.0.113.7",
+	}
+	for remote, want := range cases {
+		r := httptest.NewRequest("POST", "/api/login", nil)
+		r.RemoteAddr = remote
+		if got := limitAddr(r); got != want {
+			t.Errorf("limitAddr(%s) = %q, want %q", remote, got, want)
+		}
+	}
+}

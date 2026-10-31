@@ -227,7 +227,7 @@ func TestRecomputeOldMonState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.execScript(laterMigrations[len(laterMigrations)-1].text(s.db.driver)); err != nil {
+	if err := tx.execScript(migrations[18-1].text(s.db.driver)); err != nil { // migration 18
 		t.Fatal(err)
 	}
 	if err := tx.Commit(); err != nil {

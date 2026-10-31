@@ -146,6 +146,8 @@
     "maint": "maint",
     "waitingFirst": "waiting for the first check...",
     "degradedAt": "degraded at {pct}%",
+    "ipv4Only": "IPv4 only",
+    "ipv6Only": "IPv6 only",
     "degradedAtDefault": "degraded at default"
   },
   "monitorForm": {
@@ -162,11 +164,11 @@
       },
       "tcp": {
         "label": "tcp port",
-        "hint": "open a TCP connection"
+        "hint": "open a TCP connection. IPv6 in brackets: [2001:db8::1]:443"
       },
       "ping": {
         "label": "ping (icmp)",
-        "hint": "send ICMP echo requests"
+        "hint": "send ICMP echo requests (ICMPv6 for IPv6 addresses)"
       },
       "dns": {
         "label": "dns",
@@ -294,6 +296,13 @@
     "degradedPct": "degraded at (% of locations)",
     "degradedPctHint": "empty = instance default (settings)",
     "degradedPctPlaceholder": "default",
+    "ipFamily": {
+      "label": "ip version",
+      "hint": "IPv4 or IPv6 only, to catch one of them broken on a dual-stack host",
+      "v0": "IPv4 or IPv6",
+      "v4": "IPv4 only",
+      "v6": "IPv6 only"
+    },
     "responseRules": {
       "title": "response checks",
       "hint": "Rules on the JSON body. All must pass, otherwise the check fails and the alert says which rule broke. Paths look like <code>checks.redis.status</code> or <code>items[0].id</code>.",

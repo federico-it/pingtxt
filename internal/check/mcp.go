@@ -72,6 +72,7 @@ func runMCP(ctx context.Context, j Job, timeout time.Duration) (r Result) {
 		Proxy:               http.ProxyFromEnvironment,
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: j.IgnoreTLS}, //nolint:gosec // user opt-in
 		TLSHandshakeTimeout: timeout,
+		DialContext:         j.dialContext,
 	}
 	defer tr.CloseIdleConnections()
 	c := &mcpConn{hc: &http.Client{Transport: tr}, j: j, target: u}

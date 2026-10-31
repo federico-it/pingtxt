@@ -411,6 +411,8 @@ var laterMigrations = []migration{
 		WHERE start > (SELECT MIN(ts) FROM results) - 3600000 AND total + maint = (SELECT COUNT(*) FROM results r
 		WHERE r.monitor_id = result_rollups.monitor_id AND r.location = result_rollups.location
 		AND r.ts >= result_rollups.start AND r.ts < result_rollups.start + 3600000);`},
+	// 19: checks over IPv4 only (4), IPv6 only (6) or either (0).
+	{sqlite: `ALTER TABLE monitors ADD COLUMN ip_family INTEGER NOT NULL DEFAULT 0`},
 }
 
 func sqliteOnly(list []string) []migration {

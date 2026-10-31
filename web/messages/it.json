@@ -146,6 +146,8 @@
     "maint": "manut",
     "waitingFirst": "in attesa del primo controllo...",
     "degradedAt": "degradato dal {pct}%",
+    "ipv4Only": "solo IPv4",
+    "ipv6Only": "solo IPv6",
     "degradedAtDefault": "degradato dalla soglia predefinita"
   },
   "monitorForm": {
@@ -162,11 +164,11 @@
       },
       "tcp": {
         "label": "porta tcp",
-        "hint": "apre una connessione TCP"
+        "hint": "apre una connessione TCP. IPv6 tra parentesi: [2001:db8::1]:443"
       },
       "ping": {
         "label": "ping (icmp)",
-        "hint": "invia richieste ICMP echo"
+        "hint": "invia richieste ICMP echo (ICMPv6 per gli indirizzi IPv6)"
       },
       "dns": {
         "label": "dns",
@@ -294,6 +296,13 @@
     "degradedPct": "degradato da (% di località)",
     "degradedPctHint": "vuoto = valore predefinito dell'istanza (impostazioni)",
     "degradedPctPlaceholder": "predefinito",
+    "ipFamily": {
+      "label": "versione ip",
+      "hint": "solo IPv4 o solo IPv6, per accorgersi se uno dei due non funziona su un host dual-stack",
+      "v0": "IPv4 o IPv6",
+      "v4": "solo IPv4",
+      "v6": "solo IPv6"
+    },
     "responseRules": {
       "title": "controlli sulla risposta",
       "hint": "Regole sul corpo JSON. Devono passare tutte, altrimenti il controllo fallisce e l'avviso indica quale regola non è rispettata. I percorsi sono come <code>checks.redis.status</code> o <code>items[0].id</code>.",

@@ -487,7 +487,7 @@ func monitorFields() map[string]any {
 	return map[string]any{
 		"name":            prop("string", "Display name"),
 		"type":            map[string]any{"type": "string", "enum": validTypes, "description": "Check type"},
-		"target":          prop("string", "What to check: URL for http/keyword, host:port for tcp, host for ping/dns, connection URL for databases, container for docker, grpc://host:port, smtp://host. Empty for push."),
+		"target":          prop("string", "What to check: URL for http/keyword, host:port for tcp ([2001:db8::1]:443 for IPv6), host or IP for ping/dns, connection URL for databases, container for docker, grpc://host:port, smtp://host. Empty for push."),
 		"interval_sec":    prop("integer", "Seconds between checks (10 to 86400, default 60). For push monitors: expected heartbeat period."),
 		"timeout_ms":      prop("integer", "Timeout in milliseconds (500 to 60000, default 10000)"),
 		"retries":         prop("integer", "Failed checks in a row before the monitor is down (1 to 10)"),
@@ -509,6 +509,7 @@ func monitorFields() map[string]any {
 		"dns_record":          prop("string", "DNS record type, e.g. A, AAAA, MX, TXT"),
 		"dns_expected":        prop("string", "Expected DNS answer"),
 		"ignore_tls":          prop("boolean", "Ignore TLS certificate errors"),
+		"ip_family":           map[string]any{"type": "integer", "enum": []int{0, 4, 6}, "description": "Check over IPv4 only (4), IPv6 only (6) or either (0, default)"},
 		"grace_sec":           prop("integer", "Push monitors: extra seconds before a missing heartbeat is down"),
 		"locations":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Where to check from: ids from list_agents (\"local\" is the hub itself). Default local."},
 		"group_id":            prop("integer", "Group id from list_groups, 0 for none"),

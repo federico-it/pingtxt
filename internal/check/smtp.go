@@ -21,7 +21,7 @@ func runSMTP(ctx context.Context, j Job) Result {
 	}
 	addr := net.JoinHostPort(host, port)
 	start := time.Now()
-	conn, certExpiry, err := dial(ctx, addr, implicitTLS, host, j.IgnoreTLS)
+	conn, certExpiry, err := dial(ctx, j, addr, implicitTLS, host, j.IgnoreTLS)
 	if err != nil {
 		return Result{LatencyMs: ms(time.Since(start)), Message: cleanErr(err)}
 	}
@@ -91,7 +91,7 @@ func hasExt(ehlo, ext string) bool {
 func parseSMTPTarget(target string) (host, port string, implicitTLS bool, err error) {
 	t := strings.TrimSpace(target)
 	if !strings.Contains(t, "://") {
-		t = "smtp://" + t
+		t = "smtp://" + BracketIPv6(t)
 	}
 	u, perr := url.Parse(t)
 	if perr != nil || (u.Scheme != "smtp" && u.Scheme != "smtps") || u.Hostname() == "" {

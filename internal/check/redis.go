@@ -27,7 +27,7 @@ func runRedis(ctx context.Context, j Job) Result {
 		addr = net.JoinHostPort(u.Hostname(), "6379")
 	}
 	start := time.Now()
-	conn, certExpiry, err := dial(ctx, addr, u.Scheme == "rediss", u.Hostname(), j.IgnoreTLS)
+	conn, certExpiry, err := dial(ctx, j, addr, u.Scheme == "rediss", u.Hostname(), j.IgnoreTLS)
 	if err != nil {
 		return Result{LatencyMs: ms(time.Since(start)), Message: cleanErr(err)}
 	}
@@ -103,9 +103,8 @@ func readRESP(rd *bufio.Reader) (string, error) {
 
 // dial opens a TCP connection, optionally wrapped in TLS, and returns the
 // leaf certificate expiry (unix seconds) when TLS is used.
-func dial(ctx context.Context, addr string, useTLS bool, serverName string, insecure bool) (net.Conn, int64, error) {
-	var d net.Dialer
-	conn, err := d.DialContext(ctx, "tcp", addr)
+func dial(ctx context.Context, j Job, addr string, useTLS bool, serverName string, insecure bool) (net.Conn, int64, error) {
+	conn, err := j.dialContext(ctx, "tcp", addr)
 	if err != nil || !useTLS {
 		return conn, 0, err
 	}
