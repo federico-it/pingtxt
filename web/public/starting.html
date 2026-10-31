@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>pingtxt · starting</title>
+<!--
+  Shown while the hub restarts or updates. The hub serves it for every page
+  until it is ready, and the service worker (sw.js) shows its cached copy
+  when a reverse proxy answers 502/503/504 or the hub cannot be reached.
+  Self-contained on purpose: no other file may be needed to render it.
+-->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23111'/%3E%3Cpath d='M6 10l6 6-6 6' stroke='%234ade80' stroke-width='3' fill='none' stroke-linecap='square'/%3E%3Crect x='15' y='20' width='11' height='3' fill='%234ade80'/%3E%3C/svg%3E">
+<script>
+  // Same theme choice as the app (next-themes keeps it in localStorage).
+  (function () {
+    var t = null
+    try { t = localStorage.getItem("theme") } catch (e) {}
+    if (t !== "light" && t !== "dark") {
+      t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+    }
+    document.documentElement.className = t
+  })()
+</script>
+<style>
+  :root {
+    --bg: oklch(0.985 0.002 90);
+    --fg: oklch(0.2 0.005 90);
+    --muted: oklch(0.52 0.005 90);
+    --border: oklch(0.88 0.004 90);
+    --card: oklch(0.995 0.002 90);
+    --up: oklch(0.58 0.15 150);
+    --warn: oklch(0.7 0.15 75);
+    --info: oklch(0.55 0.12 250);
+    color-scheme: light;
+  }
+  .dark {
+    --bg: oklch(0.155 0.004 150);
+    --fg: oklch(0.9 0.01 150);
+    --muted: oklch(0.62 0.01 150);
+    --border: oklch(0.3 0.008 150);
+    --card: oklch(0.175 0.005 150);
+    --up: oklch(0.78 0.17 150);
+    --warn: oklch(0.82 0.15 85);
+    --info: oklch(0.72 0.12 240);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 13px/1.6 "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-feature-settings: "calt" 0, "zero" 1;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .box {
+    width: 100%;
+    max-width: 30rem;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px dashed var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .dot { width: 8px; height: 8px; border: 1px solid var(--border); }
+  .bar span:last-child { margin-left: auto; }
+  .body { padding: 20px 20px 16px; }
+  .head { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 36px; height: 36px; flex: none; }
+  .logo .cur { animation: blink 1.1s steps(1) infinite; }
+  h1 { margin: 0; font-size: 15px; font-weight: 600; }
+  .sub { margin: 0; color: var(--muted); }
+  .ver b { color: var(--fg); font-weight: 600; }
+  .pulse { display: block; width: 100%; height: 48px; margin: 18px 0 14px; overflow: visible; }
+  .pulse path { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .pulse .base { stroke: var(--border); }
+  .pulse .beat {
+    stroke: var(--up);
+    stroke-dasharray: 70 430;
+    stroke-dashoffset: 500;
+    animation: beat 2.2s linear infinite;
+    filter: drop-shadow(0 0 3px var(--up));
+  }
+  .waiting .pulse .beat { stroke: var(--warn); filter: drop-shadow(0 0 3px var(--warn)); }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; gap: 10px; color: var(--muted); }
+  li .m { width: 1ch; flex: none; text-align: center; }
+  li.done .m { color: var(--up); }
+  li.now { color: var(--fg); }
+  li.now .m { color: var(--warn); }
+  .foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .cursor { animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes beat { to { stroke-dashoffset: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .pulse .beat { animation: none; stroke-dasharray: none; }
+    .logo .cur, .cursor { animation: none; }
+  }
+</style>
+</head>
+<body>
+<main class="box" id="box" aria-live="polite">
+  <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span>pingtxt</span></div>
+  <div class="body">
+    <div class="head">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" fill="#111"/>
+        <path d="M6 10l6 6-6 6" stroke="#4ade80" stroke-width="3" fill="none" stroke-linecap="square"/>
+        <rect class="cur" x="15" y="20" width="11" height="3" fill="#4ade80"/>
+      </svg>
+      <div>
+        <h1 id="title">pingtxt is starting</h1>
+        <p class="sub" id="sub">getting ready, this page reloads by itself</p>
+      </div>
+    </div>
+
+    <svg class="pulse" viewBox="0 0 500 48" preserveAspectRatio="none" aria-hidden="true">
+      <path class="base" d="M0 30H120l10-6 8 6h18l8-26 10 40 8-14h28l10-8 10 8H330l10-6 8 6h18l8-26 10 40 8-14h28l10-8 10 8H500"/>
+      <path class="beat" pathLength="500" d="M0 30H120l10-6 8 6h18l8-26 10 40 8-14h28l10-8 10 8H330l10-6 8 6h18l8-26 10 40 8-14h28l10-8 10 8H500"/>
+    </svg>
+
+    <ul id="steps"></ul>
+
+    <div class="foot">
+      <span id="elapsed">0s</span>
+      <span>waiting<span class="cursor">_</span></span>
+    </div>
+  </div>
+</main>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id) }
+  var frames = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+  var frame = 0
+  var t0 = Date.now()
+  var state = null // last /api/health answer while starting, null when unreachable
+
+  var labels = {
+    restore: "restoring the backup",
+    database: "opening the database",
+    migrate: "updating the database",
+    starting: "starting monitors and agents",
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]
+    })
+  }
+
+  function render() {
+    var updating = state && state.previous_version && state.previous_version !== state.version
+    var title, sub, steps
+    if (state) {
+      title = updating ? "pingtxt is updating" : "pingtxt is starting"
+      sub = updating
+        ? '<span class="ver"><b>' + esc(state.previous_version) + "</b> → <b>" + esc(state.version) + "</b></span>"
+        : "getting ready, this page reloads by itself"
+      var order = ["database", "starting"]
+      if (state.phase === "restore") order.unshift("restore")
+      var at = order.indexOf(state.phase)
+      steps = order.map(function (p, i) {
+        var label = p === "database" && updating ? labels.migrate : labels[p]
+        return { label: label, st: i < at ? "done" : i === at ? "now" : "" }
+      })
+    } else {
+      title = "pingtxt is restarting"
+      sub = "updating or restarting: the hub is not reachable yet, this page reloads by itself when it is back"
+      steps = [{ label: "waiting for the hub", st: "now" }]
+    }
+    document.title = "pingtxt · " + (state ? (updating ? "updating" : "starting") : "restarting")
+    $("box").className = "box" + (state ? "" : " waiting")
+    $("title").textContent = title
+    $("sub").innerHTML = sub
+    $("steps").innerHTML = steps.map(function (s) {
+      var m = s.st === "done" ? "✓" : s.st === "now" ? frames[frame] : "·"
+      return '<li class="' + s.st + '"><span class="m">' + m + "</span><span>" + esc(s.label) + "</span></li>"
+    }).join("")
+    var sec = Math.floor((Date.now() - t0) / 1000)
+    $("elapsed").textContent = sec < 60 ? sec + "s" : Math.floor(sec / 60) + "m " + (sec % 60) + "s"
+  }
+
+  var stopped = false
+
+  function ready() {
+    // Opened directly while the hub is up: go to the app.
+    if (location.pathname === "/starting.html") return location.replace("/")
+    // Reloading again the same page right after the last reload would loop
+    // (for example a proxy that hides the hub's header on an error page).
+    var key = "pingtxt.starting", now = Date.now(), last = null
+    try { last = JSON.parse(sessionStorage.getItem(key)) } catch (e) {}
+    if (last && last.u === location.href && now - last.t < 15000) {
+      stopped = true
+      $("box").className = "box"
+      $("title").textContent = "pingtxt is running"
+      $("sub").innerHTML = 'but this page could not be loaded. <a href="/" style="color:inherit">open pingtxt</a>'
+      $("steps").innerHTML = ""
+      return
+    }
+    try { sessionStorage.setItem(key, JSON.stringify({ u: location.href, t: now })) } catch (e) {}
+    location.reload()
+  }
+
+  function poll() {
+    var ctl = window.AbortController ? new AbortController() : null
+    var timer = setTimeout(function () { if (ctl) ctl.abort() }, 4000)
+    fetch("/api/health", { cache: "no-store", credentials: "same-origin", signal: ctl && ctl.signal })
+      .then(function (r) {
+        return r.json().catch(function () { return null }).then(function (j) {
+          if (r.ok && j && j.ok) return ready()
+          if (j && j.starting) state = j
+          else state = null // a proxy error page: the hub is down
+        })
+      })
+      .catch(function () { state = null })
+      .then(function () {
+        clearTimeout(timer)
+        if (stopped) return
+        render()
+        setTimeout(poll, 1500)
+      })
+  }
+
+  var tick = setInterval(function () {
+    if (stopped) return clearInterval(tick)
+    frame = (frame + 1) % frames.length
+    render()
+  }, 120)
+  render()
+  poll()
+})()
+</script>
+</body>
+</html>
