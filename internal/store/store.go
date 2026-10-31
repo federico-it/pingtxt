@@ -247,6 +247,40 @@ var laterMigrations = []migration{
 	ALTER TABLE result_rollups ADD COLUMN up INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE result_rollups ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0;
 	UPDATE result_rollups SET up = ok;`},
+	// 15: alert escalation and reminders. A channel can wait delay_min minutes
+	// of downtime before its first alert and repeat it every repeat_min
+	// minutes; incident_alerts remembers what each channel was sent.
+	{
+		sqlite: `ALTER TABLE notifiers ADD COLUMN delay_min INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE notifiers ADD COLUMN repeat_min INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE incident_alerts (
+		incident_id INTEGER NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+		notifier_id INTEGER NOT NULL REFERENCES notifiers(id) ON DELETE CASCADE,
+		sent_at INTEGER NOT NULL,
+		count INTEGER NOT NULL DEFAULT 1,
+		PRIMARY KEY (incident_id, notifier_id)
+	);`,
+		postgres: `ALTER TABLE notifiers ADD COLUMN delay_min INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE notifiers ADD COLUMN repeat_min INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE incident_alerts (
+		incident_id BIGINT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+		notifier_id BIGINT NOT NULL REFERENCES notifiers(id) ON DELETE CASCADE,
+		sent_at BIGINT NOT NULL,
+		count INTEGER NOT NULL DEFAULT 1,
+		PRIMARY KEY (incident_id, notifier_id)
+	);`,
+		mysql: `ALTER TABLE notifiers ADD COLUMN delay_min INT NOT NULL DEFAULT 0;
+	ALTER TABLE notifiers ADD COLUMN repeat_min INT NOT NULL DEFAULT 0;
+	CREATE TABLE incident_alerts (
+		incident_id BIGINT NOT NULL,
+		notifier_id BIGINT NOT NULL,
+		sent_at BIGINT NOT NULL,
+		count INT NOT NULL DEFAULT 1,
+		PRIMARY KEY (incident_id, notifier_id),
+		FOREIGN KEY (incident_id) REFERENCES incidents(id) ON DELETE CASCADE,
+		FOREIGN KEY (notifier_id) REFERENCES notifiers(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

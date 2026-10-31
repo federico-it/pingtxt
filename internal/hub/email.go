@@ -97,7 +97,7 @@ func emailSubject(e Event) string {
 		// e.g. "[pingtxt] example.com certificate expiring"
 		return prefix + "[pingtxt] " + strings.TrimPrefix(e.Title(), "pingtxt: ")
 	}
-	return fmt.Sprintf("%s[pingtxt] %s is %s", prefix, e.Monitor, strings.ToUpper(e.Status))
+	return fmt.Sprintf("%s[pingtxt] %s is %s", prefix, e.Monitor, e.statusWord())
 }
 
 func newMessageID(host string) string {

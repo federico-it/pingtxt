@@ -6786,6 +6786,18 @@
           "enabled": {
             "type": "boolean"
           },
+          "delay_min": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10080,
+            "description": "Minutes a monitor must stay down before this channel gets its first alert (0 = right away). Use it for an escalation contact: shorter outages never reach it, and it gets the recovery message only if it was alerted."
+          },
+          "repeat_min": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10080,
+            "description": "Repeat the alert every this many minutes while the monitor stays down (0 = once, otherwise at least 5). Reminders carry reminder=1, 2, ... and down_since in the webhook payload. Nothing is sent during maintenance windows."
+          },
           "created_at": {
             "type": "integer",
             "format": "int64",

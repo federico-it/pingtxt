@@ -256,6 +256,10 @@ export interface Notifier {
   type: NotifierType
   config: Record<string, string>
   enabled: boolean
+  /** Minutes of downtime before the first alert (0 = right away). */
+  delay_min: number
+  /** Repeat the alert every this many minutes while down (0 = once). */
+  repeat_min: number
   created_at: number
 }
 
