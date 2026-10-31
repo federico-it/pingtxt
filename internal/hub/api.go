@@ -770,11 +770,7 @@ func (h *Hub) locationNames() map[string]string {
 	names := map[string]string{LocalLocation: h.localName(), PushLocation: pushLocationName}
 	agents, _ := h.store.ListAgents()
 	for _, a := range agents {
-		n := a.Name
-		if a.Location != "" {
-			n = a.Location
-		}
-		names[AgentLocation(a.ID)] = n
+		names[AgentLocation(a.ID)] = agentLabel(a)
 	}
 	return names
 }
@@ -981,11 +977,7 @@ func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.Use
 		return
 	}
 	for _, a := range agents {
-		n := a.Name
-		if a.Location != "" {
-			n = a.Location
-		}
-		out = append(out, map[string]any{"id": AgentLocation(a.ID), "name": n, "online": h.AgentOnline(a.ID), "kind": "agent"})
+		out = append(out, map[string]any{"id": AgentLocation(a.ID), "name": agentLabel(a), "online": h.AgentOnline(a.ID), "kind": "agent"})
 	}
 	writeJSON(w, 200, out)
 }
