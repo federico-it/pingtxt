@@ -7,12 +7,18 @@ import type { Bar } from "@/lib/api"
 import { datetime, utcDate, ms, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
+// Share of failed checks in a bucket that turns it yellow, and red past the
+// outage line (same >50% rule the hub uses to call a monitor down). A single
+// missed check out of ~150 stays green.
+const WARN_FAILED = 0.2
+const DOWN_FAILED = 0.5
+
 function barClass(b: Bar) {
   if (b.total === 0) return b.maint ? "bg-info" : "bg-muted"
-  const r = b.ok / b.total
-  if (r >= 0.999) return "bg-up"
-  if (r >= 0.9) return "bg-warn"
-  return "bg-down"
+  const failed = (b.total - b.ok) / b.total
+  if (failed > DOWN_FAILED) return "bg-down"
+  if (failed >= WARN_FAILED) return "bg-warn"
+  return "bg-up"
 }
 
 export function UptimeBars({
