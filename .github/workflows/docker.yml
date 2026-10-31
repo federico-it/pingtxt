@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write # cosign keyless signing
 
 # Two quick merges on main would otherwise race to push :latest, and the older
 # build could finish last. Keep only the newest run per ref.
@@ -51,7 +52,8 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
-      - uses: docker/build-push-action@v7
+      - id: build
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.file }}
@@ -62,3 +64,10 @@ jobs:
           build-args: VERSION=${{ steps.ver.outputs.version }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      # Keyless signature tied to this workflow's GitHub identity, so users
+      # can check an image was built here (see "Verify a release" in README).
+      - uses: sigstore/cosign-installer@v4
+      - name: Sign image
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE"

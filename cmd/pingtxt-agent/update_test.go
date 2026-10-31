@@ -105,3 +105,54 @@ func TestSecureHub(t *testing.T) {
 		}
 	}
 }
+
+func TestReleaseCheck(t *testing.T) {
+	good := strings.Repeat("ab", 32)
+	other := strings.Repeat("cd", 32)
+	name := agentFileName()
+	sums := "0000000000000000000000000000000000000000000000000000000000000000  pingtxt-agent-plan9-386\n" +
+		good + "  " + name + "\n"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1.2.3/SHA256SUMS":
+			w.Write([]byte(sums))
+		case "/v1.2.4/SHA256SUMS":
+			w.Write([]byte("0000000000000000000000000000000000000000000000000000000000000000  pingtxt-linux-amd64\n"))
+		case "/v1.2.5/SHA256SUMS":
+			http.Error(w, "boom", http.StatusBadGateway)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	ctx := context.Background()
+
+	cases := []struct {
+		name, mode, version, sum string
+		err, warn                string
+	}{
+		{"match", verifyAuto, "v1.2.3", good, "", ""},
+		{"match upper case", verifyStrict, "v1.2.3", strings.ToUpper(good), "", ""},
+		{"mismatch", verifyAuto, "v1.2.3", other, "does not match", ""},
+		{"no entry for platform", verifyAuto, "v1.2.4", good, "no checksum", ""},
+		{"release not found", verifyAuto, "v9.0.0", good, "no checksum", ""},
+		{"github down, auto", verifyAuto, "v1.2.5", good, "", "cannot read"},
+		{"github down, strict", verifyStrict, "v1.2.5", good, "cannot read", ""},
+		{"dev build, auto", verifyAuto, "main-abc1234", other, "", "not a release"},
+		{"dev build, strict", verifyStrict, "main-abc1234", good, "not a published release", ""},
+		{"path in version", verifyStrict, "v1.2.3/../x", good, "not a published release", ""},
+		{"off", verifyOff, "v1.2.3", other, "", ""},
+	}
+	for _, c := range cases {
+		warn, err := releaseCheck(ctx, srv.Client(), srv.URL+"/", c.mode, c.version, c.sum)
+		if c.err == "" && err != nil {
+			t.Errorf("%s: unexpected error %v", c.name, err)
+		}
+		if c.err != "" && (err == nil || !strings.Contains(err.Error(), c.err)) {
+			t.Errorf("%s: want error containing %q, got %v", c.name, c.err, err)
+		}
+		if !strings.Contains(warn, c.warn) || (c.warn == "" && warn != "") {
+			t.Errorf("%s: want warning %q, got %q", c.name, c.warn, warn)
+		}
+	}
+}

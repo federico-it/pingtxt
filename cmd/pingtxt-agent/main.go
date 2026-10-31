@@ -36,6 +36,8 @@ func main() {
 	concurrency := flag.Int("concurrency", 32, "max parallel checks")
 	noUpdate := flag.Bool("no-auto-update", envBool("PINGTXT_NO_AUTO_UPDATE"), "never replace this binary when the hub asks (env PINGTXT_NO_AUTO_UPDATE)")
 	insecureUpdate := flag.Bool("insecure-update", envBool("PINGTXT_INSECURE_UPDATE"), "allow self-update from a hub reached over plain http on a public address (env PINGTXT_INSECURE_UPDATE)")
+	verifyUpdate := flag.String("verify-update", envOr("PINGTXT_VERIFY_UPDATE", verifyAuto), "check self-updates against the checksums published with the GitHub release: auto, strict or off (env PINGTXT_VERIFY_UPDATE)")
+	releaseURL := flag.String("release-url", envOr("PINGTXT_RELEASE_URL", defaultReleaseURL), "base URL of the release downloads, for -verify-update (env PINGTXT_RELEASE_URL)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 	if *showVersion {
@@ -45,6 +47,10 @@ func main() {
 	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	if *hubURL == "" || *token == "" {
 		log.Error("hub URL and token are required (PINGTXT_HUB, PINGTXT_TOKEN)")
+		os.Exit(2)
+	}
+	if !validVerifyMode(*verifyUpdate) {
+		log.Error("-verify-update must be auto, strict or off", "value", *verifyUpdate)
 		os.Exit(2)
 	}
 	wsURL, err := toWS(*hubURL)
@@ -62,7 +68,7 @@ func main() {
 	}
 	ag := &agent{
 		log: log, wsURL: wsURL, httpURL: toHTTP(wsURL), token: *token, concurrency: *concurrency,
-		exe: exe, noUpdateReason: noUpdateReason,
+		exe: exe, noUpdateReason: noUpdateReason, verify: *verifyUpdate, releaseURL: *releaseURL,
 		client: &http.Client{Timeout: 10 * time.Minute},
 	}
 
@@ -121,6 +127,13 @@ func toHTTP(wsURL string) string {
 	return "http://" + strings.TrimPrefix(u, "ws://")
 }
 
+func envOr(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
+}
+
 func envBool(k string) bool {
 	switch strings.ToLower(os.Getenv(k)) {
 	case "1", "true", "yes", "on":
@@ -142,6 +155,8 @@ type agent struct {
 
 	exe            string // path of this binary, empty when it cannot self-update
 	noUpdateReason string
+	verify         string // release checksum check mode, see releaseCheck
+	releaseURL     string
 }
 
 func (a *agent) session(ctx context.Context) error {
@@ -283,7 +298,7 @@ func (a *agent) session(ctx context.Context) error {
 			}
 			updating = true
 			log.Info("updating agent", "from", version, "to", u.Version)
-			go func() { updated <- downloadUpdate(sctx, a.client, a.httpURL, a.exe, *u) }()
+			go func() { updated <- a.update(sctx, *u) }()
 		}
 	}
 }

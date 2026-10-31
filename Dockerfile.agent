@@ -1,7 +1,10 @@
 # syntax=docker/dockerfile:1
 # pingtxt agent: a ~10 MB probe that connects out to the hub.
 
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS go
+# Keep in sync with the "go" line of go.mod (CI checks it).
+ARG GO_VERSION=1.26.10
+
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS go
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -9,7 +12,7 @@ COPY cmd ./cmd
 COPY internal ./internal
 ARG VERSION=dev
 ARG TARGETOS TARGETARCH
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o /out/pingtxt-agent ./cmd/pingtxt-agent
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=$VERSION" -o /out/pingtxt-agent ./cmd/pingtxt-agent
 
 FROM alpine:3.22
 RUN apk add --no-cache ca-certificates tzdata

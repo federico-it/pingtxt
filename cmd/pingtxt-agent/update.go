@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -23,6 +24,104 @@ import (
 
 // maxBinarySize caps the download, as a guard against a broken hub response.
 const maxBinarySize = 200 << 20
+
+// How an update is checked against the checksums published with the GitHub
+// release of its version (see releaseCheck).
+const (
+	verifyAuto   = "auto"   // check release versions; go ahead if GitHub cannot be reached
+	verifyStrict = "strict" // only install published releases whose checksum matches
+	verifyOff    = "off"    // trust the hub (forks and private builds)
+)
+
+// defaultReleaseURL is where release assets are downloaded from: the
+// version and the file name are appended.
+const defaultReleaseURL = "https://github.com/federico-it/pingtxt/releases/download/"
+
+// maxSumsSize caps the SHA256SUMS download.
+const maxSumsSize = 64 << 10
+
+var releaseTagRe = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$`)
+
+func validVerifyMode(m string) bool {
+	return m == verifyAuto || m == verifyStrict || m == verifyOff
+}
+
+// agentFileName is the name of this platform's binary in a release.
+func agentFileName() string {
+	return "pingtxt-agent-" + runtime.GOOS + "-" + runtime.GOARCH
+}
+
+// releaseCheck compares the checksum the hub sent for an update with the one
+// in the SHA256SUMS file of the GitHub release of that version. The hub
+// bundles the same binaries the release workflow publishes (the builds are
+// reproducible), so a hub that was tampered with cannot make agents install
+// a binary that was not built from a release. SHA256SUMS itself is signed
+// with cosign in the release workflow.
+//
+// It returns an error when the update must be refused, and a warning when
+// the check was skipped.
+func releaseCheck(ctx context.Context, client *http.Client, baseURL, mode, version, sum string) (warn string, err error) {
+	if mode == verifyOff {
+		return "", nil
+	}
+	if !releaseTagRe.MatchString(version) {
+		if mode == verifyStrict {
+			return "", fmt.Errorf("version %q is not a published release, refused by the strict update check", version)
+		}
+		return "not a release version: published checksums not checked", nil
+	}
+	name := agentFileName()
+	want, found, err := releaseSum(ctx, client, strings.TrimRight(baseURL, "/")+"/"+version+"/SHA256SUMS", name)
+	switch {
+	case err != nil && mode == verifyStrict:
+		return "", fmt.Errorf("cannot read the release checksums: %w", err)
+	case err != nil:
+		return "cannot read the release checksums, update not checked against them: " + err.Error(), nil
+	case !found:
+		return "", fmt.Errorf("release %s publishes no checksum for %s, update refused", version, name)
+	case !strings.EqualFold(want, sum):
+		return "", fmt.Errorf("the hub's binary does not match the checksum published in release %s, update refused", version)
+	}
+	return "", nil
+}
+
+// releaseSum fetches a SHA256SUMS file and returns the digest listed for
+// name. found is false when the file or the entry does not exist.
+func releaseSum(ctx context.Context, client *http.Client, sumsURL, name string) (sum string, found bool, err error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sumsURL, nil)
+	if err != nil {
+		return "", false, err
+	}
+	req.Header.Set("User-Agent", "pingtxt-agent/"+version)
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", false, fmt.Errorf("%s answered %s", req.URL.Host, resp.Status)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxSumsSize))
+	if err != nil {
+		return "", false, err
+	}
+	// Lines look like "<hex>  <name>" (sha256sum output; "*" marks binary mode).
+	for line := range strings.Lines(string(body)) {
+		f := strings.Fields(line)
+		if len(f) == 2 && strings.TrimPrefix(f[1], "*") == name {
+			if b, err := hex.DecodeString(f[0]); err != nil || len(b) != sha256.Size {
+				return "", false, errors.New("malformed SHA256SUMS")
+			}
+			return f[0], true, nil
+		}
+	}
+	return "", false, nil
+}
 
 // selfUpdateSupport reports whether this agent can replace its own binary,
 // and if not, why. It runs once at start.
@@ -82,6 +181,18 @@ func inContainer() bool {
 		}
 	}
 	return false
+}
+
+// update checks an update against the release checksums, then installs it.
+func (a *agent) update(ctx context.Context, u protocol.Update) error {
+	warn, err := releaseCheck(ctx, a.client, a.releaseURL, a.verify, u.Version, u.SHA256)
+	if err != nil {
+		return err
+	}
+	if warn != "" {
+		a.log.Warn("update check", "version", u.Version, "note", warn)
+	}
+	return downloadUpdate(ctx, a.client, a.httpURL, a.exe, u)
 }
 
 // downloadUpdate fetches the new binary from the hub, checks its digest and

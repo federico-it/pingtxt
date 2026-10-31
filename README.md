@@ -413,6 +413,17 @@ the agents page.
 - Agents update themselves only from a hub reached over **https** (or plain http on a
   loopback or private IP address): over plain http anyone on the path could swap the binary
   and its checksum. To accept that risk anyway, use `-insecure-update` (`PINGTXT_INSECURE_UPDATE=1`).
+- Before installing, agents also compare the hub's checksum with the one in the `SHA256SUMS` of
+  the GitHub release of that version (the hub bundles the same, reproducibly built binaries).
+  A mismatch, or a release with no checksum for the platform, refuses the update, so a hub
+  that was tampered with cannot push its own binary. `-verify-update` (`PINGTXT_VERIFY_UPDATE`)
+  sets how strict this is:
+  - `auto` (default): checks release versions; if GitHub cannot be reached the update goes
+    ahead with a warning in the agent log, and development builds are not checked.
+  - `strict`: installs only published releases whose checksum matches. Use it when agents can
+    reach github.com.
+  - `off`: trusts the hub, for forks and private builds (or point `-release-url` /
+    `PINGTXT_RELEASE_URL` at your own release downloads).
 - **Docker agents** never replace their own binary: pull the new image, or let
   [Watchtower](https://containrrr.dev/watchtower/) (or a similar image updater) do it:
 
@@ -424,6 +435,34 @@ the agents page.
 
 Pushing a `v*` tag publishes a GitHub release with the hub and agent binaries and `SHA256SUMS`,
 plus the Docker images for that tag.
+
+### Verify a release
+
+Releases after v0.1.0 are signed with [cosign](https://docs.sigstore.dev/) in keyless mode: the
+signature is tied to the GitHub Actions workflow that built them, with no key to leak. Each
+release has `SHA256SUMS` and its signature `SHA256SUMS.sigstore.json`; images on ghcr.io are
+signed by digest.
+
+```sh
+V=v0.2.0   # the release to check
+base=https://github.com/federico-it/pingtxt/releases/download/$V
+curl -fsSLO $base/SHA256SUMS -O $base/SHA256SUMS.sigstore.json -O $base/pingtxt-agent-linux-amd64
+
+# 1. SHA256SUMS was signed by release.yml for this tag
+cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "https://github.com/federico-it/pingtxt/.github/workflows/release.yml@refs/tags/$V" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+# 2. the files you downloaded match it
+sha256sum --ignore-missing -c SHA256SUMS
+
+# Docker images (tag without the "v")
+cosign verify ghcr.io/federico-it/pingtxt:${V#v} \
+  --certificate-identity "https://github.com/federico-it/pingtxt/.github/workflows/docker.yml@refs/tags/$V" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+`latest` and `main` images are signed too, by `docker.yml@refs/heads/main`.
 
 ## Build from source
 
