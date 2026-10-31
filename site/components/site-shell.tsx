@@ -8,6 +8,7 @@ const nav = [
   { href: "/#features", label: "features" },
   { href: "/#install", label: "install" },
   { href: "/docs/", label: "docs" },
+  { href: "/docs/api/", label: "api" },
   { href: REPO, label: "github" },
 ]
 

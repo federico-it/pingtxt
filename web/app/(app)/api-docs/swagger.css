@@ -1,0 +1,16 @@
+/* Swagger UI has a light theme only: in dark mode invert it and turn the
+   hues back, so method colors stay recognizable. */
+.dark .pingtxt-swagger .swagger-ui {
+  filter: invert(0.9) hue-rotate(180deg);
+}
+.dark .pingtxt-swagger .swagger-ui .microlight,
+.dark .pingtxt-swagger .swagger-ui img {
+  filter: invert(1) hue-rotate(180deg);
+}
+.pingtxt-swagger .swagger-ui .info {
+  margin: 10px 0 20px;
+}
+.pingtxt-swagger .swagger-ui .scheme-container {
+  box-shadow: none;
+  padding: 10px 0;
+}

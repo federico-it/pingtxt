@@ -110,6 +110,12 @@ curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/monitors
 `GET /api/monitors` accepts `?group=<id>` (or `group=none`) and `?tag=<id>` filters. Groups and tags are managed at
 `/api/groups` and `/api/tags`; `PUT /api/groups/<id>/monitors` with `{"monitor_ids": [...]}` sets a group's members.
 
+**API reference**: every endpoint, with parameters, roles and examples, is on [pingtxt.com/docs/api](https://pingtxt.com/docs/api/).
+Each hub also serves the OpenAPI 3.1 document at `/api/openapi.json` (use it to generate a client) and an interactive
+Swagger UI at `/api/docs`, linked from **settings → api tokens**, where requests run with your browser session or a token
+set in *Authorize*. The document is [internal/hub/openapi.json](internal/hub/openapi.json): a test fails when a route in
+`internal/hub/api.go` is missing from it.
+
 ### MCP server (Claude and other AI assistants)
 
 The hub is also an [MCP](https://modelcontextprotocol.io) server at `/mcp` (Streamable HTTP), so an AI assistant can

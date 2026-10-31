@@ -827,7 +827,8 @@
     "disconnect": "disconnect",
     "disconnected": "{name} disconnected",
     "disconnectTitle": "disconnect {name}?",
-    "disconnectText": "The assistant loses access right away and has to sign in again."
+    "disconnectText": "The assistant loses access right away and has to sign in again.",
+    "apiDocs": "API reference: <docs>interactive docs</docs> and the <spec>OpenAPI document</spec>."
   },
   "users": {
     "roles": {
@@ -953,5 +954,10 @@
     "keep": "keep",
     "keepHint": "older scheduled backups are deleted",
     "saveSchedule": "save schedule"
+  },
+  "apiDocs": {
+    "title": "api reference",
+    "intro": "Every endpoint of the hub's REST API. Try it out uses your browser session; to test a token, paste it in Authorize. Account and instance settings accept the browser session only.",
+    "error": "could not load the API document: {error}"
   }
 }

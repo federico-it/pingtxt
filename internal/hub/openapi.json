@@ -1,0 +1,6855 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "pingtxt API",
+    "version": "dev",
+    "summary": "REST API of the pingtxt hub.",
+    "description": "Everything the web UI does goes through this API.\n\n## Authentication\n\nCreate a personal token in **settings → api tokens** and send it as a bearer token:\n\n```\ncurl -H \"Authorization: Bearer ptk_...\" https://status.example.com/api/monitors\n```\n\n- **read** tokens can call every `GET` endpoint marked *read*.\n- **write** tokens can also create, change and delete. Only admins can create them.\n- Account and instance settings (users, tokens, 2FA, settings, backups) need a browser session: tokens get `403`.\n\n## Roles\n\nAdmins can change everything. **Viewers** are read-only: every request that is not `GET` answers `403`, and secrets in monitors and notification channels are replaced by `********`.\n\n## Conventions\n\n- Bodies are JSON (`Content-Type: application/json`); other content types on writes get `415`.\n- Times are Unix milliseconds. Ids are integers.\n- Errors are `{\"error\": \"message\"}` with a 4xx/5xx status.\n- Browser requests from another origin are refused (`403`).\n\nAI assistants can use the same API through the MCP server on `/mcp`.",
+    "license": {
+      "name": "AGPL-3.0-only",
+      "identifier": "AGPL-3.0-only"
+    }
+  },
+  "externalDocs": {
+    "description": "pingtxt docs",
+    "url": "https://pingtxt.com/docs/"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "This hub"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Monitors",
+      "description": "Checks, their history and heartbeat (push) URLs."
+    },
+    {
+      "name": "Incidents",
+      "description": "Down periods of monitors."
+    },
+    {
+      "name": "Maintenance",
+      "description": "Windows during which monitors don't alert."
+    },
+    {
+      "name": "Groups and tags",
+      "description": "Organize monitors; status pages and maintenance windows can select them by group or tag."
+    },
+    {
+      "name": "Agents",
+      "description": "Remote check locations connected to the hub."
+    },
+    {
+      "name": "Notifications",
+      "description": "Alert channels: webhook, Discord, Slack, Telegram, ntfy, email."
+    },
+    {
+      "name": "Status pages",
+      "description": "Public pages and their data."
+    },
+    {
+      "name": "System",
+      "description": "Health, counters, metrics and this document."
+    },
+    {
+      "name": "Auth",
+      "description": "Setup, login, password, single sign-on and two-factor. Browser oriented."
+    },
+    {
+      "name": "API tokens",
+      "description": "Personal tokens and connected OAuth apps. Browser session only."
+    },
+    {
+      "name": "Users",
+      "description": "Accounts and roles. Admin browser session only."
+    },
+    {
+      "name": "Settings",
+      "description": "Instance settings. Admin browser session only."
+    },
+    {
+      "name": "Backups",
+      "description": "Database backups and configuration export/import."
+    }
+  ],
+  "paths": {
+    "/api/agents": {
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "List agents",
+        "operationId": "listAgents",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agents": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Agent"
+                      }
+                    },
+                    "hub_url": {
+                      "type": "string"
+                    },
+                    "hub_version": {
+                      "type": "string"
+                    },
+                    "auto_update": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Create an agent",
+        "operationId": "createAgent",
+        "description": "The agent token is returned once.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "example": {
+                "name": "fra-1",
+                "location": "Frankfurt"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agent": {
+                      "$ref": "#/components/schemas/Agent"
+                    },
+                    "token": {
+                      "type": "string",
+                      "description": "Agent token (pt_...)."
+                    },
+                    "hub_url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/agents/{id}": {
+      "put": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Rename an agent",
+        "operationId": "updateAgent",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the agent."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Delete an agent",
+        "operationId": "deleteAgent",
+        "description": "Disconnects it and removes it from monitor locations.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the agent."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/agents/{id}/token": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Rotate the agent token",
+        "operationId": "rotateAgentToken",
+        "description": "The agent is disconnected until it uses the new token.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the agent."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "hub_url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/agents/{id}/update": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Update an agent now",
+        "operationId": "updateAgentNow",
+        "description": "Asks a connected agent to install the hub's version.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the agent."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/auth/2fa/disable": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Disable two-factor",
+        "operationId": "disableTwoFactor",
+        "description": "**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "TOTP or recovery code."
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/auth/2fa/enable": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Enable two-factor",
+        "operationId": "enableTwoFactor",
+        "description": "**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              },
+              "example": {
+                "code": "123456"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Enabled. Recovery codes are shown once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recovery_codes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/auth/2fa/recovery-codes": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "New recovery codes",
+        "operationId": "regenerateRecoveryCodes",
+        "description": "Replaces the old codes.\n\n**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recovery_codes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/auth/2fa/setup": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Start two-factor setup",
+        "operationId": "setupTwoFactor",
+        "description": "Returns a new TOTP secret; confirm it with /api/auth/2fa/enable.\n\n**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Secret and otpauth:// URI for the QR code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "secret": {
+                      "type": "string"
+                    },
+                    "uri": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/auth/identities/{provider}": {
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Unlink a single sign-on provider",
+        "operationId": "unlinkIdentity",
+        "description": "**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "github",
+                "google",
+                "oidc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Log in with password",
+        "operationId": "login",
+        "description": "Sets the `pingtxt_session` cookie. When the user has two-factor authentication, the response is `{\"two_factor\": true, \"challenge\": \"...\"}` instead: send the challenge with a code to /api/auth/login/2fa.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              },
+              "example": {
+                "email": "admin@example.com",
+                "password": "correct horse"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logged in, or a two-factor challenge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/User"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "two_factor": {
+                          "const": true
+                        },
+                        "challenge": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/auth/login/2fa": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Complete a two-factor login",
+        "operationId": "loginSecondFactor",
+        "description": "**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challenge": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "6 digit TOTP code or a recovery code."
+                  }
+                },
+                "required": [
+                  "challenge",
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logged in, session cookie set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Log out",
+        "operationId": "logout",
+        "description": "Ends the browser session.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Current user",
+        "operationId": "me",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The user behind the session or token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "recovery_codes_left": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "example": {
+                  "user": {
+                    "id": 1,
+                    "email": "admin@example.com",
+                    "role": "admin",
+                    "created_at": 1761868800000,
+                    "has_password": true,
+                    "two_factor": false,
+                    "identities": []
+                  },
+                  "version": "v0.1.0",
+                  "recovery_codes_left": 10
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/auth/oauth/{provider}/callback": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Single sign-on callback",
+        "operationId": "oauthCallback",
+        "description": "Register `<public url>/api/auth/oauth/<provider>/callback` at the provider. Not meant to be called directly.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "github",
+                "google",
+                "oidc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the app."
+          }
+        }
+      }
+    },
+    "/api/auth/oauth/{provider}/start": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Start single sign-on",
+        "operationId": "oauthStart",
+        "description": "Browser redirect to the provider. `?next=/path` returns there after login, `?link=1` links the provider to the logged-in account.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "github",
+                "google",
+                "oidc"
+              ]
+            }
+          },
+          {
+            "name": "next",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Local path to open after login."
+          },
+          {
+            "name": "link",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "1 to link to the current account."
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the provider."
+          }
+        }
+      }
+    },
+    "/api/auth/options": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Login options",
+        "operationId": "authOptions",
+        "description": "What the login page shows: password form and single sign-on buttons.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Options.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "password_login": {
+                      "type": "boolean"
+                    },
+                    "providers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "password_login": true,
+                  "providers": [
+                    {
+                      "id": "github",
+                      "label": "GitHub"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Change password",
+        "operationId": "changePassword",
+        "description": "Other sessions of the user are logged out. Accounts created with single sign-on can set a first password with an empty `current`.\n\n**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "current": {
+                    "type": "string"
+                  },
+                  "new": {
+                    "type": "string",
+                    "description": "At least 8 characters."
+                  }
+                },
+                "required": [
+                  "new"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/backups": {
+      "get": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "List backups",
+        "operationId": "listBackups",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Backups and settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "settings": {
+                      "$ref": "#/components/schemas/BackupSettings"
+                    },
+                    "backups": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BackupFile"
+                      }
+                    },
+                    "dir": {
+                      "type": "string"
+                    },
+                    "pending_restore": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/PendingRestore"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "driver": {
+                      "type": "string",
+                      "description": "sqlite, postgres or mysql."
+                    },
+                    "file_backups": {
+                      "type": "boolean",
+                      "description": "false on PostgreSQL / MariaDB: use the database's own tools."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Back up now",
+        "operationId": "createBackup",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Backup file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupFile"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/backups/restore": {
+      "delete": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Cancel a staged restore",
+        "operationId": "cancelRestore",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/backups/upload": {
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Upload a backup",
+        "operationId": "uploadBackup",
+        "description": "Raw SQLite file as the body (`Content-Type: application/octet-stream`), up to 4 GB. SQLite only.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "backup": {
+                      "$ref": "#/components/schemas/BackupFile"
+                    },
+                    "info": {
+                      "$ref": "#/components/schemas/BackupInfo"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/backups/{name}": {
+      "get": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Download a backup",
+        "operationId": "downloadBackup",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Backup file name.",
+            "example": "pingtxt-manual-20261031-020000.db"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Delete a backup",
+        "operationId": "deleteBackup",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Backup file name.",
+            "example": "pingtxt-manual-20261031-020000.db"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/backups/{name}/restore": {
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Stage a restore",
+        "operationId": "stageRestore",
+        "description": "The backup replaces the database at the next start of the hub.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Backup file name.",
+            "example": "pingtxt-manual-20261031-020000.db"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pending_restore": {
+                      "$ref": "#/components/schemas/PendingRestore"
+                    },
+                    "info": {
+                      "$ref": "#/components/schemas/BackupInfo"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/config/export": {
+      "get": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Export the configuration",
+        "operationId": "exportConfig",
+        "description": "Admins only. Without secrets by default; `?secrets=1` needs a browser session (API tokens get 403).\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "secrets",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "1 to include passwords and tokens."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "JSON download.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigDocument"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/config/import": {
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Import a configuration",
+        "operationId": "importConfig",
+        "description": "A backup is taken first. Body up to 64 MB.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "merge",
+                "replace"
+              ],
+              "default": "merge"
+            },
+            "description": "replace deletes what is not in the document."
+          },
+          {
+            "name": "settings",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "0 to leave instance settings alone."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigDocument"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/docs": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Interactive API docs",
+        "operationId": "apiDocs",
+        "description": "Redirects to the Swagger UI page of the web app.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "responses": {
+          "302": {
+            "description": "Redirect to /api-docs/."
+          }
+        }
+      }
+    },
+    "/api/groups": {
+      "get": {
+        "tags": [
+          "Groups and tags"
+        ],
+        "summary": "List groups",
+        "operationId": "listGroups",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Groups.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Group"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Groups and tags"
+        ],
+        "summary": "Create a group",
+        "operationId": "createGroup",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Group"
+              },
+              "example": {
+                "name": "Production",
+                "description": "Customer facing"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/groups/{id}": {
+      "put": {
+        "tags": [
+          "Groups and tags"
+        ],
+        "summary": "Update a group",
+        "operationId": "updateGroup",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the group."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Group"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Groups and tags"
+        ],
+        "summary": "Delete a group",
+        "operationId": "deleteGroup",
+        "description": "Its monitors are kept, without a group.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the group."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/groups/{id}/monitors": {
+      "put": {
+        "tags": [
+          "Groups and tags"
+        ],
+        "summary": "Set the monitors of a group",
+        "operationId": "setGroupMonitors",
+        "description": "Monitors listed here move to this group; monitors of the group not listed leave it.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the group."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "monitor_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                "required": [
+                  "monitor_ids"
+                ]
+              },
+              "example": {
+                "monitor_ids": [
+                  7,
+                  8
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Group"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Health check",
+        "operationId": "health",
+        "description": "Liveness probe, also returns the hub version.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Hub is running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true,
+                  "version": "v0.1.0"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incidents": {
+      "get": {
+        "tags": [
+          "Incidents"
+        ],
+        "summary": "List incidents",
+        "operationId": "listIncidents",
+        "description": "The latest 100, open ones first.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "monitor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Only this monitor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incidents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Incident"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/locations": {
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "List check locations",
+        "operationId": "listLocations",
+        "description": "The hub (when it runs checks) and every agent.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Locations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Location"
+                  }
+                },
+                "example": [
+                  {
+                    "id": "local",
+                    "name": "hub",
+                    "online": true,
+                    "kind": "local"
+                  },
+                  {
+                    "id": "agent:2",
+                    "name": "fra-1 · Frankfurt",
+                    "online": true,
+                    "kind": "agent"
+                  }
+                ]
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/maintenances": {
+      "get": {
+        "tags": [
+          "Maintenance"
+        ],
+        "summary": "List maintenance windows",
+        "operationId": "listMaintenances",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Windows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Maintenance"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Maintenance"
+        ],
+        "summary": "Create a maintenance window",
+        "operationId": "createMaintenance",
+        "description": "Covered monitors don't alert and don't count as down.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaintenanceInput"
+              },
+              "example": {
+                "name": "DB upgrade",
+                "description": "",
+                "all_monitors": false,
+                "monitor_ids": [
+                  7
+                ],
+                "group_ids": [],
+                "tag_ids": [],
+                "kind": "weekly",
+                "start_time": "02:00",
+                "duration_min": 60,
+                "weekdays": [
+                  0
+                ],
+                "month_days": [],
+                "timezone": "Europe/Rome",
+                "enabled": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Maintenance"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/maintenances/{id}": {
+      "put": {
+        "tags": [
+          "Maintenance"
+        ],
+        "summary": "Update a maintenance window",
+        "operationId": "updateMaintenance",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the maintenance window."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MaintenanceInput"
+              },
+              "example": {
+                "name": "DB upgrade",
+                "description": "",
+                "all_monitors": false,
+                "monitor_ids": [
+                  7
+                ],
+                "group_ids": [],
+                "tag_ids": [],
+                "kind": "weekly",
+                "start_time": "02:00",
+                "duration_min": 60,
+                "weekdays": [
+                  0
+                ],
+                "month_days": [],
+                "timezone": "Europe/Rome",
+                "enabled": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Maintenance"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Maintenance"
+        ],
+        "summary": "Delete a maintenance window",
+        "operationId": "deleteMaintenance",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the maintenance window."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/monitors": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "List monitors",
+        "operationId": "listMonitors",
+        "description": "Every monitor with its last 24 hours. Secrets (passwords in targets, headers, bodies, push tokens) are hidden from read-only users.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Group id, or `none` for monitors without a group."
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Tag id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monitors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonitorSummary"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Create a monitor",
+        "operationId": "createMonitor",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitorInput"
+              },
+              "example": {
+                "name": "Website",
+                "type": "http",
+                "target": "https://example.com",
+                "interval_sec": 60,
+                "timeout_ms": 10000,
+                "retries": 2,
+                "method": "GET",
+                "expected_status": "200-299",
+                "locations": [
+                  "local"
+                ],
+                "tag_ids": [],
+                "group_id": 0,
+                "assertions": [
+                  {
+                    "path": "status",
+                    "op": "eq",
+                    "value": "ok"
+                  }
+                ],
+                "cert_expiry_alert": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Monitor"
+                },
+                "example": {
+                  "name": "Website",
+                  "type": "http",
+                  "target": "https://example.com",
+                  "interval_sec": 60,
+                  "timeout_ms": 10000,
+                  "retries": 2,
+                  "method": "GET",
+                  "expected_status": "200-299",
+                  "locations": [
+                    "local"
+                  ],
+                  "tag_ids": [],
+                  "group_id": 0,
+                  "assertions": [
+                    {
+                      "path": "status",
+                      "op": "eq",
+                      "value": "ok"
+                    }
+                  ],
+                  "cert_expiry_alert": true,
+                  "id": 7,
+                  "headers": {},
+                  "body": "",
+                  "keyword": "",
+                  "keyword_invert": false,
+                  "dns_record": "",
+                  "dns_server": "",
+                  "dns_expected": "",
+                  "ignore_tls": false,
+                  "push_token": "",
+                  "grace_sec": 0,
+                  "degraded_pct": 0,
+                  "domain_expiry_alert": false,
+                  "paused": false,
+                  "status": "up",
+                  "status_since": 1761868800000,
+                  "created_at": 1761868800000
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/monitors/{id}": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Get a monitor",
+        "operationId": "getMonitor",
+        "description": "Includes 7 and 30 day uptime and the last result of each location.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monitor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Update a monitor",
+        "operationId": "updateMonitor",
+        "description": "Replaces the monitor: send every field.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitorInput"
+              },
+              "example": {
+                "name": "Website",
+                "type": "http",
+                "target": "https://example.com",
+                "interval_sec": 60,
+                "timeout_ms": 10000,
+                "retries": 2,
+                "method": "GET",
+                "expected_status": "200-299",
+                "locations": [
+                  "local"
+                ],
+                "tag_ids": [],
+                "group_id": 0,
+                "assertions": [
+                  {
+                    "path": "status",
+                    "op": "eq",
+                    "value": "ok"
+                  }
+                ],
+                "cert_expiry_alert": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Monitor"
+                },
+                "example": {
+                  "name": "Website",
+                  "type": "http",
+                  "target": "https://example.com",
+                  "interval_sec": 60,
+                  "timeout_ms": 10000,
+                  "retries": 2,
+                  "method": "GET",
+                  "expected_status": "200-299",
+                  "locations": [
+                    "local"
+                  ],
+                  "tag_ids": [],
+                  "group_id": 0,
+                  "assertions": [
+                    {
+                      "path": "status",
+                      "op": "eq",
+                      "value": "ok"
+                    }
+                  ],
+                  "cert_expiry_alert": true,
+                  "id": 7,
+                  "headers": {},
+                  "body": "",
+                  "keyword": "",
+                  "keyword_invert": false,
+                  "dns_record": "",
+                  "dns_server": "",
+                  "dns_expected": "",
+                  "ignore_tls": false,
+                  "push_token": "",
+                  "grace_sec": 0,
+                  "degraded_pct": 0,
+                  "domain_expiry_alert": false,
+                  "paused": false,
+                  "status": "up",
+                  "status_since": 1761868800000,
+                  "created_at": 1761868800000
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Delete a monitor",
+        "operationId": "deleteMonitor",
+        "description": "Also deletes its history.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/monitors/{id}/expiry": {
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Check expiry dates now",
+        "operationId": "checkMonitorExpiry",
+        "description": "Looks up the TLS certificate and domain expiry.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Expiry checks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExpiryCheck"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/monitors/{id}/pause": {
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Pause or resume",
+        "operationId": "pauseMonitor",
+        "description": "Pausing resolves the open incident.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "paused": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "paused"
+                ]
+              },
+              "example": {
+                "paused": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Monitor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Monitor"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/monitors/{id}/push-token": {
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Rotate the heartbeat URL",
+        "operationId": "rotatePushToken",
+        "description": "push monitors only: the old URL stops working.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Monitor with the new push_token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Monitor"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/monitors/{id}/results": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Latest check results",
+        "operationId": "monitorResults",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50
+            },
+            "description": "Number of results."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Results, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Result"
+                      }
+                    },
+                    "locations": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Location id → display name."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/monitors/{id}/series": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Response time series",
+        "operationId": "monitorSeries",
+        "description": "About 90 buckets per location over the range.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1h",
+                "6h",
+                "24h",
+                "7d",
+                "30d"
+              ],
+              "default": "24h"
+            },
+            "description": "Time range."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Series.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix time in milliseconds (0 = never / unknown)."
+                    },
+                    "to": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix time in milliseconds (0 = never / unknown)."
+                    },
+                    "size": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Bucket size in ms."
+                    },
+                    "locations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "buckets": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Bucket"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/notifiers": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "List notification channels",
+        "operationId": "listNotifiers",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channels.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notifier"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Create a notification channel",
+        "operationId": "createNotifier",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Notifier"
+              },
+              "example": {
+                "name": "ops",
+                "type": "slack",
+                "config": {
+                  "url": "https://hooks.slack.com/services/T000/B000/XXXX"
+                },
+                "enabled": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notifier"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/notifiers/test": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Test an unsaved channel",
+        "operationId": "testDraftNotifier",
+        "description": "Sends a test alert with this configuration. With an `id`, empty secrets are taken from that saved channel.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Notifier"
+              },
+              "example": {
+                "name": "ops",
+                "type": "slack",
+                "config": {
+                  "url": "https://hooks.slack.com/services/T000/B000/XXXX"
+                },
+                "enabled": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          }
+        }
+      }
+    },
+    "/api/notifiers/{id}": {
+      "put": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Update a notification channel",
+        "operationId": "updateNotifier",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the channel."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Notifier"
+              },
+              "example": {
+                "name": "ops",
+                "type": "slack",
+                "config": {
+                  "url": "https://hooks.slack.com/services/T000/B000/XXXX"
+                },
+                "enabled": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notifier"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Delete a notification channel",
+        "operationId": "deleteNotifier",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the channel."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/notifiers/{id}/test": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Test a channel",
+        "operationId": "testNotifier",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the channel."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          }
+        }
+      }
+    },
+    "/api/oauth/grants": {
+      "get": {
+        "tags": [
+          "API tokens"
+        ],
+        "summary": "List connected apps",
+        "operationId": "listGrants",
+        "description": "Apps connected through OAuth (MCP clients).\n\n**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grants.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OAuthGrant"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/oauth/grants/{id}": {
+      "delete": {
+        "tags": [
+          "API tokens"
+        ],
+        "summary": "Disconnect an app",
+        "operationId": "deleteGrant",
+        "description": "**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the grant."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "OpenAPI document",
+        "operationId": "openapi",
+        "description": "This document, for the running version.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/overview": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Dashboard counters",
+        "operationId": "getOverview",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Counters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "monitors": {
+                      "type": "integer"
+                    },
+                    "status": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      },
+                      "description": "Monitors per status."
+                    },
+                    "agents": {
+                      "type": "integer"
+                    },
+                    "agents_online": {
+                      "type": "integer"
+                    },
+                    "open_incidents": {
+                      "type": "integer"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "monitors": 12,
+                  "status": {
+                    "up": 10,
+                    "down": 1,
+                    "paused": 1
+                  },
+                  "agents": 2,
+                  "agents_online": 2,
+                  "open_incidents": 1,
+                  "version": "v0.1.0"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/public/status/{slug}": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Public status page data",
+        "operationId": "publicStatus",
+        "description": "What /status/<slug> shows. Drafts answer 404 unless a user is logged in. Cached for 15 seconds.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicStatusPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/push/{token}": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Send a heartbeat",
+        "operationId": "pushGet",
+        "description": "Heartbeat of a push monitor. Any HTTP method works (GET and POST shown here). The token in the URL is the authentication.\n\n`curl -fsS https://status.example.com/api/push/<token>?status=up&msg=ok&ping=12`\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "up",
+                "down",
+                "ok",
+                "fail",
+                "0",
+                "1"
+              ],
+              "default": "up"
+            },
+            "description": "Result of the job."
+          },
+          {
+            "name": "msg",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Message shown in the history, up to 200 characters."
+          },
+          {
+            "name": "ping",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "Duration or latency in ms."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "paused": {
+                      "type": "boolean",
+                      "description": "The monitor is paused: the heartbeat was ignored."
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Send a heartbeat",
+        "operationId": "pushPost",
+        "description": "Heartbeat of a push monitor. Any HTTP method works (GET and POST shown here). The token in the URL is the authentication.\n\n`curl -fsS https://status.example.com/api/push/<token>?status=up&msg=ok&ping=12`\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "up",
+                "down",
+                "ok",
+                "fail",
+                "0",
+                "1"
+              ],
+              "default": "up"
+            },
+            "description": "Result of the job."
+          },
+          {
+            "name": "msg",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Message shown in the history, up to 200 characters."
+          },
+          {
+            "name": "ping",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "Duration or latency in ms."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "paused": {
+                      "type": "boolean",
+                      "description": "The monitor is paused: the heartbeat was ignored."
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Get instance settings",
+        "operationId": "getSettings",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/settings/agent-updates": {
+      "put": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Agent auto-update setting",
+        "operationId": "putAgentUpdateSettings",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "auto_update": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "auto_update"
+                ]
+              },
+              "example": {
+                "auto_update": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "auto_update": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/settings/auth": {
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Save login settings",
+        "operationId": "putAuthSettings",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/settings/backups": {
+      "put": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Save backup schedule",
+        "operationId": "putBackupSettings",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupSettings"
+              },
+              "example": {
+                "enabled": true,
+                "interval_hours": 24,
+                "keep": 7
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/settings/general": {
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Save general settings",
+        "operationId": "putGeneralSettings",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GeneralSettings"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Settings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/setup": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Setup state",
+        "operationId": "getSetup",
+        "description": "Whether the instance still needs its first admin account.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "State.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "needs_setup": {
+                      "type": "boolean"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "needs_setup": false,
+                  "version": "v0.1.0"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Create the first admin",
+        "operationId": "setup",
+        "description": "Works only while no user exists. Starts a session.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "At least 8 characters."
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              },
+              "example": {
+                "email": "admin@example.com",
+                "password": "correct horse"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Admin created, session cookie set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                },
+                "example": {
+                  "id": 1,
+                  "email": "admin@example.com",
+                  "role": "admin",
+                  "created_at": 1761868800000,
+                  "has_password": true,
+                  "two_factor": false,
+                  "identities": []
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/status-pages": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "List status pages",
+        "operationId": "listStatusPages",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StatusPage"
+                      }
+                    },
+                    "hub_url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Create a status page",
+        "operationId": "createStatusPage",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusPage"
+              },
+              "example": {
+                "slug": "acme",
+                "title": "Acme status",
+                "description": "",
+                "domain": "",
+                "published": true,
+                "show_incidents": true,
+                "monitor_ids": [
+                  7
+                ],
+                "group_ids": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Get a status page",
+        "operationId": "getStatusPage",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Update a status page",
+        "operationId": "updateStatusPage",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusPage"
+              },
+              "example": {
+                "slug": "acme",
+                "title": "Acme status",
+                "description": "",
+                "domain": "",
+                "published": true,
+                "show_incidents": true,
+                "monitor_ids": [
+                  7
+                ],
+                "group_ids": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Delete a status page",
+        "operationId": "deleteStatusPage",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/tags": {
+      "get": {
+        "tags": [
+          "Groups and tags"
+        ],
+        "summary": "List tags",
+        "operationId": "listTags",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tags.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Tag"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Groups and tags"
+        ],
+        "summary": "Create a tag",
+        "operationId": "createTag",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Tag"
+              },
+              "example": {
+                "name": "critical",
+                "color": "red"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tag"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/tags/{id}": {
+      "put": {
+        "tags": [
+          "Groups and tags"
+        ],
+        "summary": "Update a tag",
+        "operationId": "updateTag",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the tag."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Tag"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tag"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Groups and tags"
+        ],
+        "summary": "Delete a tag",
+        "operationId": "deleteTag",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the tag."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/tokens": {
+      "get": {
+        "tags": [
+          "API tokens"
+        ],
+        "summary": "List your API tokens",
+        "operationId": "listTokens",
+        "description": "**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tokens of the current user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/APIToken"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "API tokens"
+        ],
+        "summary": "Create an API token",
+        "operationId": "createToken",
+        "description": "The secret is returned once. Read-only users can only create read tokens. At most 50 tokens per user.\n\n**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Up to 100 characters."
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "write"
+                    ]
+                  },
+                  "expires_in_days": {
+                    "type": "integer",
+                    "description": "0 = never, up to 3650."
+                  }
+                },
+                "required": [
+                  "name",
+                  "scope"
+                ]
+              },
+              "example": {
+                "name": "grafana",
+                "scope": "read",
+                "expires_in_days": 365
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "$ref": "#/components/schemas/APIToken"
+                    },
+                    "secret": {
+                      "type": "string",
+                      "description": "Send it as `Authorization: Bearer <secret>`."
+                    }
+                  }
+                },
+                "example": {
+                  "token": {
+                    "id": 3,
+                    "name": "grafana",
+                    "hint": "x9Qa",
+                    "scope": "read",
+                    "created_at": 1761868800000,
+                    "last_used_at": 0,
+                    "expires_at": 1793404800000
+                  },
+                  "secret": "ptk_5uG...x9Qa"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/tokens/{id}": {
+      "delete": {
+        "tags": [
+          "API tokens"
+        ],
+        "summary": "Revoke an API token",
+        "operationId": "deleteToken",
+        "description": "**Access:** Browser session only: API tokens get 403.",
+        "x-pingtxt-access": "session",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the token."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "List users",
+        "operationId": "listUsers",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Create a user",
+        "operationId": "createUser",
+        "description": "Without a password the user logs in with single sign-on (matched by verified email).\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Optional, at least 8 characters."
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "viewer"
+                    ]
+                  }
+                },
+                "required": [
+                  "email",
+                  "role"
+                ]
+              },
+              "example": {
+                "email": "dev@example.com",
+                "role": "viewer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "put": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Change a user's role",
+        "operationId": "updateUser",
+        "description": "You cannot change your own role.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the user."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "admin",
+                      "viewer"
+                    ]
+                  }
+                },
+                "required": [
+                  "role"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Delete a user",
+        "operationId": "deleteUser",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the user."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/users/{id}/2fa": {
+      "delete": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Reset a user's two-factor",
+        "operationId": "resetUserTwoFactor",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the user."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Prometheus metrics",
+        "operationId": "getMetrics",
+        "description": "Metrics in the Prometheus text format. Public when *settings → general → metrics* is set to public.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metrics.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "pingtxt_monitor_up{monitor=\"Website\",type=\"http\"} 1\n"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "ptk_...",
+        "description": "Personal API token from settings → api tokens."
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "pingtxt_session",
+        "description": "Browser session, set by login."
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid input.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "name is required"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Not logged in, or the token is invalid or expired.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "unauthorized"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Not allowed for this role, token scope or kind of authentication.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "this token is read-only"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Not found.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "monitor not found"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Already exists.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "a group with this name already exists"
+            }
+          }
+        }
+      },
+      "BadGateway": {
+        "description": "The notification could not be delivered.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "slack: 404 Not Found"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Too many failed attempts. Password logins are limited to 10 failures per account and 30 per client address in 15 minutes; second factor codes to 10 wrong codes per user. Wait for `Retry-After` seconds.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds until a new attempt is accepted.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "too many failed attempts, try again in 14 minutes"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human readable message.",
+            "examples": [
+              "monitor not found"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Ok": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Always true.",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "description": "admin or viewer (read-only).",
+            "enum": [
+              "admin",
+              "viewer"
+            ]
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "has_password": {
+            "type": "boolean",
+            "description": "false for accounts that only log in with single sign-on."
+          },
+          "two_factor": {
+            "type": "boolean",
+            "description": "TOTP two-factor authentication is enabled."
+          },
+          "identities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Identity"
+            }
+          }
+        }
+      },
+      "Identity": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "github, google or oidc."
+          },
+          "email": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        }
+      },
+      "APIToken": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "hint": {
+            "type": "string",
+            "description": "Last 4 characters of the secret."
+          },
+          "scope": {
+            "type": "string",
+            "description": "read: GET requests only. write: everything a token can do.",
+            "enum": [
+              "read",
+              "write"
+            ]
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "last_used_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "expires_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Expiry, 0 = never."
+          }
+        }
+      },
+      "Assertion": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path in the JSON body: dot notation with [n] for array items, e.g. data.items[0].status.",
+            "examples": [
+              "status"
+            ]
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "eq",
+              "ne",
+              "contains",
+              "not_contains",
+              "exists",
+              "not_exists",
+              "gt",
+              "gte",
+              "lt",
+              "lte",
+              "matches"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "description": "Expected value. Not used by exists / not_exists; a number for gt/gte/lt/lte; a regular expression for matches."
+          }
+        },
+        "required": [
+          "path",
+          "op"
+        ],
+        "description": "A rule on the JSON body of an http or keyword response."
+      },
+      "MonitorInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "http",
+              "keyword",
+              "tcp",
+              "ping",
+              "dns",
+              "push",
+              "postgres",
+              "mysql",
+              "redis",
+              "mongodb",
+              "docker",
+              "grpc",
+              "smtp",
+              "mcp"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp), host:port (tcp), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port]. Empty for push.",
+            "examples": [
+              "https://example.com/health"
+            ]
+          },
+          "interval_sec": {
+            "type": "integer",
+            "description": "Seconds between checks, 10 to 86400 (push: expected period, up to 7 days). 0 = default (60, push 3600)."
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "description": "500 to 60000. 0 = 10000."
+          },
+          "retries": {
+            "type": "integer",
+            "description": "Consecutive failures before a location counts as down, 1 to 10."
+          },
+          "method": {
+            "type": "string",
+            "description": "HTTP method for http/keyword (default GET). For mcp: the transport, auto, streamable or sse."
+          },
+          "expected_status": {
+            "type": "string",
+            "description": "Accepted HTTP status codes, e.g. \"200-299\" or \"200,301\". For mcp: the minimum number of tools."
+          },
+          "keyword": {
+            "type": "string",
+            "description": "keyword: text that must appear in the body. mcp: comma separated tool names that must be listed."
+          },
+          "keyword_invert": {
+            "type": "boolean",
+            "description": "keyword: fail when the text is found."
+          },
+          "dns_record": {
+            "type": "string",
+            "description": "dns: record type (A, AAAA, CNAME, MX, TXT, NS...)."
+          },
+          "dns_server": {
+            "type": "string",
+            "description": "dns: resolver to query, host[:port]. Empty = system resolver."
+          },
+          "dns_expected": {
+            "type": "string",
+            "description": "dns: value that must be in the answer."
+          },
+          "ignore_tls": {
+            "type": "boolean",
+            "description": "Accept invalid TLS certificates."
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Request headers (http, keyword, mcp)."
+          },
+          "body": {
+            "type": "string",
+            "description": "Request body (http, keyword)."
+          },
+          "assertions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Assertion"
+            },
+            "description": "JSON response rules, http and keyword only, at most 20."
+          },
+          "grace_sec": {
+            "type": "integer",
+            "description": "push: extra time after the period before the monitor goes down, 0 to 86400."
+          },
+          "degraded_pct": {
+            "type": "integer",
+            "description": "Share of failing locations (percent) from which the monitor is degraded, 1 to 50. 0 = instance default."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Where the check runs: \"local\" (the hub) and/or \"agent:<id>\". Empty = local. See GET /api/locations.",
+            "examples": [
+              [
+                "local",
+                "agent:2"
+              ]
+            ]
+          },
+          "group_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Group, 0 = none."
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "cert_expiry_alert": {
+            "type": "boolean",
+            "description": "Alert before the TLS certificate expires (https targets)."
+          },
+          "domain_expiry_alert": {
+            "type": "boolean",
+            "description": "Alert before the domain registration expires."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Create the monitor paused. Ignored on update: use POST /api/monitors/{id}/pause."
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ]
+      },
+      "Monitor": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MonitorInput"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "push_token": {
+                "type": "string",
+                "description": "push: token of the heartbeat URL. Hidden from read-only users."
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "up",
+                  "degraded",
+                  "down",
+                  "pending",
+                  "paused",
+                  "maintenance"
+                ]
+              },
+              "status_since": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix time in milliseconds (0 = never / unknown)."
+              },
+              "created_at": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix time in milliseconds (0 = never / unknown)."
+              }
+            }
+          }
+        ]
+      },
+      "Result": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitor_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "location": {
+            "type": "string",
+            "description": "local, agent:<id> or push."
+          },
+          "ts": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "latency_ms": {
+            "type": "number"
+          },
+          "status_code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string",
+            "description": "Error or detail of the check."
+          },
+          "cert_expiry": {
+            "type": "integer",
+            "format": "int64",
+            "description": "TLS certificate expiry seen by this check."
+          },
+          "maint": {
+            "type": "boolean",
+            "description": "Taken during a maintenance window."
+          }
+        }
+      },
+      "Bar": {
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Start of the half hour."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Checks outside maintenance."
+          },
+          "ok": {
+            "type": "integer"
+          },
+          "maint": {
+            "type": "integer",
+            "description": "Checks during maintenance."
+          },
+          "avg_ms": {
+            "type": "number"
+          }
+        }
+      },
+      "ExpiryCheck": {
+        "type": "object",
+        "properties": {
+          "monitor_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cert",
+              "domain"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "Host name (cert) or registrable domain."
+          },
+          "expires_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "issuer": {
+            "type": "string",
+            "description": "Certificate issuer or registrar."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "tls",
+              "rdap",
+              "whois"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "description": "Last lookup error, if any."
+          },
+          "checked_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        }
+      },
+      "MonitorSummary": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Monitor"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "uptime_24h": {
+                "type": "number",
+                "description": "Percent."
+              },
+              "avg_ms_24h": {
+                "type": "number"
+              },
+              "last": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Result"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "bars": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Bar"
+                },
+                "description": "Last 24 hours in 48 half-hour bars."
+              },
+              "expiry": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExpiryCheck"
+                }
+              },
+              "maintenance": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "format": "int64"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "end_at": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Unix time in milliseconds (0 = never / unknown)."
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Window covering the monitor right now."
+              }
+            }
+          }
+        ]
+      },
+      "MonitorDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MonitorSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "uptime_7d": {
+                "type": "number"
+              },
+              "uptime_30d": {
+                "type": "number"
+              },
+              "location_status": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "online": {
+                      "type": "boolean"
+                    },
+                    "last": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/Result"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "push_url": {
+                "type": "string",
+                "description": "push: full heartbeat URL."
+              }
+            }
+          }
+        ]
+      },
+      "Bucket": {
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "location": {
+            "type": "string"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "ok": {
+            "type": "integer"
+          },
+          "maint": {
+            "type": "integer"
+          },
+          "avg_ms": {
+            "type": "number"
+          },
+          "min_ms": {
+            "type": "number"
+          },
+          "max_ms": {
+            "type": "number"
+          }
+        }
+      },
+      "Incident": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitor_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitor_name": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "resolved_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "0 while open."
+          },
+          "cause": {
+            "type": "string"
+          }
+        }
+      },
+      "Group": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique, up to 64 characters."
+          },
+          "description": {
+            "type": "string",
+            "description": "Up to 500 characters."
+          },
+          "monitors": {
+            "type": "integer",
+            "description": "Number of monitors in the group (read only)."
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "Tag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "Unique, up to 32 characters, no commas."
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "",
+              "red",
+              "orange",
+              "yellow",
+              "green",
+              "cyan",
+              "blue",
+              "purple",
+              "pink",
+              "gray"
+            ]
+          },
+          "monitors": {
+            "type": "integer",
+            "description": "Number of tagged monitors (read only)."
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "MaintenanceInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "all_monitors": {
+            "type": "boolean",
+            "description": "Covers every monitor."
+          },
+          "monitor_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "group_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Every monitor of these groups."
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Every monitor with one of these tags."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "once",
+              "daily",
+              "weekly",
+              "monthly"
+            ]
+          },
+          "start_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "once: start. Recurring: first day the schedule is valid (0 = now)."
+          },
+          "end_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "once: end. Recurring: last day the schedule is valid (0 = forever)."
+          },
+          "start_time": {
+            "type": "string",
+            "description": "Recurring: local start time, HH:MM.",
+            "examples": [
+              "02:00"
+            ]
+          },
+          "duration_min": {
+            "type": "integer",
+            "description": "Recurring: length in minutes, up to 7 days."
+          },
+          "weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "weekly: 0 = Sunday … 6 = Saturday."
+          },
+          "month_days": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "monthly: 1 … 31."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone, default UTC.",
+            "examples": [
+              "Europe/Rome"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
+        ]
+      },
+      "Maintenance": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MaintenanceInput"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "created_at": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix time in milliseconds (0 = never / unknown)."
+              },
+              "active": {
+                "type": "boolean",
+                "description": "Running now."
+              },
+              "active_end": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix time in milliseconds (0 = never / unknown)."
+              },
+              "next_start": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Next occurrence."
+              },
+              "next_end": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix time in milliseconds (0 = never / unknown)."
+              }
+            }
+          }
+        ]
+      },
+      "Agent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string",
+            "description": "Free text, e.g. \"Frankfurt\"."
+          },
+          "version": {
+            "type": "string"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "remote_addr": {
+            "type": "string"
+          },
+          "last_seen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "location_id": {
+            "type": "string",
+            "description": "Value to use in monitor locations.",
+            "examples": [
+              "agent:2"
+            ]
+          },
+          "online": {
+            "type": "boolean"
+          },
+          "update_available": {
+            "type": "boolean"
+          },
+          "self_update": {
+            "type": "boolean",
+            "description": "The agent can replace its own binary."
+          },
+          "no_update_reason": {
+            "type": "string"
+          },
+          "update_state": {
+            "type": "string",
+            "enum": [
+              "updating",
+              "failed"
+            ]
+          },
+          "update_error": {
+            "type": "string"
+          }
+        }
+      },
+      "Location": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "online": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "local",
+              "agent"
+            ]
+          }
+        }
+      },
+      "Notifier": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "webhook",
+              "discord",
+              "slack",
+              "telegram",
+              "ntfy",
+              "email"
+            ]
+          },
+          "config": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "webhook, discord, slack, ntfy: {url}. telegram: {bot_token, chat_id}. email: {host, port, security (starttls|tls|none), username, password, from, to}. The email password is write-only: responses carry password_set=\"true\" instead, and an empty password on update keeps the stored one. Read-only users see secrets as ********."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "config"
+        ]
+      },
+      "StatusPage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL path: /status/<slug>. 1-50 lowercase letters, digits or dashes."
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string",
+            "description": "Optional custom domain serving the page, e.g. status.example.com."
+          },
+          "published": {
+            "type": "boolean",
+            "description": "Drafts are visible only to logged-in users."
+          },
+          "show_incidents": {
+            "type": "boolean"
+          },
+          "monitor_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "group_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Every monitor of these groups, current and future."
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        },
+        "required": [
+          "slug",
+          "title"
+        ]
+      },
+      "PublicStatusPage": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "up",
+              "degraded",
+              "down",
+              "maintenance",
+              "unknown"
+            ]
+          },
+          "days": {
+            "type": "integer",
+            "description": "Number of daily bars."
+          },
+          "monitors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "group": {
+                  "type": "string",
+                  "description": "Section title, empty = no section."
+                },
+                "status": {
+                  "type": "string"
+                },
+                "uptime": {
+                  "type": "number",
+                  "description": "Over the shown days."
+                },
+                "uptime_24h": {
+                  "type": "number"
+                },
+                "bars": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Bar"
+                  },
+                  "description": "One bar per day."
+                }
+              }
+            }
+          },
+          "show_incidents": {
+            "type": "boolean"
+          },
+          "incidents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "monitor_name": {
+                  "type": "string"
+                },
+                "started_at": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Unix time in milliseconds (0 = never / unknown)."
+                },
+                "resolved_at": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Unix time in milliseconds (0 = never / unknown)."
+                }
+              }
+            }
+          },
+          "updated_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        }
+      },
+      "GeneralSettings": {
+        "type": "object",
+        "properties": {
+          "public_url": {
+            "type": "string",
+            "description": "Public URL of the hub, used in links, agent setup and OAuth callbacks."
+          },
+          "local_name": {
+            "type": "string",
+            "description": "Name of the hub's own location."
+          },
+          "local_enabled": {
+            "type": "boolean",
+            "description": "The hub runs checks itself."
+          },
+          "retention_days": {
+            "type": "integer",
+            "description": "Hourly history, up to 3650."
+          },
+          "raw_retention_days": {
+            "type": "integer",
+            "description": "Every single check."
+          },
+          "monitor_defaults": {
+            "type": "object",
+            "properties": {
+              "interval_sec": {
+                "type": "integer"
+              },
+              "timeout_ms": {
+                "type": "integer"
+              },
+              "retries": {
+                "type": "integer"
+              }
+            }
+          },
+          "expiry": {
+            "type": "object",
+            "properties": {
+              "cert_days": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                },
+                "description": "Alert thresholds in days."
+              },
+              "domain_days": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "public": {
+                "type": "boolean",
+                "description": "Serve /metrics without a token."
+              }
+            }
+          },
+          "degraded_pct": {
+            "type": "integer",
+            "description": "Default degraded threshold, 1 to 50."
+          }
+        }
+      },
+      "AuthSettings": {
+        "type": "object",
+        "properties": {
+          "password_login": {
+            "type": "boolean"
+          },
+          "allow_signup": {
+            "type": "boolean",
+            "description": "Create accounts on first single sign-on login."
+          },
+          "allowed_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Email domains allowed to sign up, empty = any."
+          },
+          "default_role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "viewer"
+            ]
+          },
+          "providers": {
+            "type": "object",
+            "description": "Keyed by github, google, oidc.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "client_id": {
+                  "type": "string"
+                },
+                "client_secret": {
+                  "type": "string",
+                  "description": "Write-only: empty keeps the stored one."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "oidc: button label."
+                },
+                "issuer": {
+                  "type": "string",
+                  "description": "oidc: issuer URL."
+                },
+                "scopes": {
+                  "type": "string",
+                  "description": "oidc: extra scopes."
+                }
+              }
+            }
+          }
+        }
+      },
+      "Settings": {
+        "type": "object",
+        "properties": {
+          "general": {
+            "$ref": "#/components/schemas/GeneralSettings"
+          },
+          "auth": {
+            "type": "object",
+            "properties": {
+              "password_login": {
+                "type": "boolean"
+              },
+              "allow_signup": {
+                "type": "boolean"
+              },
+              "allowed_domains": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "default_role": {
+                "type": "string"
+              },
+              "providers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "client_id": {
+                      "type": "string"
+                    },
+                    "client_secret": {
+                      "type": "string",
+                      "description": "Always empty."
+                    },
+                    "client_secret_set": {
+                      "type": "boolean"
+                    },
+                    "callback_url": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "issuer": {
+                      "type": "string"
+                    },
+                    "scopes": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "detected_url": {
+            "type": "string",
+            "description": "URL of the hub as seen in this request."
+          }
+        }
+      },
+      "BackupSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "interval_hours": {
+            "type": "integer"
+          },
+          "keep": {
+            "type": "integer",
+            "description": "Scheduled backups to keep."
+          }
+        }
+      },
+      "BackupFile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual",
+              "upload",
+              "pre-restore",
+              "pre-import"
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        }
+      },
+      "BackupInfo": {
+        "type": "object",
+        "properties": {
+          "schema_version": {
+            "type": "integer"
+          },
+          "monitors": {
+            "type": "integer"
+          },
+          "users": {
+            "type": "integer"
+          }
+        }
+      },
+      "PendingRestore": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "staged_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        }
+      },
+      "ConfigDocument": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "description": "Always \"pingtxt-config\"."
+          },
+          "version": {
+            "type": "integer"
+          },
+          "hub_version": {
+            "type": "string"
+          },
+          "exported_at": {
+            "type": "string"
+          },
+          "secrets": {
+            "type": "boolean",
+            "description": "Passwords and tokens are included."
+          },
+          "settings": {
+            "type": "object"
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "notifiers": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "monitors": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "maintenances": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "status_pages": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "description": "Monitors, agents, notification channels, groups, tags, maintenance windows, status pages and settings, referenced by name. Export one with GET /api/config/export to see the full shape."
+      },
+      "ImportCounts": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "integer"
+        },
+        "description": "Counts per kind (monitors, agents, ...)."
+      },
+      "ImportResult": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "merge",
+              "replace"
+            ]
+          },
+          "backup": {
+            "type": "string",
+            "description": "Backup taken before the import."
+          },
+          "created": {
+            "$ref": "#/components/schemas/ImportCounts"
+          },
+          "updated": {
+            "$ref": "#/components/schemas/ImportCounts"
+          },
+          "deleted": {
+            "$ref": "#/components/schemas/ImportCounts"
+          },
+          "skipped": {
+            "$ref": "#/components/schemas/ImportCounts"
+          },
+          "settings": {
+            "type": "boolean",
+            "description": "Instance settings were applied."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "OAuthGrant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "client_name": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "last_used_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        }
+      }
+    }
+  }
+}

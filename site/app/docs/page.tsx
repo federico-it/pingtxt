@@ -414,6 +414,14 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             <C>GET /api/monitors</C> accepts <C>?group=&lt;id&gt;</C> and <C>?tag=&lt;id&gt;</C>. Tokens never reach account
             endpoints (password, 2FA, tokens, users, instance settings).
           </p>
+          <p>
+            Every endpoint, with parameters and examples, is in the{" "}
+            <a href="/docs/api/" className="text-foreground underline underline-offset-4">
+              API reference
+            </a>
+            . Each hub also serves the OpenAPI 3.1 document at <C>/api/openapi.json</C> and an interactive Swagger UI at{" "}
+            <C>/api/docs</C> (linked from <b className="text-foreground">settings → api tokens</b>).
+          </p>
         </Section>
 
         <Section id="mcp" title="mcp server">
