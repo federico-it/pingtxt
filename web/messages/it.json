@@ -193,6 +193,10 @@
         "label": "grpc health",
         "hint": "chiama grpc.health.v1.Health/Check"
       },
+      "mcp": {
+        "label": "mcp server",
+        "hint": "initialize handshake and tools/list on a remote MCP server"
+      },
       "smtp": {
         "label": "smtp",
         "hint": "legge il saluto, EHLO e STARTTLS quando disponibile"
@@ -208,7 +212,8 @@
       "host": "host",
       "container": "nome o id del container",
       "address": "indirizzo",
-      "server": "server"
+      "server": "server",
+      "endpoint": "endpoint url"
     },
     "sections": {
       "target": "destinazione",
@@ -228,6 +233,17 @@
     "pushHint": "pingtxt assegna a questo monitor un URL segreto. Chiamalo alla fine di ogni esecuzione del tuo job: il monitor va down quando non arriva nessuna chiamata entro il periodo atteso più la tolleranza. L'URL viene mostrato dopo il salvataggio.",
     "dockerHint": "Controllato sul docker engine di ogni località selezionata: l'hub o l'agent deve poter accedere a /var/run/docker.sock (o DOCKER_HOST). Con docker, montalo con -v /var/run/docker.sock:/var/run/docker.sock:ro.",
     "grpcHint": "grpc:// in chiaro, grpcs:// con TLS. Il percorso è il nome del servizio da controllare; omettilo per controllare tutto il server.",
+    "mcpTransport": "transport",
+    "mcpTransports": {
+      "auto": "auto (streamable http, then legacy sse)",
+      "streamable": "streamable http",
+      "sse": "legacy http+sse"
+    },
+    "mcpMinTools": "minimum tools",
+    "mcpMinToolsHint": "optional: down when tools/list returns fewer",
+    "mcpTools": "required tools",
+    "mcpToolsHint": "optional, comma-separated: down when one is missing",
+    "mcpHeadersHint": "one per line, sent with every request. Hidden from read-only users",
     "query": "query",
     "queryHint": "facoltativa, predefinita SELECT 1",
     "expectedValue": "valore atteso",
@@ -274,7 +290,29 @@
     "create": "crea monitor",
     "degradedPct": "degradato da (% di località)",
     "degradedPctHint": "vuoto = valore predefinito dell'istanza (impostazioni)",
-    "degradedPctPlaceholder": "predefinito"
+    "degradedPctPlaceholder": "predefinito",
+    "responseRules": {
+      "title": "response checks",
+      "hint": "Rules on the JSON body. All must pass, otherwise the check fails and the alert says which rule broke. Paths look like <code>checks.redis.status</code> or <code>items[0].id</code>.",
+      "path": "json path",
+      "operator": "operator",
+      "value": "expected value",
+      "remove": "remove rule",
+      "add": "add rule",
+      "ops": {
+        "eq": "equals",
+        "ne": "not equals",
+        "contains": "contains",
+        "not_contains": "not contains",
+        "exists": "exists",
+        "not_exists": "not exists",
+        "gt": ">",
+        "gte": ">=",
+        "lt": "<",
+        "lte": "<=",
+        "matches": "matches regex"
+      }
+    }
   },
   "pushInfo": {
     "title": "url push",
@@ -781,7 +819,16 @@
     "expiresOn": "scade il {date}",
     "revoke": "revoca",
     "revokeTitle": "revocare {name}?",
-    "revokeText": "Gli script che usano questo token smettono subito di funzionare."
+    "revokeText": "Gli script che usano questo token smettono subito di funzionare.",
+    "mcpIntro": "AI assistants (Claude, Cursor…) connect to the MCP server at <b>{url}</b> by signing in with OAuth, or with a token.",
+    "mcpClaudeCode": "connect Claude Code to the MCP server:",
+    "connectedApps": "connected apps (signed in with OAuth to the MCP server)",
+    "connectedOn": "connected {date}",
+    "disconnect": "disconnect",
+    "disconnected": "{name} disconnected",
+    "disconnectTitle": "disconnect {name}?",
+    "disconnectText": "The assistant loses access right away and has to sign in again.",
+    "apiDocs": "API reference: <docs>interactive docs</docs> and the <spec>OpenAPI document</spec>."
   },
   "users": {
     "roles": {
@@ -907,5 +954,10 @@
     "keep": "conserva",
     "keepHint": "i backup pianificati più vecchi vengono eliminati",
     "saveSchedule": "salva pianificazione"
+  },
+  "apiDocs": {
+    "title": "api reference",
+    "intro": "Every endpoint of the hub's REST API. Try it out uses your browser session; to test a token, paste it in Authorize. Account and instance settings accept the browser session only.",
+    "error": "could not load the API document: {error}"
   }
 }
