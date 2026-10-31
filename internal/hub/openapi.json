@@ -506,6 +506,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -635,6 +638,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -809,6 +815,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -862,6 +871,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -5271,6 +5283,27 @@
             },
             "example": {
               "error": "slack: 404 Not Found"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Too many failed attempts. Password logins are limited to 10 failures per account and 30 per client address in 15 minutes; second factor codes to 10 wrong codes per user. Wait for `Retry-After` seconds.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds until a new attempt is accepted.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "too many failed attempts, try again in 14 minutes"
             }
           }
         }
