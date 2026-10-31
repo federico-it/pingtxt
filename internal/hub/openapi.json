@@ -3621,6 +3621,84 @@
         }
       }
     },
+    "/api/version": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Version and update check",
+        "operationId": "getVersion",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).\n\nThe hub asks GitHub for the latest release every 12 hours (release builds only, unless turned off in the settings) and reports whether a newer version is out.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Version status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/version/check": {
+      "post": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Check for a new version now",
+        "operationId": "checkVersion",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.\n\nAsks GitHub right away (at most once a minute; a newer call returns the last answer).",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Version status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "The check is off (settings, or a development build).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/public/status/{slug}": {
       "get": {
         "tags": [
@@ -6504,6 +6582,15 @@
           "degraded_pct": {
             "type": "integer",
             "description": "Default degraded threshold, 1 to 50."
+          },
+          "update_check": {
+            "type": "object",
+            "properties": {
+              "disabled": {
+                "type": "boolean",
+                "description": "Stop asking GitHub for new releases. PINGTXT_DISABLE_UPDATE_CHECK=true sets it on first start."
+              }
+            }
           }
         }
       },
@@ -6847,6 +6934,58 @@
             "type": "integer",
             "format": "int64",
             "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        }
+      },
+      "VersionStatus": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "string",
+            "description": "Version of this hub, e.g. v0.1.0 (dev or main-abc1234 for development and branch builds)."
+          },
+          "check_enabled": {
+            "type": "boolean",
+            "description": "The hub looks for new releases: on in the settings and running a release build."
+          },
+          "check_disabled": {
+            "type": "boolean",
+            "description": "Turned off in the settings."
+          },
+          "latest": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Latest published release, null until the first check.",
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "description": "Release notes on GitHub."
+              },
+              "published_at": {
+                "type": "integer",
+                "description": "Unix ms."
+              }
+            }
+          },
+          "update_available": {
+            "type": "boolean",
+            "description": "latest is newer than current."
+          },
+          "checked_at": {
+            "type": "integer",
+            "description": "Unix ms of the last check, 0 if none yet."
+          },
+          "error": {
+            "type": "string",
+            "description": "Why the last check failed."
           }
         }
       }

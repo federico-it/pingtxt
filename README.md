@@ -58,6 +58,13 @@ Only a few env vars are read at startup:
 `PINGTXT_PUBLIC_URL`, `PINGTXT_RETENTION_DAYS`, `PINGTXT_LOCAL_NAME` and `PINGTXT_DISABLE_LOCAL`
 still work, but only seed the settings on the first start. After that, change them in the UI.
 
+### Update check
+
+Release builds ask GitHub for the latest pingtxt release every 12 hours. When a newer one is out,
+admins see a notice with the release notes and how to update (`docker compose pull && docker compose up -d`).
+Development and `main` builds never check. Turn it off in settings → updates; for offline installs,
+`PINGTXT_DISABLE_UPDATE_CHECK=true` turns it off from the first start, before any request is made.
+
 ### Single sign-on (GitHub, Google, OpenID Connect)
 
 In **settings → authentication** turn on a provider, paste the client id and secret, and register

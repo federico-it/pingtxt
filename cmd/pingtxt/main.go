@@ -60,7 +60,9 @@ func main() {
 		AgentDir:      env("PINGTXT_AGENT_DIR", "./dist/agents"),
 		LocalName:     env("PINGTXT_LOCAL_NAME", "hub"),
 		DisableLocal:  os.Getenv("PINGTXT_DISABLE_LOCAL") == "true",
-		Version:       version,
+		// Off for offline or privacy-minded installs (first start only, then in settings).
+		DisableUpdateCheck: os.Getenv("PINGTXT_DISABLE_UPDATE_CHECK") == "true",
+		Version:            version,
 	}
 
 	// PINGTXT_DB_URL selects PostgreSQL (postgres://) or MariaDB/MySQL
