@@ -53,6 +53,7 @@
     "agents": "{online}/{total} agent",
     "readOnly": "sola lettura",
     "readOnlyHint": "il tuo account può solo leggere",
+    "menu": "menu",
     "logout": "esci",
     "themeHint": "premi <kbd>d</kbd> per cambiare tema"
   },
@@ -362,6 +363,7 @@
     "maintenance": "manutenzione",
     "noData": "nessun dato",
     "summary": "{pct} · {ok}/{total} ok · media {avg}",
+    "degradedChecks": "{count, plural, one {# check} other {# checks}} while degraded",
     "maintChecks": "+ {count, plural, one {# controllo} other {# controlli}} in manutenzione"
   },
   "incidents": {
@@ -726,6 +728,9 @@
     "metricsPublicHint": "disattivato: chi raccoglie le metriche ha bisogno di un token api (basta lo scope di lettura). attivo: chiunque raggiunga l'hub può leggere nomi e stati dei monitor",
     "public": "pubblico",
     "tokenRequired": "token api richiesto",
+    "updates": "updates",
+    "updateCheck": "check for new versions",
+    "updateCheckHint": "asks GitHub for the latest release every 12 hours and tells admins when one is out. off: the hub never contacts GitHub",
     "defaults": "valori predefiniti dei nuovi monitor",
     "interval": "intervallo (s)",
     "timeout": "timeout (ms)",
@@ -959,5 +964,21 @@
     "title": "api reference",
     "intro": "Every endpoint of the hub's REST API. Try it out uses your browser session; to test a token, paste it in Authorize. Account and instance settings accept the browser session only.",
     "error": "could not load the API document: {error}"
+  },
+  "update": {
+    "available": "pingtxt <b>{latest}</b> is available (this hub runs {current}).",
+    "notes": "release notes",
+    "how": "how to update",
+    "dismiss": "hide until the next version",
+    "footer": "{latest} available",
+    "running": "this hub runs {current}",
+    "off": "update check off",
+    "devBuild": "development build: no update check",
+    "failed": "last check failed: {error}",
+    "notYet": "not checked yet",
+    "newer": "{latest} is available.",
+    "upToDate": "up to date",
+    "checked": "checked {ago}",
+    "checkNow": "check now"
   }
 }
