@@ -302,7 +302,9 @@ export interface Overview {
 export class ApiError extends Error {
   constructor(
     public status: number,
-    message: string
+    message: string,
+    /** the JSON body of the answer, if any */
+    public data?: unknown
   ) {
     super(message)
   }
@@ -334,7 +336,7 @@ export async function api<T = unknown>(
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       if (!here.startsWith("/login")) window.location.href = "/login/"
     }
-    throw new ApiError(res.status, data?.error ?? res.statusText)
+    throw new ApiError(res.status, data?.error ?? res.statusText, data)
   }
   return data as T
 }
@@ -497,6 +499,10 @@ export interface StatusPage {
   group_ids: number[]
   /** email channel that sends incident updates to subscribers, 0 = off */
   subscribe_notifier_id: number
+  /** visitors need a password; on save, false removes it */
+  protected: boolean
+  /** new visitors' password, write-only */
+  password?: string
   created_at: number
 }
 

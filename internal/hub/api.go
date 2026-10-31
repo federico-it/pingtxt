@@ -160,6 +160,7 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/badge/{slug}/{kind}", h.pageBadge) // README badges, see badges.go
 	mux.HandleFunc("GET /api/badge/{slug}/{monitor}/{kind}", h.monitorBadge)
 	mux.HandleFunc("POST /api/public/status/{slug}/subscribe", h.publicSubscribe)
+	mux.HandleFunc("POST /api/public/status/{slug}/unlock", h.publicUnlock) // password protected pages, see pagepassword.go
 	mux.HandleFunc("POST /api/public/subscriptions/{token}/confirm", h.confirmSubscription)
 	mux.HandleFunc("POST /api/public/subscriptions/{token}/unsubscribe", h.unsubscribe)
 

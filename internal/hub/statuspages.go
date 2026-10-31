@@ -83,7 +83,9 @@ func (h *Hub) customDomains(next http.Handler, ui fs.FS) http.Handler {
 		case (p == "/api/public/status" || p == "/api/public/status/") && r.Method == http.MethodGet:
 			h.servePublicPage(w, r, slug, true)
 		case p == "/api/public/status/subscribe" && r.Method == http.MethodPost:
-			h.serveSubscribe(w, r, slug)
+			h.serveSubscribe(w, r, slug, true)
+		case p == "/api/public/status/unlock" && r.Method == http.MethodPost:
+			h.serveUnlock(w, r, slug)
 		case p == "/api/health", strings.HasPrefix(p, "/api/public/subscriptions/"), strings.HasPrefix(p, "/_next/"), p == "/icon.svg",
 			strings.HasPrefix(p, "/api/badge/"+slug+"/"): // badges of this page only
 			next.ServeHTTP(w, r)
@@ -221,6 +223,22 @@ func (h *Hub) saveStatusPage(w http.ResponseWriter, r *http.Request, _ *store.Us
 		writeErr(w, 400, err.Error())
 		return
 	}
+	old := ""
+	if !create {
+		cur, err := h.store.StatusPage(p.ID)
+		if errors.Is(err, store.ErrNotFound) {
+			writeErr(w, 404, "status page not found")
+			return
+		} else if err != nil {
+			h.internalErr(w, err)
+			return
+		}
+		old = cur.PasswordHash
+	}
+	if err := applyPagePassword(&p, old); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
 	var err error
 	if create {
 		err = h.store.CreateStatusPage(&p)
@@ -293,6 +311,9 @@ type publicPage struct {
 	// Subscribe is true when visitors can subscribe by email.
 	Subscribe bool  `json:"subscribe"`
 	UpdatedAt int64 `json:"updated_at"`
+
+	id       int64
+	passHash string // "" = no password
 }
 
 type publicMonitor struct {
@@ -328,6 +349,10 @@ func (h *Hub) servePublicPage(w http.ResponseWriter, r *http.Request, slug strin
 	// Drafts are visible to logged-in users only (preview from the admin UI).
 	if !page.Published && (byDomain || h.currentUser(r) == nil) {
 		writeErr(w, 404, "status page not found")
+		return
+	}
+	if !h.pageOpen(r, page, byDomain) {
+		passwordRequired(w, page)
 		return
 	}
 	writeJSON(w, 200, page)
@@ -378,6 +403,7 @@ func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
 		Slug: sp.Slug, Title: sp.Title, Description: sp.Description, Published: sp.Published,
 		Days: days, ShowIncidents: sp.ShowIncidents, Monitors: []publicMonitor{}, Incidents: []publicIncident{},
 		Subscribe: h.subscribeChannel(sp) != nil, UpdatedAt: now.UnixMilli(),
+		id: sp.ID, passHash: sp.PasswordHash,
 	}
 	reports, err := h.store.PublicPageIncidents(sp.ID, from, publicReportLimit)
 	if err != nil {

@@ -106,6 +106,8 @@ type cfgMaintenance struct {
 type cfgStatusPage struct {
 	store.StatusPage
 	CreatedAt int64 `json:"created_at,omitempty"`
+	// PasswordHash is the visitors' password, only in exports with secrets.
+	PasswordHash string `json:"password_hash,omitempty"`
 }
 
 // notifierSecrets are the config keys redacted from exports without secrets.
@@ -229,7 +231,11 @@ func (h *Hub) ExportConfig(secrets bool) (*ConfigDoc, error) {
 		return nil, err
 	}
 	for _, p := range pages {
-		doc.StatusPages = append(doc.StatusPages, cfgStatusPage{StatusPage: *p})
+		c := cfgStatusPage{StatusPage: *p}
+		if secrets {
+			c.PasswordHash = p.PasswordHash
+		}
+		doc.StatusPages = append(doc.StatusPages, c)
 	}
 	return doc, nil
 }
@@ -816,8 +822,26 @@ func (im *importer) importStatusPages() error {
 			im.res.Skipped["status_pages"]++
 			continue
 		}
+		// The password comes with an export with secrets. Without it a
+		// protected page keeps its current password, and a new one is
+		// created as a draft rather than opened to everyone.
+		p.Password = ""
+		p.PasswordHash = ""
+		if strings.HasPrefix(x.PasswordHash, "$2") {
+			p.PasswordHash = x.PasswordHash
+		}
+		c, e := st.StatusPageBySlug(p.Slug)
+		if p.PasswordHash == "" && x.Protected {
+			if e == nil && c.PasswordHash != "" {
+				p.PasswordHash = c.PasswordHash
+			} else if p.Published {
+				p.Published = false
+				im.res.warn("status page %q saved as a draft: its password is not in the export, set one and publish it", p.Slug)
+			}
+		}
+		p.Protected = p.PasswordHash != ""
 		var err error
-		if c, e := st.StatusPageBySlug(p.Slug); e == nil {
+		if e == nil {
 			p.ID = c.ID
 			err = st.UpdateStatusPage(&p)
 			if err == nil {

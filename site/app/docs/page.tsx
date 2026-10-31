@@ -433,6 +433,11 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             to pingtxt in your reverse proxy. On that host only the status page is served.
           </p>
           <p>
+            To keep a page private, turn on <i>protect with a password</i>. Visitors then see a password form; the right password
+            opens the page for 30 days in that browser, together with its badges and subscription form. The password is stored
+            hashed, wrong attempts are rate limited, and changing it logs every visitor out. Logged-in users never need it.
+          </p>
+          <p>
             Post <b className="text-foreground">incidents</b> on a page with a timeline of written updates (investigating,
             identified, monitoring, resolved). With an email channel picked under <i>email subscriptions</i>, visitors can
             subscribe: they confirm through a link, then get every update by email, each with an unsubscribe link.

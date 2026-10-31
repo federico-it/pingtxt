@@ -76,6 +76,8 @@ export function MonitorBadges({ monitorId, groupId }: { monitorId: number; group
   const shown = list.data.pages.filter(
     (p) => p.published && (p.monitor_ids.includes(monitorId) || (groupId > 0 && (p.group_ids ?? []).includes(groupId)))
   )
+  // Open pages first: badges of a password protected page need the password.
+  shown.sort((a, b) => Number(a.protected) - Number(b.protected))
   const page = shown.find((p) => p.slug === slug) ?? shown[0]
   const origin = list.data.hub_url
   const p = kind === "status" ? "" : `?period=${period}`
@@ -97,6 +99,7 @@ export function MonitorBadges({ monitorId, groupId }: { monitorId: number; group
       ) : (
         <>
           <p className="mb-2 text-xs text-muted-foreground">{t("hint", { page: page.title })}</p>
+          {page.protected && <p className="mb-2 text-xs text-warn">{t("protectedHint")}</p>}
           <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1">
             {shown.length > 1 && (
               <Tabs items={shown.map((s) => s.slug)} value={page.slug} onChange={setSlug} label={(s) => shown.find((x) => x.slug === s)!.title} />
@@ -124,6 +127,7 @@ export function PageBadge({ page }: { page: StatusPage }) {
   return (
     <Section title={t("title")}>
       <p className="mb-2 text-xs text-muted-foreground">{t("pageHint")}</p>
+      {page.protected && <p className="mb-2 text-xs text-warn">{t("protectedHint")}</p>}
       <Snippet page={page} path={`/api/badge/${page.slug}/status.svg`} alt={t("kinds.status")} origin={list.data.hub_url} />
     </Section>
   )

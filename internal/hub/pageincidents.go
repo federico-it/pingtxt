@@ -429,13 +429,13 @@ func normalizeEmail(s string) string {
 }
 
 func (h *Hub) publicSubscribe(w http.ResponseWriter, r *http.Request) {
-	h.serveSubscribe(w, r, strings.ToLower(r.PathValue("slug")))
+	h.serveSubscribe(w, r, strings.ToLower(r.PathValue("slug")), false)
 }
 
 // serveSubscribe adds an address to a page and sends it the confirmation
 // link. The answer is the same whether the address was new, waiting or
 // already confirmed, so the endpoint does not tell who is subscribed.
-func (h *Hub) serveSubscribe(w http.ResponseWriter, r *http.Request, slug string) {
+func (h *Hub) serveSubscribe(w http.ResponseWriter, r *http.Request, slug string, byDomain bool) {
 	notFound := func() { writeErr(w, 404, "status page not found") }
 	if !slugRe.MatchString(slug) {
 		notFound()
@@ -447,6 +447,10 @@ func (h *Hub) serveSubscribe(w http.ResponseWriter, r *http.Request, slug string
 		return
 	} else if err != nil {
 		h.internalErr(w, err)
+		return
+	}
+	if p.PasswordHash != "" && !pageCookieOK(r, p.ID, p.PasswordHash) && (byDomain || h.currentUser(r) == nil) {
+		writeErr(w, http.StatusForbidden, "this status page needs a password")
 		return
 	}
 	ec := h.subscribeChannel(p)

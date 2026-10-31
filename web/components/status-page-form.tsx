@@ -32,6 +32,7 @@ const empty: Draft = {
   monitor_ids: [],
   group_ids: [],
   subscribe_notifier_id: 0,
+  protected: false,
 }
 
 function slugify(s: string) {
@@ -53,6 +54,8 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   const { groups, groupById } = useLabels()
   const [slugTouched, setSlugTouched] = useState(!!initial)
   const [busy, setBusy] = useState(false)
+  // A password is stored: the field can stay empty to keep it.
+  const [hasPassword, setHasPassword] = useState(!!initial?.protected)
   const t = useTranslations("statusPageForm")
 
   const byId = useMemo(() => new Map((monitors.data ?? []).map((m) => [m.id, m])), [monitors.data])
@@ -89,7 +92,10 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
       })
       toast.success(t("saved"))
       if (!initial) router.replace(`/status-pages/edit/?id=${saved.id}`)
-      else setD(saved)
+      else {
+        setD(saved)
+        setHasPassword(saved.protected)
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("error"))
     } finally {
@@ -185,6 +191,37 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
               </SelectContent>
             </Select>
           </Field>
+        </div>
+      </Section>
+
+      <Section title={t("passwordTitle")}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex items-center gap-2.5 sm:col-span-2">
+            <Switch checked={d.protected} onCheckedChange={(v) => setD((p) => ({ ...p, protected: v, password: v ? p.password : "" }))} />
+            <span>
+              {t("protected")}
+              <span className="block text-[11px] text-muted-foreground">{t("protectedHint")}</span>
+            </span>
+          </label>
+          {d.protected && (
+            <Field
+              label={hasPassword ? t("newPassword") : t("password")}
+              htmlFor="sp-password"
+              hint={hasPassword ? t("passwordSet") : t("passwordNew")}
+            >
+              <Input
+                id="sp-password"
+                type="password"
+                autoComplete="new-password"
+                required={!hasPassword}
+                minLength={6}
+                maxLength={72}
+                value={d.password ?? ""}
+                placeholder={t("passwordPlaceholder")}
+                onChange={(e) => set("password", e.target.value)}
+              />
+            </Field>
+          )}
         </div>
       </Section>
 

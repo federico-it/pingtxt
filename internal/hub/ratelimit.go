@@ -92,6 +92,9 @@ type loginLimits struct {
 	account *failLimiter
 	addr    *failLimiter
 	code    *failLimiter
+	// Status page passwords, see pagepassword.go.
+	pageAddr *failLimiter
+	page     *failLimiter
 }
 
 func (l *loginLimits) init() {
@@ -99,6 +102,8 @@ func (l *loginLimits) init() {
 		l.account = newFailLimiter(loginFailsAccount)
 		l.addr = newFailLimiter(loginFailsAddr)
 		l.code = newFailLimiter(codeFailsUser)
+		l.pageAddr = newFailLimiter(pagePassFailAddr)
+		l.page = newFailLimiter(pagePassFailPage)
 	})
 }
 

@@ -421,6 +421,9 @@ var laterMigrations = []migration{
 	CREATE INDEX oauth_grants_prev_refresh ON oauth_grants(prev_refresh_hash);`,
 		mysql: `ALTER TABLE oauth_grants ADD COLUMN prev_refresh_hash VARCHAR(128) NOT NULL DEFAULT '';
 	CREATE INDEX oauth_grants_prev_refresh ON oauth_grants(prev_refresh_hash);`},
+	// 22: bcrypt hash of the password visitors need to open a status page.
+	{sqlite: `ALTER TABLE status_pages ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`,
+		mysql: `ALTER TABLE status_pages ADD COLUMN password_hash VARCHAR(100) NOT NULL DEFAULT ''`},
 }
 
 func sqliteOnly(list []string) []migration {

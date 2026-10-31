@@ -76,6 +76,16 @@ func (h *Hub) serveBadge(w http.ResponseWriter, r *http.Request, monitor, kind s
 	square := q.Get("style") == "flat-square"
 	key := strings.Join([]string{slug, monitor, kind, period, label, strconv.FormatBool(square)}, "\x00")
 
+	// Badges of a password protected page need the same access as the page.
+	cacheControl := fmt.Sprintf("public, max-age=%d", int(badgeCacheTTL.Seconds()))
+	if page, err := h.cachedPublicPage(slug); err == nil && page.Published && page.passHash != "" {
+		if !h.pageOpen(r, page, h.pageSlugForHost(r) != "") {
+			writeBadge(w, r, http.StatusForbidden, "no-store", renderBadge(badge{"pingtxt", "password protected", badgeGrey}, square))
+			return
+		}
+		cacheControl = "private, no-store"
+	}
+
 	h.pages.mu.RLock()
 	c, ok := h.pages.badges[key]
 	h.pages.mu.RUnlock()
@@ -96,13 +106,17 @@ func (h *Hub) serveBadge(w http.ResponseWriter, r *http.Request, monitor, kind s
 		h.pages.badges[key] = c
 		h.pages.mu.Unlock()
 	}
+	writeBadge(w, r, c.code, cacheControl, c.svg)
+}
+
+func writeBadge(w http.ResponseWriter, r *http.Request, code int, cacheControl string, svg []byte) {
 	w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
-	w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d", int(badgeCacheTTL.Seconds())))
+	w.Header().Set("Cache-Control", cacheControl)
 	// Opened directly, the image must not run anything.
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
-	w.WriteHeader(c.code)
+	w.WriteHeader(code)
 	if r.Method != http.MethodHead {
-		w.Write(c.svg)
+		w.Write(svg)
 	}
 }
 
