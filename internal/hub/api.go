@@ -135,12 +135,20 @@ func (h *Hub) Handler(ui fs.FS) http.Handler {
 
 	mux.HandleFunc("GET /metrics", h.metrics)
 	mux.HandleFunc(mcpPath, h.serveMCP(mux)) // MCP server for AI assistants, see mcp.go
-	// No OAuth for MCP clients (they send an API token): answer discovery
-	// with 404 instead of the web UI.
-	for _, p := range []string{"oauth-protected-resource", "oauth-authorization-server", "openid-configuration"} {
-		mux.HandleFunc("/.well-known/"+p, http.NotFound)
-		mux.HandleFunc("/.well-known/"+p+"/", http.NotFound)
-	}
+	// OAuth 2.1 for MCP clients, see mcpauth.go.
+	mux.HandleFunc("/.well-known/oauth-protected-resource", h.protectedResourceMetadata)
+	mux.HandleFunc("/.well-known/oauth-protected-resource/", h.protectedResourceMetadata)
+	mux.HandleFunc("/.well-known/oauth-authorization-server", h.authorizationServerMetadata)
+	mux.HandleFunc("/.well-known/oauth-authorization-server/", h.authorizationServerMetadata)
+	mux.HandleFunc("/.well-known/openid-configuration", http.NotFound)
+	mux.HandleFunc("/.well-known/openid-configuration/", http.NotFound)
+	mux.HandleFunc(oauthRegisterPath, h.registerClient)
+	mux.HandleFunc("GET "+oauthAuthorizePath, h.authorize)
+	mux.HandleFunc("POST "+oauthAuthorizePath, h.authorize)
+	mux.HandleFunc(oauthTokenPath, h.tokenEndpoint)
+	mux.HandleFunc(oauthRevokePath, h.revokeEndpoint)
+	mux.HandleFunc("GET /api/oauth/grants", session(h.listGrants))
+	mux.HandleFunc("DELETE /api/oauth/grants/{id}", session(h.deleteGrant))
 
 	mux.HandleFunc("GET "+protocol.Path, h.ServeAgent)
 	mux.HandleFunc("GET /install-agent.sh", func(w http.ResponseWriter, r *http.Request) {

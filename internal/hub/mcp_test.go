@@ -1,9 +1,14 @@
 package hub
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -211,5 +216,153 @@ func TestMCPServer(t *testing.T) {
 	json.NewDecoder(res.Body).Decode(&batch)
 	if len(batch) != 2 {
 		t.Fatalf("batch: %+v", batch)
+	}
+}
+
+func TestMCPOAuth(t *testing.T) {
+	h, _ := newTestHub(t)
+	srv := httptest.NewServer(h.Handler(fstest.MapFS{}))
+	defer srv.Close()
+	admin := newClient(t, srv.URL)
+	admin.do("POST", "/api/setup", map[string]string{"email": "admin@b.co", "password": "password123"})
+	admin.do("POST", "/api/monitors", map[string]any{"name": "api", "type": "http", "target": "https://example.com"})
+
+	// Discovery starts from a 401 on /mcp.
+	res := (&mcpClient{t: t, url: srv.URL}).post(`{"jsonrpc":"2.0","id":1,"method":"ping"}`)
+	wa := res.Header.Get("WWW-Authenticate")
+	if res.StatusCode != 401 || !strings.Contains(wa, `resource_metadata="`+srv.URL+`/.well-known/oauth-protected-resource/mcp"`) {
+		t.Fatalf("401: %d %s", res.StatusCode, wa)
+	}
+	prm := decode[map[string]any](t, admin.do("GET", "/.well-known/oauth-protected-resource/mcp", nil))
+	if prm["resource"] != srv.URL+"/mcp" || prm["authorization_servers"].([]any)[0] != srv.URL {
+		t.Fatalf("resource metadata: %+v", prm)
+	}
+	asm := decode[map[string]any](t, admin.do("GET", "/.well-known/oauth-authorization-server", nil))
+	if asm["token_endpoint"] != srv.URL+"/oauth/token" || asm["code_challenge_methods_supported"].([]any)[0] != "S256" {
+		t.Fatalf("server metadata: %+v", asm)
+	}
+
+	// Dynamic client registration.
+	if res := admin.do("POST", "/oauth/register", map[string]any{"redirect_uris": []string{"http://evil.example/cb"}}); res.StatusCode != 400 {
+		t.Fatalf("plain http redirect accepted: %d", res.StatusCode)
+	}
+	const redirect = "https://claude.ai/api/mcp/auth_callback"
+	reg := decode[map[string]any](t, admin.do("POST", "/oauth/register", map[string]any{"client_name": "Claude", "redirect_uris": []string{redirect, "http://localhost:3334/cb"}}))
+	clientID := reg["client_id"].(string)
+
+	verifier := "a-long-random-verifier-string-0123456789-abcdefghij"
+	sum := sha256.Sum256([]byte(verifier))
+	authURL := func(c *testClient, redirectURI, scope string) string {
+		q := url.Values{"response_type": {"code"}, "client_id": {clientID}, "redirect_uri": {redirectURI}, "state": {"xyz"},
+			"code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}, "code_challenge_method": {"S256"},
+			"scope": {scope}, "resource": {srv.URL + "/mcp"}}
+		return "/oauth/authorize?" + q.Encode()
+	}
+	// consent opens the consent page and answers it, returning the redirect.
+	consent := func(c *testClient, redirectURI, scope, action string) *url.URL {
+		t.Helper()
+		res := c.do("GET", authURL(c, redirectURI, "read write"), nil)
+		page, _ := io.ReadAll(res.Body)
+		m := regexp.MustCompile(`name="request" value="([^"]+)"`).FindSubmatch(page)
+		if res.StatusCode != 200 || m == nil {
+			t.Fatalf("consent page: %d %s", res.StatusCode, page)
+		}
+		req, _ := http.NewRequest("POST", srv.URL+"/oauth/authorize", strings.NewReader(url.Values{"request": {string(m[1])}, "scope": {scope}, "action": {action}}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", srv.URL)
+		res, err := c.c.Do(req)
+		if err != nil || res.StatusCode != 302 {
+			t.Fatalf("answer: %v %d", err, res.StatusCode)
+		}
+		loc, _ := url.Parse(res.Header.Get("Location"))
+		return loc
+	}
+	token := func(form url.Values) (int, map[string]any) {
+		res, err := http.PostForm(srv.URL+"/oauth/token", form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out map[string]any
+		json.NewDecoder(res.Body).Decode(&out)
+		return res.StatusCode, out
+	}
+
+	// Not logged in: off to the login page, coming back afterwards.
+	anon := newClient(t, srv.URL)
+	if res := anon.do("GET", authURL(anon, redirect, "read"), nil); res.StatusCode != 302 || !strings.HasPrefix(res.Header.Get("Location"), "/login?next=%2Foauth%2Fauthorize%3F") {
+		t.Fatalf("anonymous: %d %s", res.StatusCode, res.Header.Get("Location"))
+	}
+	// An unregistered redirect is refused without redirecting.
+	if res := admin.do("GET", authURL(admin, "https://evil.example/cb", "read"), nil); res.StatusCode != 400 {
+		t.Fatalf("bad redirect: %d", res.StatusCode)
+	}
+
+	// Deny, then allow with write.
+	if loc := consent(admin, redirect, "write", "deny"); loc.Query().Get("error") != "access_denied" || loc.Query().Get("state") != "xyz" {
+		t.Fatalf("deny: %s", loc)
+	}
+	loc := consent(admin, "http://localhost:51000/cb", "write", "allow") // loopback: any port
+	code := loc.Query().Get("code")
+	if code == "" || loc.Query().Get("iss") != srv.URL || loc.Host != "localhost:51000" {
+		t.Fatalf("allow: %s", loc)
+	}
+	if st, out := token(url.Values{"grant_type": {"authorization_code"}, "code": {code}, "client_id": {clientID}, "code_verifier": {"wrong"}}); st != 400 || out["error"] != "invalid_grant" {
+		t.Fatalf("bad verifier: %d %+v", st, out)
+	}
+	// The code is single use: the failed attempt burnt it.
+	code = consent(admin, redirect, "write", "allow").Query().Get("code")
+	st, tok := token(url.Values{"grant_type": {"authorization_code"}, "code": {code}, "client_id": {clientID}, "redirect_uri": {redirect}, "code_verifier": {verifier}})
+	if st != 200 || tok["scope"] != "write" || !strings.HasPrefix(tok["access_token"].(string), "pma_") {
+		t.Fatalf("token: %d %+v", st, tok)
+	}
+	if st, _ := token(url.Values{"grant_type": {"authorization_code"}, "code": {code}, "client_id": {clientID}, "code_verifier": {verifier}}); st != 400 {
+		t.Fatalf("code reused: %d", st)
+	}
+
+	// The access token works on /mcp, with write tools, but not on the REST API.
+	mc := &mcpClient{t: t, url: srv.URL, token: tok["access_token"].(string)}
+	if names := mc.toolNames(); !strings.Contains(strings.Join(names, ","), "create_monitor") {
+		t.Fatalf("oauth tools: %v", names)
+	}
+	if n := mc.callOK("list_monitors", nil).(map[string]any)["count"]; n.(float64) != 1 {
+		t.Fatalf("oauth list: %v", n)
+	}
+	if res := bearerDo(t, srv.URL, mc.token, "GET", "/api/monitors", nil); res.StatusCode != 401 {
+		t.Fatalf("oauth token on REST API: %d", res.StatusCode)
+	}
+
+	// Refresh rotates both tokens.
+	st, tok2 := token(url.Values{"grant_type": {"refresh_token"}, "refresh_token": {tok["refresh_token"].(string)}, "client_id": {clientID}})
+	if st != 200 || tok2["access_token"] == tok["access_token"] {
+		t.Fatalf("refresh: %d %+v", st, tok2)
+	}
+	if st, _ := token(url.Values{"grant_type": {"refresh_token"}, "refresh_token": {tok["refresh_token"].(string)}, "client_id": {clientID}}); st != 400 {
+		t.Fatalf("old refresh token: %d", st)
+	}
+	if res := mc.post(`{"jsonrpc":"2.0","id":1,"method":"ping"}`); res.StatusCode != 401 {
+		t.Fatalf("old access token: %d", res.StatusCode)
+	}
+	mc.token = tok2["access_token"].(string)
+	mc.rpc("ping", nil)
+
+	// Connected apps: listed and revocable from settings.
+	grants := decode[[]map[string]any](t, admin.do("GET", "/api/oauth/grants", nil))
+	if len(grants) != 1 || grants[0]["client_name"] != "Claude" || grants[0]["scope"] != "write" {
+		t.Fatalf("grants: %+v", grants)
+	}
+	if res := admin.do("DELETE", "/api/oauth/grants/"+itoa(int64(grants[0]["id"].(float64))), nil); res.StatusCode != 200 {
+		t.Fatalf("revoke: %d", res.StatusCode)
+	}
+	if res := mc.post(`{"jsonrpc":"2.0","id":1,"method":"ping"}`); res.StatusCode != 401 {
+		t.Fatalf("revoked token: %d", res.StatusCode)
+	}
+
+	// A read-only user only gets read access, whatever the form says.
+	admin.do("POST", "/api/users", map[string]any{"email": "v@b.co", "password": "password123", "role": "viewer"})
+	viewer := newClient(t, srv.URL)
+	viewer.do("POST", "/api/auth/login", map[string]string{"email": "v@b.co", "password": "password123"})
+	code = consent(viewer, redirect, "write", "allow").Query().Get("code")
+	if _, tok := token(url.Values{"grant_type": {"authorization_code"}, "code": {code}, "client_id": {clientID}, "code_verifier": {verifier}}); tok["scope"] != "read" {
+		t.Fatalf("viewer scope: %+v", tok)
 	}
 }

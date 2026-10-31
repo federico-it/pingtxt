@@ -346,8 +346,19 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
           <p>
             The hub is an <a href="https://modelcontextprotocol.io" className="text-foreground underline underline-offset-4">MCP</a>{" "}
             server at <C>/mcp</C> (Streamable HTTP): Claude and other AI assistants can tell you what is down, read incidents and
-            response times, and create monitors or maintenance windows. It uses API tokens: read tokens get the read tools, a
-            read + write token of an admin also gets the tools that change data. Roles and hidden secrets are the same as the API.
+            response times, and create monitors or maintenance windows. Roles and hidden secrets are the same as the API.
+          </p>
+          <p>
+            <b className="text-foreground">OAuth 2.1</b>, nothing to copy: add <C>https://status.example.com/mcp</C> as a custom
+            connector in claude.ai or Claude Desktop (or <C>claude mcp add --transport http pingtxt https://status.example.com/mcp</C>{" "}
+            then <C>/mcp</C> in Claude Code). You log in to pingtxt in the browser and choose read only or read + write (admins
+            only). Discovery, dynamic client registration, PKCE and rotating refresh tokens are supported; access tokens last an
+            hour and only work on <C>/mcp</C>. Connected apps can be disconnected in{" "}
+            <b className="text-foreground">settings → api tokens</b>. Behind a proxy, set the public URL in settings.
+          </p>
+          <p>
+            <b className="text-foreground">API token</b>, for clients without OAuth: read tokens get the read tools, a read + write
+            token of an admin also gets the tools that change data.
           </p>
           <CopyBlock
             label="claude code"

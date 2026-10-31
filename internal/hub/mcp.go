@@ -25,7 +25,8 @@ import (
 // carrying one JSON-RPC message (or a batch) and gets a JSON reply; there is
 // no session and no server-sent event stream.
 //
-// Auth: a personal API token ("Authorization: Bearer ptk_..."). Tools call
+// Auth: OAuth 2.1 (see mcpauth.go) or a personal API token
+// ("Authorization: Bearer ptk_..."). Tools call
 // the REST API in-process with the same token, so scopes, roles, validation
 // and secret redaction are exactly those of the API.
 
@@ -69,6 +70,15 @@ const (
 	rpcInvalidParams  = -32602
 )
 
+// mcpRequestKey marks requests made through the MCP server, where OAuth
+// access tokens are accepted.
+type mcpRequestKey struct{}
+
+func isMCPRequest(r *http.Request) bool {
+	v, _ := r.Context().Value(mcpRequestKey{}).(bool)
+	return v
+}
+
 // mcpCaller is the identity of an MCP request.
 type mcpCaller struct {
 	user   *store.User
@@ -108,15 +118,14 @@ func (h *Hub) serveMCP(api http.Handler) http.HandlerFunc {
 			writeErr(w, http.StatusUnsupportedMediaType, "content-type must be application/json")
 			return
 		}
-		if !strings.HasPrefix(bearer(r), apiTokenPrefix) {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="pingtxt", error="invalid_token", error_description="create an API token in Settings and send it as Authorization: Bearer ptk_..."`)
-			writeErr(w, http.StatusUnauthorized, "an API token is required (Authorization: Bearer ptk_...)")
+		r = r.WithContext(context.WithValue(r.Context(), mcpRequestKey{}, true))
+		if t := bearer(r); !strings.HasPrefix(t, apiTokenPrefix) && !strings.HasPrefix(t, oauthAccessPrefix) {
+			h.mcpUnauthorized(w, r, "sign in with OAuth or send an API token (Authorization: Bearer ptk_...)", t != "")
 			return
 		}
 		u, tok, err := h.authenticate(r)
 		if err != nil {
-			w.Header().Set("WWW-Authenticate", `Bearer realm="pingtxt", error="invalid_token"`)
-			writeErr(w, http.StatusUnauthorized, err.Error())
+			h.mcpUnauthorized(w, r, err.Error(), true)
 			return
 		}
 		c := &mcpCaller{user: u, token: tok, auth: r.Header.Get("Authorization"), host: r.Host, remote: r.RemoteAddr}

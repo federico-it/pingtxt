@@ -96,6 +96,7 @@ type Hub struct {
 
 	oidc       oidcDiscovery
 	states     oauthStates
+	oauth      oauthPending // OAuth consent requests and codes of MCP clients
 	challenges challenges
 	httpClient *http.Client
 
@@ -539,6 +540,7 @@ func (h *Hub) maintenance(ctx context.Context) {
 	defer t.Stop()
 	for {
 		h.compactResults(ctx, time.Now())
+		h.cleanOAuth(time.Now())
 		select {
 		case <-ctx.Done():
 			return

@@ -28,7 +28,8 @@ const (
 type pendingLogin struct {
 	provider string
 	verifier string
-	linkUser int64 // >0: link the external account to this user instead of logging in
+	linkUser int64  // >0: link the external account to this user instead of logging in
+	next     string // where to go after login (an OAuth authorization request)
 	expires  time.Time
 }
 
@@ -171,6 +172,9 @@ func (h *Hub) oauthStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := pendingLogin{provider: id, verifier: oauth2.GenerateVerifier(), expires: time.Now().Add(oauthStateTTL)}
+	if next := r.URL.Query().Get("next"); safeNext(next) {
+		p.next = next
+	}
 	if r.URL.Query().Get("link") == "1" {
 		u := h.currentUser(r)
 		if u == nil {
@@ -257,7 +261,17 @@ func (h *Hub) oauthCallback(w http.ResponseWriter, r *http.Request) {
 		h.loginRedirect(w, r, "internal error")
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusFound)
+	dest := "/"
+	if safeNext(p.next) {
+		dest = p.next
+	}
+	http.Redirect(w, r, dest, http.StatusFound)
+}
+
+// safeNext reports whether a post-login destination is allowed: only the
+// OAuth consent page of this hub, never another site.
+func safeNext(next string) bool {
+	return strings.HasPrefix(next, oauthAuthorizePath+"?") && !strings.ContainsAny(next, "\\\r\n")
 }
 
 // resolveExternalUser finds (or creates, when sign-up is on) the local user for an external account.

@@ -114,12 +114,21 @@ curl -H "Authorization: Bearer ptk_..." https://status.example.com/api/monitors
 
 The hub is also an [MCP](https://modelcontextprotocol.io) server at `/mcp` (Streamable HTTP), so an AI assistant can
 answer "what is down right now?", look at incidents and response times, or create a monitor or a maintenance window
-for you. It uses the same API tokens:
+for you. Two ways to sign in:
 
-- a **read only** token (or the token of a read-only user) gets the read tools only;
-- a **read + write** token of an admin also gets the tools that change data.
+- **OAuth 2.1** (nothing to copy): add `https://status.example.com/mcp` as a connector (claude.ai and Claude Desktop:
+  **settings → connectors → add custom connector**; Claude Code: `claude mcp add --transport http pingtxt
+  https://status.example.com/mcp`, then `/mcp` to log in). The assistant opens pingtxt in the browser, you log in as
+  usual and pick **read only** or **read + write** (admins only). The hub supports discovery (RFC 9728 / RFC 8414),
+  dynamic client registration, PKCE (S256) and rotating refresh tokens. Access tokens last an hour and only work on
+  `/mcp`; connected apps are listed in **settings → api tokens**, where you can disconnect them.
+- **API token**: send `Authorization: Bearer ptk_...` (configs below). A **read only** token (or the token of a
+  read-only user) gets the read tools only; a **read + write** token of an admin also gets the tools that change data.
 
-Roles, validation and hidden secrets are exactly those of the REST API.
+Either way, roles, validation and hidden secrets are exactly those of the REST API. The hub's public URL
+(**settings → general**) must be set when it runs behind a proxy, so OAuth redirects point to the right address.
+
+With an API token instead of OAuth:
 
 Claude Code:
 
