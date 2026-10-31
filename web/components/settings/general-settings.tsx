@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { Section } from "@/components/page-header"
 import { Field } from "@/components/settings/field"
@@ -19,6 +20,7 @@ export function GeneralSettingsForm({
 }) {
   const [g, setG] = useState<GeneralSettings>(settings.general)
   const [busy, setBusy] = useState(false)
+  const t = useTranslations("generalSettings")
   const set = <K extends keyof GeneralSettings>(k: K, v: GeneralSettings[K]) =>
     setG((p) => ({ ...p, [k]: v }))
   const setDef = (k: keyof GeneralSettings["monitor_defaults"], v: number) =>
@@ -41,10 +43,10 @@ export function GeneralSettingsForm({
         method: "PUT",
         body: g,
       })
-      toast.success("settings saved")
+      toast.success(t("saved"))
       onSaved(s)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     } finally {
       setBusy(false)
     }
@@ -52,20 +54,16 @@ export function GeneralSettingsForm({
 
   return (
     <form onSubmit={save}>
-      <Section title="instance">
+      <Section title={t("instance")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
-            label="public url"
+            label={t("publicUrl")}
             htmlFor="public_url"
             className="sm:col-span-2"
-            hint={
-              <>
-                used for agent install commands and login callbacks. empty:
-                detected from the request (
-                <span className="text-foreground">{settings.detected_url}</span>
-                ).
-              </>
-            }
+            hint={t.rich("publicUrlHint", {
+              url: settings.detected_url,
+              hl: (c) => <span className="text-foreground">{c}</span>,
+            })}
           >
             <Input
               id="public_url"
@@ -76,7 +74,7 @@ export function GeneralSettingsForm({
             />
             {missingScheme(g.public_url) && (
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-amber-600 dark:text-amber-400">
-                <span>no http:// or https:// in front: pick one</span>
+                <span>{t("missingScheme")}</span>
                 {(["https", "http"] as const).map((sc) => (
                   <Button
                     key={sc}
@@ -98,9 +96,9 @@ export function GeneralSettingsForm({
             )}
           </Field>
           <Field
-            label="built-in location"
+            label={t("localName")}
             htmlFor="local_name"
-            hint="name of the probe that runs inside the hub"
+            hint={t("localNameHint")}
           >
             <Input
               id="local_name"
@@ -109,21 +107,21 @@ export function GeneralSettingsForm({
             />
           </Field>
           <Field
-            label="run checks from the hub"
-            hint="off: checks run only from agents"
+            label={t("localEnabled")}
+            hint={t("localEnabledHint")}
           >
             <label className="flex h-8 items-center gap-2 text-xs">
               <Switch
                 checked={g.local_enabled}
                 onCheckedChange={(v) => set("local_enabled", v)}
               />
-              {g.local_enabled ? "enabled" : "disabled"}
+              {g.local_enabled ? t("enabled") : t("disabled")}
             </label>
           </Field>
           <Field
-            label="keep history (days)"
+            label={t("retention")}
             htmlFor="retention"
-            hint="hourly summaries for uptime, charts and status pages"
+            hint={t("retentionHint")}
           >
             <Input
               id="retention"
@@ -135,9 +133,9 @@ export function GeneralSettingsForm({
             />
           </Field>
           <Field
-            label="keep every check (days)"
+            label={t("rawRetention")}
             htmlFor="raw_retention"
-            hint="single results, at least 2 days. older ones live on in the hourly history"
+            hint={t("rawRetentionHint")}
           >
             <Input
               id="raw_retention"
@@ -153,12 +151,12 @@ export function GeneralSettingsForm({
         </div>
       </Section>
 
-      <Section title="expiry alerts">
+      <Section title={t("expiry")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
-            label="tls certificate (days before)"
+            label={t("certDays")}
             htmlFor="cert_days"
-            hint="one alert as each threshold is crossed, plus one when it expires. empty: off"
+            hint={t("certDaysHint")}
           >
             <Input
               id="cert_days"
@@ -171,9 +169,9 @@ export function GeneralSettingsForm({
             />
           </Field>
           <Field
-            label="domain registration (days before)"
+            label={t("domainDays")}
             htmlFor="domain_days"
-            hint="looked up with rdap, or whois where rdap is missing (e.g. .it)"
+            hint={t("domainDaysHint")}
           >
             <Input
               id="domain_days"
@@ -188,18 +186,18 @@ export function GeneralSettingsForm({
         </div>
       </Section>
 
-      <Section title="prometheus metrics">
+      <Section title={t("metrics")}>
         <div className="grid gap-4">
           <Field
-            label="public /metrics"
-            hint="off: scrapers need an api token (read scope is enough). on: anyone who can reach the hub can read monitor names and statuses"
+            label={t("metricsPublic")}
+            hint={t("metricsPublicHint")}
           >
             <label className="flex h-8 items-center gap-2 text-xs">
               <Switch
                 checked={g.metrics.public}
                 onCheckedChange={(v) => set("metrics", { public: v })}
               />
-              {g.metrics.public ? "public" : "api token required"}
+              {g.metrics.public ? t("public") : t("tokenRequired")}
             </label>
           </Field>
           <pre className="overflow-x-auto border border-dashed p-3 text-[11px] leading-relaxed text-muted-foreground">
@@ -211,12 +209,12 @@ export function GeneralSettingsForm({
         </div>
       </Section>
 
-      <Section title="status">
+      <Section title={t("status")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
-            label="degraded at (% of locations)"
+            label={t("degradedPct")}
             htmlFor="degraded_pct"
-            hint="degraded when at least this share of a monitor's online locations fails, down when more than half do. monitors can override it"
+            hint={t("degradedPctHint")}
           >
             <Input
               id="degraded_pct"
@@ -230,9 +228,9 @@ export function GeneralSettingsForm({
         </div>
       </Section>
 
-      <Section title="new monitor defaults">
+      <Section title={t("defaults")}>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="interval (s)" htmlFor="d_interval">
+          <Field label={t("interval")} htmlFor="d_interval">
             <Input
               id="d_interval"
               type="number"
@@ -242,7 +240,7 @@ export function GeneralSettingsForm({
               onChange={(e) => setDef("interval_sec", Number(e.target.value))}
             />
           </Field>
-          <Field label="timeout (ms)" htmlFor="d_timeout">
+          <Field label={t("timeout")} htmlFor="d_timeout">
             <Input
               id="d_timeout"
               type="number"
@@ -253,7 +251,7 @@ export function GeneralSettingsForm({
               onChange={(e) => setDef("timeout_ms", Number(e.target.value))}
             />
           </Field>
-          <Field label="retries" htmlFor="d_retries">
+          <Field label={t("retries")} htmlFor="d_retries">
             <Input
               id="d_retries"
               type="number"
@@ -266,11 +264,11 @@ export function GeneralSettingsForm({
         </div>
         <div className="mt-4 flex items-center gap-3">
           <Button type="submit" variant="outline" disabled={busy || !dirty}>
-            {busy ? "..." : "save"}
+            {busy ? "..." : t("save")}
           </Button>
           {dirty && (
             <span className="text-[11px] text-muted-foreground">
-              unsaved changes
+              {t("unsaved")}
             </span>
           )}
         </div>

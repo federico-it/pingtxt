@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { Confirm } from "@/components/confirm"
 import { TagChip, useLabels } from "@/components/labels"
@@ -23,6 +24,7 @@ type TagDraft = { id?: number; name: string; color: TagColor }
 export default function GroupsPage() {
   const { groups, tags } = useLabels()
   const isAdmin = useIsAdmin()
+  const t = useTranslations("groups")
   const monitors = useApi<Monitor[]>("/api/monitors", { refreshInterval: 30_000 })
   const [group, setGroup] = useState<GroupDraft | null>(null)
   const [tag, setTag] = useState<TagDraft | null>(null)
@@ -52,11 +54,11 @@ export default function GroupsPage() {
         body: { name: group.name, description: group.description },
       })
       await api(`/api/groups/${saved.id}/monitors`, { method: "PUT", body: { monitor_ids: group.monitor_ids } })
-      toast.success("group saved")
+      toast.success(t("groupSaved"))
       setGroup(null)
       refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
   }
 
@@ -65,11 +67,11 @@ export default function GroupsPage() {
     if (!tag) return
     try {
       await api(tag.id ? `/api/tags/${tag.id}` : "/api/tags", { method: tag.id ? "PUT" : "POST", body: { name: tag.name, color: tag.color } })
-      toast.success("tag saved")
+      toast.success(t("tagSaved"))
       setTag(null)
       refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
   }
 
@@ -77,7 +79,7 @@ export default function GroupsPage() {
     try {
       await api(path, { method: "DELETE" })
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     }
     refresh()
   }
@@ -86,26 +88,25 @@ export default function GroupsPage() {
 
   return (
     <>
-      <PageHeader cmd="pingtxt groups ls" title="groups & tags">
+      <PageHeader cmd="pingtxt groups ls" title={t("title")}>
         {isAdmin && (
           <>
             <Button variant="outline" onClick={() => setTag({ name: "", color: "" })}>
-              <PlusIcon /> tag
+              <PlusIcon /> {t("tag")}
             </Button>
             <Button onClick={() => editGroup()}>
-              <PlusIcon /> group
+              <PlusIcon /> {t("group")}
             </Button>
           </>
         )}
       </PageHeader>
       <p className="-mt-3 mb-2 max-w-2xl text-xs text-muted-foreground">
-        A monitor belongs to at most one group and can have any number of tags. Groups are sections on the dashboard and on status
-        pages; both can be used to pick monitors for maintenance windows and to filter the monitor list.
+        {t("intro")}
       </p>
 
-      <Section title={`groups (${groups.data?.length ?? 0})`}>
+      <Section title={t("groupsTitle", { count: groups.data?.length ?? 0 })}>
         {groups.data && groups.data.length === 0 ? (
-          <Empty>no groups yet.</Empty>
+          <Empty>{t("noGroups")}</Empty>
         ) : (
           <div className="border-t border-dashed">
             {(groups.data ?? []).map((g) => {
@@ -116,7 +117,7 @@ export default function GroupsPage() {
                     <div className="flex flex-wrap items-baseline gap-x-3">
                       <span className="font-medium">[{g.name}]</span>
                       <span className="text-xs text-muted-foreground">
-                        {g.monitors} {g.monitors === 1 ? "monitor" : "monitors"}
+                        {t("monitorCount", { count: g.monitors })}
                       </span>
                     </div>
                     {g.description && <div className="truncate text-xs text-muted-foreground">{g.description}</div>}
@@ -134,15 +135,15 @@ export default function GroupsPage() {
                   {isAdmin && (
                     <>
                       <Button variant="ghost" size="xs" onClick={() => editGroup(g)}>
-                        edit
+                        {t("edit")}
                       </Button>
                       <Confirm
-                        title={`delete group ${g.name}?`}
-                        description="Its monitors are kept, without a group. The group is removed from maintenance windows and status pages."
+                        title={t("deleteGroup", { name: g.name })}
+                        description={t("deleteGroupText")}
                         onConfirm={() => remove(`/api/groups/${g.id}`)}
                         trigger={
                           <Button variant="ghost" size="xs" className="text-down">
-                            rm
+                            {t("rm")}
                           </Button>
                         }
                       />
@@ -155,29 +156,29 @@ export default function GroupsPage() {
         )}
       </Section>
 
-      <Section title={`tags (${tags.data?.length ?? 0})`}>
+      <Section title={t("tagsTitle", { count: tags.data?.length ?? 0 })}>
         {tags.data && tags.data.length === 0 ? (
-          <Empty>no tags yet. you can also create them from the monitor form.</Empty>
+          <Empty>{t("noTags")}</Empty>
         ) : (
           <div className="border-t border-dashed">
-            {(tags.data ?? []).map((t) => (
-              <div key={t.id} className="flex items-center gap-3 border-b border-dashed px-2 py-2">
-                <TagChip tag={t} className="h-5 px-1.5 text-xs" />
+            {(tags.data ?? []).map((tg) => (
+              <div key={tg.id} className="flex items-center gap-3 border-b border-dashed px-2 py-2">
+                <TagChip tag={tg} className="h-5 px-1.5 text-xs" />
                 <span className="flex-1 text-xs text-muted-foreground">
-                  {t.monitors} {t.monitors === 1 ? "monitor" : "monitors"}
+                  {t("monitorCount", { count: tg.monitors })}
                 </span>
                 {isAdmin && (
                   <>
-                    <Button variant="ghost" size="xs" onClick={() => setTag({ id: t.id, name: t.name, color: t.color })}>
-                      edit
+                    <Button variant="ghost" size="xs" onClick={() => setTag({ id: tg.id, name: tg.name, color: tg.color })}>
+                      {t("edit")}
                     </Button>
                     <Confirm
-                      title={`delete tag ${t.name}?`}
-                      description="The tag is removed from every monitor and maintenance window."
-                      onConfirm={() => remove(`/api/tags/${t.id}`)}
+                      title={t("deleteTag", { name: tg.name })}
+                      description={t("deleteTagText")}
+                      onConfirm={() => remove(`/api/tags/${tg.id}`)}
                       trigger={
                         <Button variant="ghost" size="xs" className="text-down">
-                          rm
+                          {t("rm")}
                         </Button>
                       }
                     />
@@ -194,19 +195,19 @@ export default function GroupsPage() {
           {group && (
             <form onSubmit={saveGroup} className="grid gap-4">
               <DialogHeader>
-                <DialogTitle>{group.id ? "edit group" : "new group"}</DialogTitle>
-                <DialogDescription>Pick the monitors in this group. A monitor moved here leaves its previous group.</DialogDescription>
+                <DialogTitle>{group.id ? t("editGroup") : t("newGroup")}</DialogTitle>
+                <DialogDescription>{t("groupDialogText")}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-1.5">
-                <Label htmlFor="g-name">name</Label>
+                <Label htmlFor="g-name">{t("name")}</Label>
                 <Input id="g-name" required maxLength={64} value={group.name} onChange={(e) => setGroup({ ...group, name: e.target.value })} placeholder="web" />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="g-desc">description (optional)</Label>
+                <Label htmlFor="g-desc">{t("description")}</Label>
                 <Textarea id="g-desc" rows={2} maxLength={500} value={group.description} onChange={(e) => setGroup({ ...group, description: e.target.value })} />
               </div>
               <div className="grid gap-1.5">
-                <Label>monitors ({group.monitor_ids.length})</Label>
+                <Label>{t("monitorsSelected", { count: group.monitor_ids.length })}</Label>
                 <div className="grid max-h-60 gap-1 overflow-y-auto sm:grid-cols-2">
                   {all.map((m) => {
                     const other = m.group_id && m.group_id !== group.id ? groupName.get(m.group_id) : undefined
@@ -223,11 +224,11 @@ export default function GroupsPage() {
                       </label>
                     )
                   })}
-                  {monitors.data?.length === 0 && <span className="text-xs text-muted-foreground">no monitors yet</span>}
+                  {monitors.data?.length === 0 && <span className="text-xs text-muted-foreground">{t("noMonitorsYet")}</span>}
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit">save</Button>
+                <Button type="submit">{t("save")}</Button>
               </DialogFooter>
             </form>
           )}
@@ -239,15 +240,15 @@ export default function GroupsPage() {
           {tag && (
             <form onSubmit={saveTag} className="grid gap-4">
               <DialogHeader>
-                <DialogTitle>{tag.id ? "edit tag" : "new tag"}</DialogTitle>
-                <DialogDescription>Tags are free labels, like the environment or the team.</DialogDescription>
+                <DialogTitle>{tag.id ? t("editTag") : t("newTag")}</DialogTitle>
+                <DialogDescription>{t("tagDialogText")}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-1.5">
-                <Label htmlFor="t-name">name</Label>
-                <Input id="t-name" required maxLength={32} value={tag.name} onChange={(e) => setTag({ ...tag, name: e.target.value })} placeholder="production" />
+                <Label htmlFor="t-name">{t("name")}</Label>
+                <Input id="t-name" required maxLength={32} value={tag.name} onChange={(e) => setTag({ ...tag, name: e.target.value })} placeholder={t("tagPlaceholder")} />
               </div>
               <div className="grid gap-1.5">
-                <Label>color</Label>
+                <Label>{t("color")}</Label>
                 <div className="flex flex-wrap gap-1">
                   {tagColors.map((c) => (
                     <button
@@ -255,19 +256,19 @@ export default function GroupsPage() {
                       type="button"
                       onClick={() => setTag({ ...tag, color: c })}
                       className={cn("border border-transparent p-0.5", tag.color === c && "border-foreground")}
-                      aria-label={c || "default"}
+                      aria-label={c ? t(`colors.${c}`) : t("colors.default")}
                       aria-pressed={tag.color === c}
                     >
-                      <TagChip tag={{ name: c || "default", color: c } as Pick<Tag, "name" | "color">} />
+                      <TagChip tag={{ name: c ? t(`colors.${c}`) : t("colors.default"), color: c } as Pick<Tag, "name" | "color">} />
                     </button>
                   ))}
                 </div>
               </div>
               <div className="text-xs text-muted-foreground">
-                preview: <TagChip tag={{ name: tag.name || "tag", color: tag.color }} />
+                {t("preview")} <TagChip tag={{ name: tag.name || t("tag"), color: tag.color }} />
               </div>
               <DialogFooter>
-                <Button type="submit">save</Button>
+                <Button type="submit">{t("save")}</Button>
               </DialogFooter>
             </form>
           )}

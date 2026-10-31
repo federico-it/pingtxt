@@ -1,3 +1,5 @@
+import { tr } from "@/lib/i18n"
+
 export function pct(v: number | undefined | null, digits = 2): string {
   if (v === undefined || v === null || v < 0) return "--.--%"
   return (v * 100).toFixed(v === 1 ? 0 : digits) + "%"
@@ -11,13 +13,13 @@ export function ms(v: number | undefined | null): string {
 }
 
 export function ago(ts: number | undefined | null): string {
-  if (!ts) return "never"
+  if (!ts) return tr("time.never")
   const s = Math.max(0, Math.round((Date.now() - ts) / 1000))
-  if (s < 5) return "just now"
-  if (s < 60) return s + "s ago"
-  if (s < 3600) return Math.floor(s / 60) + "m ago"
-  if (s < 86400) return Math.floor(s / 3600) + "h ago"
-  return Math.floor(s / 86400) + "d ago"
+  if (s < 5) return tr("time.justNow")
+  if (s < 60) return tr("time.ago", { t: s + tr("time.s") })
+  if (s < 3600) return tr("time.ago", { t: Math.floor(s / 60) + tr("time.m") })
+  if (s < 86400) return tr("time.ago", { t: Math.floor(s / 3600) + tr("time.h") })
+  return tr("time.ago", { t: Math.floor(s / 86400) + tr("time.d") })
 }
 
 export function duration(msTotal: number): string {
@@ -25,10 +27,11 @@ export function duration(msTotal: number): string {
   const d = Math.floor(s / 86400)
   const h = Math.floor((s % 86400) / 3600)
   const m = Math.floor((s % 3600) / 60)
-  if (d) return `${d}d ${h}h`
-  if (h) return `${h}h ${m}m`
-  if (m) return `${m}m ${s % 60}s`
-  return `${s}s`
+  const [ud, uh, um, us] = [tr("time.d"), tr("time.h"), tr("time.m"), tr("time.s")]
+  if (d) return `${d}${ud} ${h}${uh}`
+  if (h) return `${h}${uh} ${m}${um}`
+  if (m) return `${m}${um} ${s % 60}${us}`
+  return `${s}${us}`
 }
 
 export function datetime(ts: number): string {
@@ -38,10 +41,10 @@ export function datetime(ts: number): string {
 }
 
 export function interval(sec: number): string {
-  if (sec >= 86400 && sec % 86400 === 0) return sec / 86400 + "d"
-  if (sec % 3600 === 0) return sec / 3600 + "h"
-  if (sec % 60 === 0) return sec / 60 + "m"
-  return sec + "s"
+  if (sec >= 86400 && sec % 86400 === 0) return sec / 86400 + tr("time.d")
+  if (sec % 3600 === 0) return sec / 3600 + tr("time.h")
+  if (sec % 60 === 0) return sec / 60 + tr("time.m")
+  return sec + tr("time.s")
 }
 
 /** Calendar day of a UTC day bucket. */

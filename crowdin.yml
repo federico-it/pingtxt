@@ -1,0 +1,16 @@
+# Crowdin configuration for the hub UI translations.
+# Used by the Crowdin GitHub integration (project "pingtxt"): it uploads the
+# English source on every push to main and opens a pull request with the
+# translations. Source: web/messages/en.json. Targets: it, es, fr, de, pt-BR.
+# See CONTRIBUTING.md#translating-the-interface.
+
+preserve_hierarchy: true
+
+files:
+  - source: /web/messages/en.json
+    translation: /web/messages/%two_letters_code%.json
+    languages_mapping:
+      two_letters_code:
+        pt-BR: pt-BR
+    # When an English string changes, keep its translations but mark them unapproved.
+    update_option: update_as_unapproved

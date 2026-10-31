@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { GroupToggle, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
@@ -47,6 +48,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   const { groups, groupById } = useLabels()
   const [slugTouched, setSlugTouched] = useState(!!initial)
   const [busy, setBusy] = useState(false)
+  const t = useTranslations("statusPageForm")
 
   const byId = useMemo(() => new Map((monitors.data ?? []).map((m) => [m.id, m])), [monitors.data])
   // Monitors of a picked group are on the page already.
@@ -75,11 +77,11 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         method: initial ? "PUT" : "POST",
         body: d,
       })
-      toast.success("status page saved")
+      toast.success(t("saved"))
       if (!initial) router.replace(`/status-pages/edit/?id=${saved.id}`)
       else setD(saved)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "error")
+      toast.error(err instanceof Error ? err.message : t("error"))
     } finally {
       setBusy(false)
     }
@@ -88,20 +90,20 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   return (
     <form onSubmit={save} className="grid max-w-3xl gap-2">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="title" htmlFor="sp-title">
+        <Field label={t("pageTitle")} htmlFor="sp-title">
           <Input
             id="sp-title"
             required
             maxLength={100}
             value={d.title}
-            placeholder="Acme status"
+            placeholder={t("titlePlaceholder")}
             onChange={(e) => {
               const title = e.target.value
               setD((p) => ({ ...p, title, slug: slugTouched ? p.slug : slugify(title) }))
             }}
           />
         </Field>
-        <Field label="slug" htmlFor="sp-slug" hint={origin && `${origin}/status/${d.slug || "..."}/`}>
+        <Field label={t("slug")} htmlFor="sp-slug" hint={origin && `${origin}/status/${d.slug || "..."}/`}>
           <Input
             id="sp-slug"
             required
@@ -115,24 +117,21 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
             }}
           />
         </Field>
-        <Field label="description (optional)" htmlFor="sp-desc" className="sm:col-span-2">
+        <Field label={t("description")} htmlFor="sp-desc" className="sm:col-span-2">
           <Textarea
             id="sp-desc"
             maxLength={1000}
             value={d.description}
-            placeholder="Live status of our public services."
+            placeholder={t("descriptionPlaceholder")}
             onChange={(e) => set("description", e.target.value)}
           />
         </Field>
         <Field
-          label="custom domain (optional)"
+          label={t("domain")}
           htmlFor="sp-domain"
           className="sm:col-span-2"
           hint={
-            <>
-              Point a DNS record (CNAME or A) for this host at pingtxt and route it through the same reverse proxy, with its
-              own TLS certificate. On that domain only this page is served, at <code>/</code>.
-            </>
+            t.rich("domainHint", { code: (c) => <code>{c}</code> })
           }
         >
           <Input id="sp-domain" value={d.domain} placeholder="status.example.com" onChange={(e) => set("domain", e.target.value)} />
@@ -140,24 +139,23 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         <label className="flex items-center gap-2.5">
           <Switch checked={d.published} onCheckedChange={(v) => set("published", v)} />
           <span>
-            published
-            <span className="block text-[11px] text-muted-foreground">drafts are visible only when you are logged in</span>
+            {t("published")}
+            <span className="block text-[11px] text-muted-foreground">{t("publishedHint")}</span>
           </span>
         </label>
         <label className="flex items-center gap-2.5">
           <Switch checked={d.show_incidents} onCheckedChange={(v) => set("show_incidents", v)} />
           <span>
-            show incident history
-            <span className="block text-[11px] text-muted-foreground">start time and duration, without error details</span>
+            {t("showIncidents")}
+            <span className="block text-[11px] text-muted-foreground">{t("showIncidentsHint")}</span>
           </span>
         </label>
       </div>
 
       {(groups.data?.length ?? 0) > 0 && (
-        <Section title={`groups on this page (${d.group_ids.length})`}>
+        <Section title={t("groupsTitle", { count: d.group_ids.length })}>
           <p className="mb-2 text-xs text-muted-foreground">
-            A group adds all its monitors, also the ones added later. Each group is a section with its name; monitors picked one by
-            one come first, in their own order.
+            {t("groupsHint")}
           </p>
           {d.group_ids.length > 0 && (
             <div className="mb-2 border-t border-dashed">
@@ -167,22 +165,22 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
                   <div key={id} className="flex items-center gap-2 border-b border-dashed px-2 py-1.5">
                     <span className="w-5 text-right text-xs text-muted-foreground">{i + 1}</span>
                     <span className="min-w-0 flex-1 truncate">
-                      [{g?.name ?? `#${id}`}] <span className="text-xs text-muted-foreground">{g?.monitors ?? 0} monitors</span>
+                      [{g?.name ?? `#${id}`}] <span className="text-xs text-muted-foreground">{t("monitorCount", { count: g?.monitors ?? 0 })}</span>
                     </span>
-                    <Button type="button" variant="ghost" size="icon-xs" aria-label="move up" disabled={i === 0} onClick={() => move("group_ids", i, -1)}>
+                    <Button type="button" variant="ghost" size="icon-xs" aria-label={t("moveUp")} disabled={i === 0} onClick={() => move("group_ids", i, -1)}>
                       <ArrowUpIcon />
                     </Button>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon-xs"
-                      aria-label="move down"
+                      aria-label={t("moveDown")}
                       disabled={i === d.group_ids.length - 1}
                       onClick={() => move("group_ids", i, 1)}
                     >
                       <ArrowDownIcon />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon-xs" aria-label="remove" onClick={() => set("group_ids", d.group_ids.filter((x) => x !== id))}>
+                    <Button type="button" variant="ghost" size="icon-xs" aria-label={t("remove")} onClick={() => set("group_ids", d.group_ids.filter((x) => x !== id))}>
                       <XIcon />
                     </Button>
                   </div>
@@ -200,10 +198,10 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         </Section>
       )}
 
-      <Section title={`monitors on this page (${d.monitor_ids.length})`}>
+      <Section title={t("monitorsTitle", { count: d.monitor_ids.length })}>
         {d.monitor_ids.length === 0 ? (
           <div className="border border-dashed p-4 text-center text-muted-foreground">
-            {d.group_ids.length > 0 ? "only the groups above. add single monitors from the list below." : "pick monitors from the list below."}
+            {d.group_ids.length > 0 ? t("onlyGroups") : t("pickMonitors")}
           </div>
         ) : (
           <div className="border-t border-dashed">
@@ -217,14 +215,14 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
                     {m?.name ?? `#${id}`}
                     {m && groupById.get(m.group_id) && <span className="ml-2 text-xs text-muted-foreground">[{groupById.get(m.group_id)!.name}]</span>}
                   </span>
-                  <Button type="button" variant="ghost" size="icon-xs" aria-label="move up" disabled={i === 0} onClick={() => move("monitor_ids", i, -1)}>
+                  <Button type="button" variant="ghost" size="icon-xs" aria-label={t("moveUp")} disabled={i === 0} onClick={() => move("monitor_ids", i, -1)}>
                     <ArrowUpIcon />
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    aria-label="move down"
+                    aria-label={t("moveDown")}
                     disabled={i === d.monitor_ids.length - 1}
                     onClick={() => move("monitor_ids", i, 1)}
                   >
@@ -234,7 +232,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    aria-label="remove"
+                    aria-label={t("remove")}
                     onClick={() => set("monitor_ids", d.monitor_ids.filter((x) => x !== id))}
                   >
                     <XIcon />
@@ -247,17 +245,17 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
       </Section>
 
       <Section
-        title={`available (${available.length})`}
+        title={t("availableTitle", { count: available.length })}
         actions={
           available.length > 0 && (
             <button type="button" className="hover:text-foreground" onClick={() => set("monitor_ids", [...d.monitor_ids, ...available.map((m) => m.id)])}>
-              [add all]
+              [{t("addAll")}]
             </button>
           )
         }
       >
         {monitors.data && available.length === 0 ? (
-          <div className="text-xs text-muted-foreground">every monitor is on this page.</div>
+          <div className="text-xs text-muted-foreground">{t("allAdded")}</div>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {available.map((m) => (
@@ -271,15 +269,15 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
 
       <div className="mt-8 flex flex-wrap gap-2">
         <Button type="submit" disabled={busy}>
-          {busy ? "saving..." : "save"}
+          {busy ? t("saving") : t("save")}
         </Button>
         {initial && (
           <Button variant="outline" render={<a href={`/status/${initial.slug}/`} target="_blank" rel="noreferrer" />} nativeButton={false}>
-            open page
+            {t("openPage")}
           </Button>
         )}
         <Button type="button" variant="ghost" onClick={() => router.push("/status-pages/")}>
-          back
+          {t("back")}
         </Button>
       </div>
     </form>

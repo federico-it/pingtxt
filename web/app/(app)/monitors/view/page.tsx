@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useState } from "react"
 import { toast } from "sonner"
+import { useTranslations } from "use-intl"
 
 import { Confirm } from "@/components/confirm"
 import { ExpiryTable } from "@/components/expiry"
@@ -45,6 +46,8 @@ function View() {
   const m = useApi<MonitorDetail>(id ? `/api/monitors/${id}` : null)
   const isAdmin = useIsAdmin()
   const { groupById, tagById } = useLabels()
+  const t = useTranslations("monitor")
+  const tc = useTranslations("common")
   const series = useApi<Series>(
     id ? `/api/monitors/${id}/series?range=${range}` : null,
     { refreshInterval: 30_000 }
@@ -62,7 +65,7 @@ function View() {
   if (!m.data)
     return (
       <div className="text-muted-foreground">
-        loading<span className="cursor-blink">_</span>
+        {tc("loading")}<span className="cursor-blink">_</span>
       </div>
     )
   const d = m.data
@@ -73,16 +76,16 @@ function View() {
         method: "POST",
         body: { paused: !d.paused },
       })
-      toast.success(d.paused ? "monitor resumed" : "monitor paused")
+      toast.success(d.paused ? t("resumed") : t("paused"))
       m.mutate()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "error")
+      toast.error(e instanceof Error ? e.message : t("error"))
     }
   }
 
   async function remove() {
     await api(`/api/monitors/${id}`, { method: "DELETE" })
-    toast.success("monitor deleted")
+    toast.success(t("deleted"))
     router.push("/")
   }
 
@@ -92,7 +95,7 @@ function View() {
         {isAdmin && (
           <>
             <Button variant="outline" size="sm" onClick={togglePause}>
-              {d.paused ? "resume" : "pause"}
+              {d.paused ? t("resume") : t("pause")}
             </Button>
             <Button
               variant="outline"
@@ -100,15 +103,15 @@ function View() {
               render={<Link href={`/monitors/edit/?id=${id}`} />}
               nativeButton={false}
             >
-              edit
+              {t("edit")}
             </Button>
             <Confirm
-              title={`delete ${d.name}?`}
-              description="All results and incidents of this monitor will be deleted."
+              title={t("deleteTitle", { name: d.name })}
+              description={t("deleteText")}
               onConfirm={remove}
               trigger={
                 <Button variant="destructive" size="sm">
-                  delete
+                  {tc("delete")}
                 </Button>
               }
             />
@@ -119,17 +122,28 @@ function View() {
       <div className="-mt-4 mb-6 truncate text-xs text-muted-foreground">
         {d.type === "push" ? (
           <>
-            heartbeat · expected every{" "}
-            <span className="text-foreground">{interval(d.interval_sec)}</span>{" "}
-            · grace {d.grace_sec ? interval(d.grace_sec) : "none"}
+            {t.rich("pushLine", {
+              every: interval(d.interval_sec),
+              grace: d.grace_sec ? interval(d.grace_sec) : t("none"),
+              hl: (c) => <span className="text-foreground">{c}</span>,
+            })}
           </>
         ) : (
           <>
-            {d.type} · <span className="text-foreground">{displayTarget(d.target)}</span> ·
-            every {interval(d.interval_sec)} · timeout {d.timeout_ms}ms ·
-            retries {d.retries}
+            {t.rich("checkLine", {
+              type: d.type,
+              target: displayTarget(d.target),
+              every: interval(d.interval_sec),
+              timeout: d.timeout_ms,
+              retries: d.retries,
+              hl: (c) => <span className="text-foreground">{c}</span>,
+            })}
             {d.locations.length > 1 &&
-              ` · degraded at ${d.degraded_pct ? `${d.degraded_pct}%` : "default"}`}
+              ` · ${
+                d.degraded_pct
+                  ? t("degradedAt", { pct: d.degraded_pct })
+                  : t("degradedAtDefault")
+              }`}
           </>
         )}
       </div>
@@ -146,42 +160,46 @@ function View() {
 
       {d.maintenance && (
         <div className="mb-4 border border-dashed border-info/60 px-3 py-2 text-xs text-info">
-          ◇ in maintenance: <span className="text-foreground">{d.maintenance.name}</span> until {datetime(d.maintenance.end_at)}. checks
-          keep running, alerts and incidents are paused.{" "}
+          ◇{" "}
+          {t.rich("inMaintenance", {
+            name: d.maintenance.name,
+            until: datetime(d.maintenance.end_at),
+            hl: (c) => <span className="text-foreground">{c}</span>,
+          })}{" "}
           <Link href="/maintenance/" className="underline underline-offset-4">
-            manage
+            {t("manage")}
           </Link>
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-4 border-y border-dashed py-4 sm:grid-cols-3 lg:grid-cols-6">
-        <KV k="status" v={<StatusText status={d.status} />} />
+        <KV k={t("kv.status")} v={<StatusText status={d.status} />} />
         <KV
-          k="for"
+          k={t("kv.for")}
           v={d.status_since ? duration(now - d.status_since) : "--"}
         />
-        <KV k="uptime 24h" v={pct(d.uptime_24h)} />
-        <KV k="uptime 7d" v={pct(d.uptime_7d)} />
-        <KV k="uptime 30d" v={pct(d.uptime_30d)} />
-        <KV k="avg 24h" v={ms(d.avg_ms_24h)} />
+        <KV k={t("kv.uptime24h")} v={pct(d.uptime_24h)} />
+        <KV k={t("kv.uptime7d")} v={pct(d.uptime_7d)} />
+        <KV k={t("kv.uptime30d")} v={pct(d.uptime_30d)} />
+        <KV k={t("kv.avg24h")} v={ms(d.avg_ms_24h)} />
       </div>
 
       {d.type === "push" && d.push_url && (
         <PushInfo id={id} url={d.push_url} onRotated={() => m.mutate()} />
       )}
 
-      <Section title="last 24h">
+      <Section title={t("last24h")}>
         <UptimeBars bars={d.bars} height="h-8" />
       </Section>
 
       {d.expiry.length > 0 && (
-        <Section title="expiry">
+        <Section title={t("expiry")}>
           <ExpiryTable monitorId={id} checks={d.expiry} now={now} onChange={() => m.mutate()} />
         </Section>
       )}
 
       <Section
-        title={d.type === "push" ? "run time (from ?ping=)" : "response time"}
+        title={d.type === "push" ? t("runTime") : t("responseTime")}
         actions={
           <div className="flex gap-1 normal-case">
             {ranges.map((r) => (
@@ -206,15 +224,15 @@ function View() {
         )}
       </Section>
 
-      <Section title={d.type === "push" ? "last heartbeat" : "locations"}>
+      <Section title={d.type === "push" ? t("lastHeartbeat") : t("locations")}>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{d.type === "push" ? "source" : "location"}</TableHead>
-              <TableHead>state</TableHead>
-              <TableHead className="text-right">latency</TableHead>
-              <TableHead>message</TableHead>
-              <TableHead className="text-right">checked</TableHead>
+              <TableHead>{d.type === "push" ? t("cols.source") : t("cols.location")}</TableHead>
+              <TableHead>{t("cols.state")}</TableHead>
+              <TableHead className="text-right">{t("cols.latency")}</TableHead>
+              <TableHead>{t("cols.message")}</TableHead>
+              <TableHead className="text-right">{t("cols.checked")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -223,11 +241,11 @@ function View() {
                 <TableCell>{l.name}</TableCell>
                 <TableCell>
                   {!l.online ? (
-                    <span className="text-muted-foreground">offline</span>
+                    <span className="text-muted-foreground">{t("offline")}</span>
                   ) : l.last ? (
                     <OkText ok={l.last.ok} />
                   ) : (
-                    <span className="text-muted-foreground">waiting</span>
+                    <span className="text-muted-foreground">{t("waiting")}</span>
                   )}
                 </TableCell>
                 <TableCell className="text-right">
@@ -245,7 +263,7 @@ function View() {
         </Table>
       </Section>
 
-      <Section title="incidents">
+      <Section title={t("incidents")}>
         {incidents.data?.length ? (
           <div className="grid gap-1">
             {incidents.data.slice(0, 10).map((i) => (
@@ -255,7 +273,7 @@ function View() {
                     i.resolved_at ? "text-muted-foreground" : "text-down"
                   }
                 >
-                  {i.resolved_at ? "[resolved]" : "[ongoing] "}
+                  {i.resolved_at ? `[${t("resolved")}]` : `[${t("ongoing")}] `}
                 </span>
                 <span>{datetime(i.started_at)}</span>
                 <span className="text-muted-foreground">
@@ -269,12 +287,12 @@ function View() {
           </div>
         ) : (
           <div className="text-xs text-muted-foreground">
-            no incidents. nice.
+            {t("noIncidents")}
           </div>
         )}
       </Section>
 
-      <Section title="log">
+      <Section title={t("log")}>
         <div className="max-h-96 overflow-y-auto border bg-muted/30 p-3 text-xs leading-6">
           {(results.data?.results ?? []).map((r) => (
             <div key={r.id} className="flex gap-3 whitespace-nowrap">
@@ -289,14 +307,14 @@ function View() {
                 {ms(r.latency_ms)}
               </span>
               <span className="truncate text-muted-foreground">
-                {r.maint && <span className="text-info">[maint] </span>}
+                {r.maint && <span className="text-info">[{t("maint")}] </span>}
                 {r.message}
               </span>
             </div>
           ))}
           {results.data?.results.length === 0 && (
             <span className="text-muted-foreground">
-              waiting for the first check...
+              {t("waitingFirst")}
             </span>
           )}
         </div>

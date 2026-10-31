@@ -2,25 +2,30 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTranslations } from "use-intl"
 
+import { LanguagePicker } from "@/components/language-picker"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { api, useApi, type Me, type Overview } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import type en from "@/messages/en.json"
 
-const nav = [
-  { href: "/", label: "monitors", match: (p: string) => p === "/" || p.startsWith("/monitors") },
-  { href: "/incidents/", label: "incidents" },
-  { href: "/maintenance/", label: "maint" },
-  { href: "/groups/", label: "groups" },
-  { href: "/agents/", label: "agents" },
-  { href: "/notifications/", label: "notify" },
-  { href: "/status-pages/", label: "status" },
-  { href: "/settings/", label: "settings" },
+const nav: { href: string; key: keyof (typeof en)["nav"]["links"]; match?: (p: string) => boolean }[] = [
+  { href: "/", key: "monitors", match: (p: string) => p === "/" || p.startsWith("/monitors") },
+  { href: "/incidents/", key: "incidents" },
+  { href: "/maintenance/", key: "maintenance" },
+  { href: "/groups/", key: "groups" },
+  { href: "/agents/", key: "agents" },
+  { href: "/notifications/", key: "notifications" },
+  { href: "/status-pages/", key: "statusPages" },
+  { href: "/settings/", key: "settings" },
 ]
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/"
+  const t = useTranslations("nav")
+  const tc = useTranslations("common")
   const me = useApi<Me>("/api/auth/me", { refreshInterval: 60_000 })
   const ov = useApi<Overview>(me.data ? "/api/overview" : null)
 
@@ -34,7 +39,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-svh items-center justify-center text-muted-foreground">
         <span>
-          loading<span className="cursor-blink">_</span>
+          {tc("loading")}<span className="cursor-blink">_</span>
         </span>
       </div>
     )
@@ -60,7 +65,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   active && "bg-accent text-foreground"
                 )}
               >
-                {active ? `[${n.label}]` : ` ${n.label} `}
+                {active ? `[${t(`links.${n.key}`)}]` : ` ${t(`links.${n.key}`)} `}
               </Link>
             )
           })}
@@ -68,28 +73,27 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="ml-auto flex items-center gap-1">
           {ov.data && (
             <span className="mr-2 hidden text-xs text-muted-foreground md:inline">
-              {down > 0 ? <span className="text-down">{down} down</span> : <span className="text-up">all systems go</span>} ·{" "}
-              {maint > 0 && <span className="text-info">{maint} in maintenance · </span>}
-              {ov.data.agents_online}/{ov.data.agents} agents
+              {down > 0 ? <span className="text-down">{t("down", { count: down })}</span> : <span className="text-up">{t("allGood")}</span>} ·{" "}
+              {maint > 0 && <span className="text-info">{t("inMaintenance", { count: maint })} · </span>}
+              {t("agents", { online: ov.data.agents_online, total: ov.data.agents })}
             </span>
           )}
           {me.data.user.role === "viewer" && (
-            <span className="mr-1 border border-dashed px-1.5 text-xs text-muted-foreground" title="your account can only read">
-              read-only
+            <span className="mr-1 border border-dashed px-1.5 text-xs text-muted-foreground" title={t("readOnlyHint")}>
+              {t("readOnly")}
             </span>
           )}
+          <LanguagePicker />
           <ThemeToggle />
           <Button variant="ghost" size="sm" onClick={logout} title={me.data.user.email}>
-            logout
+            {t("logout")}
           </Button>
         </div>
       </header>
       <main className="flex-1 py-8">{children}</main>
       <footer className="flex justify-between border-t border-dashed py-3 text-xs text-muted-foreground">
         <span>pingtxt {me.data.version}</span>
-        <span>
-          press <kbd className="border px-1">d</kbd> to toggle theme
-        </span>
+        <span>{t.rich("themeHint", { kbd: (c) => <kbd className="border px-1">{c}</kbd> })}</span>
       </footer>
     </div>
   )
