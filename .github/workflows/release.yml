@@ -2,14 +2,16 @@ name: release
 
 # Pushing a tag like v1.2.3 (or publishing a release for a new tag from the
 # GitHub web UI) publishes a GitHub release with the hub and agent
-# binaries and a SHA256SUMS file. Docker images for the same tag are built by
-# docker.yml.
+# binaries, a SHA256SUMS file and its cosign signature (SHA256SUMS.sigstore.json,
+# keyless: signed with this workflow's GitHub identity). Docker images for the
+# same tag are built and signed by docker.yml.
 on:
   push:
     tags: ["v*"]
 
 permissions:
   contents: write
+  id-token: write # cosign keyless signing
 
 jobs:
   binaries:
@@ -33,16 +35,34 @@ jobs:
         run: |
           set -eu
           mkdir -p release
+          # -buildvcs=false: same bytes as the agents bundled in the hub image,
+          # which are built without the git checkout (see Dockerfile).
           flags="-s -w -X main.version=$VERSION"
           for p in linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64; do
             os=${p%/*}; arch=${p#*/}
-            GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$flags" -o release/pingtxt-agent-$os-$arch ./cmd/pingtxt-agent
+            GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false -ldflags "$flags" -o release/pingtxt-agent-$os-$arch ./cmd/pingtxt-agent
           done
           for p in linux/amd64 linux/arm64; do
             os=${p%/*}; arch=${p#*/}
-            GOOS=$os GOARCH=$arch go build -trimpath -ldflags "$flags" -o release/pingtxt-$os-$arch ./cmd/pingtxt
+            GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false -ldflags "$flags" -o release/pingtxt-$os-$arch ./cmd/pingtxt
           done
-          cd release && sha256sum * > SHA256SUMS
+      # Agents check self-updates from the hub against SHA256SUMS, so the
+      # agents in the hub image must be the same bytes: build them with the
+      # Dockerfile and compare before publishing anything.
+      - name: Check agents match the Docker build
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -eu
+          docker buildx build --target agents --build-arg VERSION="$VERSION" --output type=local,dest=docker-agents .
+          for f in docker-agents/*; do
+            cmp "$f" "release/$(basename "$f")"
+          done
+      - name: Checksums
+        run: cd release && sha256sum * > SHA256SUMS
+      - uses: sigstore/cosign-installer@v4
+      - name: Sign checksums
+        run: cosign sign-blob --yes --bundle release/SHA256SUMS.sigstore.json release/SHA256SUMS
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

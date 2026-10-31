@@ -84,6 +84,21 @@ export interface ResultRow {
   message: string
   cert_expiry: number
   maint: boolean
+  /** HTTP checks only, from hub and updated agents */
+  timing?: Phases
+}
+
+/** Time per phase of an HTTP check, in ms. */
+export interface Phases {
+  dns_ms: number
+  connect_ms: number
+  tls_ms: number
+  /** wait from the request being sent to the first byte */
+  ttfb_ms: number
+  /** buckets: average latency of the checks with phases */
+  total_ms?: number
+  /** buckets: how many checks the averages come from */
+  n?: number
 }
 
 export interface Bar {
@@ -141,6 +156,7 @@ export interface Bucket {
   avg_ms: number
   min_ms: number
   max_ms: number
+  phases?: Phases
 }
 
 export interface Series {
@@ -256,6 +272,10 @@ export interface Notifier {
   type: NotifierType
   config: Record<string, string>
   enabled: boolean
+  /** Minutes of downtime before the first alert (0 = right away). */
+  delay_min: number
+  /** Repeat the alert every this many minutes while down (0 = once). */
+  repeat_min: number
   created_at: number
 }
 
@@ -463,6 +483,46 @@ export interface StatusPage {
   monitor_ids: number[]
   /** every monitor of these groups, current and future */
   group_ids: number[]
+  /** email channel that sends incident updates to subscribers, 0 = off */
+  subscribe_notifier_id: number
+  created_at: number
+}
+
+export type ReportStatus = "investigating" | "identified" | "monitoring" | "resolved"
+export const reportStatuses: ReportStatus[] = ["investigating", "identified", "monitoring", "resolved"]
+export type ReportImpact = "none" | "minor" | "major" | "critical"
+export const reportImpacts: ReportImpact[] = ["none", "minor", "major", "critical"]
+
+export interface PageIncidentUpdate {
+  id: number
+  incident_id: number
+  status: ReportStatus
+  message: string
+  created_at: number
+}
+
+/** An incident written on a status page, with its timeline. */
+export interface PageIncident {
+  id: number
+  page_id: number
+  title: string
+  impact: ReportImpact
+  /** status of the latest update */
+  status: ReportStatus
+  created_at: number
+  updated_at: number
+  /** 0 = still open */
+  resolved_at: number
+  /** newest first */
+  updates: PageIncidentUpdate[]
+}
+
+export interface PageSubscriber {
+  id: number
+  page_id: number
+  email: string
+  /** 0 = waiting for confirmation */
+  confirmed_at: number
   created_at: number
 }
 
@@ -495,6 +555,10 @@ export interface PublicStatusPage {
     started_at: number
     resolved_at: number
   }[]
+  /** incidents written on the page: open ones, then recently resolved */
+  reports: PageIncident[]
+  /** visitors can subscribe by email */
+  subscribe: boolean
   updated_at: number
 }
 
@@ -522,6 +586,41 @@ export interface BackupSettings {
   enabled: boolean
   interval_hours: number
   keep: number
+}
+
+export type ReportKind = "weekly" | "monthly"
+
+export interface ReportSettings {
+  weekly: boolean
+  monthly: boolean
+  /** hour of the day (0-23, in timezone) the reports are sent */
+  hour: number
+  timezone: string
+  /** email channels that receive the reports */
+  notifier_ids: number[]
+  /** only these groups; empty: every monitor */
+  group_ids: number[]
+}
+
+export interface Reports extends ReportSettings {
+  /** next report of each enabled kind (unix ms) */
+  next: Partial<Record<ReportKind, number>>
+  last: Partial<Record<ReportKind, { from: number; sent_at: number }>>
+}
+
+export interface Report {
+  kind: ReportKind
+  from: number
+  to: number
+  timezone: string
+  uptime: number
+  prev_uptime: number
+  incidents: number
+  downtime_ms: number
+  monitors: number
+  subject: string
+  /** plain text body of the email */
+  text: string
 }
 
 export interface Backups {

@@ -124,6 +124,8 @@
     "expiry": "expiry",
     "runTime": "run time (from ?ping=)",
     "responseTime": "response time",
+    "byLocation": "by location",
+    "byPhase": "by phase",
     "lastHeartbeat": "last heartbeat",
     "locations": "locations",
     "cols": {
@@ -331,6 +333,22 @@
     "regenerate": "regenerate",
     "regenerateUrl": "regenerate url"
   },
+  "badges": {
+    "title": "badges",
+    "hint": "SVG images for a README, served without login through the status page \"{page}\". They refresh every minute and show only what the page already shows.",
+    "pageHint": "SVG image with the overall state of this page, for a README. It refreshes every minute.",
+    "needsPage": "Badges need a published status page that shows this monitor. Add it to one in <link>status pages</link>.",
+    "kinds": {
+      "status": "status",
+      "uptime": "uptime",
+      "response": "response time"
+    },
+    "formats": {
+      "markdown": "markdown",
+      "html": "html",
+      "url": "url"
+    }
+  },
   "expiry": {
     "unknown": "unknown",
     "expiredAgo": "expired {days}d ago",
@@ -358,6 +376,18 @@
     "noData": "no data yet",
     "now": "now",
     "failed": "{count, plural, one {# failed check} other {# failed checks}}"
+  },
+  "phaseChart": {
+    "noData": "no phase data yet: HTTP checks from the hub and updated agents measure it",
+    "now": "now",
+    "dns": "DNS",
+    "connect": "connect",
+    "tls": "TLS",
+    "wait": "wait (TTFB)",
+    "transfer": "transfer",
+    "total": "total",
+    "average": "average over the range",
+    "allLocations": "all"
   },
   "uptimeBars": {
     "maintenance": "maintenance",
@@ -548,7 +578,7 @@
     "sendingTo": "sending test to {name}...",
     "sending": "sending test...",
     "testSent": "test notification sent",
-    "intro": "Every enabled channel receives a message when a monitor goes down and when it recovers.",
+    "intro": "Every enabled channel receives a message when a monitor goes down and when it recovers. A channel can also wait before alerting, to escalate long outages to another contact, and repeat the alert while the monitor stays down.",
     "empty": "no channels. you won't be alerted when something breaks.",
     "test": "test",
     "edit": "edit",
@@ -562,6 +592,12 @@
     "sendTest": "send test",
     "save": "save",
     "savedKeep": "(saved, leave empty to keep)",
+    "delayMin": "send after (min)",
+    "delayHint": "Minutes down before the first alert. 0 = right away. With a delay the channel only hears about outages still going on by then: use it for an escalation contact.",
+    "repeatMin": "repeat every (min)",
+    "repeatHint": "0 = once. Otherwise a reminder is sent while the monitor stays down (at least {min}).",
+    "afterDown": "after {min}m down",
+    "everyMin": "repeats every {min}m",
     "kinds": {
       "webhook": "webhook (json)",
       "discord": "discord",
@@ -594,6 +630,39 @@
       "commaSeparated": "comma separated"
     }
   },
+  "reports": {
+    "title": "periodic reports",
+    "intro": "An email with the uptime and the incidents of the last week or month, per monitor group, sent through your email channels.",
+    "kinds": {
+      "weekly": "weekly report, every Monday for the week before",
+      "monthly": "monthly report, on the 1st for the month before"
+    },
+    "next": "next {date}",
+    "last": "last sent {date}",
+    "channels": "email channels",
+    "channelsHint": "Each selected channel sends the report to its recipients. Disabled channels are skipped.",
+    "noEmail": "No email channel yet: add one above to receive the reports.",
+    "disabled": "disabled",
+    "groups": "groups",
+    "groupsHint": "Pick groups to report only on them.",
+    "allMonitors": "all monitors",
+    "hour": "hour",
+    "hourHint": "Hour of the day (0-23) the reports are sent.",
+    "timezone": "time zone",
+    "save": "save",
+    "saved": "saved",
+    "error": "error",
+    "preview": {
+      "weekly": "preview weekly",
+      "monthly": "preview monthly"
+    },
+    "sendNow": "send now",
+    "sending": "sending report...",
+    "sent": "report sent to {count, plural, one {# channel} other {# channels}}",
+    "sentPartly": "report sent to {count, plural, one {# channel} other {# channels}}, some failed: {error}",
+    "close": "close",
+    "previewHint": "The preview uses the saved settings."
+  },
   "statusPages": {
     "title": "status pages",
     "new": "new",
@@ -608,7 +677,8 @@
     "edit": "edit",
     "rm": "rm",
     "deleteTitle": "delete {name}?",
-    "deleteText": "The public page stops working right away."
+    "deleteText": "The public page stops working right away.",
+    "incidents": "incidents"
   },
   "statusPageForm": {
     "newTitle": "new status page",
@@ -641,7 +711,14 @@
     "saving": "saving...",
     "save": "save",
     "openPage": "open page",
-    "back": "back"
+    "back": "back",
+    "subscribeTitle": "email subscriptions",
+    "subscribeChannel": "send updates through",
+    "subscribeOff": "off: visitors cannot subscribe",
+    "channelDisabled": "disabled",
+    "subscribeHint": "Visitors can subscribe by email to the incidents you post. Emails go out through the SMTP server and sender of this email channel, not to its recipients.",
+    "subscribeNoChannel": "Add an email channel in notifications to let visitors subscribe.",
+    "incidents": "incidents"
   },
   "statusPublic": {
     "banner": {
@@ -672,6 +749,20 @@
       "down": "{down}/{total} down",
       "degraded": "degraded",
       "operational": "operational"
+    },
+    "reportStarted": "since {at}",
+    "subscribe": {
+      "title": "get updates",
+      "email": "email address",
+      "placeholder": "you@example.com",
+      "submit": "subscribe",
+      "sending": "sending...",
+      "sent": "Check {email}: open the link we sent to confirm.",
+      "hint": "Incident updates by email. Every email has a link to unsubscribe.",
+      "error": "error",
+      "confirmed": "{email} is subscribed: you will get incident updates by email.",
+      "unsubscribed": "{email} is unsubscribed: you will get no more emails.",
+      "badLink": "this link is not valid anymore."
     }
   },
   "settings": {
@@ -980,5 +1071,62 @@
     "upToDate": "up to date",
     "checked": "checked {ago}",
     "checkNow": "check now"
+  },
+  "pageIncidents": {
+    "pageTitle": "incidents: {name}",
+    "intro": "Tell visitors what is going on: open an incident and post updates until it is resolved. They show on the public page.",
+    "introSubscribers": "Tell visitors what is going on: open an incident and post updates until it is resolved. They show on the public page and are emailed to subscribers.",
+    "noPage": "no status page selected",
+    "openPage": "open page",
+    "back": "back",
+    "error": "error",
+    "incidentTitle": "title",
+    "titlePlaceholder": "Slow responses of the API",
+    "impactLabel": "impact",
+    "statusLabel": "status",
+    "message": "message",
+    "messagePlaceholder": "We are looking into slow responses of the API.",
+    "updatePlaceholder": "what changed?",
+    "notify": "email subscribers",
+    "create": "open incident",
+    "posting": "posting...",
+    "posted": "posted",
+    "postedNotified": "posted, {count, plural, one {# email} other {# emails}} on the way",
+    "postUpdate": "post update",
+    "saved": "incident saved",
+    "save": "save",
+    "cancel": "cancel",
+    "edit": "edit",
+    "rm": "rm",
+    "deleted": "incident deleted",
+    "deleteTitle": "delete {name}?",
+    "deleteText": "The incident and all its updates disappear from the public page. Emails already sent stay sent.",
+    "deleteUpdate": "delete update",
+    "updateDeleted": "update deleted",
+    "started": "started {at}",
+    "resolvedAt": "resolved {at}",
+    "openTitle": "open ({count})",
+    "noOpen": "no open incidents.",
+    "pastTitle": "resolved ({count})",
+    "subscribersTitle": "subscribers ({confirmed} confirmed, {pending} waiting)",
+    "subscriptionsOff": "Subscriptions are off: pick a working email channel in the page settings. Nobody gets emails until then.",
+    "noSubscribers": "nobody subscribed yet.",
+    "confirmed": "confirmed {at}",
+    "pending": "waiting for confirmation",
+    "subscriberRemoved": "subscriber removed",
+    "removeSubscriberTitle": "remove {email}?",
+    "status": {
+      "investigating": "investigating",
+      "identified": "identified",
+      "monitoring": "monitoring",
+      "resolved": "resolved"
+    },
+    "impact": {
+      "none": "no impact",
+      "minor": "minor",
+      "major": "major",
+      "critical": "critical"
+    },
+    "addUpdate": "add an update"
   }
 }

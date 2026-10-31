@@ -17,6 +17,7 @@ const toc = [
   ["agents", "add a location"],
   ["agent-updates", "agent updates"],
   ["checks", "check types"],
+  ["phases", "response time per phase"],
   ["response-checks", "response checks (JSON)"],
   ["mcp", "mcp servers"],
   ["heartbeat", "heartbeat monitors"],
@@ -30,6 +31,7 @@ const toc = [
   ["mcp", "mcp server"],
   ["prometheus", "prometheus"],
   ["upgrade", "upgrade + backup"],
+  ["verify", "verify a release"],
   ["build", "build from source"],
   ["contributing", "contributing"],
 ] as const
@@ -239,6 +241,12 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
               Agents update themselves only from an https hub (or plain http on a loopback or private IP address).
               To allow it over plain http anyway, use <C>-insecure-update</C> (<C>PINGTXT_INSECURE_UPDATE=1</C>).
             </li>
+            <li>
+              Agents also check the hub&apos;s checksum against the <C>SHA256SUMS</C> of the GitHub release of that version, so a
+              tampered hub cannot push its own binary. <C>-verify-update</C> (<C>PINGTXT_VERIFY_UPDATE</C>) is{" "}
+              <C>auto</C> by default (skipped with a warning if GitHub is unreachable), <C>strict</C> to install only matching
+              published releases, or <C>off</C> for forks and private builds.
+            </li>
             <li>Docker agents never replace their binary: pull the new image or use Watchtower.</li>
           </ul>
         </Section>
@@ -267,6 +275,18 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Passwords in connection URLs are hidden in the list and in notifications; use a read-only user. Docker checks need{" "}
             <C>/var/run/docker.sock</C> on the hub or agent that runs them (add{" "}
             <C>-v /var/run/docker.sock:/var/run/docker.sock:ro</C>).
+          </p>
+        </Section>
+
+        <Section id="phases" title="response time per phase">
+          <p>
+            HTTP and keyword checks measure where the time goes: <b className="text-foreground">DNS</b> lookup,{" "}
+            <b className="text-foreground">connect</b>, <b className="text-foreground">TLS</b> handshake,{" "}
+            <b className="text-foreground">wait</b> for the first byte (TTFB, the server at work) and{" "}
+            <b className="text-foreground">transfer</b> of the body. On the monitor page switch the response time chart to{" "}
+            <b className="text-foreground">by phase</b>, per location or all together; hover a latency in the log for the
+            breakdown of that check. With redirects the phases of every hop are added up. Agents measure phases from this
+            version on: update older ones to see their data.
           </p>
         </Section>
 
@@ -361,6 +381,22 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             For a custom domain (e.g. <C>status.example.com</C>), set it on the page, point its DNS at the hub and route the host
             to pingtxt in your reverse proxy. On that host only the status page is served.
           </p>
+          <p>
+            Post <b className="text-foreground">incidents</b> on a page with a timeline of written updates (investigating,
+            identified, monitoring, resolved). With an email channel picked under <i>email subscriptions</i>, visitors can
+            subscribe: they confirm through a link, then get every update by email, each with an unsubscribe link.
+          </p>
+          <p>
+            <b className="text-foreground">README badges</b>: every published page has SVG badges for its overall state and for
+            each monitor it shows (state, uptime, response time). Copy them from the monitor page or the status page editor:
+          </p>
+          <CopyBlock
+            code={`[![uptime](https://status.example.com/api/badge/acme/12/uptime.svg?period=7d)](https://status.example.com/status/acme/)`}
+          />
+          <p>
+            Kinds: <C>status</C>, <C>uptime</C>, <C>response</C>; <C>period=</C> <C>24h</C>, <C>7d</C>, <C>30d</C> or{" "}
+            <C>90d</C>; optional <C>label=</C> and <C>style=flat-square</C>. Drafts and monitors not on the page have no badge.
+          </p>
         </Section>
 
         <Section id="maintenance" title="maintenance windows">
@@ -382,6 +418,19 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
           <p>
             Webhook (JSON), Discord, Slack, Telegram, ntfy and email (SMTP with STARTTLS/TLS). Add them under{" "}
             <b className="text-foreground">notify</b>, test them before saving, and attach them to monitors.
+          </p>
+          <p>
+            <b className="text-foreground">Periodic reports</b>, on the same page, email the uptime, the incidents and the
+            downtime of the last week (every Monday) or month (on the 1st) per monitor group, compared with the period before.
+            Pick the email channels, optionally some groups, the hour and the time zone; preview a report or send it now
+            before turning it on.
+          </p>
+          <p>
+            Escalation and reminders are set per channel. <b className="text-foreground">send after</b> N minutes alerts the
+            channel only if the monitor is still down by then (an on-call phone, a manager), so short outages never reach it.{" "}
+            <b className="text-foreground">repeat every</b> N minutes sends a STILL DOWN reminder while the monitor stays down
+            (at least 5). Webhooks carry <C>reminder</C> and <C>down_since</C>. Nothing is sent during maintenance
+            windows; due alerts go out when the window ends.
           </p>
         </Section>
 
@@ -512,6 +561,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
               [<C key="1">pingtxt_monitor_up</C>, "1 up or degraded, 0 down"],
               [<C key="2">pingtxt_monitor_uptime_ratio</C>, "uptime per window (24h, 7d, 30d)"],
               [<C key="3">pingtxt_check_latency_seconds</C>, "last check per location"],
+              [<C key="3p">pingtxt_check_phase_seconds</C>, "DNS, connect, TLS and first byte of the last HTTP check"],
               [<C key="4">pingtxt_cert_expiry_days</C>, "days before the certificate expires"],
               [<C key="5">pingtxt_domain_expiry_days</C>, "days before the domain expires"],
               [<C key="6">pingtxt_agent_connected</C>, "agent connectivity"],
@@ -532,6 +582,28 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Turn it off in <b className="text-foreground">settings → updates</b>, or start the hub with{" "}
             <C>PINGTXT_DISABLE_UPDATE_CHECK=true</C> so it never contacts GitHub.
           </p>
+        </Section>
+
+        <Section id="verify" title="verify a release">
+          <p>
+            Releases after v0.1.0 are signed with <a href="https://docs.sigstore.dev/" className="text-foreground underline underline-offset-4">cosign</a>{" "}
+            in keyless mode, tied to the GitHub workflow that built them. Each release ships <C>SHA256SUMS</C> and its signature{" "}
+            <C>SHA256SUMS.sigstore.json</C>; images on ghcr.io are signed by digest.
+          </p>
+          <CopyBlock
+            code={`V=v0.2.0
+base=https://github.com/federico-it/pingtxt/releases/download/$V
+curl -fsSLO $base/SHA256SUMS -O $base/SHA256SUMS.sigstore.json -O $base/pingtxt-agent-linux-amd64
+cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \\
+  --certificate-identity "https://github.com/federico-it/pingtxt/.github/workflows/release.yml@refs/tags/$V" \\
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+sha256sum --ignore-missing -c SHA256SUMS`}
+          />
+          <CopyBlock
+            code={`cosign verify ghcr.io/federico-it/pingtxt:\${V#v} \\
+  --certificate-identity "https://github.com/federico-it/pingtxt/.github/workflows/docker.yml@refs/tags/$V" \\
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com`}
+          />
         </Section>
 
         <Section id="build" title="build from source">

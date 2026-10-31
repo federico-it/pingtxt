@@ -1,20 +1,23 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
+import { PageBadge } from "@/components/badge-info"
 import { GroupToggle, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
 import { Field } from "@/components/settings/field"
 import { StatusGlyph } from "@/components/status"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { api, useApi, type Monitor, type StatusPage } from "@/lib/api"
+import { api, useApi, type Monitor, type Notifier, type StatusPage } from "@/lib/api"
 import { useMounted } from "@/hooks/use-now"
 
 type Draft = Omit<StatusPage, "id" | "created_at">
@@ -28,6 +31,7 @@ const empty: Draft = {
   show_incidents: true,
   monitor_ids: [],
   group_ids: [],
+  subscribe_notifier_id: 0,
 }
 
 function slugify(s: string) {
@@ -44,6 +48,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   const router = useRouter()
   const mounted = useMounted()
   const monitors = useApi<Monitor[]>("/api/monitors", { refreshInterval: 0 })
+  const notifiers = useApi<Notifier[]>("/api/notifiers", { refreshInterval: 0 })
   const [d, setD] = useState<Draft>(initial ? { ...initial, group_ids: initial.group_ids ?? [] } : empty)
   const { groups, groupById } = useLabels()
   const [slugTouched, setSlugTouched] = useState(!!initial)
@@ -54,6 +59,11 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   // Monitors of a picked group are on the page already.
   const available = (monitors.data ?? []).filter((m) => !d.monitor_ids.includes(m.id) && !d.group_ids.includes(m.group_id))
   const origin = mounted ? window.location.origin : ""
+  const emailChannels = (notifiers.data ?? []).filter((n) => n.type === "email")
+  const channelItems = [
+    { value: "0", label: t("subscribeOff") },
+    ...emailChannels.map((n) => ({ value: String(n.id), label: n.enabled ? n.name : `${n.name} (${t("channelDisabled")})` })),
+  ]
 
   function set<K extends keyof Draft>(k: K, v: Draft[K]) {
     setD((p) => ({ ...p, [k]: v }))
@@ -151,6 +161,32 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
           </span>
         </label>
       </div>
+
+      <Section title={t("subscribeTitle")}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label={t("subscribeChannel")}
+            hint={emailChannels.length === 0 && notifiers.data ? t("subscribeNoChannel") : t("subscribeHint")}
+          >
+            <Select
+              items={channelItems}
+              value={String(d.subscribe_notifier_id ?? 0)}
+              onValueChange={(v) => set("subscribe_notifier_id", Number(v ?? 0))}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {channelItems.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+      </Section>
 
       {(groups.data?.length ?? 0) > 0 && (
         <Section title={t("groupsTitle", { count: d.group_ids.length })}>
@@ -267,6 +303,8 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         )}
       </Section>
 
+      {initial?.published && <PageBadge page={initial} />}
+
       <div className="mt-8 flex flex-wrap gap-2">
         <Button type="submit" disabled={busy}>
           {busy ? t("saving") : t("save")}
@@ -274,6 +312,11 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         {initial && (
           <Button variant="outline" render={<a href={`/status/${initial.slug}/`} target="_blank" rel="noreferrer" />} nativeButton={false}>
             {t("openPage")}
+          </Button>
+        )}
+        {initial && (
+          <Button variant="outline" render={<Link href={`/status-pages/incidents/?id=${initial.id}`} />} nativeButton={false}>
+            {t("incidents")}
           </Button>
         )}
         <Button type="button" variant="ghost" onClick={() => router.push("/status-pages/")}>

@@ -77,6 +77,9 @@ func sameSnapshot(t *testing.T, name string, a, b snapshot) {
 				!near(x.AvgMs, y.AvgMs) || !near(x.MinMs, y.MinMs) || !near(x.MaxMs, y.MaxMs) {
 				t.Fatalf("%s: bucket %d/%d: %+v, want %+v", name, i, j, y, x)
 			}
+			if (x.Phases == nil) != (y.Phases == nil) || x.Phases != nil && *x.Phases != *y.Phases {
+				t.Fatalf("%s: bucket %d/%d phases: %+v, want %+v", name, i, j, y.Phases, x.Phases)
+			}
 		}
 	}
 }
@@ -96,6 +99,9 @@ func TestRollupKeepsHistory(t *testing.T) {
 		ts := now - int64(i)*5*60*1000 - 1
 		for _, loc := range []string{"local", "agent:1"} {
 			r := &ResultRow{MonitorID: m.ID, Location: loc, TS: ts, OK: i%9 != 0, LatencyMs: float64(5 + (i*7)%50), Maint: i%13 == 0}
+			if i%3 != 0 { // some checks measured phases, others did not (old agents)
+				r.Timing = &Phases{DNSMs: 0.4 + float64(i%5), ConnectMs: 1.25, TLSMs: float64(i % 3), TTFBMs: 2.5}
+			}
 			if !r.OK {
 				r.MonState = MonDown
 				if i%2 == 0 {
@@ -112,6 +118,9 @@ func TestRollupKeepsHistory(t *testing.T) {
 		t.Fatalf("nothing may be pruned before the rollup, pruned %d", n)
 	}
 	before := takeSnapshot(t, s, m.ID, now)
+	if p := before.buckets[0][0].Phases; p == nil || p.ConnectMs != 1.3 || p.TTFBMs != 2.5 || p.TotalMs <= p.DNSMs+p.ConnectMs+p.TLSMs+p.TTFBMs-1 {
+		t.Fatalf("phases of the first bucket: %+v", p)
+	}
 
 	hours, err := s.RollupResults(time.UnixMilli(now).Add(RollupLag), nil)
 	if err != nil {
@@ -143,5 +152,93 @@ func TestRollupKeepsHistory(t *testing.T) {
 	_ = s.db.QueryRow(`SELECT COUNT(*) FROM result_rollups WHERE start < ?`, now-3*24*RollupHour).Scan(&left)
 	if left != 0 {
 		t.Fatalf("%d old rollups left", left)
+	}
+}
+
+func TestResultPhasesRoundTrip(t *testing.T) {
+	s := openTest(t)
+	m := &Monitor{Name: "m", Type: "http", Target: "http://x", IntervalSec: 60, Locations: []string{"local"}}
+	if err := s.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UnixMilli()
+	with := &ResultRow{MonitorID: m.ID, Location: "local", TS: now - 2, OK: true, LatencyMs: 40,
+		Timing: &Phases{DNSMs: 3.04, ConnectMs: 7.25, TLSMs: 12, TTFBMs: 0.01}}
+	without := &ResultRow{MonitorID: m.ID, Location: "local", TS: now - 1, OK: true, LatencyMs: 9}
+	if err := s.InsertResult(with); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.InsertResults([]*ResultRow{without}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.RecentResults(m.ID, 10)
+	if err != nil || len(got) != 2 {
+		t.Fatalf("%v %v", got, err)
+	}
+	if got[0].Timing != nil {
+		t.Fatalf("no phases measured, got %+v", got[0].Timing)
+	}
+	// Tenths of a ms; a measured wait is never stored as 0.
+	if p := got[1].Timing; p == nil || *p != (Phases{DNSMs: 3, ConnectMs: 7.3, TLSMs: 12, TTFBMs: 0.1}) {
+		t.Fatalf("phases %+v", p)
+	}
+	b, err := s.Buckets(m.ID, now-RollupHour, now+1, RollupHour, true)
+	if err != nil || len(b) != 1 || b[0].Phases == nil || b[0].Phases.TotalMs != 40 || b[0].AvgMs != 24.5 {
+		t.Fatalf("buckets %+v %v", b, err)
+	}
+}
+
+// Migration 18 turns failed checks stored before migration 14 back into
+// uptime when most locations of the same round were fine, in the raw
+// results and in the rollup hours they still cover.
+func TestRecomputeOldMonState(t *testing.T) {
+	s := openTest(t)
+	m := &Monitor{Name: "m", Type: "http", Target: "http://x", IntervalSec: 60, Locations: []string{"local"}}
+	if err := s.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UnixMilli()
+	now -= now % RollupHour
+	h := now - 2*RollupHour
+	locs := []string{"local", "agent:1", "agent:2"}
+	var rows []*ResultRow
+	for i := range 60 {
+		ts := h + int64(i)*60_000 + 5_000
+		for j, loc := range locs {
+			// Round 10: one location fails. Round 20: two of three fail.
+			ok := !(i == 10 && j == 0) && !(i == 20 && j < 2)
+			r := &ResultRow{MonitorID: m.ID, Location: loc, TS: ts + int64(j)*1000, OK: ok, LatencyMs: 1}
+			if !ok {
+				r.MonState = MonDown // as migration 14 left them
+			}
+			rows = append(rows, r)
+		}
+	}
+	if err := s.InsertResults(rows); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RollupResults(time.UnixMilli(now).Add(RollupLag), nil); err != nil {
+		t.Fatal(err)
+	}
+	if up, _, _ := s.Uptime(m.ID, h); up != 177.0/180 {
+		t.Fatalf("before: uptime %v, want %v", up, 177.0/180)
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.execScript(laterMigrations[len(laterMigrations)-1].text(s.db.driver)); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	// Only the down round (two failed rows) still counts.
+	if up, _, _ := s.Uptime(m.ID, h); up != 178.0/180 {
+		t.Fatalf("after: uptime %v, want %v", up, 178.0/180)
+	}
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM results WHERE mon_state = 2`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("down rows: %d %v", n, err)
 	}
 }

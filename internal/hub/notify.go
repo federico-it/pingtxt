@@ -44,6 +44,10 @@ type Event struct {
 	Cause     string `json:"cause,omitempty"`
 	At        int64  `json:"at"`
 	Test      bool   `json:"test,omitempty"`
+	// Status events of an incident: when the monitor went down (unix ms) and,
+	// for "down", the reminder number (0 = first alert).
+	DownSince int64 `json:"down_since,omitempty"`
+	Reminder  int   `json:"reminder,omitempty"`
 	// Expiry events only.
 	Subject   string `json:"subject,omitempty"`    // host name or domain
 	ExpiresAt int64  `json:"expires_at,omitempty"` // unix ms
@@ -65,7 +69,43 @@ func (e Event) Title() string {
 		}
 		return fmt.Sprintf("pingtxt: %s %s %s", e.Subject, what, e.Status)
 	}
-	return "pingtxt: " + e.Monitor + " " + strings.ToUpper(e.Status)
+	return "pingtxt: " + e.Monitor + " " + e.statusWord()
+}
+
+// statusWord is DOWN, STILL DOWN (reminders) or UP.
+func (e Event) statusWord() string {
+	if e.Status == StatusDown && e.Reminder > 0 {
+		return "STILL DOWN"
+	}
+	return strings.ToUpper(e.Status)
+}
+
+// downFor is how long the monitor has been (or was) down, or "" when the
+// alert is not late.
+func (e Event) downFor() string {
+	if e.DownSince == 0 || e.At-e.DownSince < 60_000 {
+		return ""
+	}
+	return fmtDuration(time.Duration(e.At-e.DownSince) * time.Millisecond)
+}
+
+// fmtDuration renders a duration as "45m", "2h 5m" or "3d 4h".
+func fmtDuration(d time.Duration) string {
+	m := int(d / time.Minute)
+	switch {
+	case m < 60:
+		return fmt.Sprintf("%dm", m)
+	case m < 24*60:
+		if m%60 == 0 {
+			return fmt.Sprintf("%dh", m/60)
+		}
+		return fmt.Sprintf("%dh %dm", m/60, m%60)
+	}
+	h := m / 60
+	if h%24 == 0 {
+		return fmt.Sprintf("%dd", h/24)
+	}
+	return fmt.Sprintf("%dd %dh", h/24, h%24)
 }
 
 func (e Event) Text() string {
@@ -78,13 +118,23 @@ func (e Event) Text() string {
 		return prefix + e.expiryText()
 	}
 	if e.Status == StatusDown {
-		s := fmt.Sprintf("%s[DOWN] %s (%s) at %s", prefix, e.Monitor, e.Target, ts)
+		var s string
+		if d := e.downFor(); d != "" {
+			since := time.UnixMilli(e.DownSince).UTC().Format("2006-01-02 15:04:05 UTC")
+			s = fmt.Sprintf("%s[%s] %s (%s) down for %s, since %s", prefix, e.statusWord(), e.Monitor, e.Target, d, since)
+		} else {
+			s = fmt.Sprintf("%s[DOWN] %s (%s) at %s", prefix, e.Monitor, e.Target, ts)
+		}
 		if e.Cause != "" {
 			s += "\n> " + e.Cause
 		}
 		return s
 	}
-	return fmt.Sprintf("%s[UP] %s (%s) is back up at %s", prefix, e.Monitor, e.Target, ts)
+	s := fmt.Sprintf("%s[UP] %s (%s) is back up at %s", prefix, e.Monitor, e.Target, ts)
+	if d := e.downFor(); d != "" {
+		s += " after " + d + " down"
+	}
+	return s
 }
 
 func (e Event) expiryText() string {
@@ -127,6 +177,15 @@ type Notifier struct {
 
 func NewNotifier(st *store.Store, log *slog.Logger) *Notifier {
 	return &Notifier{store: st, log: log, client: &http.Client{Timeout: 15 * time.Second}}
+}
+
+// SendTo delivers the event to one channel, asynchronously.
+func (n *Notifier) SendTo(nt *store.Notifier, e Event) {
+	go func() {
+		if err := n.Deliver(context.Background(), nt, e); err != nil {
+			n.log.Warn("notification failed", "notifier", nt.Name, "err", err)
+		}
+	}()
 }
 
 // Send delivers the event to every enabled channel, asynchronously.

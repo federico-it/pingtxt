@@ -137,13 +137,30 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/notifiers/{id}", auth(h.deleteNotifier))
 	mux.HandleFunc("POST /api/notifiers/test", auth(h.testDraftNotifier))
 	mux.HandleFunc("POST /api/notifiers/{id}/test", auth(h.testNotifier))
+	mux.HandleFunc("GET /api/reports", auth(h.getReports))
+	mux.HandleFunc("PUT /api/reports", auth(h.putReports))
+	mux.HandleFunc("GET /api/reports/preview", auth(h.previewReport))
+	mux.HandleFunc("POST /api/reports/send", auth(h.sendReportNow))
 
 	mux.HandleFunc("GET /api/status-pages", auth(h.listStatusPages))
 	mux.HandleFunc("POST /api/status-pages", auth(h.saveStatusPage))
 	mux.HandleFunc("GET /api/status-pages/{id}", auth(h.getStatusPage))
 	mux.HandleFunc("PUT /api/status-pages/{id}", auth(h.saveStatusPage))
 	mux.HandleFunc("DELETE /api/status-pages/{id}", auth(h.deleteStatusPage))
+	mux.HandleFunc("GET /api/status-pages/{id}/incidents", auth(h.listPageIncidents))
+	mux.HandleFunc("POST /api/status-pages/{id}/incidents", auth(h.createPageIncident))
+	mux.HandleFunc("PUT /api/status-pages/{id}/incidents/{incident}", auth(h.updatePageIncident))
+	mux.HandleFunc("DELETE /api/status-pages/{id}/incidents/{incident}", auth(h.deletePageIncident))
+	mux.HandleFunc("POST /api/status-pages/{id}/incidents/{incident}/updates", auth(h.addPageIncidentUpdate))
+	mux.HandleFunc("DELETE /api/status-pages/{id}/incidents/{incident}/updates/{update}", auth(h.deletePageIncidentUpdate))
+	mux.HandleFunc("GET /api/status-pages/{id}/subscribers", admin(h.listPageSubscribers)) // email addresses: admins only
+	mux.HandleFunc("DELETE /api/status-pages/{id}/subscribers/{subscriber}", admin(h.deletePageSubscriber))
 	mux.HandleFunc("GET /api/public/status/{slug}", h.publicStatus)
+	mux.HandleFunc("GET /api/badge/{slug}/{kind}", h.pageBadge) // README badges, see badges.go
+	mux.HandleFunc("GET /api/badge/{slug}/{monitor}/{kind}", h.monitorBadge)
+	mux.HandleFunc("POST /api/public/status/{slug}/subscribe", h.publicSubscribe)
+	mux.HandleFunc("POST /api/public/subscriptions/{token}/confirm", h.confirmSubscription)
+	mux.HandleFunc("POST /api/public/subscriptions/{token}/unsubscribe", h.unsubscribe)
 
 	mux.HandleFunc("GET /metrics", h.metrics)
 	mux.HandleFunc(mcpPath, h.serveMCP(mux)) // MCP server for AI assistants, see mcp.go
@@ -213,7 +230,10 @@ func securityHeaders(next http.Handler) http.Handler {
 		// Mutating API calls must be JSON: blocks cross-site form posts (CSRF).
 		// Heartbeats are exempt: they are authenticated by the URL token, not
 		// by the session cookie, and any client must be able to send them.
-		if strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/api/push/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+		// So are subscription links, which mail clients post as forms for
+		// one-click unsubscribe (RFC 8058).
+		if strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/api/push/") &&
+			!strings.HasPrefix(r.URL.Path, "/api/public/subscriptions/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
 			ctype := r.Header.Get("Content-Type")
 			// Backup uploads are raw files. application/octet-stream is not a
 			// CORS "simple" type either, so a cross-site form cannot send it.
@@ -1210,6 +1230,12 @@ func validateNotifier(n *store.Notifier) error {
 	}
 	if n.Config == nil {
 		n.Config = map[string]string{}
+	}
+	if n.DelayMin < 0 || n.DelayMin > maxAlertMin {
+		return fmt.Errorf("delay must be between 0 and %d minutes", maxAlertMin)
+	}
+	if n.RepeatMin != 0 && (n.RepeatMin < minRepeatMin || n.RepeatMin > maxAlertMin) {
+		return fmt.Errorf("repeat interval must be 0 (off) or between %d and %d minutes", minRepeatMin, maxAlertMin)
 	}
 	if n.Type == "telegram" {
 		if n.Config["bot_token"] == "" || n.Config["chat_id"] == "" {
