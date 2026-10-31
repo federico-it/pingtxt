@@ -104,11 +104,17 @@ func (l *loginLimits) init() {
 
 // limitAddr is the client address used for rate limits. It is the direct
 // peer, or the first X-Forwarded-For entry when the hub runs behind a proxy.
+// IPv6 clients count per /64: one host usually holds a whole /64 and could
+// otherwise rotate addresses to get around the limit.
 func limitAddr(r *http.Request) string {
-	if ip := net.ParseIP(clientIP(r)); ip != nil {
-		return ip.String()
+	ip := net.ParseIP(clientIP(r))
+	if ip == nil {
+		return r.RemoteAddr
 	}
-	return r.RemoteAddr
+	if ip.To4() != nil {
+		return ip.To4().String()
+	}
+	return (&net.IPNet{IP: ip.Mask(net.CIDRMask(64, 128)), Mask: net.CIDRMask(64, 128)}).String()
 }
 
 func tooManyAttempts(w http.ResponseWriter, wait time.Duration) {

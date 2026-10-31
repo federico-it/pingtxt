@@ -40,6 +40,7 @@ func runGRPC(ctx context.Context, j Job, timeout time.Duration) Result {
 		DisableKeepAlives:   true,
 		TLSHandshakeTimeout: timeout,
 		Protocols:           new(http.Protocols),
+		DialContext:         j.dialContext,
 	}
 	scheme := "http"
 	if secure {

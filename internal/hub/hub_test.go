@@ -221,6 +221,46 @@ func TestResponseRulesNeedAnUpdatedAgent(t *testing.T) {
 	}
 }
 
+func TestIPFamilyNeedsAnUpdatedAgent(t *testing.T) {
+	h, st := newTestHub(t)
+	a, err := st.CreateAgent("old", "old", "old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.agents[a.ID] = &agentConn{agent: a, done: make(chan struct{})}
+	loc := AgentLocation(a.ID)
+	m := &store.Monitor{Name: "m", Type: "http", Target: "http://x", Retries: 1, Locations: []string{loc}, IPFamily: check.IPv6}
+	if err := h.validateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.Monitor(m.ID); got.IPFamily != check.IPv6 {
+		t.Fatalf("ip_family not stored: %d", got.IPFamily)
+	}
+	if j := jobFor(m); j.IPFamily != check.IPv6 {
+		t.Fatalf("job ip_family %d", j.IPFamily)
+	}
+	h.MonitorChanged(m.ID)
+
+	// An old agent reports up without knowing the family.
+	h.HandleResult(loc, result(m.ID, true))
+	if s := status(t, st, m.ID); s != StatusDown {
+		t.Fatalf("want down, got %s", s)
+	}
+	rows, _ := st.RecentResults(m.ID, 1)
+	if len(rows) != 1 || rows[0].Message != "this agent cannot limit checks to IPv4 or IPv6: update it" {
+		t.Fatalf("unexpected result: %+v", rows)
+	}
+	r := result(m.ID, true)
+	r.IPFamily = check.IPv6
+	h.HandleResult(loc, r)
+	if s := status(t, st, m.ID); s != StatusUp {
+		t.Fatalf("want up, got %s", s)
+	}
+}
+
 func TestValidateResponseRules(t *testing.T) {
 	h, _ := newTestHub(t)
 	bad := &store.Monitor{Name: "m", Type: "http", Target: "http://x",

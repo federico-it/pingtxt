@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -451,6 +452,39 @@ var urlSchemes = map[string][]string{
 var containerRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 var hostPortRe = regexp.MustCompile(`^[^\s/]+:\d{1,5}$`)
 
+var errIPv6Brackets = errors.New("put IPv6 addresses in brackets before the port, e.g. [2001:db8::1]:443")
+
+// checkIPv6Brackets rejects URL targets with a bare IPv6 address, like
+// http://2001:db8::1/, which Go reads as host "2001" and a bad port.
+func checkIPv6Brackets(m *store.Monitor) error {
+	t := m.Target
+	switch m.Type {
+	case check.TypeHTTP, check.TypeKeyword, check.TypeMCP, check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo:
+	case check.TypeGRPC:
+		if !strings.Contains(t, "://") {
+			t = "grpc://" + t
+		}
+	default:
+		return nil
+	}
+	_, rest, ok := strings.Cut(t, "://")
+	if !ok {
+		return nil
+	}
+	host := rest
+	if i := strings.IndexAny(host, "/?#"); i >= 0 {
+		host = host[:i]
+	}
+	if i := strings.LastIndex(host, "@"); i >= 0 {
+		host = host[i+1:]
+	}
+	host, _, _ = strings.Cut(host, ",") // mongodb host lists
+	if strings.Count(host, ":") > 1 && !strings.HasPrefix(host, "[") {
+		return errIPv6Brackets
+	}
+	return nil
+}
+
 func (h *Hub) validateMonitor(m *store.Monitor) error {
 	m.Name = strings.TrimSpace(m.Name)
 	m.Target = strings.TrimSpace(m.Target)
@@ -473,6 +507,12 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 	if m.Type != check.TypeHTTP && m.Type != check.TypeKeyword {
 		m.Assertions = []check.Assertion{}
+	}
+	switch {
+	case m.Type == check.TypePush || m.Type == check.TypeDocker:
+		m.IPFamily = check.IPAny // no network check of their own
+	case m.IPFamily != check.IPAny && m.IPFamily != check.IPv4 && m.IPFamily != check.IPv6:
+		return errors.New("ip_family must be 0 (IPv4 or IPv6), 4 or 6")
 	}
 	if m.Assertions == nil {
 		m.Assertions = []check.Assertion{}
@@ -508,10 +548,14 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 		if !hostPortRe.MatchString(m.Target) {
 			return errors.New("target must be host:port")
 		}
+		if _, _, err := net.SplitHostPort(m.Target); err != nil {
+			return errIPv6Brackets
+		}
 	case check.TypePing, check.TypeDNS:
 		if strings.ContainsAny(m.Target, " /") {
 			return errors.New("target must be a hostname or IP")
 		}
+		m.Target = check.StripBrackets(m.Target)
 	case check.TypeMongo:
 		if _, err := check.ParseMongoURL(m.Target); err != nil {
 			return err
@@ -542,12 +586,16 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	case check.TypeSMTP:
 		t := m.Target
 		if !strings.Contains(t, "://") {
-			t = "smtp://" + t
+			t = "smtp://" + check.BracketIPv6(t)
 		}
 		u, err := url.Parse(t)
 		if err != nil || (u.Scheme != "smtp" && u.Scheme != "smtps") || u.Hostname() == "" || strings.Trim(u.Path, "/") != "" {
 			return errors.New("target must be smtp://host[:port] or smtps://host[:port]")
 		}
+	}
+
+	if err := checkIPv6Brackets(m); err != nil {
+		return err
 	}
 
 	if m.IntervalSec == 0 {

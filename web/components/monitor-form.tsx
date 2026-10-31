@@ -155,6 +155,7 @@ function withValue(list: { value: string; label: string }[], sec: number) {
 
 const methods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 const records = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"]
+const ipFamilies = [0, 4, 6] as const
 // Labels are in messages: monitorForm.mcpTransports.<value>.
 const mcpTransports = ["auto", "streamable", "sse"] as const
 
@@ -183,6 +184,7 @@ export const emptyMonitor: MonitorInput = {
   assertions: [],
   grace_sec: 300,
   degraded_pct: 0,
+  ip_family: 0,
   locations: ["local"],
   group_id: 0,
   tag_ids: [],
@@ -672,7 +674,7 @@ export function MonitorForm({
           <p className="mb-3 text-xs text-muted-foreground">
             {tr("locationsHint")}
           </p>
-          <div className="mb-4 max-w-xs">
+          <div className="mb-4 grid gap-4 sm:grid-cols-2">
             <Field
               label={tr("degradedPct")}
               hint={tr("degradedPctHint")}
@@ -691,6 +693,31 @@ export function MonitorForm({
                 }
               />
             </Field>
+            {m.type !== "docker" && (
+              <Field label={tr("ipFamily.label")} hint={tr("ipFamily.hint")}>
+                <Select
+                  items={ipFamilies.map((f) => ({
+                    value: String(f),
+                    label: tr(`ipFamily.v${f}`),
+                  }))}
+                  value={String(m.ip_family ?? 0)}
+                  onValueChange={(v) =>
+                    v && set("ip_family", Number(v) as Monitor["ip_family"])
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ipFamilies.map((f) => (
+                      <SelectItem key={f} value={String(f)}>
+                        {tr(`ipFamily.v${f}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {(locations.data ?? []).map((l) => (

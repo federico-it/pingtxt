@@ -247,6 +247,8 @@ var laterMigrations = []migration{
 	ALTER TABLE result_rollups ADD COLUMN up INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE result_rollups ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0;
 	UPDATE result_rollups SET up = ok;`},
+	// 15: checks over IPv4 only (4), IPv6 only (6) or either (0).
+	{sqlite: `ALTER TABLE monitors ADD COLUMN ip_family INTEGER NOT NULL DEFAULT 0`},
 }
 
 func sqliteOnly(list []string) []migration {

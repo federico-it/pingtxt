@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	_ "github.com/lib/pq" // registers the "postgres" driver
+	"github.com/lib/pq" // also registers the "postgres" driver
 )
 
 // runSQL connects to PostgreSQL or MySQL/MariaDB and runs a query
@@ -27,7 +27,7 @@ func runSQL(ctx context.Context, j Job) Result {
 		query = "SELECT 1"
 	}
 	start := time.Now()
-	db, err := sql.Open(driver, dsn)
+	db, err := openSQL(j, driver, dsn)
 	if err != nil {
 		return Result{Message: cleanErr(err)}
 	}
@@ -77,6 +77,36 @@ func runSQL(ctx context.Context, j Job) Result {
 	return Result{OK: true, LatencyMs: lat, Message: "query ok"}
 }
 
+// openSQL opens the database with the job's IP family. MySQL takes it in
+// the DSN (tcp4/tcp6); lib/pq needs its own dialer.
+func openSQL(j Job, driver, dsn string) (*sql.DB, error) {
+	if driver != "postgres" || j.IPFamily == IPAny {
+		return sql.Open(driver, dsn)
+	}
+	c, err := pq.NewConnector(dsn)
+	if err != nil {
+		return nil, err
+	}
+	c.Dialer(pqDialer{j})
+	return sql.OpenDB(c), nil
+}
+
+type pqDialer struct{ j Job }
+
+func (d pqDialer) Dial(network, addr string) (net.Conn, error) {
+	return d.j.dialContext(context.Background(), network, addr)
+}
+
+func (d pqDialer) DialTimeout(network, addr string, timeout time.Duration) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return d.j.dialContext(ctx, network, addr)
+}
+
+func (d pqDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	return d.j.dialContext(ctx, network, addr)
+}
+
 func sqlErr(ctx context.Context, err error) string {
 	if ctx.Err() != nil {
 		return "timeout"
@@ -110,7 +140,7 @@ func sqlDSN(j Job) (driver, dsn string, err error) {
 		return "postgres", u.String(), nil
 	case TypeMySQL:
 		c := mysql.NewConfig()
-		c.Net = "tcp"
+		c.Net = j.netFor("tcp")
 		c.Addr = u.Host
 		if u.Port() == "" {
 			c.Addr = net.JoinHostPort(u.Hostname(), "3306")

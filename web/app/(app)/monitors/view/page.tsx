@@ -145,6 +145,7 @@ function View() {
                   ? t("degradedAt", { pct: d.degraded_pct })
                   : t("degradedAtDefault")
               }`}
+            {d.ip_family ? ` · ${t(d.ip_family === 4 ? "ipv4Only" : "ipv6Only")}` : ""}
           </>
         )}
       </div>

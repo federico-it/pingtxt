@@ -61,6 +61,8 @@ export interface Monitor {
   grace_sec: number
   /** percent of failing locations that marks the monitor degraded; 0 = instance default */
   degraded_pct: number
+  /** 4 = IPv4 only, 6 = IPv6 only, 0 = either */
+  ip_family: 0 | 4 | 6
   locations: string[]
   /** 0 = no group */
   group_id: number

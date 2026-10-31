@@ -54,7 +54,7 @@ func runMongo(ctx context.Context, j Job) Result {
 		addr = net.JoinHostPort(strings.Trim(host, "[]"), "27017")
 	}
 	serverName, _, _ := net.SplitHostPort(addr)
-	conn, certExpiry, err := dial(ctx, addr, useTLS, serverName, j.IgnoreTLS || q.Get("tlsInsecure") == "true")
+	conn, certExpiry, err := dial(ctx, j, addr, useTLS, serverName, j.IgnoreTLS || q.Get("tlsInsecure") == "true")
 	if err != nil {
 		return Result{LatencyMs: ms(time.Since(start)), Message: cleanErr(err)}
 	}

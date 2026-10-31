@@ -58,6 +58,8 @@ type Job struct {
 	Body           string            `json:"body,omitempty"`
 	// Assertions are rules on the JSON body of http/keyword responses.
 	Assertions []Assertion `json:"assertions,omitempty"`
+	// IPFamily limits the check to IPv4 (4) or IPv6 (6); 0 uses either.
+	IPFamily int `json:"ip_family,omitempty"`
 }
 
 // Result is the outcome of a Job.
@@ -71,7 +73,10 @@ type Result struct {
 	CertExpiry int64   `json:"cert_expiry,omitempty"` // unix seconds
 	// Asserted is how many response rules passed. The hub uses it to spot
 	// agents too old to check them.
-	Asserted int   `json:"asserted,omitempty"`
+	Asserted int `json:"asserted,omitempty"`
+	// IPFamily repeats the job's IP family, so the hub can tell agents that
+	// do not know the setting (and would use either family) from those that do.
+	IPFamily int   `json:"ip_family,omitempty"`
 	At       int64 `json:"at"` // unix milliseconds
 }
 
@@ -113,6 +118,7 @@ func Run(ctx context.Context, j Job) Result {
 	}
 	r.JobID = j.ID
 	r.MonitorID = j.MonitorID
+	r.IPFamily = j.IPFamily
 	r.At = time.Now().UnixMilli()
 	r.Message = truncate(r.Message, 300)
 	return r
@@ -142,6 +148,7 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: j.IgnoreTLS},
 		DisableKeepAlives:   true,
 		TLSHandshakeTimeout: timeout,
+		DialContext:         j.dialContext,
 	}
 	defer tr.CloseIdleConnections()
 	client := &http.Client{Transport: tr, Timeout: timeout, CheckRedirect: dropHeadersOnRedirect(j.Headers)}
@@ -245,9 +252,8 @@ func StatusMatches(spec string, code int) bool {
 }
 
 func runTCP(ctx context.Context, j Job) Result {
-	var d net.Dialer
 	start := time.Now()
-	conn, err := d.DialContext(ctx, "tcp", j.Target)
+	conn, err := j.dialContext(ctx, "tcp", j.Target)
 	lat := ms(time.Since(start))
 	if err != nil {
 		return Result{LatencyMs: lat, Message: cleanErr(err)}
@@ -257,8 +263,9 @@ func runTCP(ctx context.Context, j Job) Result {
 }
 
 func runPing(ctx context.Context, j Job, timeout time.Duration) Result {
-	p, err := probing.NewPinger(j.Target)
-	if err != nil {
+	p := probing.New(StripBrackets(j.Target))
+	p.SetNetwork(j.netFor("ip"))
+	if err := p.Resolve(); err != nil {
 		return Result{Message: cleanErr(err)}
 	}
 	p.Count = 3
@@ -286,17 +293,19 @@ func runDNS(ctx context.Context, j Job) Result {
 	if j.DNSServer != "" {
 		server := j.DNSServer
 		if _, _, err := net.SplitHostPort(server); err != nil {
-			server = net.JoinHostPort(server, "53")
+			server = net.JoinHostPort(StripBrackets(server), "53")
 		}
 		res = &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
-				var d net.Dialer
-				return d.DialContext(ctx, network, server)
+				return j.dialContext(ctx, network, server)
 			},
 		}
+	} else if j.IPFamily != IPAny {
+		// The system resolver, reached over the chosen family only.
+		res = &net.Resolver{PreferGo: true, Dial: j.dialContext}
 	}
-	host := j.Target
+	host := StripBrackets(j.Target)
 	if u, err := url.Parse(host); err == nil && u.Host != "" {
 		host = u.Hostname()
 	}

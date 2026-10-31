@@ -17,6 +17,7 @@ const toc = [
   ["agents", "add a location"],
   ["agent-updates", "agent updates"],
   ["checks", "check types"],
+  ["ipv6", "ipv6"],
   ["response-checks", "response checks (JSON)"],
   ["mcp", "mcp servers"],
   ["heartbeat", "heartbeat monitors"],
@@ -256,8 +257,8 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             rows={[
               ["http(s)", <C key="h">https://example.com</C>, "status codes, headers, body, JSON rules, TLS expiry"],
               ["keyword", "url + text", "the response body contains (or not) a keyword"],
-              ["tcp port", <C key="t">host:port</C>, "connection opens"],
-              ["ping", "host", "ICMP echo (agents need NET_RAW)"],
+              ["tcp port", <C key="t">host:port</C>, "connection opens (IPv6: [2001:db8::1]:443)"],
+              ["ping", "host or IP", "ICMP echo or ICMPv6 (agents need NET_RAW)"],
               ["dns", "name + record type", "resolves, optional expected value"],
               ["postgresql", <C key="p">postgres://user:pass@host:5432/db</C>, "connect + query (default SELECT 1), optional expected value"],
               ["mysql / mariadb", <C key="m">mysql://user:pass@host:3306/db</C>, "same as postgresql"],
@@ -274,6 +275,28 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Passwords in connection URLs are hidden in the list and in notifications; use a read-only user. Docker checks need{" "}
             <C>/var/run/docker.sock</C> on the hub or agent that runs them (add{" "}
             <C>-v /var/run/docker.sock:/var/run/docker.sock:ro</C>).
+          </p>
+        </Section>
+
+        <Section id="ipv6" title="ipv6">
+          <p>
+            Every check type works over IPv6. Hosts with only AAAA records just work; write IPv6 addresses in brackets
+            when a port follows (<C>[2001:db8::1]:443</C>, <C>https://[2001:db8::1]/</C>,{" "}
+            <C>redis://[2001:db8::1]:6379</C>). Ping and dns take the bare address.
+          </p>
+          <p>
+            By default a check passes when IPv4 <i>or</i> IPv6 works, so a broken IPv6 on a dual-stack host goes unnoticed.
+            Set <b className="text-foreground">ip version</b> to <i>IPv4 only</i> or <i>IPv6 only</i> on the monitor (two
+            monitors cover both). Agents older than this version cannot do it and report the check as failed: update them.
+          </p>
+          <p>
+            The hub listens on IPv4 and IPv6 (<C>:8090</C>). Docker containers get no IPv6 by default, so checks to IPv6
+            targets fail from a container until IPv6 is enabled on its network (Docker 27 or later, and IPv6 on the server):
+          </p>
+          <CopyBlock label="docker-compose.yml" code={`networks:\n  default:\n    enable_ipv6: true`} />
+          <p>
+            With <C>docker run</C>: <C>docker network create --ipv6 pingtxt</C> and <C>--network pingtxt</C>, or{" "}
+            <C>--network host</C>.
           </p>
         </Section>
 

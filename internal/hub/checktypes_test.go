@@ -75,3 +75,53 @@ func TestEventTargetRedactsPassword(t *testing.T) {
 		t.Errorf("eventTarget = %q", got)
 	}
 }
+
+func TestValidateIPv6Targets(t *testing.T) {
+	h, _ := newTestHub(t)
+	cases := []struct {
+		typ, target string
+		ok          bool
+	}{
+		{check.TypeHTTP, "http://[2001:db8::1]:8080/health", true},
+		{check.TypeHTTP, "http://2001:db8::1/health", false},
+		{check.TypeTCP, "[2001:db8::1]:443", true},
+		{check.TypeTCP, "2001:db8::1:443", false},
+		{check.TypePing, "2001:db8::1", true},
+		{check.TypePing, "[2001:db8::1]", true},
+		{check.TypeDNS, "ipv6.example.com", true},
+		{check.TypeSMTP, "2001:db8::25", true},
+		{check.TypeSMTP, "[2001:db8::25]:587", true},
+		{check.TypeGRPC, "[2001:db8::1]:50051", true},
+		{check.TypeGRPC, "2001:db8::1:50051", false},
+		{check.TypeRedis, "redis://:pw@[2001:db8::1]:6379", true},
+		{check.TypeRedis, "redis://2001:db8::1", false},
+		{check.TypePostgres, "postgres://u:p@[::1]/app", true},
+		{check.TypeMongo, "mongodb://[::1]:27017,[::2]:27017/app", true},
+	}
+	for _, c := range cases {
+		m := &store.Monitor{Name: "x", Type: c.typ, Target: c.target}
+		err := h.validateMonitor(m)
+		if (err == nil) != c.ok {
+			t.Errorf("%s %q: err = %v, want ok=%v", c.typ, c.target, err, c.ok)
+		}
+	}
+	// ping keeps the address without brackets
+	m := &store.Monitor{Name: "x", Type: check.TypePing, Target: "[::1]"}
+	if err := h.validateMonitor(m); err != nil || m.Target != "::1" {
+		t.Fatalf("ping target %q, err %v", m.Target, err)
+	}
+}
+
+func TestValidateIPFamily(t *testing.T) {
+	h, _ := newTestHub(t)
+	for fam, ok := range map[int]bool{0: true, 4: true, 6: true, 5: false, -1: false} {
+		m := &store.Monitor{Name: "x", Type: check.TypeHTTP, Target: "https://example.com", IPFamily: fam}
+		if err := h.validateMonitor(m); (err == nil) != ok {
+			t.Errorf("ip_family %d: err = %v", fam, err)
+		}
+	}
+	m := &store.Monitor{Name: "x", Type: check.TypeDocker, Target: "web", IPFamily: 6}
+	if err := h.validateMonitor(m); err != nil || m.IPFamily != 0 {
+		t.Fatalf("docker keeps ip_family %d, err %v", m.IPFamily, err)
+	}
+}
