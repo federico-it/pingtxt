@@ -46,6 +46,10 @@
       "description": "Alert channels: webhook, Discord, Slack, Telegram, ntfy, email."
     },
     {
+      "name": "Reports",
+      "description": "Periodic email reports: uptime and incidents of the last week or month, per monitor group."
+    },
+    {
       "name": "Status pages",
       "description": "Public pages and their data."
     },
@@ -5462,6 +5466,983 @@
           }
         }
       }
+    },
+    "/api/reports": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Get report settings",
+        "operationId": "getReports",
+        "description": "Report settings, when the next reports go out and the last ones sent.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reports"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Save report settings",
+        "operationId": "putReports",
+        "description": "Turns the weekly and monthly reports on or off and picks the email channels, the groups, the hour and the time zone. A report that is turned on starts with the next period.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportSettings"
+              },
+              "example": {
+                "weekly": true,
+                "monthly": true,
+                "hour": 8,
+                "timezone": "Europe/Rome",
+                "notifier_ids": [
+                  3
+                ],
+                "group_ids": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reports"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/reports/preview": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Preview a report",
+        "operationId": "previewReport",
+        "description": "The report of the last complete week (Monday to Sunday) or month, with the saved settings, as it would be sent now. `text` is the plain text body of the email.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "weekly",
+                "monthly"
+              ],
+              "default": "weekly"
+            },
+            "description": "Which report."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/reports/send": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "Send a report now",
+        "operationId": "sendReport",
+        "description": "Emails the report of the last complete period to the saved channels now. The schedule does not change.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "weekly",
+                      "monthly"
+                    ],
+                    "default": "weekly"
+                  }
+                }
+              },
+              "example": {
+                "kind": "monthly"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sent to at least one channel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "sent": {
+                      "type": "integer",
+                      "description": "Channels that accepted the email."
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Channels that failed, if any."
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true,
+                  "sent": 1
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "502": {
+            "$ref": "#/components/responses/BadGateway"
+          }
+        }
+      }
+    },
+    "/api/public/status/{slug}/subscribe": {
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Subscribe to a status page by email",
+        "operationId": "publicSubscribe",
+        "description": "Sends a confirmation link to the address; nothing else is sent until it is confirmed. The answer is the same for new, waiting and already confirmed addresses. On a custom domain the path is `/api/public/status/subscribe`. Limited to 10 requests per client address and 3 per email address every 15 minutes.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              },
+              "example": {
+                "email": "jane@example.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Confirmation email queued (or already subscribed).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/api/public/subscriptions/{token}/confirm": {
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Confirm an email subscription",
+        "operationId": "confirmSubscription",
+        "description": "Called by the status page when a visitor opens the link of the confirmation email. Links expire after 7 days.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token of the links sent by email."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Confirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "page": {
+                      "type": "string",
+                      "description": "Title of the status page."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/public/subscriptions/{token}/unsubscribe": {
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Unsubscribe from a status page",
+        "operationId": "unsubscribe",
+        "description": "Removes the address. Also the target of the `List-Unsubscribe` header of update emails (RFC 8058 one-click: the body may be a form, not JSON).\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Token of the links sent by email."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unsubscribed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "page": {
+                      "type": "string",
+                      "description": "Title of the status page."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}/incidents": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "List the incidents of a status page",
+        "operationId": "listPageIncidents",
+        "description": "Incidents written on the page, open ones first, each with its updates (newest first).\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incidents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "incidents": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PageIncident"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Create an incident on a status page",
+        "operationId": "createPageIncident",
+        "description": "Opens an incident with its first update. With `notify` (default true) the update is emailed to the confirmed subscribers of the page, in the background.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageIncidentInput"
+              },
+              "example": {
+                "title": "Slow API responses",
+                "impact": "minor",
+                "status": "investigating",
+                "message": "We are looking into slow responses of the API.",
+                "notify": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "incident": {
+                      "$ref": "#/components/schemas/PageIncident"
+                    },
+                    "notified": {
+                      "type": "integer",
+                      "description": "Emails queued for subscribers."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}/incidents/{incident}": {
+      "put": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Edit an incident",
+        "operationId": "updatePageIncident",
+        "description": "Changes the title and impact. Updates are added with POST …/updates.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          },
+          {
+            "name": "incident",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the incident."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageIncidentInput"
+              },
+              "example": {
+                "title": "Slow API responses in EU",
+                "impact": "major"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Incident.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageIncident"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Delete an incident",
+        "operationId": "deletePageIncident",
+        "description": "Removes the incident and all its updates from the page.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          },
+          {
+            "name": "incident",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the incident."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}/incidents/{incident}/updates": {
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Post an incident update",
+        "operationId": "addPageIncidentUpdate",
+        "description": "Adds an update to the timeline; the incident takes its status (`resolved` closes it, any other status reopens it). With `notify` (default true) it is emailed to the confirmed subscribers.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          },
+          {
+            "name": "incident",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the incident."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageIncidentInput"
+              },
+              "example": {
+                "status": "resolved",
+                "message": "Response times are back to normal.",
+                "notify": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "incident": {
+                      "$ref": "#/components/schemas/PageIncident"
+                    },
+                    "notified": {
+                      "type": "integer",
+                      "description": "Emails queued for subscribers."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}/incidents/{incident}/updates/{update}": {
+      "delete": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Delete an incident update",
+        "operationId": "deletePageIncidentUpdate",
+        "description": "Removes one update; the incident takes the status of the latest one left. The last update cannot be deleted (409): delete the incident instead.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          },
+          {
+            "name": "incident",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the incident."
+          },
+          {
+            "name": "update",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the update."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Incident.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageIncident"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}/subscribers": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "List the email subscribers of a status page",
+        "operationId": "listPageSubscribers",
+        "description": "Addresses subscribed to incident updates, confirmed or waiting for confirmation (unconfirmed ones are dropped after 7 days). `enabled` is false when the page has no working email channel.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscribers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subscribers": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PageSubscriber"
+                      }
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}/subscribers/{subscriber}": {
+      "delete": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Remove an email subscriber",
+        "operationId": "deletePageSubscriber",
+        "description": "The address gets no more emails from the page.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          },
+          {
+            "name": "subscriber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the subscriber."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5968,6 +6949,10 @@
           "maint": {
             "type": "boolean",
             "description": "Taken during a maintenance window."
+          },
+          "timing": {
+            "$ref": "#/components/schemas/Phases",
+            "description": "HTTP checks only, from the hub and agents that measure phases."
           }
         }
       },
@@ -6197,6 +7182,10 @@
           },
           "max_ms": {
             "type": "number"
+          },
+          "phases": {
+            "$ref": "#/components/schemas/Phases",
+            "description": "Average per phase of the OK HTTP checks that measured it."
           }
         }
       },
@@ -6554,6 +7543,18 @@
           "enabled": {
             "type": "boolean"
           },
+          "delay_min": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10080,
+            "description": "Minutes a monitor must stay down before this channel gets its first alert (0 = right away). Use it for an escalation contact: shorter outages never reach it, and it gets the recovery message only if it was alerted."
+          },
+          "repeat_min": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10080,
+            "description": "Repeat the alert every this many minutes while the monitor stays down (0 = once, otherwise at least 5). Reminders carry reminder=1, 2, ... and down_since in the webhook payload. Nothing is sent during maintenance windows."
+          },
           "created_at": {
             "type": "integer",
             "format": "int64",
@@ -6613,6 +7614,11 @@
             "type": "integer",
             "format": "int64",
             "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "subscribe_notifier_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Email notification channel that sends incident updates to the page's subscribers (its SMTP server and sender are used, its recipients are not). 0 = visitors cannot subscribe."
           }
         },
         "required": [
@@ -6638,12 +7644,13 @@
           "status": {
             "type": "string",
             "enum": [
-              "up",
+              "operational",
               "degraded",
-              "down",
-              "maintenance",
+              "partial_outage",
+              "major_outage",
               "unknown"
-            ]
+            ],
+            "description": "Overall state, from the monitors and the open incidents written on the page (minor impact = degraded, major = partial outage, critical = major outage), whichever is worse."
           },
           "days": {
             "type": "integer",
@@ -6718,6 +7725,17 @@
             "type": "integer",
             "format": "int64",
             "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageIncident"
+            },
+            "description": "Incidents written on the page: the open ones and those resolved in the shown days, open first."
+          },
+          "subscribe": {
+            "type": "boolean",
+            "description": "Visitors can subscribe to incident updates by email."
           }
         }
       },
@@ -7192,6 +8210,428 @@
           "error": {
             "type": "string",
             "description": "Why the last check failed."
+          }
+        }
+      },
+      "ReportSettings": {
+        "type": "object",
+        "properties": {
+          "weekly": {
+            "type": "boolean",
+            "description": "Send a report every Monday for the week before."
+          },
+          "monthly": {
+            "type": "boolean",
+            "description": "Send a report on the 1st for the month before."
+          },
+          "hour": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 23,
+            "description": "Hour of the day the reports are sent, in `timezone`."
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA time zone of the periods and of the times in the report.",
+            "examples": [
+              "Europe/Rome"
+            ]
+          },
+          "notifier_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Email channels that receive the reports. Disabled channels are skipped."
+          },
+          "group_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Only these monitor groups. Empty: every monitor."
+          }
+        }
+      },
+      "Reports": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ReportSettings"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "next": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "description": "When the next report of each enabled kind goes out (unix ms), by kind."
+              },
+              "last": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Start of the period (unix ms)."
+                    },
+                    "sent_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix ms."
+                    }
+                  }
+                },
+                "description": "Last report sent, by kind."
+              }
+            }
+          }
+        ]
+      },
+      "ReportIncident": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitor_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitor": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "resolved_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "0 while open."
+          },
+          "duration_ms": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Part of the incident inside the period."
+          },
+          "cause": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportMonitor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "uptime": {
+            "type": "number",
+            "description": "0 to 1, -1 without data. Degraded counts as up, maintenance is left out."
+          },
+          "prev_uptime": {
+            "type": "number",
+            "description": "0 to 1, -1 without data. Degraded counts as up, maintenance is left out."
+          },
+          "avg_ms": {
+            "type": "number"
+          },
+          "incidents": {
+            "type": "integer"
+          },
+          "downtime_ms": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ReportGroup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "0: monitors without a group."
+          },
+          "name": {
+            "type": "string"
+          },
+          "uptime": {
+            "type": "number",
+            "description": "Average uptime of the monitors of the group, -1 without data."
+          },
+          "prev_uptime": {
+            "type": "number"
+          },
+          "incidents": {
+            "type": "integer"
+          },
+          "downtime_ms": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportMonitor"
+            }
+          },
+          "incident_list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportIncident"
+            }
+          }
+        }
+      },
+      "Report": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "weekly",
+              "monthly"
+            ]
+          },
+          "from": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Start of the period (unix ms, included)."
+          },
+          "to": {
+            "type": "integer",
+            "format": "int64",
+            "description": "End of the period (unix ms, excluded)."
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "uptime": {
+            "type": "number",
+            "description": "Average uptime of the monitors, -1 without data."
+          },
+          "prev_uptime": {
+            "type": "number",
+            "description": "Same for the period before."
+          },
+          "incidents": {
+            "type": "integer"
+          },
+          "downtime_ms": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitors": {
+            "type": "integer"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportGroup"
+            }
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject."
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text body of the email."
+          },
+          "url": {
+            "type": "string",
+            "description": "Public URL of the hub, when set."
+          }
+        }
+      },
+      "Phases": {
+        "type": "object",
+        "description": "Time per phase of an HTTP check, in ms. With redirects the phases of every hop are added up; what is left of the latency is reading the response body.",
+        "properties": {
+          "dns_ms": {
+            "type": "number"
+          },
+          "connect_ms": {
+            "type": "number"
+          },
+          "tls_ms": {
+            "type": "number"
+          },
+          "ttfb_ms": {
+            "type": "number",
+            "description": "Wait from the request being sent to the first byte of the response."
+          },
+          "total_ms": {
+            "type": "number",
+            "description": "Buckets only: average latency of the checks the phases come from."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Buckets only: how many checks the averages come from."
+          }
+        }
+      },
+      "PageIncidentUpdate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "incident_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "investigating",
+              "identified",
+              "monitoring",
+              "resolved"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          }
+        }
+      },
+      "PageIncident": {
+        "type": "object",
+        "description": "An incident written on a status page, with its timeline of updates.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "impact": {
+            "type": "string",
+            "enum": [
+              "none",
+              "minor",
+              "major",
+              "critical"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "investigating",
+              "identified",
+              "monitoring",
+              "resolved"
+            ],
+            "description": "Status of the latest update."
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "updated_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "resolved_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When it was resolved, unix ms. 0 = still open."
+          },
+          "updates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageIncidentUpdate"
+            },
+            "description": "Newest first."
+          }
+        }
+      },
+      "PageIncidentInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "One line, at most 200 characters. Required to create and to edit."
+          },
+          "impact": {
+            "type": "string",
+            "enum": [
+              "none",
+              "minor",
+              "major",
+              "critical"
+            ],
+            "description": "Default minor."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "investigating",
+              "identified",
+              "monitoring",
+              "resolved"
+            ],
+            "description": "Status of the update. Default investigating when creating."
+          },
+          "message": {
+            "type": "string",
+            "description": "Text of the update, at most 5000 characters. Required to create and for updates."
+          },
+          "notify": {
+            "type": "boolean",
+            "description": "Email the update to the confirmed subscribers of the page (default true). Ignored when editing the title or impact."
+          }
+        }
+      },
+      "PageSubscriber": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string"
+          },
+          "confirmed_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When the address confirmed, unix ms. 0 = waiting for confirmation."
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
           }
         }
       }

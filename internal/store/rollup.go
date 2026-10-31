@@ -85,12 +85,14 @@ func (s *Store) rollupHour(h int64) error {
 	defer tx.Rollback()
 	// The hour is a trusted integer: written inline so that PostgreSQL knows its type.
 	q := `INSERT INTO result_rollups
-		(monitor_id, location, start, total, ok, up, degraded, maint, lat_sum, lat_n, up_lat_sum, up_lat_n, lat_min, lat_max)
+		(monitor_id, location, start, total, ok, up, degraded, maint, lat_sum, lat_n, up_lat_sum, up_lat_n, lat_min, lat_max,
+		ph_n, ph_lat_sum, dns_sum, conn_sum, tls_sum, ttfb_sum)
 		SELECT monitor_id, location, ` + strconv.FormatInt(h, 10) + `, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END),
 			SUM(CASE WHEN mon_state < 2 AND maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN mon_state = 1 AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
 			COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END),
 			COALESCE(SUM(CASE WHEN ok = 1 AND maint = 0 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END),
-			COALESCE(MIN(CASE WHEN ok = 1 THEN latency_ms END), 0), COALESCE(MAX(CASE WHEN ok = 1 THEN latency_ms END), 0)
+			COALESCE(MIN(CASE WHEN ok = 1 THEN latency_ms END), 0), COALESCE(MAX(CASE WHEN ok = 1 THEN latency_ms END), 0),
+			` + rawPhaseSums + `
 		FROM results INDEXED BY results_ts WHERE ts >= ? AND ts < ? GROUP BY monitor_id, location`
 	switch s.db.driver {
 	case DriverSQLite:
@@ -100,7 +102,9 @@ func (s *Store) rollupHour(h int64) error {
 	case DriverPostgres:
 		q += ` ON CONFLICT (monitor_id, start, location) DO UPDATE SET total = excluded.total, ok = excluded.ok, up = excluded.up, degraded = excluded.degraded,
 			maint = excluded.maint, lat_sum = excluded.lat_sum, lat_n = excluded.lat_n, up_lat_sum = excluded.up_lat_sum,
-			up_lat_n = excluded.up_lat_n, lat_min = excluded.lat_min, lat_max = excluded.lat_max`
+			up_lat_n = excluded.up_lat_n, lat_min = excluded.lat_min, lat_max = excluded.lat_max,
+			ph_n = excluded.ph_n, ph_lat_sum = excluded.ph_lat_sum, dns_sum = excluded.dns_sum, conn_sum = excluded.conn_sum,
+			tls_sum = excluded.tls_sum, ttfb_sum = excluded.ttfb_sum`
 	}
 	if _, err := tx.Exec(q, h, h+RollupHour); err != nil {
 		return err

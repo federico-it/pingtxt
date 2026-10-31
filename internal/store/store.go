@@ -247,6 +247,170 @@ var laterMigrations = []migration{
 	ALTER TABLE result_rollups ADD COLUMN up INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE result_rollups ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0;
 	UPDATE result_rollups SET up = ok;`},
+	// 15: alert escalation and reminders. A channel can wait delay_min minutes
+	// of downtime before its first alert and repeat it every repeat_min
+	// minutes; incident_alerts remembers what each channel was sent.
+	{
+		sqlite: `ALTER TABLE notifiers ADD COLUMN delay_min INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE notifiers ADD COLUMN repeat_min INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE incident_alerts (
+		incident_id INTEGER NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+		notifier_id INTEGER NOT NULL REFERENCES notifiers(id) ON DELETE CASCADE,
+		sent_at INTEGER NOT NULL,
+		count INTEGER NOT NULL DEFAULT 1,
+		PRIMARY KEY (incident_id, notifier_id)
+	);`,
+		postgres: `ALTER TABLE notifiers ADD COLUMN delay_min INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE notifiers ADD COLUMN repeat_min INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE incident_alerts (
+		incident_id BIGINT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+		notifier_id BIGINT NOT NULL REFERENCES notifiers(id) ON DELETE CASCADE,
+		sent_at BIGINT NOT NULL,
+		count INTEGER NOT NULL DEFAULT 1,
+		PRIMARY KEY (incident_id, notifier_id)
+	);`,
+		mysql: `ALTER TABLE notifiers ADD COLUMN delay_min INT NOT NULL DEFAULT 0;
+	ALTER TABLE notifiers ADD COLUMN repeat_min INT NOT NULL DEFAULT 0;
+	CREATE TABLE incident_alerts (
+		incident_id BIGINT NOT NULL,
+		notifier_id BIGINT NOT NULL,
+		sent_at BIGINT NOT NULL,
+		count INT NOT NULL DEFAULT 1,
+		PRIMARY KEY (incident_id, notifier_id),
+		FOREIGN KEY (incident_id) REFERENCES incidents(id) ON DELETE CASCADE,
+		FOREIGN KEY (notifier_id) REFERENCES notifiers(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
+	// 16: HTTP response time per phase (DNS, connect, TLS, wait for the first
+	// byte). Results keep each phase as an integer in tenths of a ms: 0 (no
+	// data) costs no space in SQLite and small values take 1 to 3 bytes.
+	// Rollups keep, for the OK checks that have phases (ph_n), the sums of
+	// those tenths and of their latency in ms, so the rest (reading the
+	// body) can be shown too.
+	{sqlite: `ALTER TABLE results ADD COLUMN t_dns INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE results ADD COLUMN t_conn INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE results ADD COLUMN t_tls INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE results ADD COLUMN t_ttfb INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN ph_n INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN ph_lat_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN dns_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN conn_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN tls_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN ttfb_sum DOUBLE PRECISION NOT NULL DEFAULT 0;`},
+	// 17: incidents written on status pages (with their updates) and the
+	// email subscribers of a page. subscribe_notifier_id is the email
+	// channel that sends to subscribers (0 = subscriptions off).
+	{
+		sqlite: `ALTER TABLE status_pages ADD COLUMN subscribe_notifier_id INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE page_incidents (
+		id INTEGER PRIMARY KEY,
+		page_id INTEGER NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		title TEXT NOT NULL,
+		impact TEXT NOT NULL DEFAULT 'minor',
+		status TEXT NOT NULL,
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL,
+		resolved_at INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX page_incidents_page ON page_incidents(page_id, created_at);
+	CREATE TABLE page_incident_updates (
+		id INTEGER PRIMARY KEY,
+		incident_id INTEGER NOT NULL REFERENCES page_incidents(id) ON DELETE CASCADE,
+		status TEXT NOT NULL,
+		message TEXT NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+	CREATE INDEX page_incident_updates_incident ON page_incident_updates(incident_id, created_at);
+	CREATE TABLE page_subscribers (
+		id INTEGER PRIMARY KEY,
+		page_id INTEGER NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		email TEXT NOT NULL,
+		token TEXT NOT NULL UNIQUE,
+		confirmed_at INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL,
+		UNIQUE (page_id, email)
+	);`,
+		postgres: `ALTER TABLE status_pages ADD COLUMN subscribe_notifier_id BIGINT NOT NULL DEFAULT 0;
+	CREATE TABLE page_incidents (
+		id BIGSERIAL PRIMARY KEY,
+		page_id BIGINT NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		title TEXT NOT NULL,
+		impact TEXT NOT NULL DEFAULT 'minor',
+		status TEXT NOT NULL,
+		created_at BIGINT NOT NULL,
+		updated_at BIGINT NOT NULL,
+		resolved_at BIGINT NOT NULL DEFAULT 0
+	);
+	CREATE INDEX page_incidents_page ON page_incidents(page_id, created_at);
+	CREATE TABLE page_incident_updates (
+		id BIGSERIAL PRIMARY KEY,
+		incident_id BIGINT NOT NULL REFERENCES page_incidents(id) ON DELETE CASCADE,
+		status TEXT NOT NULL,
+		message TEXT NOT NULL,
+		created_at BIGINT NOT NULL
+	);
+	CREATE INDEX page_incident_updates_incident ON page_incident_updates(incident_id, created_at);
+	CREATE TABLE page_subscribers (
+		id BIGSERIAL PRIMARY KEY,
+		page_id BIGINT NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		email TEXT NOT NULL,
+		token TEXT NOT NULL UNIQUE,
+		confirmed_at BIGINT NOT NULL DEFAULT 0,
+		created_at BIGINT NOT NULL,
+		UNIQUE (page_id, email)
+	);`,
+		mysql: `ALTER TABLE status_pages ADD COLUMN subscribe_notifier_id BIGINT NOT NULL DEFAULT 0;
+	CREATE TABLE page_incidents (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		page_id BIGINT NOT NULL,
+		title VARCHAR(255) NOT NULL,
+		impact VARCHAR(16) NOT NULL DEFAULT 'minor',
+		status VARCHAR(16) NOT NULL,
+		created_at BIGINT NOT NULL,
+		updated_at BIGINT NOT NULL,
+		resolved_at BIGINT NOT NULL DEFAULT 0,
+		INDEX page_incidents_page (page_id, created_at),
+		FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+	CREATE TABLE page_incident_updates (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		incident_id BIGINT NOT NULL,
+		status VARCHAR(16) NOT NULL,
+		message TEXT NOT NULL,
+		created_at BIGINT NOT NULL,
+		INDEX page_incident_updates_incident (incident_id, created_at),
+		FOREIGN KEY (incident_id) REFERENCES page_incidents(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+	CREATE TABLE page_subscribers (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		page_id BIGINT NOT NULL,
+		email VARCHAR(254) NOT NULL,
+		token VARCHAR(64) NOT NULL UNIQUE,
+		confirmed_at BIGINT NOT NULL DEFAULT 0,
+		created_at BIGINT NOT NULL,
+		UNIQUE KEY page_subscribers_email (page_id, email),
+		FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
+	// 18: migration 14 marked every failed check stored before it as
+	// downtime. Recompute those still in the raw results with the majority
+	// rule: a failed check is downtime only when more than half of the
+	// checks of that monitor within half an interval of it failed. Then
+	// recompute up for the rollup hours whose raw results are all still there.
+	// The derived table x lets MariaDB/MySQL read the table it updates.
+	{sqlite: `UPDATE results SET mon_state = 0 WHERE id IN (SELECT id FROM (
+		SELECT r.id AS id FROM results r
+		JOIN monitors m ON m.id = r.monitor_id
+		JOIN results o ON o.monitor_id = r.monitor_id AND o.ts >= r.ts - m.interval_sec * 500 AND o.ts < r.ts + m.interval_sec * 500
+		WHERE r.ok = 0 AND r.mon_state = 2
+		GROUP BY r.id
+		HAVING 2 * SUM(CASE WHEN o.ok = 0 THEN 1 ELSE 0 END) <= COUNT(*)) x);
+	UPDATE result_rollups SET up = (SELECT SUM(CASE WHEN r.mon_state < 2 AND r.maint = 0 THEN 1 ELSE 0 END) FROM results r
+		WHERE r.monitor_id = result_rollups.monitor_id AND r.location = result_rollups.location
+		AND r.ts >= result_rollups.start AND r.ts < result_rollups.start + 3600000)
+		WHERE start > (SELECT MIN(ts) FROM results) - 3600000 AND total + maint = (SELECT COUNT(*) FROM results r
+		WHERE r.monitor_id = result_rollups.monitor_id AND r.location = result_rollups.location
+		AND r.ts >= result_rollups.start AND r.ts < result_rollups.start + 3600000);`},
 }
 
 func sqliteOnly(list []string) []migration {
