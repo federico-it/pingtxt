@@ -6,7 +6,7 @@ but plain text, monospace, light and dark.
 - **One container** for the hub: Go API + scheduler + SQLite + the Next.js UI, ~25 MB image.
 - **Agents** for multi-location checks: a ~8 MB static binary (or Docker image) that only
   dials *out* to the hub over WebSocket. No open ports, works behind NAT. Install with one command.
-- Checks: **HTTP(S)** (status codes, headers, body, JSON response rules, TLS expiry), **keyword**, **TCP port**, **ICMP ping**, **DNS**,
+- Checks: **HTTP(S)** (status codes, headers, body, JSON response rules, TLS expiry, response time per phase: DNS, connect, TLS, first byte), **keyword**, **TCP port**, **ICMP ping**, **DNS**,
   databases (**PostgreSQL**, **MySQL/MariaDB**, **Redis**, **MongoDB**), **Docker containers**, **gRPC health**, **SMTP**,
   remote **MCP servers** (handshake, tools), and **heartbeat (push)** monitors for cron jobs and workers.
 - Status across locations: **down** when more than half of the online locations fail, **degraded** when at least 35% fail (configurable in settings and per monitor).
@@ -208,6 +208,7 @@ scrape_configs:
 | `pingtxt_monitor_uptime_ratio` | + window (24h, 7d, 30d) | share of checks taken while the monitor was up or degraded, maintenance excluded |
 | `pingtxt_monitor_latency_avg_seconds` | + window | average response time of successful checks |
 | `pingtxt_check_up`, `pingtxt_check_latency_seconds`, `pingtxt_check_status_code`, `pingtxt_check_timestamp_seconds` | + location, location_name | last check from each location |
+| `pingtxt_check_phase_seconds` | + location, location_name, phase (dns, connect, tls, ttfb) | time per phase of the last HTTP check from each location |
 | `pingtxt_cert_expiry_days`, `pingtxt_domain_expiry_days` (and `_timestamp_seconds`) | + subject | days left before expiry |
 | `pingtxt_agent_connected`, `pingtxt_agent_last_seen_timestamp_seconds` | agent_id, agent, location, location_name, version | agent connectivity |
 | `pingtxt_monitors`, `pingtxt_agents`, `pingtxt_incidents_open`, `pingtxt_info` | | totals and hub version |

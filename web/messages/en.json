@@ -124,6 +124,8 @@
     "expiry": "expiry",
     "runTime": "run time (from ?ping=)",
     "responseTime": "response time",
+    "byLocation": "by location",
+    "byPhase": "by phase",
     "lastHeartbeat": "last heartbeat",
     "locations": "locations",
     "cols": {
@@ -358,6 +360,18 @@
     "noData": "no data yet",
     "now": "now",
     "failed": "{count, plural, one {# failed check} other {# failed checks}}"
+  },
+  "phaseChart": {
+    "noData": "no phase data yet: HTTP checks from the hub and updated agents measure it",
+    "now": "now",
+    "dns": "DNS",
+    "connect": "connect",
+    "tls": "TLS",
+    "wait": "wait (TTFB)",
+    "transfer": "transfer",
+    "total": "total",
+    "average": "average over the range",
+    "allLocations": "all"
   },
   "uptimeBars": {
     "maintenance": "maintenance",

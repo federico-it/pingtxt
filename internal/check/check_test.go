@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestStatusMatches(t *testing.T) {
@@ -65,5 +66,30 @@ func TestTCP(t *testing.T) {
 	ln.Close()
 	if r := Run(context.Background(), Job{Type: TypeTCP, Target: addr, TimeoutMs: 2000}); r.OK {
 		t.Fatalf("tcp closed should fail: %+v", r)
+	}
+}
+
+func TestHTTPPhases(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(20 * time.Millisecond)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+	r := Run(context.Background(), Job{Type: TypeHTTP, Target: srv.URL, IgnoreTLS: true, TimeoutMs: 5000})
+	if !r.OK || r.Timing == nil {
+		t.Fatalf("result %+v", r)
+	}
+	p := r.Timing
+	if p.ConnectMs <= 0 || p.TLSMs <= 0 || p.TTFBMs < 20 || p.DNSMs != 0 {
+		t.Fatalf("phases %+v", p)
+	}
+	if sum := p.DNSMs + p.ConnectMs + p.TLSMs + p.TTFBMs; sum > r.LatencyMs+0.01 {
+		t.Fatalf("phases %.2f longer than latency %.2f", sum, r.LatencyMs)
+	}
+
+	// No response, no phases.
+	srv.Close()
+	if r := Run(context.Background(), Job{Type: TypeHTTP, Target: srv.URL, TimeoutMs: 2000}); r.OK || r.Timing != nil {
+		t.Fatalf("closed server: %+v", r)
 	}
 }

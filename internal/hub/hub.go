@@ -468,7 +468,7 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	row := &store.ResultRow{
 		MonitorID: r.MonitorID, Location: loc, TS: r.At, OK: r.OK, LatencyMs: r.LatencyMs,
 		StatusCode: r.StatusCode, Message: r.Message, CertExpiry: r.CertExpiry, Maint: inMaint,
-		MonState: state,
+		MonState: state, Timing: phasesOf(r.Timing),
 	}
 	if st.stats != nil {
 		st.stats.add(row)
@@ -485,6 +485,15 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		h.log.Info("status change", "monitor", name, "from", prev, "to", display)
 	}
 	h.raise(m, alert, strings.Join(causes, "; "), r.At)
+}
+
+// phasesOf converts the phases a check measured (nil from old agents and
+// non-HTTP checks).
+func phasesOf(t *check.Timing) *store.Phases {
+	if t == nil {
+		return nil
+	}
+	return &store.Phases{DNSMs: t.DNSMs, ConnectMs: t.ConnectMs, TLSMs: t.TLSMs, TTFBMs: t.TTFBMs}
 }
 
 // resultState maps a monitor status to the value stored with each result, which

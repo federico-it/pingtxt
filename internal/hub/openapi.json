@@ -5775,6 +5775,10 @@
           "maint": {
             "type": "boolean",
             "description": "Taken during a maintenance window."
+          },
+          "timing": {
+            "$ref": "#/components/schemas/Phases",
+            "description": "HTTP checks only, from the hub and agents that measure phases."
           }
         }
       },
@@ -6004,6 +6008,10 @@
           },
           "max_ms": {
             "type": "number"
+          },
+          "phases": {
+            "$ref": "#/components/schemas/Phases",
+            "description": "Average per phase of the OK HTTP checks that measured it."
           }
         }
       },
@@ -6999,6 +7007,33 @@
           "error": {
             "type": "string",
             "description": "Why the last check failed."
+          }
+        }
+      },
+      "Phases": {
+        "type": "object",
+        "description": "Time per phase of an HTTP check, in ms. With redirects the phases of every hop are added up; what is left of the latency is reading the response body.",
+        "properties": {
+          "dns_ms": {
+            "type": "number"
+          },
+          "connect_ms": {
+            "type": "number"
+          },
+          "tls_ms": {
+            "type": "number"
+          },
+          "ttfb_ms": {
+            "type": "number",
+            "description": "Wait from the request being sent to the first byte of the response."
+          },
+          "total_ms": {
+            "type": "number",
+            "description": "Buckets only: average latency of the checks the phases come from."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Buckets only: how many checks the averages come from."
           }
         }
       }

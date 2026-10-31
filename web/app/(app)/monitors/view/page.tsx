@@ -10,6 +10,7 @@ import { Confirm } from "@/components/confirm"
 import { ExpiryTable } from "@/components/expiry"
 import { PushInfo } from "@/components/push-info"
 import { LatencyChart } from "@/components/latency-chart"
+import { PhaseChart, hasPhases, phaseLocations, phaseTitle } from "@/components/phase-chart"
 import { TagList, useLabels } from "@/components/labels"
 import { KV, PageHeader, Section } from "@/components/page-header"
 import { OkText, StatusText } from "@/components/status"
@@ -43,11 +44,14 @@ function View() {
   const id = Number(useSearchParams().get("id"))
   const now = useNow()
   const [range, setRange] = useState<(typeof ranges)[number]>("24h")
+  const [byPhase, setByPhase] = useState(false)
+  const [phaseLoc, setPhaseLoc] = useState("")
   const m = useApi<MonitorDetail>(id ? `/api/monitors/${id}` : null)
   const isAdmin = useIsAdmin()
   const { groupById, tagById } = useLabels()
   const t = useTranslations("monitor")
   const tc = useTranslations("common")
+  const tp = useTranslations("phaseChart")
   const series = useApi<Series>(
     id ? `/api/monitors/${id}/series?range=${range}` : null,
     { refreshInterval: 30_000 }
@@ -217,7 +221,42 @@ function View() {
           </div>
         }
       >
-        {series.data ? (
+        {hasPhases(series.data) && (
+          <div className="mb-2 flex flex-wrap gap-1 text-xs text-muted-foreground">
+            {([false, true] as const).map((p) => (
+              <button
+                key={String(p)}
+                onClick={() => setByPhase(p)}
+                className={cn(
+                  "px-1.5 hover:text-foreground",
+                  byPhase === p && "bg-accent text-foreground"
+                )}
+              >
+                {p ? t("byPhase") : t("byLocation")}
+              </button>
+            ))}
+            {byPhase && series.data && phaseLocations(series.data).length > 1 && (
+              <>
+                <span className="px-1">|</span>
+                {[{ id: "", name: tp("allLocations") }, ...phaseLocations(series.data)].map((l) => (
+                  <button
+                    key={l.id}
+                    onClick={() => setPhaseLoc(l.id)}
+                    className={cn(
+                      "px-1.5 hover:text-foreground",
+                      phaseLoc === l.id && "bg-accent text-foreground"
+                    )}
+                  >
+                    {l.name}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+        {series.data && byPhase && hasPhases(series.data) ? (
+          <PhaseChart series={series.data} location={phaseLoc} />
+        ) : series.data ? (
           <LatencyChart series={series.data} />
         ) : (
           <div className="h-[180px]" />
@@ -248,7 +287,10 @@ function View() {
                     <span className="text-muted-foreground">{t("waiting")}</span>
                   )}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell
+                  className="text-right"
+                  title={l.last ? phaseTitle(l.last.timing, l.last.latency_ms, tp) : undefined}
+                >
                   {ms(l.last?.latency_ms)}
                 </TableCell>
                 <TableCell className="max-w-72 truncate text-muted-foreground">
@@ -303,7 +345,10 @@ function View() {
               <span className="w-8 shrink-0">
                 <OkText ok={r.ok} />
               </span>
-              <span className="w-16 shrink-0 text-right">
+              <span
+                className="w-16 shrink-0 text-right"
+                title={phaseTitle(r.timing, r.latency_ms, tp)}
+              >
                 {ms(r.latency_ms)}
               </span>
               <span className="truncate text-muted-foreground">

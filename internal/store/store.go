@@ -247,6 +247,22 @@ var laterMigrations = []migration{
 	ALTER TABLE result_rollups ADD COLUMN up INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE result_rollups ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0;
 	UPDATE result_rollups SET up = ok;`},
+	// 15: HTTP response time per phase (DNS, connect, TLS, wait for the first
+	// byte). Results keep each phase as an integer in tenths of a ms: 0 (no
+	// data) costs no space in SQLite and small values take 1 to 3 bytes.
+	// Rollups keep, for the OK checks that have phases (ph_n), the sums of
+	// those tenths and of their latency in ms, so the rest (reading the
+	// body) can be shown too.
+	{sqlite: `ALTER TABLE results ADD COLUMN t_dns INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE results ADD COLUMN t_conn INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE results ADD COLUMN t_tls INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE results ADD COLUMN t_ttfb INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN ph_n INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN ph_lat_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN dns_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN conn_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN tls_sum DOUBLE PRECISION NOT NULL DEFAULT 0;
+	ALTER TABLE result_rollups ADD COLUMN ttfb_sum DOUBLE PRECISION NOT NULL DEFAULT 0;`},
 }
 
 func sqliteOnly(list []string) []migration {

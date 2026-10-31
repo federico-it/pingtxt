@@ -124,6 +124,8 @@
     "expiry": "scadenze",
     "runTime": "durata (da ?ping=)",
     "responseTime": "tempo di risposta",
+    "byLocation": "per località",
+    "byPhase": "per fase",
     "lastHeartbeat": "ultimo heartbeat",
     "locations": "località",
     "cols": {
@@ -358,6 +360,18 @@
     "noData": "ancora nessun dato",
     "now": "ora",
     "failed": "{count, plural, one {# controllo fallito} other {# controlli falliti}}"
+  },
+  "phaseChart": {
+    "noData": "ancora nessun dato per fase: lo misurano i controlli HTTP dell'hub e degli agent aggiornati",
+    "now": "ora",
+    "dns": "DNS",
+    "connect": "connessione",
+    "tls": "TLS",
+    "wait": "attesa (TTFB)",
+    "transfer": "trasferimento",
+    "total": "totale",
+    "average": "media sul periodo",
+    "allLocations": "tutte"
   },
   "uptimeBars": {
     "maintenance": "manutenzione",

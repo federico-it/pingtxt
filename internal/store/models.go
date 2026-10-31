@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -423,6 +424,59 @@ type ResultRow struct {
 	// monitor was not down, so one failing location among several does not
 	// lower it. Written only, not read back by RecentResults.
 	MonState int `json:"-"`
+	// Timing splits the latency of HTTP checks into phases (nil: none).
+	Timing *Phases `json:"timing,omitempty"`
+}
+
+// Phases is the time spent in each phase of an HTTP check, in ms. Results
+// store them in tenths of a ms.
+type Phases struct {
+	DNSMs     float64 `json:"dns_ms"`
+	ConnectMs float64 `json:"connect_ms"`
+	TLSMs     float64 `json:"tls_ms"`
+	TTFBMs    float64 `json:"ttfb_ms"`
+	// TotalMs is the average latency of the checks the phases come from
+	// (buckets only): what is left after the phases is reading the body.
+	TotalMs float64 `json:"total_ms,omitempty"`
+	// N is how many checks the averages come from (buckets only).
+	N int64 `json:"n,omitempty"`
+}
+
+func tenths(v float64) int64 { return int64(math.Round(max(v, 0) * 10)) }
+
+// phaseArgs returns the stored columns t_dns, t_conn, t_tls, t_ttfb. A
+// result with phases always has t_ttfb > 0, which marks it.
+func (r *ResultRow) phaseArgs() []any {
+	p := r.Timing
+	if p == nil {
+		return []any{0, 0, 0, 0}
+	}
+	return []any{tenths(p.DNSMs), tenths(p.ConnectMs), tenths(p.TLSMs), max(1, tenths(p.TTFBMs))}
+}
+
+func phasesFrom(dns, conn, tls, ttfb int64) *Phases {
+	if ttfb <= 0 {
+		return nil
+	}
+	return &Phases{DNSMs: float64(dns) / 10, ConnectMs: float64(conn) / 10, TLSMs: float64(tls) / 10, TTFBMs: float64(ttfb) / 10}
+}
+
+const resultInsert = `INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint, mon_state, t_dns, t_conn, t_tls, t_ttfb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+func (r *ResultRow) insertArgs() []any {
+	return append([]any{r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint), r.MonState}, r.phaseArgs()...)
+}
+
+const resultCols = `id, monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint, t_dns, t_conn, t_tls, t_ttfb`
+
+func scanResult(rows *sql.Rows) (*ResultRow, error) {
+	r := &ResultRow{}
+	var dns, conn, tls, ttfb int64
+	if err := rows.Scan(&r.ID, &r.MonitorID, &r.Location, &r.TS, &r.OK, &r.LatencyMs, &r.StatusCode, &r.Message, &r.CertExpiry, &r.Maint, &dns, &conn, &tls, &ttfb); err != nil {
+		return nil, err
+	}
+	r.Timing = phasesFrom(dns, conn, tls, ttfb)
+	return r, nil
 }
 
 // Monitor status kept with each result.
@@ -433,8 +487,7 @@ const (
 )
 
 func (s *Store) InsertResult(r *ResultRow) error {
-	id, err := s.db.insert(s.db, `INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint, mon_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint), r.MonState)
+	id, err := s.db.insert(s.db, resultInsert, r.insertArgs()...)
 	if err != nil {
 		return err
 	}
@@ -444,15 +497,15 @@ func (s *Store) InsertResult(r *ResultRow) error {
 
 // RecentResults returns the newest results of a monitor, newest first.
 func (s *Store) RecentResults(monitorID int64, limit int) ([]*ResultRow, error) {
-	rows, err := s.db.Query(`SELECT id, monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint FROM results WHERE monitor_id = ? ORDER BY ts DESC LIMIT ?`, monitorID, limit)
+	rows, err := s.db.Query(`SELECT `+resultCols+` FROM results WHERE monitor_id = ? ORDER BY ts DESC LIMIT ?`, monitorID, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := []*ResultRow{}
 	for rows.Next() {
-		r := &ResultRow{}
-		if err := rows.Scan(&r.ID, &r.MonitorID, &r.Location, &r.TS, &r.OK, &r.LatencyMs, &r.StatusCode, &r.Message, &r.CertExpiry, &r.Maint); err != nil {
+		r, err := scanResult(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -462,7 +515,8 @@ func (s *Store) RecentResults(monitorID int64, limit int) ([]*ResultRow, error) 
 
 // LatestPerLocation returns the most recent result for each location.
 func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
-	rows, err := s.db.Query(`SELECT r.id, r.monitor_id, r.location, r.ts, r.ok, r.latency_ms, r.status_code, r.message, r.cert_expiry, r.maint
+	rows, err := s.db.Query(`SELECT r.id, r.monitor_id, r.location, r.ts, r.ok, r.latency_ms, r.status_code, r.message, r.cert_expiry, r.maint,
+		r.t_dns, r.t_conn, r.t_tls, r.t_ttfb
 		FROM results r JOIN (SELECT location, MAX(ts) AS ts FROM results WHERE monitor_id = ? AND ts > ? GROUP BY location) l
 		ON r.location = l.location AND r.ts = l.ts WHERE r.monitor_id = ? ORDER BY r.id DESC`, monitorID, now()-7*24*3600*1000, monitorID)
 	if err != nil {
@@ -472,8 +526,8 @@ func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
 	out := []*ResultRow{}
 	seen := map[string]bool{}
 	for rows.Next() {
-		r := &ResultRow{}
-		if err := rows.Scan(&r.ID, &r.MonitorID, &r.Location, &r.TS, &r.OK, &r.LatencyMs, &r.StatusCode, &r.Message, &r.CertExpiry, &r.Maint); err != nil {
+		r, err := scanResult(rows)
+		if err != nil {
 			return nil, err
 		}
 		if !seen[r.Location] {
@@ -537,7 +591,44 @@ type Bucket struct {
 	AvgMs    float64 `json:"avg_ms"`
 	MinMs    float64 `json:"min_ms"`
 	MaxMs    float64 `json:"max_ms"`
+	// Phases is the average time per phase of the OK HTTP checks that
+	// measured it (nil: none did, e.g. other check types or old agents).
+	Phases *Phases `json:"phases,omitempty"`
 }
+
+// phaseSums adds up phases, in tenths of a ms, and the latency of the
+// checks they come from.
+type phaseSums struct {
+	n                    int64
+	lat                  float64
+	dns, conn, tls, ttfb float64
+}
+
+func (a *phaseSums) add(b phaseSums) {
+	a.n += b.n
+	a.lat += b.lat
+	a.dns += b.dns
+	a.conn += b.conn
+	a.tls += b.tls
+	a.ttfb += b.ttfb
+}
+
+func (a phaseSums) avg() *Phases {
+	if a.n == 0 {
+		return nil
+	}
+	n := float64(a.n)
+	r := func(v float64) float64 { return math.Round(v/n) / 10 }
+	return &Phases{DNSMs: r(a.dns), ConnectMs: r(a.conn), TLSMs: r(a.tls), TTFBMs: r(a.ttfb), TotalMs: math.Round(a.lat/n*10) / 10, N: a.n}
+}
+
+// Phase sums of the OK checks with phases, raw results and rollups.
+const (
+	rawPhaseSums = `SUM(CASE WHEN ok = 1 AND t_ttfb > 0 THEN 1 ELSE 0 END), COALESCE(SUM(CASE WHEN ok = 1 AND t_ttfb > 0 THEN latency_ms END), 0),
+		COALESCE(SUM(CASE WHEN ok = 1 AND t_ttfb > 0 THEN t_dns END), 0), COALESCE(SUM(CASE WHEN ok = 1 AND t_ttfb > 0 THEN t_conn END), 0),
+		COALESCE(SUM(CASE WHEN ok = 1 AND t_ttfb > 0 THEN t_tls END), 0), COALESCE(SUM(CASE WHEN ok = 1 AND t_ttfb > 0 THEN t_ttfb END), 0)`
+	rollupPhaseSums = `SUM(ph_n), SUM(ph_lat_sum), SUM(dns_sum), SUM(conn_sum), SUM(tls_sum), SUM(ttfb_sum)`
+)
 
 // Buckets aggregates results in [from, to) into fixed windows of `size` ms.
 // When perLocation is true buckets are split by location and OK counts the
@@ -554,6 +645,7 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 		Bucket
 		latSum float64
 		latN   int
+		ph     phaseSums
 	}
 	acc := map[key]*agg{}
 	var keys []key
@@ -563,7 +655,9 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 			var k key
 			var b agg
 			var minMs, maxMs float64
-			if err := rows.Scan(&k.idx, &k.loc, &b.Total, &b.OK, &b.Degraded, &b.Maint, &b.latSum, &b.latN, &minMs, &maxMs); err != nil {
+			var ph phaseSums
+			if err := rows.Scan(&k.idx, &k.loc, &b.Total, &b.OK, &b.Degraded, &b.Maint, &b.latSum, &b.latN, &minMs, &maxMs,
+				&ph.n, &ph.lat, &ph.dns, &ph.conn, &ph.tls, &ph.ttfb); err != nil {
 				return err
 			}
 			a := acc[k]
@@ -584,6 +678,7 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 			}
 			a.latSum += b.latSum
 			a.latN += b.latN
+			a.ph.add(ph)
 		}
 		return rows.Err()
 	}
@@ -596,7 +691,8 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 	w := s.RollupUntil()
 	if from < w {
 		rows, err := s.db.Query(`SELECT `+s.db.idiv(s.db.greatest("start", "?")+" - ?", "?")+` AS b, `+loc+` AS loc, SUM(total), SUM(`+rollOK+`), SUM(`+rollDeg+`), SUM(maint),
-			SUM(lat_sum), SUM(lat_n), COALESCE(MIN(CASE WHEN lat_n > 0 THEN lat_min END), 0), MAX(lat_max)
+			SUM(lat_sum), SUM(lat_n), COALESCE(MIN(CASE WHEN lat_n > 0 THEN lat_min END), 0), MAX(lat_max),
+			`+rollupPhaseSums+`
 			FROM result_rollups WHERE monitor_id = ? AND start >= ? AND start < ? GROUP BY b, loc`,
 			from, from, size, monitorID, from-from%RollupHour, min(w, to))
 		if err != nil {
@@ -610,7 +706,8 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 		SUM(CASE WHEN `+rawDeg+` AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
 		COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END),
 		COALESCE(MIN(CASE WHEN ok = 1 THEN latency_ms END), 0),
-		COALESCE(MAX(CASE WHEN ok = 1 THEN latency_ms END), 0)
+		COALESCE(MAX(CASE WHEN ok = 1 THEN latency_ms END), 0),
+		`+rawPhaseSums+`
 		FROM results WHERE monitor_id = ? AND ts >= ? AND ts < ? GROUP BY b, loc`, from, size, monitorID, max(from, w), to)
 	if err != nil {
 		return nil, err
@@ -633,6 +730,7 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 		if a.latN > 0 {
 			b.AvgMs = a.latSum / float64(a.latN)
 		}
+		b.Phases = a.ph.avg()
 		out = append(out, b)
 	}
 	return out, nil
@@ -668,7 +766,7 @@ func (s *Store) InsertResults(rows []*ResultRow) error {
 		return err
 	}
 	defer tx.Rollback()
-	q := `INSERT INTO results (monitor_id, location, ts, ok, latency_ms, status_code, message, cert_expiry, maint, mon_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	q := resultInsert
 	pg := s.db.driver == DriverPostgres
 	if pg {
 		q += ` RETURNING id`
@@ -679,7 +777,7 @@ func (s *Store) InsertResults(rows []*ResultRow) error {
 	}
 	defer stmt.Close()
 	for _, r := range rows {
-		args := []any{r.MonitorID, r.Location, r.TS, b2i(r.OK), r.LatencyMs, r.StatusCode, r.Message, r.CertExpiry, b2i(r.Maint), r.MonState}
+		args := r.insertArgs()
 		if pg {
 			if err := stmt.QueryRow(args...).Scan(&r.ID); err != nil {
 				return err
