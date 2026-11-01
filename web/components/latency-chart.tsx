@@ -7,7 +7,7 @@ import type { Series } from "@/lib/api"
 import { datetime, ms } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
+const COLORS = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `var(--chart-${n})`)
 const H = 180
 const PAD = { l: 44, r: 8, t: 8, b: 20 }
 
