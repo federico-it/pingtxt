@@ -55,7 +55,19 @@
     "readOnlyHint": "your account can only read",
     "menu": "menu",
     "logout": "logout",
-    "themeHint": "press <kbd>d</kbd> to toggle theme"
+    "themeHint": "press <kbd>d</kbd> to toggle theme",
+    "jumpHint": "<kbd>ctrl k</kbd> to jump"
+  },
+  "commandMenu": {
+    "title": "jump to",
+    "placeholder": "type a monitor or page...",
+    "actions": "actions",
+    "monitors": "monitors",
+    "pages": "pages",
+    "empty": "nothing found",
+    "newMonitor": "new monitor",
+    "newStatusPage": "new status page",
+    "keys": "<kbd>↑↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close · elsewhere: <kbd>/</kbd> search <kbd>n</kbd> new monitor <kbd>d</kbd> theme"
   },
   "notFound": {
     "message": "404: no such file or directory"
@@ -95,7 +107,37 @@
     "down": "{count} down",
     "heartbeatLine": "heartbeat · expected every {every}",
     "monitorLine": "{type} · {target} · every {every}",
-    "locations": "{count} locations"
+    "locations": "{count} locations",
+    "searchHint": "press / to search, Esc to clear",
+    "sort": {
+      "title": "sort monitors",
+      "label": "sort: {sort}",
+      "status": "status",
+      "name": "name",
+      "uptime": "lowest uptime",
+      "latency": "slowest",
+      "changed": "recently changed"
+    },
+    "bulk": {
+      "selectAll": "select all",
+      "select": "select {name}",
+      "selected": "{count, plural, one {# monitor selected} other {# monitors selected}}",
+      "pause": "pause",
+      "resume": "resume",
+      "moveToGroup": "move to group",
+      "noGroup": "no group",
+      "delete": "delete",
+      "clear": "clear",
+      "deleteTitle": "{count, plural, one {delete # monitor?} other {delete # monitors?}}",
+      "deleteText": "All their results and incidents will be deleted.",
+      "error": "error",
+      "done": {
+        "pause": "{count, plural, one {# monitor paused} other {# monitors paused}}",
+        "resume": "{count, plural, one {# monitor resumed} other {# monitors resumed}}",
+        "delete": "{count, plural, one {# monitor deleted} other {# monitors deleted}}",
+        "group": "{count, plural, one {# monitor moved} other {# monitors moved}}"
+      }
+    }
   },
   "monitor": {
     "resumed": "monitor resumed",
@@ -149,7 +191,11 @@
     "ipv4Only": "IPv4 only",
     "ipv6Only": "IPv6 only",
     "ipBoth": "IPv4 and IPv6",
-    "degradedAtDefault": "degraded at default"
+    "degradedAtDefault": "degraded at default",
+    "checkNow": "check now",
+    "checking": "checking...",
+    "duplicate": "duplicate",
+    "duplicateHint": "new monitor with the same settings"
   },
   "monitorForm": {
     "newTitle": "new monitor",
@@ -330,7 +376,22 @@
         "lte": "<=",
         "matches": "matches regex"
       }
-    }
+    },
+    "test": "test",
+    "testing": "testing...",
+    "testHint": "run the check once at the selected locations without saving",
+    "unsaved": "unsaved changes",
+    "unsavedChanges": "You have unsaved changes. Leave this page anyway?",
+    "copyTitle": "copy of {name}",
+    "copyName": "{name} (copy)"
+  },
+  "testCheck": {
+    "title": "test check",
+    "running": "running the check",
+    "ok": "ok",
+    "fail": "fail",
+    "skipped": "skip",
+    "notStored": "one-off check: not saved in the history and no alerts sent."
   },
   "pushInfo": {
     "title": "push url",

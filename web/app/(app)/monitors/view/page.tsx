@@ -16,6 +16,7 @@ import { TagList, useLabels } from "@/components/labels"
 import { KV, PageHeader, Section } from "@/components/page-header"
 import { OkText, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
+import { TestResults, type TestResult } from "@/components/test-results"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -47,6 +48,8 @@ function View() {
   const [range, setRange] = useState<(typeof ranges)[number]>("24h")
   const [byPhase, setByPhase] = useState(false)
   const [phaseLoc, setPhaseLoc] = useState("")
+  const [testing, setTesting] = useState(false)
+  const [tested, setTested] = useState<TestResult[] | null>(null)
   const m = useApi<MonitorDetail>(id ? `/api/monitors/${id}` : null)
   const isAdmin = useIsAdmin()
   const { groupById, tagById } = useLabels()
@@ -88,6 +91,21 @@ function View() {
     }
   }
 
+  async function checkNow() {
+    setTesting(true)
+    setTested(null)
+    try {
+      const res = await api<{ results: TestResult[] }>(`/api/monitors/${id}/test`, {
+        method: "POST",
+      })
+      setTested(res.results)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("error"))
+    } finally {
+      setTesting(false)
+    }
+  }
+
   async function remove() {
     await api(`/api/monitors/${id}`, { method: "DELETE" })
     toast.success(t("deleted"))
@@ -99,6 +117,11 @@ function View() {
       <PageHeader cmd={`pingtxt monitors show ${id}`} title={d.name}>
         {isAdmin && (
           <>
+            {d.type !== "push" && (
+              <Button variant="outline" size="sm" onClick={checkNow} disabled={testing}>
+                {testing ? t("checking") : t("checkNow")}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={togglePause}>
               {d.paused ? t("resume") : t("pause")}
             </Button>
@@ -109,6 +132,15 @@ function View() {
               nativeButton={false}
             >
               {t("edit")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              render={<Link href={`/monitors/new/?from=${id}`} />}
+              nativeButton={false}
+              title={t("duplicateHint")}
+            >
+              {t("duplicate")}
             </Button>
             <Confirm
               title={t("deleteTitle", { name: d.name })}
@@ -155,6 +187,12 @@ function View() {
           </>
         )}
       </div>
+      <TestResults
+        results={tested}
+        running={testing}
+        onClose={() => setTested(null)}
+        className="-mt-2 mb-6"
+      />
       {(groupById.has(d.group_id) || (d.tag_ids?.length ?? 0) > 0) && (
         <div className="-mt-4 mb-6 flex flex-wrap items-center gap-2 text-xs">
           {groupById.has(d.group_id) && (
