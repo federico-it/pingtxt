@@ -1002,7 +1002,38 @@
     "disconnect": "scollega",
     "disconnectTitle": "scollegare {provider}?",
     "disconnectText": "Non potrai più accedere con questo account.",
-    "connect": "collega"
+    "connect": "collega",
+    "nav": {
+      "label": "",
+      "personal": "",
+      "instance": "",
+      "back": ""
+    },
+    "cats": {
+      "profile": "",
+      "account": "",
+      "tokens": "",
+      "general": "",
+      "monitors": "",
+      "access": "",
+      "integrations": "",
+      "data": ""
+    },
+    "catHints": {
+      "profile": "",
+      "account": "",
+      "tokens": "",
+      "general": "",
+      "monitors": "",
+      "access": "",
+      "integrations": "",
+      "data": ""
+    },
+    "adminOnly": "",
+    "unsaved": "",
+    "discard": "",
+    "save": "",
+    "unsavedLeave": ""
   },
   "generalSettings": {
     "saved": "impostazioni salvate",
