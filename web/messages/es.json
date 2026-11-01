@@ -646,6 +646,7 @@
       "tls": "",
       "none": ""
     },
+    "pushOff": "",
     "hints": {
       "commaSeparated": "",
       "appUsers": ""
@@ -974,8 +975,6 @@
     "relayUrl": "",
     "relayHint": "",
     "relayChanged": "",
-    "registrationToken": "",
-    "registrationTokenHint": "",
     "status": "",
     "notRegistered": "",
     "save": "",
@@ -983,10 +982,6 @@
     "error": "",
     "test": "",
     "testOk": "",
-    "register": "",
-    "registerTitle": "",
-    "registerText": "",
-    "registered": "",
     "channelHint": ""
   },
   "users": {
@@ -1118,6 +1113,23 @@
     "title": "",
     "intro": "",
     "error": ""
+  },
+  "telemetry": {
+    "question": "",
+    "what": "",
+    "yes": "",
+    "no": "",
+    "thanks": "",
+    "declined": "",
+    "title": "",
+    "label": "",
+    "hint": "",
+    "forcedOff": "",
+    "sends": "",
+    "sent": "",
+    "notYet": "",
+    "failed": "",
+    "off": ""
   },
   "update": {
     "available": "",
