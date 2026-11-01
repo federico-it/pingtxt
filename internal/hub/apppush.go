@@ -289,6 +289,12 @@ func validateAppConfig(c map[string]string) error {
 	return nil
 }
 
+// setupError is a problem with the hub's own setup (push off, no phones),
+// not a failure of the relay: a test answers 409 instead of 502.
+type setupError string
+
+func (e setupError) Error() string { return string(e) }
+
 // sendApp delivers an event to the phones of the channel's users. Handles the
 // relay reports gone are deleted; failed ones are retried with backoff.
 func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) error {
@@ -297,7 +303,7 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 		return err
 	}
 	if !ps.ready() {
-		return errors.New("mobile app notifications are off, turn them on in Settings")
+		return setupError("mobile app notifications are off: turn them on in Settings, Mobile app")
 	}
 	ids, err := n.appRecipients(c)
 	if err != nil {
@@ -308,7 +314,10 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 		return err
 	}
 	if len(devices) == 0 {
-		return errors.New("no phone signed in to the pingtxt app for this channel")
+		if ids != nil && len(ids) == 0 {
+			return setupError("none of the users of this channel exists on this hub")
+		}
+		return setupError("no phone is signed in to the pingtxt app for this channel: sign in to this hub with the app and allow notifications")
 	}
 	byHandle := map[string][]*store.PushDevice{}
 	pending := []string{}
@@ -387,7 +396,7 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 		}
 	}
 	if sent == 0 && total > 0 && lastErr == nil {
-		return errors.New("every phone of this channel is gone, sign in again with the app")
+		return setupError("every phone of this channel is gone, sign in again with the app")
 	}
 	if dropped > 0 && lastErr != nil {
 		if sent == 0 {

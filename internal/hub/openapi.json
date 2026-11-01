@@ -3257,6 +3257,9 @@
           "403": {
             "$ref": "#/components/responses/Forbidden"
           },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
           "502": {
             "$ref": "#/components/responses/BadGateway"
           }
@@ -3440,6 +3443,9 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "502": {
             "$ref": "#/components/responses/BadGateway"
