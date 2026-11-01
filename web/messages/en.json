@@ -583,10 +583,37 @@
     "updatingState": "updating…",
     "updateFailed": "update failed",
     "newVersion": "a new version is available",
-    "updatesOnReconnect": "updates when the agent reconnects"
+    "updatesOnReconnect": "updates when the agent reconnects",
+    "waiting": "waiting for {name} to connect… you will be asked which monitors should use it.",
+    "noMonitors": "in no monitor",
+    "monitors": "{count, plural, one {# monitor} other {# monitors}}",
+    "assign": "add to monitors"
   },
   "agentInstall": {
     "hint": "The agent only dials out to the hub over HTTPS/WebSocket: no ports to open. The token is shown only now; rotate it to get a new one."
+  },
+  "agentAssign": {
+    "title": "add {name} to your monitors?",
+    "textOnline": "{name} is online. Pick the monitors that should also be checked from this location.",
+    "text": "Pick the monitors that should also be checked from {name}.",
+    "loading": "looking at your monitors…",
+    "compatible": "{count, plural, one {# compatible monitor} other {# compatible monitors}}",
+    "skipped": "{count, plural, one {# monitor skipped} other {# monitors skipped}}",
+    "already": "{count, plural, one {# monitor already uses it.} other {# monitors already use it.}}",
+    "none": "no monitor can use this agent yet.",
+    "noneLeft": "{count, plural, one {the only compatible monitor already uses it.} other {all # compatible monitors already use it.}}",
+    "selectAll": "select all",
+    "selectNone": "select none",
+    "reasons": {
+      "no_ipv6": "needs IPv6, the agent has none",
+      "ipv6_unknown": "needs IPv6, not reported by the agent yet",
+      "docker": "docker checks its own host",
+      "loopback": "target is localhost"
+    },
+    "later": "not now",
+    "add": "{count, plural, =0 {add} one {add to # monitor} other {add to # monitors}}",
+    "added": "{name} added to {count, plural, one {# monitor} other {# monitors}}",
+    "error": "error"
   },
   "notifications": {
     "title": "notifications",

@@ -459,6 +459,169 @@
         }
       }
     },
+    "/api/agents/{id}/monitors": {
+      "get": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Preview compatible monitors",
+        "operationId": "listAgentMonitors",
+        "description": "Monitors this agent can be added to, and the ones skipped with the reason. Heartbeat monitors have no locations and are left out.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the agent."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compatible and skipped monitors.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "compatible": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AgentMonitor"
+                      }
+                    },
+                    "skipped": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AgentMonitor"
+                      }
+                    },
+                    "already": {
+                      "type": "integer",
+                      "description": "Monitors that already check from this agent."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Add the agent to monitors",
+        "operationId": "assignAgentMonitors",
+        "description": "Adds the agent's location to the given monitors. Monitors that are not compatible are skipped and returned with the reason.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the agent."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "monitor_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                "required": [
+                  "monitor_ids"
+                ]
+              },
+              "example": {
+                "monitor_ids": [
+                  1,
+                  4,
+                  7
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "added": {
+                      "type": "integer"
+                    },
+                    "skipped": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AgentMonitor"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/api/auth/2fa/disable": {
       "post": {
         "tags": [
@@ -8310,6 +8473,10 @@
           "online": {
             "type": "boolean"
           },
+          "monitors": {
+            "type": "integer",
+            "description": "Number of monitors that check from this agent."
+          },
           "update_available": {
             "type": "boolean"
           },
@@ -8359,6 +8526,34 @@
               2
             ],
             "description": "IPv6 connectivity as last probed: 0 unknown (agents before this field), 1 available, 2 not available. IPv6-only monitors cannot use a location with 2, and monitors with ip_family 0 check over IPv4 there."
+          }
+        }
+      },
+      "AgentMonitor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "no_ipv6",
+              "ipv6_unknown",
+              "docker",
+              "loopback"
+            ],
+            "description": "Why the monitor is skipped: no_ipv6 = the monitor checks over IPv6 only (or IPv4 and IPv6) and the agent has no IPv6; ipv6_unknown = same, but the agent has not reported IPv6 yet; docker = Docker checks look at a container on the probe's own host; loopback = the target is localhost."
           }
         }
       },
