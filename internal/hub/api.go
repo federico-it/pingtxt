@@ -166,6 +166,7 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 
 	mux.HandleFunc("GET /api/status-pages", auth(h.listStatusPages))
 	mux.HandleFunc("POST /api/status-pages", auth(h.saveStatusPage))
+	mux.HandleFunc("POST /api/status-pages/preview", auth(h.previewStatusPage))
 	mux.HandleFunc("GET /api/status-pages/{id}", auth(h.getStatusPage))
 	mux.HandleFunc("PUT /api/status-pages/{id}", auth(h.saveStatusPage))
 	mux.HandleFunc("DELETE /api/status-pages/{id}", auth(h.deleteStatusPage))
@@ -1117,15 +1118,28 @@ func (h *Hub) monitorSeries(w http.ResponseWriter, r *http.Request, _ *store.Use
 		writeErr(w, 400, "invalid id")
 		return
 	}
-	rng, ok := ranges[r.URL.Query().Get("range")]
+	qs := r.URL.Query()
+	rng, ok := ranges[qs.Get("range")]
 	if !ok {
 		rng = 24 * time.Hour
 	}
 	now := time.Now().UnixMilli()
-	size := rng.Milliseconds() / 90
+	to := now
 	from := now - rng.Milliseconds()
+	// A custom window (?start=&end=, unix ms) zooms into part of the history.
+	if s, e := qs.Get("start"), qs.Get("end"); s != "" || e != "" {
+		start, err1 := strconv.ParseInt(s, 10, 64)
+		end, err2 := strconv.ParseInt(e, 10, 64)
+		end = min(end, now)
+		if err1 != nil || err2 != nil || start <= 0 || end-start < minSeriesWindow || end-start > maxSeriesWindow {
+			writeErr(w, 400, "start and end must be unix ms, 5 minutes to 400 days apart")
+			return
+		}
+		from, to = start, end
+	}
+	size := max((to-from)/90, 1000)
 	from -= from % size
-	buckets, err := h.store.Buckets(id, from, now+1, size, true)
+	buckets, err := h.store.Buckets(id, from, to+1, size, true)
 	if err != nil {
 		h.internalErr(w, err)
 		return
@@ -1140,7 +1154,46 @@ func (h *Hub) monitorSeries(w http.ResponseWriter, r *http.Request, _ *store.Use
 		}
 	}
 	slices.SortFunc(locs, func(a, b map[string]string) int { return strings.Compare(a["name"], b["name"]) })
-	writeJSON(w, 200, map[string]any{"from": from, "to": now, "size": size, "locations": locs, "buckets": buckets})
+	// Same numbers for the window and the one just before it, to compare.
+	cur, err := h.periodStats(id, from, to)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	prev, err := h.periodStats(id, from-(to-from), from)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"from": from, "to": to, "size": size, "locations": locs, "buckets": buckets,
+		"stats": map[string]any{"current": cur, "previous": prev}})
+}
+
+const (
+	minSeriesWindow = int64(5 * time.Minute / time.Millisecond)
+	maxSeriesWindow = int64(400 * 24 * time.Hour / time.Millisecond)
+)
+
+// seriesStats summarizes one window of a monitor's history.
+type seriesStats struct {
+	From   int64   `json:"from"`
+	To     int64   `json:"to"`
+	Uptime float64 `json:"uptime"` // 0..1, -1 = no checks
+	AvgMs  float64 `json:"avg_ms"`
+	// Latency percentiles of the successful checks (raw results only).
+	Percentiles store.Percentiles `json:"percentiles"`
+}
+
+func (h *Hub) periodStats(id, from, to int64) (seriesStats, error) {
+	up, avg, err := h.store.UptimeBetween(id, from, to)
+	if err != nil {
+		return seriesStats{}, err
+	}
+	p, err := h.store.LatencyPercentiles(id, from, to)
+	if err != nil {
+		return seriesStats{}, err
+	}
+	return seriesStats{From: from, To: to, Uptime: up, AvgMs: avg, Percentiles: p}, nil
 }
 
 func (h *Hub) monitorResults(w http.ResponseWriter, r *http.Request, _ *store.User) {

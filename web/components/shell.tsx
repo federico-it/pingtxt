@@ -13,6 +13,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { UpdateNotice, useVersionStatus } from "@/components/update-notice"
 import { Button } from "@/components/ui/button"
 import { useHotkey } from "@/hooks/use-hotkey"
+import { useIncidentNotifications } from "@/hooks/use-incident-notifications"
 import { api, useApi, type Me, type Overview } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import type en from "@/messages/en.json"
@@ -70,6 +71,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   useHotkey("n", () => router.push("/monitors/new/"), isAdmin)
 
   useStatusInTab(ov.data, pathname)
+  useIncidentNotifications(!!me.data)
 
   async function logout() {
     await api("/api/auth/logout", { method: "POST" }).catch(() => {})

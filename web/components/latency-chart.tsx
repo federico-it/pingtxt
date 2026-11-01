@@ -5,6 +5,7 @@ import { useTranslations } from "use-intl"
 
 import type { Series } from "@/lib/api"
 import { datetime, ms } from "@/lib/format"
+import { cn } from "@/lib/utils"
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
 const H = 180
@@ -17,10 +18,25 @@ function niceMax(v: number) {
   return 10 * p
 }
 
-export function LatencyChart({ series }: { series: Series }) {
+/** Shortest window the chart zooms into (the API allows 5 minutes). */
+const MIN_ZOOM = 5 * 60_000
+
+export function LatencyChart({
+  series,
+  live = true,
+  onZoom,
+}: {
+  series: Series
+  /** the window ends now (false: a past window, labelled with its end time) */
+  live?: boolean
+  /** called with a window [start, end) picked by dragging across the chart */
+  onZoom?: (start: number, end: number) => void
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(600)
   const [hover, setHover] = useState<number | null>(null)
+  // Slots where a drag started and where the pointer is now.
+  const [drag, setDrag] = useState<[number, number] | null>(null)
   const t = useTranslations("latencyChart")
 
   useEffect(() => {
@@ -79,11 +95,40 @@ export function LatencyChart({ series }: { series: Series }) {
       .join("")
   }
 
-  function onMove(e: React.MouseEvent<SVGSVGElement>) {
+  function slotAt(e: React.PointerEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
     const px = e.clientX - rect.left - PAD.l
-    const i = Math.round((px / iw) * (slots - 1))
+    return Math.round((px / iw) * (slots - 1))
+  }
+
+  function onMove(e: React.PointerEvent<SVGSVGElement>) {
+    const i = slotAt(e)
     setHover(i >= 0 && i < slots ? i : null)
+    if (drag) setDrag([drag[0], Math.min(Math.max(i, 0), slots - 1)])
+  }
+
+  // Drag with a mouse or pen to zoom; touch keeps scrolling the page.
+  function onDown(e: React.PointerEvent<SVGSVGElement>) {
+    if (!onZoom || e.pointerType === "touch" || e.button !== 0) return
+    const i = slotAt(e)
+    if (i < 0 || i >= slots) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDrag([i, i])
+  }
+
+  function onUp() {
+    if (!drag || !onZoom) return
+    setDrag(null)
+    const [a, b] = [Math.min(...drag), Math.max(...drag)]
+    if (b - a < 1) return // a click, not a drag
+    let start = series.from + a * series.size
+    let end = Math.min(series.from + (b + 1) * series.size, series.to)
+    if (end - start < MIN_ZOOM) {
+      const mid = (start + end) / 2
+      start = Math.round(mid - MIN_ZOOM / 2)
+      end = start + MIN_ZOOM
+    }
+    onZoom(start, end)
   }
 
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * yMax)
@@ -94,7 +139,16 @@ export function LatencyChart({ series }: { series: Series }) {
 
   return (
     <div ref={ref} className="relative w-full select-none">
-      <svg width={w} height={H} onMouseMove={onMove} onMouseLeave={() => setHover(null)} className="block">
+      <svg
+        width={w}
+        height={H}
+        onPointerMove={onMove}
+        onPointerDown={onDown}
+        onPointerUp={onUp}
+        onPointerCancel={() => setDrag(null)}
+        onPointerLeave={() => setHover(null)}
+        className={cn("block", onZoom && "cursor-crosshair")}
+      >
         {ticks.map((v) => (
           <g key={v}>
             <line x1={PAD.l} x2={w - PAD.r} y1={y(v)} y2={y(v)} stroke="var(--border)" strokeDasharray="2 3" />
@@ -121,6 +175,18 @@ export function LatencyChart({ series }: { series: Series }) {
             </g>
           )
         })}
+        {drag && drag[0] !== drag[1] && (
+          <rect
+            x={x(Math.min(...drag))}
+            y={PAD.t}
+            width={Math.abs(x(drag[1]) - x(drag[0]))}
+            height={ih}
+            fill="var(--primary)"
+            fillOpacity={0.12}
+            stroke="var(--primary)"
+            strokeOpacity={0.5}
+          />
+        )}
         {hover !== null && (
           <line x1={x(hover)} x2={x(hover)} y1={PAD.t} y2={PAD.t + ih} stroke="var(--muted-foreground)" strokeDasharray="2 2" />
         )}
@@ -128,7 +194,7 @@ export function LatencyChart({ series }: { series: Series }) {
           {datetime(series.from)}
         </text>
         <text x={w - PAD.r} y={H - 2} fontSize={10} textAnchor="end" fill="var(--muted-foreground)">
-          {t("now")}
+          {live ? t("now") : datetime(series.to)}
         </text>
       </svg>
       {hover !== null && (

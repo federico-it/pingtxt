@@ -642,6 +642,57 @@ func (s *Store) UptimeBetween(monitorID, from, to int64) (float64, float64, erro
 	return float64(ok) / float64(total), avg, nil
 }
 
+// Percentiles holds latency percentiles of the successful checks in a window.
+// Only raw results have single latencies, so the numbers cover [From, to):
+// From is later than the asked start when older raw results were pruned.
+type Percentiles struct {
+	N    int     `json:"n"`
+	From int64   `json:"from"`
+	P50  float64 `json:"p50"`
+	P95  float64 `json:"p95"`
+	P99  float64 `json:"p99"`
+}
+
+// LatencyPercentiles computes p50/p95/p99 of the successful checks outside
+// maintenance in [from, to), over every location (nearest-rank method).
+func (s *Store) LatencyPercentiles(monitorID, from, to int64) (Percentiles, error) {
+	rows, err := s.db.Query(`SELECT ts, latency_ms FROM results
+		WHERE monitor_id = ? AND ts >= ? AND ts < ? AND ok = 1 AND maint = 0`, monitorID, from, to)
+	if err != nil {
+		return Percentiles{}, err
+	}
+	defer rows.Close()
+	var lat []float64
+	first := int64(math.MaxInt64)
+	for rows.Next() {
+		var ts int64
+		var v float64
+		if err := rows.Scan(&ts, &v); err != nil {
+			return Percentiles{}, err
+		}
+		lat = append(lat, v)
+		first = min(first, ts)
+	}
+	if err := rows.Err(); err != nil {
+		return Percentiles{}, err
+	}
+	if len(lat) == 0 {
+		return Percentiles{}, nil
+	}
+	slices.Sort(lat)
+	rank := func(p float64) float64 {
+		i := int(math.Ceil(p*float64(len(lat)))) - 1
+		return lat[min(max(i, 0), len(lat)-1)]
+	}
+	// Raw results start at the first summarized hour that was not pruned:
+	// when that is after from, the window is only partly covered.
+	start := from
+	if first-from > RollupHour {
+		start = first
+	}
+	return Percentiles{N: len(lat), From: start, P50: rank(0.5), P95: rank(0.95), P99: rank(0.99)}, nil
+}
+
 // Bucket is an aggregated window of results.
 type Bucket struct {
 	Start    int64  `json:"t"`

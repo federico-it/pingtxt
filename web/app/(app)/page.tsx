@@ -30,6 +30,8 @@ import { useHotkey } from "@/hooks/use-hotkey"
 import { api, useApi, useIsAdmin, type MonitorSummary, type Status } from "@/lib/api"
 import { ago, datetime, displayTarget, interval, ms, pct } from "@/lib/format"
 import { deleteWithUndo, usePendingDeletes } from "@/lib/pending-delete"
+import { usePins } from "@/lib/pins"
+import { PinButton } from "@/components/pin-button"
 import { cn } from "@/lib/utils"
 
 const order: Record<Status, number> = {
@@ -138,6 +140,7 @@ function Monitors() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const pendingDeletes = usePendingDeletes()
   const collapsed = useCollapsedGroups()
+  const pins = usePins()
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const now = useMinute()
@@ -248,12 +251,17 @@ function Monitors() {
   }
 
 
-  // With groups, the list is split in one section per group (by name), with
-  // monitors without a group last.
+  // Pinned monitors come first, in their own section. With groups, the rest
+  // is split in one section per group (by name), with monitors without a
+  // group last.
   const sections = useMemo(() => {
-    if (!hasGroups) return [{ key: "all", title: "", items: list }]
+    const pinned = list.filter((m) => pins.has(m.id))
+    const rest = list.filter((m) => !pins.has(m.id))
+    const top = pinned.length ? [{ key: "pinned", title: t("pinned"), items: pinned }] : []
+    if (!hasGroups)
+      return [...top, ...(rest.length ? [{ key: "all", title: top.length ? t("others") : "", items: rest }] : [])]
     const by = new Map<number, MonitorSummary[]>()
-    for (const m of list) {
+    for (const m of rest) {
       const k = groupById.has(m.group_id) ? m.group_id : 0
       by.set(k, [...(by.get(k) ?? []), m])
     }
@@ -262,8 +270,8 @@ function Monitors() {
       .map((g) => ({ key: String(g.id), title: g.name, items: by.get(g.id)! }))
     if (by.has(0))
       out.push({ key: "none", title: t("ungrouped"), items: by.get(0)! })
-    return out
-  }, [list, hasGroups, groups.data, groupById, t])
+    return [...top, ...out]
+  }, [list, pins, hasGroups, groups.data, groupById, t])
 
   return (
     <>
@@ -415,6 +423,7 @@ function Monitors() {
                 {t("bulk.selectAll")}
               </span>
             )}
+            <span className="ml-auto w-8 shrink-0" />
           </div>
           {sections.map((sec) => (
             <div key={sec.key}>
@@ -426,6 +435,7 @@ function Monitors() {
                   className="flex w-full items-center gap-2 border-b border-dashed bg-muted/40 px-2 py-1 text-left text-xs hover:bg-muted/70"
                 >
                   <span className="w-3 text-muted-foreground">{collapsed.has(sec.key) ? "▸" : "▾"}</span>
+                  {sec.key === "pinned" && <span className="text-warn">★</span>}
                   <span className="font-medium">{sec.title}</span>
                   <span className="text-muted-foreground">
                     {sec.items.length}
@@ -508,6 +518,7 @@ function Monitors() {
                     {m.paused ? ts("paused") : ago(m.last?.ts)}
                   </span>
                 </Link>
+                <PinButton id={m.id} name={m.name} pinned={pins.has(m.id)} />
                 </div>
               ))}
             </div>

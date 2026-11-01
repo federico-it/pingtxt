@@ -269,6 +269,29 @@ func (h *Hub) saveStatusPage(w http.ResponseWriter, r *http.Request, _ *store.Us
 	writeJSON(w, code, got)
 }
 
+// previewStatusPage builds the public payload of an unsaved page, so the
+// editor can show what visitors would see. Nothing is stored.
+func (h *Hub) previewStatusPage(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	var p store.StatusPage
+	if readJSON(r, &p) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	p.Title = strings.TrimSpace(p.Title)
+	p.Description = strings.TrimSpace(p.Description)
+	if p.ID != 0 { // incidents written on the page come from the saved page
+		if _, err := h.store.StatusPage(p.ID); err != nil {
+			p.ID = 0
+		}
+	}
+	page, err := h.buildPublicPage(&p)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, page)
+}
+
 func (h *Hub) deleteStatusPage(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	id, ok := pathID(r)
 	if !ok {
