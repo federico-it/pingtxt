@@ -170,6 +170,9 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/status-pages/{id}", auth(h.getStatusPage))
 	mux.HandleFunc("PUT /api/status-pages/{id}", auth(h.saveStatusPage))
 	mux.HandleFunc("DELETE /api/status-pages/{id}", auth(h.deleteStatusPage))
+	mux.HandleFunc("POST /api/status-pages/{id}/logo", auth(h.uploadPageLogo)) // raw file, see pagelogo.go
+	mux.HandleFunc("POST /api/status-pages/{id}/logo/url", auth(h.importPageLogo))
+	mux.HandleFunc("DELETE /api/status-pages/{id}/logo", auth(h.deletePageLogo))
 	mux.HandleFunc("GET /api/status-pages/{id}/incidents", auth(h.listPageIncidents))
 	mux.HandleFunc("POST /api/status-pages/{id}/incidents", auth(h.createPageIncident))
 	mux.HandleFunc("PUT /api/status-pages/{id}/incidents/{incident}", auth(h.updatePageIncident))
@@ -179,6 +182,7 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/status-pages/{id}/subscribers", admin(h.listPageSubscribers)) // email addresses: admins only
 	mux.HandleFunc("DELETE /api/status-pages/{id}/subscribers/{subscriber}", admin(h.deletePageSubscriber))
 	mux.HandleFunc("GET /api/public/status/{slug}", h.publicStatus)
+	mux.HandleFunc("GET /api/public/status/{slug}/logo/{file}", h.publicPageLogo)
 	mux.HandleFunc("GET /api/badge/{slug}/{kind}", h.pageBadge) // README badges, see badges.go
 	mux.HandleFunc("GET /api/badge/{slug}/{monitor}/{kind}", h.monitorBadge)
 	mux.HandleFunc("POST /api/public/status/{slug}/subscribe", h.publicSubscribe)
@@ -260,9 +264,10 @@ func securityHeaders(next http.Handler) http.Handler {
 		if strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/api/push/") &&
 			!strings.HasPrefix(r.URL.Path, "/api/public/subscriptions/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
 			ctype := r.Header.Get("Content-Type")
-			// Backup uploads are raw files. application/octet-stream is not a
+			// Backup and status page logo uploads are raw files. application/octet-stream is not a
 			// CORS "simple" type either, so a cross-site form cannot send it.
-			upload := r.URL.Path == "/api/backups/upload" && strings.HasPrefix(ctype, "application/octet-stream")
+			upload := (r.URL.Path == "/api/backups/upload" || (strings.HasPrefix(r.URL.Path, "/api/status-pages/") &&
+				strings.HasSuffix(r.URL.Path, "/logo"))) && strings.HasPrefix(ctype, "application/octet-stream")
 			if r.ContentLength != 0 && !strings.HasPrefix(ctype, "application/json") && !upload {
 				writeErr(w, http.StatusUnsupportedMediaType, "content-type must be application/json")
 				return

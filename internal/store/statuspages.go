@@ -8,11 +8,15 @@ import (
 
 // StatusPage is a public page showing the state of selected monitors.
 type StatusPage struct {
-	ID            int64   `json:"id"`
-	Slug          string  `json:"slug"`
-	Title         string  `json:"title"`
-	Description   string  `json:"description"`
-	Domain        string  `json:"domain"`
+	ID          int64  `json:"id"`
+	Slug        string `json:"slug"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Domain      string `json:"domain"`
+	// HeaderURL is where the page name links to (http or https), "" = no link.
+	HeaderURL string `json:"header_url"`
+	// HideTitle shows only the logo in the header (when there is one).
+	HideTitle     bool    `json:"hide_title"`
 	Published     bool    `json:"published"`
 	ShowIncidents bool    `json:"show_incidents"`
 	MonitorIDs    []int64 `json:"monitor_ids"`
@@ -32,11 +36,11 @@ type StatusPage struct {
 	CreatedAt    int64  `json:"created_at"`
 }
 
-const statusPageCols = `id, slug, title, description, domain, published, show_incidents, subscribe_notifier_id, password_hash, created_at`
+const statusPageCols = `id, slug, title, description, domain, header_url, hide_title, published, show_incidents, subscribe_notifier_id, password_hash, created_at`
 
 func (s *Store) scanStatusPage(sc interface{ Scan(...any) error }) (*StatusPage, error) {
 	p := &StatusPage{}
-	err := sc.Scan(&p.ID, &p.Slug, &p.Title, &p.Description, &p.Domain, &p.Published, &p.ShowIncidents, &p.SubscribeNotifierID, &p.PasswordHash, &p.CreatedAt)
+	err := sc.Scan(&p.ID, &p.Slug, &p.Title, &p.Description, &p.Domain, &p.HeaderURL, &p.HideTitle, &p.Published, &p.ShowIncidents, &p.SubscribeNotifierID, &p.PasswordHash, &p.CreatedAt)
 	p.Protected = p.PasswordHash != ""
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -162,8 +166,8 @@ func (s *Store) CreateStatusPage(p *StatusPage) error {
 		return err
 	}
 	defer tx.Rollback()
-	id, err := s.db.insert(tx, `INSERT INTO status_pages (slug, title, description, domain, published, show_incidents, subscribe_notifier_id, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.Slug, p.Title, p.Description, p.Domain, b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.PasswordHash, p.CreatedAt)
+	id, err := s.db.insert(tx, `INSERT INTO status_pages (slug, title, description, domain, header_url, hide_title, published, show_incidents, subscribe_notifier_id, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.Slug, p.Title, p.Description, p.Domain, p.HeaderURL, b2i(p.HideTitle), b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.PasswordHash, p.CreatedAt)
 	if err != nil {
 		return uniqueErr(err)
 	}
@@ -180,8 +184,8 @@ func (s *Store) UpdateStatusPage(p *StatusPage) error {
 		return err
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec(`UPDATE status_pages SET slug = ?, title = ?, description = ?, domain = ?, published = ?, show_incidents = ?, subscribe_notifier_id = ?, password_hash = ? WHERE id = ?`,
-		p.Slug, p.Title, p.Description, p.Domain, b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.PasswordHash, p.ID)
+	res, err := tx.Exec(`UPDATE status_pages SET slug = ?, title = ?, description = ?, domain = ?, header_url = ?, hide_title = ?, published = ?, show_incidents = ?, subscribe_notifier_id = ?, password_hash = ? WHERE id = ?`,
+		p.Slug, p.Title, p.Description, p.Domain, p.HeaderURL, b2i(p.HideTitle), b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.PasswordHash, p.ID)
 	if err != nil {
 		return uniqueErr(err)
 	}

@@ -902,7 +902,24 @@
     "passwordPlaceholder": "at least 6 characters",
     "passwordSet": "A password is set. Leave the field empty to keep it; a new one logs out every visitor.",
     "passwordNew": "Share it with the people who should see the page.",
-    "incidents": "incidents"
+    "incidents": "incidents",
+    "headerTitle": "header",
+    "headerUrl": "name link (optional)",
+    "headerUrlHint": "Clicking the page name or logo opens this address, for example your website. Empty: the name is not a link.",
+    "headerUrlInvalid": "use an address that starts with http:// or https://",
+    "logo": "logo",
+    "logoHint": "SVG, PNG, JPEG, GIF, WebP or AVIF, up to 4 MB. Images are resized and served as AVIF and WebP; SVG files are kept as vectors, without scripts.",
+    "logoNone": "no logo: the header shows the page name.",
+    "logoSaveFirst": "Save the page first, then add its logo.",
+    "logoUpload": "upload file",
+    "logoUploading": "uploading...",
+    "logoUrl": "or import from a URL",
+    "logoImport": "import",
+    "logoRemove": "remove logo",
+    "logoSaved": "logo updated",
+    "logoRemoved": "logo removed",
+    "hideTitle": "show only the logo",
+    "hideTitleHint": "for logos that already contain the name. The name stays the browser tab title."
   },
   "statusPublic": {
     "banner": {
