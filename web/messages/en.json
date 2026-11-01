@@ -55,7 +55,19 @@
     "readOnlyHint": "your account can only read",
     "menu": "menu",
     "logout": "logout",
-    "themeHint": "press <kbd>d</kbd> to toggle theme"
+    "themeHint": "press <kbd>d</kbd> to toggle theme",
+    "jumpHint": "<kbd>ctrl k</kbd> to jump"
+  },
+  "commandMenu": {
+    "title": "jump to",
+    "placeholder": "type a monitor or page...",
+    "actions": "actions",
+    "monitors": "monitors",
+    "pages": "pages",
+    "empty": "nothing found",
+    "newMonitor": "new monitor",
+    "newStatusPage": "new status page",
+    "keys": "<kbd>↑↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close · elsewhere: <kbd>/</kbd> search <kbd>n</kbd> new monitor <kbd>d</kbd> theme"
   },
   "notFound": {
     "message": "404: no such file or directory"
@@ -95,7 +107,37 @@
     "down": "{count} down",
     "heartbeatLine": "heartbeat · expected every {every}",
     "monitorLine": "{type} · {target} · every {every}",
-    "locations": "{count} locations"
+    "locations": "{count} locations",
+    "searchHint": "press / to search, Esc to clear",
+    "sort": {
+      "title": "sort monitors",
+      "label": "sort: {sort}",
+      "status": "status",
+      "name": "name",
+      "uptime": "lowest uptime",
+      "latency": "slowest",
+      "changed": "recently changed"
+    },
+    "bulk": {
+      "selectAll": "select all",
+      "select": "select {name}",
+      "selected": "{count, plural, one {# monitor selected} other {# monitors selected}}",
+      "pause": "pause",
+      "resume": "resume",
+      "moveToGroup": "move to group",
+      "noGroup": "no group",
+      "delete": "delete",
+      "clear": "clear",
+      "error": "error",
+      "done": {
+        "pause": "{count, plural, one {# monitor paused} other {# monitors paused}}",
+        "resume": "{count, plural, one {# monitor resumed} other {# monitors resumed}}",
+        "delete": "{count, plural, one {# monitor deleted} other {# monitors deleted}}",
+        "group": "{count, plural, one {# monitor moved} other {# monitors moved}}"
+      },
+      "undo": "undo",
+      "undone": "undone"
+    }
   },
   "monitor": {
     "resumed": "monitor resumed",
@@ -105,8 +147,6 @@
     "resume": "resume",
     "pause": "pause",
     "edit": "edit",
-    "deleteTitle": "delete {name}?",
-    "deleteText": "All results and incidents of this monitor will be deleted.",
     "none": "none",
     "pushLine": "heartbeat · expected every <hl>{every}</hl> · grace {grace}",
     "checkLine": "{type} · <hl>{target}</hl> · every {every} · timeout {timeout}ms · retries {retries}",
@@ -149,7 +189,23 @@
     "ipv4Only": "IPv4 only",
     "ipv6Only": "IPv6 only",
     "ipBoth": "IPv4 and IPv6",
-    "degradedAtDefault": "degraded at default"
+    "degradedAtDefault": "degraded at default",
+    "checkNow": "check now",
+    "checking": "checking...",
+    "duplicate": "duplicate",
+    "duplicateHint": "new monitor with the same settings",
+    "undo": "undo",
+    "undone": "undone",
+    "deleteHint": "deleted after a few seconds: you can undo it"
+  },
+  "resultsLog": {
+    "failedOnly": "errors only",
+    "window": "{from}–{to}",
+    "clearWindow": "show all checks",
+    "none": "no checks match",
+    "loadMore": "load more",
+    "loading": "loading...",
+    "retentionHint": "single checks are kept for the raw retention days set in settings; older hours only have totals."
   },
   "monitorForm": {
     "newTitle": "new monitor",
@@ -330,7 +386,22 @@
         "lte": "<=",
         "matches": "matches regex"
       }
-    }
+    },
+    "test": "test",
+    "testing": "testing...",
+    "testHint": "run the check once at the selected locations without saving",
+    "unsaved": "unsaved changes",
+    "unsavedChanges": "You have unsaved changes. Leave this page anyway?",
+    "copyTitle": "copy of {name}",
+    "copyName": "{name} (copy)"
+  },
+  "testCheck": {
+    "title": "test check",
+    "running": "running the check",
+    "ok": "ok",
+    "fail": "fail",
+    "skipped": "skip",
+    "notStored": "one-off check: not saved in the history and no alerts sent."
   },
   "pushInfo": {
     "title": "push url",
@@ -410,7 +481,8 @@
     "noData": "no data",
     "summary": "{pct} · {ok}/{total} up · avg {avg}",
     "degradedChecks": "{count, plural, one {# check} other {# checks}} while degraded",
-    "maintChecks": "+ {count, plural, one {# check} other {# checks}} in maintenance"
+    "maintChecks": "+ {count, plural, one {# check} other {# checks}} in maintenance",
+    "clickForChecks": "click to see the checks"
   },
   "incidents": {
     "title": "incidents",
@@ -421,7 +493,18 @@
     "duration": "duration",
     "cause": "cause",
     "resolved": "resolved",
-    "ongoing": "ongoing"
+    "ongoing": "ongoing",
+    "filter": {
+      "all": "all",
+      "open": "ongoing",
+      "resolved": "resolved",
+      "period": "period:",
+      "anyTime": "any time"
+    },
+    "allMonitors": "all monitors",
+    "noMatch": "no incidents match",
+    "count": "{count, plural, one {# incident} other {# incidents}}",
+    "showChecks": "show the checks around this incident"
   },
   "maintenance": {
     "title": "maintenance",
@@ -1108,6 +1191,25 @@
     "keep": "keep",
     "keepHint": "older scheduled backups are deleted",
     "saveSchedule": "save schedule"
+  },
+  "kumaImport": {
+    "title": "import from uptime kuma",
+    "intro": "Upload a backup file from Uptime Kuma 1.x (Settings → Backup → Export). You see what will be created before anything changes. Groups and tags come along, paused monitors stay paused; notification channels are not imported.",
+    "chooseFile": "choose kuma backup",
+    "reading": "reading...",
+    "summary": "Uptime Kuma {version} · {create} of {total} monitors will be created · {groups} groups · {tags} tags",
+    "action": {
+      "create": "create",
+      "exists": "exists",
+      "skip": "skip"
+    },
+    "paused": "paused",
+    "import": "{count, plural, one {import # monitor} other {import # monitors}}",
+    "importing": "importing...",
+    "cancel": "cancel",
+    "done": "{count, plural, =0 {nothing imported} one {# monitor imported} other {# monitors imported}}",
+    "openDashboard": "open the dashboard",
+    "error": "import failed"
   },
   "apiDocs": {
     "title": "api reference",

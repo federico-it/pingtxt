@@ -92,6 +92,7 @@ type Hub struct {
 	warmUntil int64
 
 	localQueue chan check.Job
+	tests      testChecks                   // test checks waiting for an agent, see monitortest.go
 	localIPv6  check.IPv6Watcher            // IPv6 connectivity of the built-in location
 	skipped    atomic.Int64                 // local checks skipped: previous still running or pool full
 	writer     atomic.Pointer[resultWriter] // batches result inserts while Run is active

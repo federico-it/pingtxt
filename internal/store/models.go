@@ -524,6 +524,51 @@ func (s *Store) RecentResults(monitorID int64, limit int) ([]*ResultRow, error) 
 	return out, rows.Err()
 }
 
+// ResultQuery selects raw results of a monitor, newest first.
+type ResultQuery struct {
+	Before int64 // only results older than this (unix ms), 0 = no bound
+	From   int64 // only results at or after this (unix ms), 0 = no bound
+	To     int64 // only results before this (unix ms), 0 = no bound
+	Failed bool  // only failed checks
+	Limit  int
+}
+
+// QueryResults returns raw results of a monitor matching q, newest first.
+func (s *Store) QueryResults(monitorID int64, q ResultQuery) ([]*ResultRow, error) {
+	where := `monitor_id = ?`
+	args := []any{monitorID}
+	if q.Before > 0 {
+		where += ` AND ts < ?`
+		args = append(args, q.Before)
+	}
+	if q.From > 0 {
+		where += ` AND ts >= ?`
+		args = append(args, q.From)
+	}
+	if q.To > 0 {
+		where += ` AND ts < ?`
+		args = append(args, q.To)
+	}
+	if q.Failed {
+		where += ` AND ok = 0`
+	}
+	args = append(args, q.Limit)
+	rows, err := s.db.Query(`SELECT `+resultCols+` FROM results WHERE `+where+` ORDER BY ts DESC LIMIT ?`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*ResultRow{}
+	for rows.Next() {
+		r, err := scanResult(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // LatestPerLocation returns the most recent result for each location.
 func (s *Store) LatestPerLocation(monitorID int64) ([]*ResultRow, error) {
 	rows, err := s.db.Query(`SELECT r.id, r.monitor_id, r.location, r.ts, r.ok, r.latency_ms, r.status_code, r.message, r.cert_expiry, r.maint,
@@ -937,14 +982,37 @@ func (s *Store) ResolveIncident(monitorID int64, at int64) error {
 }
 
 func (s *Store) ListIncidents(monitorID int64, limit int) ([]*Incident, error) {
-	q := `SELECT i.id, i.monitor_id, m.name, i.started_at, i.resolved_at, i.cause FROM incidents i JOIN monitors m ON m.id = i.monitor_id`
+	return s.FindIncidents(IncidentQuery{MonitorID: monitorID, Limit: limit})
+}
+
+// IncidentQuery selects incidents, newest first.
+type IncidentQuery struct {
+	MonitorID int64  // 0 = all monitors
+	State     string // "open", "resolved" or "" for both
+	Since     int64  // only incidents open at some point after this (unix ms), 0 = all
+	Limit     int
+}
+
+// FindIncidents returns the incidents matching q, newest first.
+func (s *Store) FindIncidents(iq IncidentQuery) ([]*Incident, error) {
+	q := `SELECT i.id, i.monitor_id, m.name, i.started_at, i.resolved_at, i.cause FROM incidents i JOIN monitors m ON m.id = i.monitor_id WHERE 1 = 1`
 	args := []any{}
-	if monitorID > 0 {
-		q += ` WHERE i.monitor_id = ?`
-		args = append(args, monitorID)
+	if iq.MonitorID > 0 {
+		q += ` AND i.monitor_id = ?`
+		args = append(args, iq.MonitorID)
+	}
+	switch iq.State {
+	case "open":
+		q += ` AND i.resolved_at = 0`
+	case "resolved":
+		q += ` AND i.resolved_at > 0`
+	}
+	if iq.Since > 0 {
+		q += ` AND (i.resolved_at = 0 OR i.resolved_at >= ?)`
+		args = append(args, iq.Since)
 	}
 	q += ` ORDER BY i.started_at DESC LIMIT ?`
-	args = append(args, limit)
+	args = append(args, iq.Limit)
 	rows, err := s.db.Query(q, args...)
 	if err != nil {
 		return nil, err
