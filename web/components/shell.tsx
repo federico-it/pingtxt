@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { useHotkey } from "@/hooks/use-hotkey"
 import { useIncidentNotifications } from "@/hooks/use-incident-notifications"
 import { api, useApi, type Me, type Overview } from "@/lib/api"
+import { settingsHref, useSettingsGroups } from "@/lib/settings-nav"
 import { cn } from "@/lib/utils"
 import type en from "@/messages/en.json"
 
@@ -56,6 +57,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [cmdOpen, setCmdOpen] = useState(false)
   const isAdmin = me.data?.user.role === "admin"
+  const tset = useTranslations("settings")
+  const settingsGroups = useSettingsGroups()
 
   // Ctrl+K / ⌘K opens the jump menu, also from inside text fields.
   useEffect(() => {
@@ -235,7 +238,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <CommandMenu
         open={cmdOpen}
         onOpenChange={setCmdOpen}
-        pages={links.map((n) => ({ href: n.href, label: n.label }))}
+        pages={[
+          ...links.map((n) => ({ href: n.href, label: n.label })),
+          ...settingsGroups.flatMap((g) =>
+            g.cats.map((slug) => ({
+              href: settingsHref(slug),
+              label: `${t("links.settings")} › ${tset(`cats.${slug}`)}`,
+              hint: tset(`catHints.${slug}`),
+              searchOnly: true,
+            }))
+          ),
+        ]}
         actions={
           isAdmin
             ? [

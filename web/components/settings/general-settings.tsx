@@ -6,6 +6,7 @@ import { useTranslations } from "use-intl"
 
 import { Section } from "@/components/page-header"
 import { Field } from "@/components/settings/field"
+import { SaveBar } from "@/components/settings/save-bar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -39,29 +40,16 @@ const ipFamilies = [
   [46, "both"],
 ] as const
 
-export function GeneralSettingsForm({
-  settings,
-  onSaved,
-}: {
-  settings: Settings
-  onSaved: (s: Settings) => void
-}) {
+/**
+ * State and save for the "general" settings object. Each settings page edits
+ * one part of it; save sends the whole object, the rest as the hub has it.
+ */
+function useGeneralForm(settings: Settings, onSaved: (s: Settings) => void) {
   const [g, setG] = useState<GeneralSettings>(settings.general)
   const [busy, setBusy] = useState(false)
   const t = useTranslations("generalSettings")
-  const tf = useTranslations("monitorForm.ipFamily")
   const set = <K extends keyof GeneralSettings>(k: K, v: GeneralSettings[K]) =>
     setG((p) => ({ ...p, [k]: v }))
-  const setDef = (k: keyof GeneralSettings["monitor_defaults"], v: number) =>
-    setG((p) => ({ ...p, monitor_defaults: { ...p.monitor_defaults, [k]: v } }))
-  const [certDays, setCertDays] = useState(
-    settings.general.expiry.cert_days.join(", ")
-  )
-  const [domainDays, setDomainDays] = useState(
-    settings.general.expiry.domain_days.join(", ")
-  )
-  const setExpiry = (k: keyof GeneralSettings["expiry"], text: string) =>
-    setG((p) => ({ ...p, expiry: { ...p.expiry, [k]: parseDays(text) } }))
   const dirty = JSON.stringify(g) !== JSON.stringify(settings.general)
 
   async function save(e: React.FormEvent) {
@@ -81,9 +69,17 @@ export function GeneralSettingsForm({
     }
   }
 
+  return { g, setG, set, dirty, busy, save, t }
+}
+
+type FormProps = { settings: Settings; onSaved: (s: Settings) => void }
+
+/** General: public URL, built-in location, history, update check. */
+export function InstanceForm({ settings, onSaved }: FormProps) {
+  const { g, setG, set, dirty, busy, save, t } = useGeneralForm(settings, onSaved)
   return (
     <form onSubmit={save}>
-      <Section title={t("instance")}>
+      <Section title={t("instance")} className="mt-0">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label={t("publicUrl")}
@@ -176,62 +172,81 @@ export function GeneralSettingsForm({
           </Field>
         </div>
       </Section>
-
-      <Section title={t("expiry")}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label={t("certDays")}
-            htmlFor="cert_days"
-            hint={t("certDaysHint")}
-          >
-            <Input
-              id="cert_days"
-              placeholder="14, 7, 3, 1"
-              value={certDays}
-              onChange={(e) => {
-                setCertDays(e.target.value)
-                setExpiry("cert_days", e.target.value)
-              }}
-            />
-          </Field>
-          <Field
-            label={t("domainDays")}
-            htmlFor="domain_days"
-            hint={t("domainDaysHint")}
-          >
-            <Input
-              id="domain_days"
-              placeholder="30, 14, 7, 1"
-              value={domainDays}
-              onChange={(e) => {
-                setDomainDays(e.target.value)
-                setExpiry("domain_days", e.target.value)
-              }}
-            />
-          </Field>
-        </div>
-      </Section>
-
-      <Section title={t("metrics")}>
+      <Section title={t("updates")}>
         <div className="grid gap-4">
-          <Field label={t("metricsPublic")} hint={t("metricsPublicHint")}>
+          <Field label={t("updateCheck")} hint={t("updateCheckHint")}>
             <label className="flex h-8 items-center gap-2 text-xs">
               <Switch
-                checked={g.metrics.public}
-                onCheckedChange={(v) => set("metrics", { public: v })}
+                checked={!g.update_check.disabled}
+                onCheckedChange={(v) => set("update_check", { disabled: !v })}
               />
-              {g.metrics.public ? t("public") : t("tokenRequired")}
+              {g.update_check.disabled ? t("disabled") : t("enabled")}
             </label>
           </Field>
-          <pre className="overflow-x-auto border border-dashed p-3 text-[11px] leading-relaxed text-muted-foreground">
-            {scrapeConfig(
-              settings.general.public_url || settings.detected_url,
-              g.metrics.public
-            )}
-          </pre>
+          <UpdateStatus />
         </div>
       </Section>
+      <SaveBar dirty={dirty} busy={busy} onDiscard={() => setG(settings.general)} />
+    </form>
+  )
+}
 
+/** Monitors: defaults for new monitors, degraded threshold, IP family, expiry alerts. */
+export function MonitorDefaultsForm({ settings, onSaved }: FormProps) {
+  const { g, setG, set, dirty, busy, save, t } = useGeneralForm(settings, onSaved)
+  const tf = useTranslations("monitorForm.ipFamily")
+  const setDef = (k: keyof GeneralSettings["monitor_defaults"], v: number) =>
+    setG((p) => ({ ...p, monitor_defaults: { ...p.monitor_defaults, [k]: v } }))
+  const [certDays, setCertDays] = useState(
+    settings.general.expiry.cert_days.join(", ")
+  )
+  const [domainDays, setDomainDays] = useState(
+    settings.general.expiry.domain_days.join(", ")
+  )
+  const setExpiry = (k: keyof GeneralSettings["expiry"], text: string) =>
+    setG((p) => ({ ...p, expiry: { ...p.expiry, [k]: parseDays(text) } }))
+  function discard() {
+    setG(settings.general)
+    setCertDays(settings.general.expiry.cert_days.join(", "))
+    setDomainDays(settings.general.expiry.domain_days.join(", "))
+  }
+  return (
+    <form onSubmit={save}>
+      <Section title={t("defaults")} className="mt-0">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Field label={t("interval")} htmlFor="d_interval">
+            <Input
+              id="d_interval"
+              type="number"
+              min={10}
+              max={86400}
+              value={g.monitor_defaults.interval_sec}
+              onChange={(e) => setDef("interval_sec", Number(e.target.value))}
+            />
+          </Field>
+          <Field label={t("timeout")} htmlFor="d_timeout">
+            <Input
+              id="d_timeout"
+              type="number"
+              min={500}
+              max={60000}
+              step={500}
+              value={g.monitor_defaults.timeout_ms}
+              onChange={(e) => setDef("timeout_ms", Number(e.target.value))}
+            />
+          </Field>
+          <Field label={t("retries")} htmlFor="d_retries">
+            <Input
+              id="d_retries"
+              type="number"
+              min={1}
+              max={10}
+              value={g.monitor_defaults.retries}
+              onChange={(e) => setDef("retries", Number(e.target.value))}
+            />
+          </Field>
+        </div>
+      </Section>
       <Section title={t("status")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
@@ -273,69 +288,70 @@ export function GeneralSettingsForm({
           </Field>
         </div>
       </Section>
+      <Section title={t("expiry")}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label={t("certDays")}
+            htmlFor="cert_days"
+            hint={t("certDaysHint")}
+          >
+            <Input
+              id="cert_days"
+              placeholder="14, 7, 3, 1"
+              value={certDays}
+              onChange={(e) => {
+                setCertDays(e.target.value)
+                setExpiry("cert_days", e.target.value)
+              }}
+            />
+          </Field>
+          <Field
+            label={t("domainDays")}
+            htmlFor="domain_days"
+            hint={t("domainDaysHint")}
+          >
+            <Input
+              id="domain_days"
+              placeholder="30, 14, 7, 1"
+              value={domainDays}
+              onChange={(e) => {
+                setDomainDays(e.target.value)
+                setExpiry("domain_days", e.target.value)
+              }}
+            />
+          </Field>
+        </div>
+      </Section>
+      <SaveBar dirty={dirty} busy={busy} onDiscard={discard} />
+    </form>
+  )
+}
 
-      <Section title={t("updates")}>
+/** Integrations: whether /metrics needs an API token, plus a scrape example. */
+export function MetricsForm({ settings, onSaved }: FormProps) {
+  const { g, setG, set, dirty, busy, save, t } = useGeneralForm(settings, onSaved)
+  return (
+    <form onSubmit={save}>
+      <Section title={t("metrics")}>
         <div className="grid gap-4">
-          <Field label={t("updateCheck")} hint={t("updateCheckHint")}>
+          <Field label={t("metricsPublic")} hint={t("metricsPublicHint")}>
             <label className="flex h-8 items-center gap-2 text-xs">
               <Switch
-                checked={!g.update_check.disabled}
-                onCheckedChange={(v) => set("update_check", { disabled: !v })}
+                checked={g.metrics.public}
+                onCheckedChange={(v) => set("metrics", { public: v })}
               />
-              {g.update_check.disabled ? t("disabled") : t("enabled")}
+              {g.metrics.public ? t("public") : t("tokenRequired")}
             </label>
           </Field>
-          <UpdateStatus />
+          <pre className="overflow-x-auto border border-dashed p-3 text-[11px] leading-relaxed text-muted-foreground">
+            {scrapeConfig(
+              settings.general.public_url || settings.detected_url,
+              g.metrics.public
+            )}
+          </pre>
         </div>
       </Section>
-
-      <UsageStats />
-
-      <Section title={t("defaults")}>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label={t("interval")} htmlFor="d_interval">
-            <Input
-              id="d_interval"
-              type="number"
-              min={10}
-              max={86400}
-              value={g.monitor_defaults.interval_sec}
-              onChange={(e) => setDef("interval_sec", Number(e.target.value))}
-            />
-          </Field>
-          <Field label={t("timeout")} htmlFor="d_timeout">
-            <Input
-              id="d_timeout"
-              type="number"
-              min={500}
-              max={60000}
-              step={500}
-              value={g.monitor_defaults.timeout_ms}
-              onChange={(e) => setDef("timeout_ms", Number(e.target.value))}
-            />
-          </Field>
-          <Field label={t("retries")} htmlFor="d_retries">
-            <Input
-              id="d_retries"
-              type="number"
-              min={1}
-              max={10}
-              value={g.monitor_defaults.retries}
-              onChange={(e) => setDef("retries", Number(e.target.value))}
-            />
-          </Field>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <Button type="submit" variant="outline" disabled={busy || !dirty}>
-            {busy ? "..." : t("save")}
-          </Button>
-          {dirty && (
-            <span className="text-[11px] text-muted-foreground">
-              {t("unsaved")}
-            </span>
-          )}
-        </div>
-      </Section>
+      <SaveBar dirty={dirty} busy={busy} onDiscard={() => setG(settings.general)} />
     </form>
   )
 }
@@ -452,7 +468,7 @@ function parseDays(text: string): number[] {
 }
 
 /** Anonymous usage stats: saved right away, apart from the form. */
-function UsageStats() {
+export function UsageStats() {
   const t = useTranslations("telemetry")
   const tg = useTranslations("generalSettings")
   const s = useTelemetry(true)

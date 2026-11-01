@@ -13,6 +13,10 @@ import { cn } from "@/lib/utils"
 export interface CommandLink {
   href: string
   label: string
+  /** Extra words to match, shown greyed after the label. */
+  hint?: string
+  /** Listed only once something is typed. */
+  searchOnly?: boolean
 }
 
 interface Item {
@@ -82,8 +86,8 @@ export function CommandMenu({
       {
         title: t("pages"),
         items: pages
-          .filter((p) => match(p.label, p.href))
-          .map((p) => ({ key: "p" + p.href, ...p })),
+          .filter((p) => (!p.searchOnly || s) && match(p.label, p.href, p.hint))
+          .map((p) => ({ key: "p" + p.href, href: p.href, label: p.label, hint: p.hint })),
       },
     ]
     return out.filter((g) => g.items.length > 0)

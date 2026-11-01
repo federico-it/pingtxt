@@ -322,7 +322,7 @@ func (h *Hub) linkAccount(w http.ResponseWriter, r *http.Request, provider strin
 		h.settingsRedirect(w, r, "internal error")
 		return
 	}
-	http.Redirect(w, r, "/settings/?linked="+url.QueryEscape(provider), http.StatusFound)
+	http.Redirect(w, r, "/settings/account/?linked="+url.QueryEscape(provider), http.StatusFound)
 }
 
 func (h *Hub) finishRedirect(w http.ResponseWriter, r *http.Request, p pendingLogin, msg string) {
@@ -338,7 +338,7 @@ func (h *Hub) loginRedirect(w http.ResponseWriter, r *http.Request, msg string) 
 }
 
 func (h *Hub) settingsRedirect(w http.ResponseWriter, r *http.Request, msg string) {
-	http.Redirect(w, r, "/settings/?error="+url.QueryEscape(msg), http.StatusFound)
+	http.Redirect(w, r, "/settings/account/?error="+url.QueryEscape(msg), http.StatusFound)
 }
 
 func getJSON(ctx context.Context, client *http.Client, u string, v any) error {
