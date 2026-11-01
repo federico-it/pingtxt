@@ -1002,7 +1002,38 @@
     "disconnect": "",
     "disconnectTitle": "",
     "disconnectText": "",
-    "connect": ""
+    "connect": "",
+    "nav": {
+      "label": "",
+      "personal": "",
+      "instance": "",
+      "back": ""
+    },
+    "cats": {
+      "profile": "",
+      "account": "",
+      "tokens": "",
+      "general": "",
+      "monitors": "",
+      "access": "",
+      "integrations": "",
+      "data": ""
+    },
+    "catHints": {
+      "profile": "",
+      "account": "",
+      "tokens": "",
+      "general": "",
+      "monitors": "",
+      "access": "",
+      "integrations": "",
+      "data": ""
+    },
+    "adminOnly": "",
+    "unsaved": "",
+    "discard": "",
+    "save": "",
+    "unsavedLeave": ""
   },
   "generalSettings": {
     "saved": "",
