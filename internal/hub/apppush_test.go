@@ -177,7 +177,7 @@ func TestAppPush(t *testing.T) {
 
 	// A channel for one user only: the viewer has no phone left.
 	only := decode[store.Notifier](t, admin.do("POST", "/api/notifiers", map[string]any{"name": "v", "type": "app", "enabled": true, "config": map[string]string{"users": "V@b.co"}}))
-	if res := admin.do("POST", "/api/notifiers/"+itoa(only.ID)+"/test", nil); res.StatusCode != 502 {
+	if res := admin.do("POST", "/api/notifiers/"+itoa(only.ID)+"/test", nil); res.StatusCode != 409 {
 		t.Fatalf("no phones: %d", res.StatusCode)
 	}
 
@@ -210,7 +210,6 @@ func TestAppPush(t *testing.T) {
 		t.Fatalf("relay change: %+v", v)
 	}
 }
-
 
 func TestAppMessage(t *testing.T) {
 	at := time.Now().UnixMilli()

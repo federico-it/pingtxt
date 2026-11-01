@@ -1501,6 +1501,12 @@ func (h *Hub) testDraftNotifier(w http.ResponseWriter, r *http.Request, _ *store
 func (h *Hub) sendTest(w http.ResponseWriter, r *http.Request, n *store.Notifier) {
 	ev := Event{Monitor: "example.com", Target: "https://example.com", Status: StatusDown, Cause: "this is a test notification", At: time.Now().UnixMilli(), Test: true}
 	if err := h.notify.Deliver(r.Context(), n, ev); err != nil {
+		h.log.Warn("test notification failed", "channel", n.Name, "type", n.Type, "err", err)
+		var se setupError
+		if errors.As(err, &se) {
+			writeErr(w, 409, err.Error())
+			return
+		}
 		writeErr(w, 502, err.Error())
 		return
 	}
