@@ -935,11 +935,13 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
           <p>
             {t(
               <>
-                Webhook (JSON), Discord, Slack, Telegram, ntfy and email (SMTP with STARTTLS/TLS). Add them under{" "}
+                Webhook (JSON), Discord, Slack, Telegram, ntfy and email (SMTP with STARTTLS/TLS, or the Resend API with an
+                API key from a verified domain). Add them under{" "}
                 <B>notify</B>, test them before saving, and attach them to monitors.
               </>,
               <>
-                Webhook (JSON), Discord, Slack, Telegram, ntfy ed email (SMTP con STARTTLS/TLS). Aggiungili in{" "}
+                Webhook (JSON), Discord, Slack, Telegram, ntfy ed email (SMTP con STARTTLS/TLS, oppure l&apos;API di Resend
+                con una API key di un dominio verificato). Aggiungili in{" "}
                 <B>notifiche</B>, provali prima di salvare e collegali ai monitor.
               </>,
             )}
