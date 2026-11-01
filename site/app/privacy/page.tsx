@@ -1,12 +1,13 @@
 import type { Metadata } from "next"
 
 import { Prompt, REPO, SectionTitle } from "@/components/site-shell"
+import { pageMeta } from "@/lib/seo"
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "privacy policy",
   description: "Privacy policy of the pingtxt iOS app and the pingtxt.com website: what is sent where, and what is stored.",
-  alternates: { canonical: "/privacy/" },
-}
+  path: "/privacy/",
+})
 
 // Who answers for this policy. Change it here only.
 const OWNER = "Federico Mengascini"
