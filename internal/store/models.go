@@ -750,7 +750,9 @@ const (
 // checks that succeeded there; otherwise OK follows the monitor status (see
 // Uptime). History older than
 // the raw results comes from the hourly rollups: each hour falls in the
-// window that contains its start.
+// window that contains its start. Windows shorter than an hour read the raw
+// results while they are kept, so that recent history is not shown at hour
+// precision.
 func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bucket, error) {
 	type key struct {
 		idx int64
@@ -804,6 +806,13 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 		rawOK, rawDeg = `ok = 1`, `1 = 0`
 	}
 	w := s.RollupUntil()
+	if size < RollupHour && from < w {
+		split, err := s.rawSince(monitorID)
+		if err != nil {
+			return nil, err
+		}
+		w = min(w, split)
+	}
 	if from < w {
 		rows, err := s.db.Query(`SELECT `+s.db.idiv(s.db.greatest("start", "?")+" - ?", "?")+` AS b, `+loc+` AS loc, SUM(total), SUM(`+rollOK+`), SUM(`+rollDeg+`), SUM(maint),
 			SUM(lat_sum), SUM(lat_n), COALESCE(MIN(CASE WHEN lat_n > 0 THEN lat_min END), 0), MAX(lat_max),
@@ -849,6 +858,23 @@ func (s *Store) Buckets(monitorID, from, to, size int64, perLocation bool) ([]Bu
 		out = append(out, b)
 	}
 	return out, nil
+}
+
+// rawSince returns the first hour from which a monitor's raw results are
+// all still kept: the hour after its oldest raw result, which may be partly
+// pruned already (math.MaxInt64: no raw results).
+func (s *Store) rawSince(monitorID int64) (int64, error) {
+	var first sql.NullInt64
+	if err := s.db.QueryRow(`SELECT MIN(ts) FROM results WHERE monitor_id = ?`, monitorID).Scan(&first); err != nil {
+		return 0, err
+	}
+	if !first.Valid {
+		return math.MaxInt64, nil
+	}
+	if first.Int64%RollupHour == 0 {
+		return first.Int64, nil
+	}
+	return first.Int64 - first.Int64%RollupHour + RollupHour, nil
 }
 
 // PruneResults deletes raw results older than before, but never results that

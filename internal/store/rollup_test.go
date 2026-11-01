@@ -242,3 +242,64 @@ func TestRecomputeOldMonState(t *testing.T) {
 		t.Fatalf("down rows: %d %v", n, err)
 	}
 }
+
+// Windows shorter than an hour read the raw results while they are kept,
+// instead of one point per summarized hour, and fall back to the rollups for
+// the pruned history.
+func TestBucketsFineWindowsReadRaw(t *testing.T) {
+	s := openTest(t)
+	m := &Monitor{Name: "m", Type: "http", Target: "http://x", IntervalSec: 60, Locations: []string{"local"}}
+	if err := s.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UnixMilli()
+	now -= now % RollupHour
+	var rows []*ResultRow
+	for i := range 12 * 12 { // 12 hours, every 5 min
+		rows = append(rows, &ResultRow{MonitorID: m.ID, Location: "local", TS: now - int64(i)*5*60*1000 - 1, OK: true, LatencyMs: float64(10 + i%7)})
+	}
+	if err := s.InsertResults(rows); err != nil {
+		t.Fatal(err)
+	}
+	size := int64(5 * 60 * 1000)
+	from := now - 2*RollupHour
+	before, err := s.Buckets(m.ID, from, now, size, true)
+	if err != nil || len(before) != 24 {
+		t.Fatalf("before rollup: %d buckets, %v", len(before), err)
+	}
+	if _, err := s.RollupResults(time.UnixMilli(now).Add(RollupLag), nil); err != nil {
+		t.Fatal(err)
+	}
+	after, err := s.Buckets(m.ID, from, now, size, true)
+	if err != nil || len(after) != len(before) {
+		t.Fatalf("after rollup: %d buckets, want %d, %v", len(after), len(before), err)
+	}
+	for i := range before {
+		if before[i].Start != after[i].Start || before[i].AvgMs != after[i].AvgMs || before[i].Total != after[i].Total {
+			t.Fatalf("bucket %d: %+v, want %+v", i, after[i], before[i])
+		}
+	}
+
+	// Prune half way through an hour: that hour and older ones come from the
+	// rollups (one point per hour), the rest from the raw results.
+	cut := now - 4*RollupHour - RollupHour/2
+	if _, err := s.PruneResults(cut); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Buckets(m.ID, now-8*RollupHour, now, size, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hourly, fine, total int
+	for _, b := range got {
+		total += b.Total
+		if b.Start < now-4*RollupHour {
+			hourly++
+		} else {
+			fine++
+		}
+	}
+	if hourly != 4 || fine != 4*12 || total != 8*12 {
+		t.Fatalf("got %d hourly and %d fine buckets with %d checks, want 4, 48, 96", hourly, fine, total)
+	}
+}
