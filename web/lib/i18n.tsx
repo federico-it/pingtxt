@@ -7,8 +7,8 @@ import en from "@/messages/en.json"
 
 /**
  * Languages offered in the picker. English is the source language and is
- * bundled; the others are loaded on demand. Crowdin writes the files in
- * web/messages/: add a locale here once its file is reasonably complete.
+ * bundled; the others are loaded on demand from web/messages/<code>.json:
+ * add a locale here once its file is reasonably complete.
  */
 export const locales = {
   en: "English",

@@ -15,7 +15,7 @@
   "language": {
     "choose": "lingua",
     "title": "lingua",
-    "hint": "Salvata in questo browser. Manca la tua lingua o hai trovato una parola sbagliata? Aiuta a tradurre pingtxt su <link>Crowdin</link>."
+    "hint": "Salvata in questo browser. Manca la tua lingua o hai trovato una parola sbagliata? <link>Aiuta a tradurre pingtxt</link> su GitHub."
   },
   "time": {
     "never": "mai",
@@ -55,7 +55,19 @@
     "readOnlyHint": "il tuo account può solo leggere",
     "menu": "menu",
     "logout": "esci",
-    "themeHint": "premi <kbd>d</kbd> per cambiare tema"
+    "themeHint": "premi <kbd>d</kbd> per cambiare tema",
+    "jumpHint": "<kbd>ctrl k</kbd> per saltare"
+  },
+  "commandMenu": {
+    "title": "vai a",
+    "placeholder": "scrivi un monitor o una pagina...",
+    "actions": "azioni",
+    "monitors": "monitor",
+    "pages": "pagine",
+    "empty": "nessun risultato",
+    "newMonitor": "nuovo monitor",
+    "newStatusPage": "nuova status page",
+    "keys": "<kbd>↑↓</kbd> sposta <kbd>invio</kbd> apri <kbd>esc</kbd> chiudi · altrove: <kbd>/</kbd> cerca <kbd>n</kbd> nuovo monitor <kbd>d</kbd> tema"
   },
   "notFound": {
     "message": "404: file o cartella inesistente"
@@ -85,6 +97,10 @@
     "fetching": "caricamento",
     "noMatch": "nessun monitor corrisponde",
     "emptyState": "ancora nessun monitor. <link>crea il primo</link>",
+    "pinned": "fissati",
+    "others": "tutto il resto",
+    "pin": "fissa {name} in alto (in questo browser)",
+    "unpin": "sblocca {name}",
     "cols": {
       "name": "nome",
       "last24h": "ultime 24h",
@@ -95,7 +111,37 @@
     "down": "{count} down",
     "heartbeatLine": "heartbeat · atteso ogni {every}",
     "monitorLine": "{type} · {target} · ogni {every}",
-    "locations": "{count} località"
+    "locations": "{count} località",
+    "searchHint": "premi / per cercare, Esc per cancellare",
+    "sort": {
+      "title": "ordina i monitor",
+      "label": "ordina: {sort}",
+      "status": "stato",
+      "name": "nome",
+      "uptime": "uptime più basso",
+      "latency": "più lenti",
+      "changed": "cambiati di recente"
+    },
+    "bulk": {
+      "selectAll": "seleziona tutti",
+      "select": "seleziona {name}",
+      "selected": "{count, plural, one {# monitor selezionato} other {# monitor selezionati}}",
+      "pause": "pausa",
+      "resume": "riprendi",
+      "moveToGroup": "sposta nel gruppo",
+      "noGroup": "nessun gruppo",
+      "delete": "elimina",
+      "clear": "deseleziona",
+      "error": "errore",
+      "done": {
+        "pause": "{count, plural, one {# monitor in pausa} other {# monitor in pausa}}",
+        "resume": "{count, plural, one {# monitor ripreso} other {# monitor ripresi}}",
+        "delete": "{count, plural, one {# monitor eliminato} other {# monitor eliminati}}",
+        "group": "{count, plural, one {# monitor spostato} other {# monitor spostati}}"
+      },
+      "undo": "annulla",
+      "undone": "annullato"
+    }
   },
   "monitor": {
     "resumed": "monitor ripreso",
@@ -105,8 +151,6 @@
     "resume": "riprendi",
     "pause": "pausa",
     "edit": "modifica",
-    "deleteTitle": "eliminare {name}?",
-    "deleteText": "Tutti i risultati e gli incidenti di questo monitor saranno eliminati.",
     "none": "nessuna",
     "pushLine": "heartbeat · atteso ogni <hl>{every}</hl> · tolleranza {grace}",
     "checkLine": "{type} · <hl>{target}</hl> · ogni {every} · timeout {timeout}ms · tentativi {retries}",
@@ -148,9 +192,57 @@
     "degradedAt": "degradato dal {pct}%",
     "ipv4Only": "solo IPv4",
     "ipv6Only": "solo IPv6",
-    "degradedAtDefault": "degradato dalla soglia predefinita"
+    "ipBoth": "IPv4 e IPv6",
+    "degradedAtDefault": "degradato dalla soglia predefinita",
+    "checkNow": "controlla ora",
+    "checking": "controllo...",
+    "duplicate": "duplica",
+    "duplicateHint": "nuovo monitor con le stesse impostazioni",
+    "undo": "annulla",
+    "undone": "annullato",
+    "deleteHint": "viene eliminato dopo qualche secondo: puoi annullare",
+    "zoomHint": "trascina sul grafico per ingrandire",
+    "zoomed": "{from} → {to}",
+    "zoomReset": "torna a {range}"
+  },
+  "browserNotify": {
+    "title": "notifiche desktop in questo browser",
+    "hint": "finché una scheda di pingtxt è aperta, anche in background, questo browser ti avvisa quando un monitor va down o torna up. solo per te, non viene inviato nulla ad altri.",
+    "unsupported": "questo browser non può mostrare notifiche.",
+    "denied": "le notifiche sono bloccate per questo sito: consentile nelle impostazioni del sito del browser, poi torna qui.",
+    "testTitle": "le notifiche di pingtxt sono attive",
+    "testBody": "ne vedrai una quando un monitor va down o torna up.",
+    "down": "▼ {name} è down",
+    "downBody": "il monitor non supera i controlli.",
+    "up": "▲ {name} è di nuovo up",
+    "upBody": "down per {duration}"
+  },
+  "periodStats": {
+    "uptime": "uptime",
+    "avg": "media",
+    "p50Hint": "metà dei controlli è stata più veloce di così",
+    "p95Hint": "il 95% dei controlli è stato più veloce di così",
+    "p99Hint": "il 99% dei controlli è stato più veloce di così: l'1% più lento ci ha messo di più",
+    "compared": "rispetto a {from} → {to}",
+    "partial": "percentili dal {from}: i controlli più vecchi sono conservati solo come medie orarie",
+    "checks": "{count, plural, one {# controllo} other {# controlli}}",
+    "flat": "= uguale",
+    "was": "prima: {v}",
+    "points": "pt"
+  },
+  "resultsLog": {
+    "failedOnly": "solo errori",
+    "window": "{from}–{to}",
+    "clearWindow": "mostra tutti i controlli",
+    "none": "nessun controllo corrisponde",
+    "loadMore": "carica altri",
+    "loading": "caricamento...",
+    "retentionHint": "i singoli controlli sono conservati per i giorni di conservazione dei dati grezzi impostati nelle impostazioni; per le ore più vecchie ci sono solo i totali."
   },
   "monitorForm": {
+    "curlHint": "suggerimento: incolla qui un comando curl per compilare metodo, header e body",
+    "curlFilled": "compilato dal comando curl",
+    "curlError": "impossibile leggere il comando curl: {error}",
     "newTitle": "nuovo monitor",
     "editTitle": "modifica: {name}",
     "types": {
@@ -225,7 +317,8 @@
       "labels": "gruppo e tag",
       "schedule": "pianificazione",
       "locations": "località",
-      "expiry": "avvisi di scadenza"
+      "expiry": "avvisi di scadenza",
+      "notifications": "notifiche"
     },
     "noGroup": "nessun gruppo",
     "noGrace": "nessuna",
@@ -279,6 +372,9 @@
     "builtIn": "integrata",
     "online": "online",
     "offline": "offline",
+    "noIPv6": "niente IPv6",
+    "noIPv6Hint": "Questa località non ha connettività IPv6: non può controllare via IPv6. Con IPv4 o IPv6, o con il default dell'istanza, controlla via IPv4.",
+    "noIPv6Selected": "Alcune località selezionate non hanno IPv6: rimuovile o scegli un'altra versione ip.",
     "method": "metodo",
     "acceptedStatus": "stati accettati",
     "acceptedStatusHint": "ad es. 200-299,301 o 2xx. vuoto = 200-399",
@@ -299,9 +395,11 @@
     "ipFamily": {
       "label": "versione ip",
       "hint": "solo IPv4 o solo IPv6, per accorgersi se uno dei due non funziona su un host dual-stack",
-      "v0": "IPv4 o IPv6",
+      "default": "default dell'istanza",
+      "either": "IPv4 o IPv6 (il primo che risponde)",
       "v4": "solo IPv4",
-      "v6": "solo IPv6"
+      "v6": "solo IPv6",
+      "both": "IPv4 e IPv6 (devono funzionare entrambi)"
     },
     "responseRules": {
       "title": "controlli sulla risposta",
@@ -324,7 +422,22 @@
         "lte": "<=",
         "matches": "corrisponde alla regex"
       }
-    }
+    },
+    "test": "prova",
+    "testing": "prova in corso...",
+    "testHint": "esegue il controllo una volta dalle località selezionate senza salvare",
+    "unsaved": "modifiche non salvate",
+    "unsavedChanges": "Hai modifiche non salvate. Uscire comunque da questa pagina?",
+    "copyTitle": "copia di {name}",
+    "copyName": "{name} (copia)"
+  },
+  "testCheck": {
+    "title": "controllo di prova",
+    "running": "controllo in corso",
+    "ok": "ok",
+    "fail": "errore",
+    "skipped": "saltato",
+    "notStored": "controllo singolo: non viene salvato nello storico e non invia avvisi."
   },
   "pushInfo": {
     "title": "url push",
@@ -346,6 +459,7 @@
     "title": "badge",
     "hint": "Immagini SVG per un README, servite senza login tramite la status page \"{page}\". Si aggiornano ogni minuto e mostrano solo ciò che la pagina mostra già.",
     "pageHint": "Immagine SVG con lo stato generale di questa pagina, per un README. Si aggiorna ogni minuto.",
+    "protectedHint": "Questa pagina ha una password: i suoi badge mostrano \"protetto da password\" a chi non ha aperto la pagina.",
     "needsPage": "I badge richiedono una status page pubblicata che mostri questo monitor. Aggiungilo a una in <link>status page</link>.",
     "kinds": {
       "status": "stato",
@@ -403,7 +517,8 @@
     "noData": "nessun dato",
     "summary": "{pct} · {ok}/{total} up · media {avg}",
     "degradedChecks": "{count, plural, one {# controllo} other {# controlli}} con stato degradato",
-    "maintChecks": "+ {count, plural, one {# controllo} other {# controlli}} in manutenzione"
+    "maintChecks": "+ {count, plural, one {# controllo} other {# controlli}} in manutenzione",
+    "clickForChecks": "clicca per vedere i controlli"
   },
   "incidents": {
     "title": "incidenti",
@@ -414,7 +529,18 @@
     "duration": "durata",
     "cause": "causa",
     "resolved": "risolto",
-    "ongoing": "in corso"
+    "ongoing": "in corso",
+    "filter": {
+      "all": "tutti",
+      "open": "in corso",
+      "resolved": "risolti",
+      "period": "periodo:",
+      "anyTime": "sempre"
+    },
+    "allMonitors": "tutti i monitor",
+    "noMatch": "nessun incidente corrisponde",
+    "count": "{count, plural, one {# incidente} other {# incidenti}}",
+    "showChecks": "mostra i controlli intorno a questo incidente"
   },
   "maintenance": {
     "title": "manutenzione",
@@ -553,6 +679,8 @@
     "online": "online",
     "offline": "offline",
     "neverConnected": "mai collegato",
+    "ipv6Yes": "IPv6",
+    "ipv6No": "niente IPv6",
     "now": "ora",
     "update": "aggiorna",
     "edit": "modifica",
@@ -574,10 +702,37 @@
     "updatingState": "aggiornamento…",
     "updateFailed": "aggiornamento fallito",
     "newVersion": "è disponibile una nuova versione",
-    "updatesOnReconnect": "si aggiorna quando l'agent si ricollega"
+    "updatesOnReconnect": "si aggiorna quando l'agent si ricollega",
+    "waiting": "in attesa che {name} si colleghi… ti verrà chiesto quali monitor devono usarlo.",
+    "noMonitors": "in nessun monitor",
+    "monitors": "{count, plural, one {# monitor} other {# monitor}}",
+    "assign": "aggiungi ai monitor"
   },
   "agentInstall": {
     "hint": "L'agent si collega solo in uscita verso l'hub via HTTPS/WebSocket: nessuna porta da aprire. Il token è mostrato solo ora; rigeneralo per averne uno nuovo."
+  },
+  "agentAssign": {
+    "title": "aggiungere {name} ai tuoi monitor?",
+    "textOnline": "{name} è online. Scegli i monitor da controllare anche da questa località.",
+    "text": "Scegli i monitor da controllare anche da {name}.",
+    "loading": "guardo i tuoi monitor…",
+    "compatible": "{count, plural, one {# monitor compatibile} other {# monitor compatibili}}",
+    "skipped": "{count, plural, one {# monitor escluso} other {# monitor esclusi}}",
+    "already": "{count, plural, one {# monitor lo usa già.} other {# monitor lo usano già.}}",
+    "none": "nessun monitor può ancora usare questo agent.",
+    "noneLeft": "{count, plural, one {l'unico monitor compatibile lo usa già.} other {tutti i # monitor compatibili lo usano già.}}",
+    "selectAll": "seleziona tutti",
+    "selectNone": "deseleziona tutti",
+    "reasons": {
+      "no_ipv6": "richiede IPv6, l'agent non ce l'ha",
+      "ipv6_unknown": "richiede IPv6, l'agent non l'ha ancora segnalato",
+      "docker": "docker controlla il proprio host",
+      "loopback": "la destinazione è localhost"
+    },
+    "later": "non ora",
+    "add": "{count, plural, =0 {aggiungi} one {aggiungi a # monitor} other {aggiungi a # monitor}}",
+    "added": "{name} aggiunto a {count, plural, one {# monitor} other {# monitor}}",
+    "error": "errore"
   },
   "notifications": {
     "title": "notifiche",
@@ -613,7 +768,8 @@
       "slack": "slack",
       "telegram": "telegram",
       "ntfy": "ntfy",
-      "email": "email (smtp)"
+      "email": "email (smtp)",
+      "app": "app pingtxt (push)"
     },
     "fields": {
       "url": "url",
@@ -622,21 +778,29 @@
       "chatId": "chat id",
       "topicUrl": "url del topic",
       "accessToken": "token di accesso (facoltativo)",
+      "provider": "invia con",
+      "apiKey": "api key di resend",
       "smtpHost": "host smtp",
       "port": "porta",
       "security": "sicurezza",
       "username": "utente (facoltativo)",
       "password": "password",
       "from": "mittente",
-      "to": "destinatari"
+      "to": "destinatari",
+      "users": "utenti (email)"
     },
     "options": {
+      "smtp": "server smtp",
+      "resend": "resend (api http)",
       "starttls": "starttls (587)",
       "tls": "tls (465)",
       "none": "nessuna (25, relay locale)"
     },
+    "pushOff": "Le notifiche push all'app mobile sono disattivate: attivale in <settings>Impostazioni, app mobile</settings> per abilitare questo canale.",
     "hints": {
-      "commaSeparated": "separati da virgola"
+      "commaSeparated": "separati da virgola",
+      "appUsers": "Separati da virgola. Vuoto = tutti gli utenti. Ogni utente riceve gli avvisi sui telefoni in cui ha fatto l'accesso con l'app pingtxt.",
+      "resendKey": "Crea una chiave con accesso in invio in <link>Resend, API keys</link>. L'indirizzo del mittente deve essere su un dominio verificato in Resend."
     }
   },
   "reports": {
@@ -690,6 +854,10 @@
     "incidents": "incidenti"
   },
   "statusPageForm": {
+    "preview": "anteprima",
+    "previewHint": "quello che vedono i visitatori, prima di salvare",
+    "previewUntitled": "pagina senza titolo",
+    "previewSubscribe": "qui i visitatori possono iscriversi via email.",
     "newTitle": "nuova status page",
     "editTitle": "modifica: {name}",
     "saved": "status page salvata",
@@ -727,7 +895,32 @@
     "channelDisabled": "disattivato",
     "subscribeHint": "I visitatori possono iscriversi via email agli incidenti che pubblichi. Le email partono dal server SMTP e dal mittente di questo canale email, non ai suoi destinatari.",
     "subscribeNoChannel": "Aggiungi un canale email nelle notifiche per far iscrivere i visitatori.",
-    "incidents": "incidenti"
+    "passwordTitle": "password",
+    "protected": "proteggi con una password",
+    "protectedHint": "i visitatori inseriscono una password per vedere la pagina, i suoi badge e il modulo di iscrizione. Agli utenti che hanno effettuato l'accesso non serve mai.",
+    "password": "password",
+    "newPassword": "nuova password",
+    "passwordPlaceholder": "almeno 6 caratteri",
+    "passwordSet": "È impostata una password. Lascia il campo vuoto per mantenerla; una nuova disconnette tutti i visitatori.",
+    "passwordNew": "Condividila con le persone che devono vedere la pagina.",
+    "incidents": "incidenti",
+    "headerTitle": "intestazione",
+    "headerUrl": "link del nome (facoltativo)",
+    "headerUrlHint": "Cliccando il nome o il logo della pagina si apre questo indirizzo, per esempio il tuo sito. Vuoto: il nome non è un link.",
+    "headerUrlInvalid": "usa un indirizzo che inizia con http:// o https://",
+    "logo": "logo",
+    "logoHint": "SVG, PNG, JPEG, GIF, WebP o AVIF, fino a 4 MB. Le immagini vengono ridimensionate e servite come AVIF e WebP; i file SVG restano vettoriali, senza script.",
+    "logoNone": "nessun logo: l'intestazione mostra il nome della pagina.",
+    "logoSaveFirst": "Salva prima la pagina, poi aggiungi il logo.",
+    "logoUpload": "carica file",
+    "logoUploading": "caricamento...",
+    "logoUrl": "o importa da un URL",
+    "logoImport": "importa",
+    "logoRemove": "rimuovi logo",
+    "logoSaved": "logo aggiornato",
+    "logoRemoved": "logo rimosso",
+    "hideTitle": "mostra solo il logo",
+    "hideTitleHint": "per i logo che contengono già il nome. Il nome resta il titolo della scheda del browser."
   },
   "statusPublic": {
     "banner": {
@@ -772,6 +965,15 @@
       "confirmed": "{email} è iscritto: riceverai gli aggiornamenti sugli incidenti via email.",
       "unsubscribed": "{email} è disiscritto: non riceverai altre email.",
       "badLink": "questo link non è più valido."
+    },
+    "locked": {
+      "title": "questa pagina è protetta da password",
+      "hint": "Inserisci la password che ti è stata data per vedere lo stato.",
+      "password": "password",
+      "submit": "apri",
+      "checking": "verifica...",
+      "wrong": "password errata",
+      "error": "errore"
     }
   },
   "settings": {
@@ -800,7 +1002,38 @@
     "disconnect": "scollega",
     "disconnectTitle": "scollegare {provider}?",
     "disconnectText": "Non potrai più accedere con questo account.",
-    "connect": "collega"
+    "connect": "collega",
+    "nav": {
+      "label": "categorie delle impostazioni",
+      "personal": "personali",
+      "instance": "istanza",
+      "back": "impostazioni"
+    },
+    "cats": {
+      "profile": "profilo",
+      "account": "account",
+      "tokens": "token",
+      "general": "generali",
+      "monitors": "monitor",
+      "access": "accesso",
+      "integrations": "integrazioni",
+      "data": "dati"
+    },
+    "catHints": {
+      "profile": "aspetto, lingua",
+      "account": "password, accessi collegati, due fattori",
+      "tokens": "token api, app collegate",
+      "general": "url pubblico, storico, aggiornamenti, statistiche d'uso",
+      "monitors": "default, degradato, ip, avvisi di scadenza",
+      "access": "login, single sign-on, utenti",
+      "integrations": "app mobile, metriche prometheus",
+      "data": "esportazione, importazione, backup"
+    },
+    "adminOnly": "solo gli admin possono modificare queste impostazioni.",
+    "unsaved": "modifiche non salvate",
+    "discard": "scarta",
+    "save": "salva",
+    "unsavedLeave": "Hai modifiche non salvate nelle impostazioni. Uscire senza salvare?"
   },
   "generalSettings": {
     "saved": "impostazioni salvate",
@@ -840,7 +1073,9 @@
     "missingScheme": "manca http:// o https:// davanti: scegline uno",
     "status": "stato",
     "degradedPct": "degradato da (% di località)",
-    "degradedPctHint": "degradato quando fallisce almeno questa quota delle località online di un monitor, down quando ne fallisce più della metà. ogni monitor può cambiarla"
+    "degradedPctHint": "degradato quando fallisce almeno questa quota delle località online di un monitor, down quando ne fallisce più della metà. ogni monitor può cambiarla",
+    "ipFamily": "versione ip",
+    "ipFamilyHint": "come i monitor controllano gli host dual-stack, se non impostano la propria. le località senza IPv6 controllano via IPv4"
   },
   "authSettings": {
     "title": "autenticazione",
@@ -933,7 +1168,24 @@
     "disconnected": "{name} scollegata",
     "disconnectTitle": "scollegare {name}?",
     "disconnectText": "L'assistente perde subito l'accesso e dovrà accedere di nuovo.",
-    "apiDocs": "Riferimento API: <docs>documentazione interattiva</docs> e <spec>documento OpenAPI</spec>."
+    "apiDocs": "Riferimento API: <docs>documentazione interattiva</docs> e <spec>documento OpenAPI</spec>.",
+    "pushDevice": "notifiche push su {name}"
+  },
+  "mobileApp": {
+    "title": "app mobile",
+    "intro": "Invia gli avvisi all'app pingtxt sui telefoni del tuo team. Le notifiche passano da un push relay, che custodisce la chiave Firebase dell'app. Il relay non salva nulla: non ha database, inoltra solo ogni messaggio a Firebase e non registra il testo (nomi dei monitor, errori) né i token dei telefoni.",
+    "enabled": "notifiche push all'app mobile",
+    "relayUrl": "push relay",
+    "relayHint": "Il relay ufficiale funziona con l'app dell'App Store.",
+    "relayChanged": "Con un relay diverso questo hub si registra di nuovo: ogni telefono deve registrarsi di nuovo (l'app lo fa al prossimo avvio).",
+    "status": "registrato come {hub} · {count, plural, =0 {ancora nessun telefono} one {1 telefono} other {# telefoni}}",
+    "notRegistered": "Non registrato: attivando le push questo hub si registra sul relay.",
+    "save": "salva",
+    "saved": "salvato",
+    "error": "errore",
+    "test": "prova relay",
+    "testOk": "il relay accetta questo hub",
+    "channelHint": "Poi aggiungi un canale \"app pingtxt\" nelle notifiche per scegliere chi riceve gli avvisi."
   },
   "users": {
     "roles": {
@@ -1060,10 +1312,46 @@
     "keepHint": "i backup pianificati più vecchi vengono eliminati",
     "saveSchedule": "salva pianificazione"
   },
+  "kumaImport": {
+    "title": "importa da uptime kuma",
+    "intro": "Carica un file di backup di Uptime Kuma 1.x (Settings → Backup → Export). Vedi cosa verrà creato prima che cambi qualcosa. Gruppi e tag vengono importati, i monitor in pausa restano in pausa; i canali di notifica non vengono importati.",
+    "chooseFile": "scegli backup di kuma",
+    "reading": "lettura...",
+    "summary": "Uptime Kuma {version} · {create} di {total} monitor verranno creati · {groups} gruppi · {tags} tag",
+    "action": {
+      "create": "crea",
+      "exists": "esiste",
+      "skip": "salta"
+    },
+    "paused": "in pausa",
+    "import": "{count, plural, one {importa # monitor} other {importa # monitor}}",
+    "importing": "importazione...",
+    "cancel": "annulla",
+    "done": "{count, plural, =0 {niente importato} one {# monitor importato} other {# monitor importati}}",
+    "openDashboard": "apri la dashboard",
+    "error": "importazione non riuscita"
+  },
   "apiDocs": {
     "title": "riferimento API",
     "intro": "Tutti gli endpoint della REST API dell'hub. Try it out usa la tua sessione del browser; per provare un token, incollalo in Authorize. Account e impostazioni dell'istanza accettano solo la sessione del browser.",
     "error": "impossibile caricare il documento API: {error}"
+  },
+  "telemetry": {
+    "question": "Vuoi aiutare a migliorare pingtxt? Questo hub può inviare statistiche d'uso anonime una volta all'ora: un id casuale, la versione e quanti monitor e agent esegue. Nient'altro.",
+    "what": "cosa viene inviato",
+    "yes": "sì, invia",
+    "no": "no, grazie",
+    "thanks": "grazie! puoi disattivarle nelle impostazioni",
+    "declined": "non verrà inviato nulla. puoi cambiare idea nelle impostazioni",
+    "title": "statistiche d'uso",
+    "label": "invia statistiche d'uso anonime",
+    "hint": "una volta all'ora: un id casuale che non cambia mai, la versione, i monitor attivi e gli agent collegati. niente nomi, destinazioni o indirizzi",
+    "forcedOff": "disattivate su questo hub (PINGTXT_DISABLE_TELEMETRY o build di sviluppo).",
+    "sends": "prossimo invio:",
+    "sent": "ultimo invio {ago}",
+    "notYet": "non ancora inviate",
+    "failed": "ultimo invio non riuscito: {error}",
+    "off": "disattivate: non viene inviato nulla."
   },
   "update": {
     "available": "è disponibile pingtxt <b>{latest}</b> (questo hub usa la {current}).",
@@ -1080,6 +1368,21 @@
     "upToDate": "aggiornato",
     "checked": "controllato {ago}",
     "checkNow": "controlla ora"
+  },
+  "hubOffline": {
+    "starting": "pingtxt si sta avviando",
+    "updating": "pingtxt si sta aggiornando",
+    "restarting": "pingtxt si sta riavviando",
+    "hint": "quasi pronto, questa pagina prosegue da sola",
+    "unreachable": "l'hub non è ancora raggiungibile, questa pagina prosegue da sola quando torna",
+    "waiting": "in attesa",
+    "steps": {
+      "restore": "ripristino del backup",
+      "database": "apertura del database",
+      "migrate": "aggiornamento del database",
+      "starting": "avvio di monitor e agent",
+      "wait": "in attesa dell'hub"
+    }
   },
   "pageIncidents": {
     "pageTitle": "incidenti: {name}",
@@ -1137,5 +1440,40 @@
       "critical": "critico"
     },
     "addUpdate": "aggiungi un aggiornamento"
+  },
+  "channelLinks": {
+    "events": "eventi",
+    "eventsHint": "Cosa riceve questo canale per i monitor che copre. I ripristini vanno solo ai canali che hanno ricevuto l'avviso di down.",
+    "event": {
+      "down": "down",
+      "up": "di nuovo up",
+      "degraded": "degradato",
+      "cert_expiry": "scadenza certificato",
+      "domain_expiry": "scadenza dominio"
+    },
+    "short": {
+      "down": "down",
+      "up": "up",
+      "degraded": "degradato",
+      "cert_expiry": "cert",
+      "domain_expiry": "dominio"
+    },
+    "monitors": "monitor",
+    "allMonitors": "tutti i monitor",
+    "allHint": "Tutti i monitor, anche quelli aggiunti dopo. Togli la spunta a un monitor per escluderlo, o clicca i suoi eventi per inviare altro per quel monitor.",
+    "scopeHint": "Sono inclusi i monitor dei gruppi e dei tag selezionati, anche quelli aggiunti dopo. Spunta gli altri monitor uno per uno; clicca gli eventi di un monitor per cambiarli.",
+    "groups": "gruppi",
+    "tags": "tag",
+    "noMonitorsYet": "ancora nessun monitor",
+    "monitorCount": "{count, plural, =0 {nessun monitor} one {# monitor} other {# monitor}}",
+    "editEvents": "cambia gli eventi per questo monitor",
+    "reset": "usa gli eventi del canale",
+    "leftOut": "escluso",
+    "noEvents": "nessun evento",
+    "monitorHint": "Canali che ricevono gli avvisi di questo monitor. I canali impostati su tutti i monitor, o sul gruppo o sui tag di questo monitor, sono spuntati finché non togli la spunta; clicca gli eventi per inviare altro per questo monitor.",
+    "noChannels": "Ancora nessun canale di notifica: <link>aggiungine uno</link>.",
+    "channelOff": "disattivato",
+    "viaAll": "tutti i monitor",
+    "viaLabels": "gruppo o tag"
   }
 }
