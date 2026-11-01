@@ -477,6 +477,49 @@ var laterMigrations = []migration{
 	ALTER TABLE push_devices ADD COLUMN la_token VARCHAR(1024) NOT NULL DEFAULT '';
 	ALTER TABLE push_devices ADD COLUMN la_started_at BIGINT NOT NULL DEFAULT 0;`,
 	},
+	// 25: where the name of a status page links to, e.g. the company
+	// website ("" = not a link), whether the header shows only the logo,
+	// and the page logo: a cleaned SVG, or a raster image as PNG
+	// (fallback), WebP and AVIF.
+	{
+		sqlite: `ALTER TABLE status_pages ADD COLUMN header_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE status_pages ADD COLUMN hide_title INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE status_page_logos (
+		page_id INTEGER PRIMARY KEY REFERENCES status_pages(id) ON DELETE CASCADE,
+		svg BLOB,
+		png BLOB,
+		webp BLOB,
+		avif BLOB,
+		width INTEGER NOT NULL DEFAULT 0,
+		height INTEGER NOT NULL DEFAULT 0,
+		updated_at INTEGER NOT NULL
+	);`,
+		postgres: `ALTER TABLE status_pages ADD COLUMN header_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE status_pages ADD COLUMN hide_title INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE status_page_logos (
+		page_id BIGINT PRIMARY KEY REFERENCES status_pages(id) ON DELETE CASCADE,
+		svg BYTEA,
+		png BYTEA,
+		webp BYTEA,
+		avif BYTEA,
+		width INTEGER NOT NULL DEFAULT 0,
+		height INTEGER NOT NULL DEFAULT 0,
+		updated_at BIGINT NOT NULL
+	);`,
+		mysql: `ALTER TABLE status_pages ADD COLUMN header_url VARCHAR(2048) NOT NULL DEFAULT '';
+	ALTER TABLE status_pages ADD COLUMN hide_title INT NOT NULL DEFAULT 0;
+	CREATE TABLE status_page_logos (
+		page_id BIGINT PRIMARY KEY,
+		svg MEDIUMBLOB,
+		png MEDIUMBLOB,
+		webp MEDIUMBLOB,
+		avif MEDIUMBLOB,
+		width INT NOT NULL DEFAULT 0,
+		height INT NOT NULL DEFAULT 0,
+		updated_at BIGINT NOT NULL,
+		FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

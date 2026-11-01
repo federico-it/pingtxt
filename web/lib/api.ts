@@ -544,6 +544,12 @@ export interface StatusPage {
   title: string
   description: string
   domain: string
+  /** where the page name and logo link to (http or https), "" = no link */
+  header_url: string
+  /** show only the logo in the header, when there is one */
+  hide_title: boolean
+  /** the logo, only from GET /api/status-pages/{id}; changed with its own routes */
+  logo?: PageLogo
   published: boolean
   show_incidents: boolean
   monitor_ids: number[]
@@ -610,10 +616,26 @@ export interface PublicMonitor {
   bars: Bar[]
 }
 
+/**
+ * Logo of a status page. Files are next to the page JSON:
+ * <page path>/logo/logo.svg, or logo.avif, logo.webp and logo.png.
+ */
+export interface PageLogo {
+  svg: boolean
+  width: number
+  height: number
+  /** version, appended as ?v= */
+  v: number
+}
+
 export interface PublicStatusPage {
   slug: string
   title: string
   description: string
+  /** where the page name and logo link to, "" = no link */
+  header_url: string
+  logo?: PageLogo
+  hide_title: boolean
   published: boolean
   status: PageStatus
   days: number

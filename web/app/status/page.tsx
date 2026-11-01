@@ -69,6 +69,7 @@ export default function PublicStatusPage() {
     <StatusPageView
       data={data}
       now={now}
+      logoBase={path ? `${path}/logo/` : undefined}
       notice={<SubscriptionNotice />}
       subscribe={data.subscribe && path ? <SubscribeForm endpoint={`${path}/subscribe`} /> : null}
     />
