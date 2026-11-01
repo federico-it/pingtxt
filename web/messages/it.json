@@ -55,7 +55,19 @@
     "readOnlyHint": "il tuo account può solo leggere",
     "menu": "menu",
     "logout": "esci",
-    "themeHint": "premi <kbd>d</kbd> per cambiare tema"
+    "themeHint": "premi <kbd>d</kbd> per cambiare tema",
+    "jumpHint": ""
+  },
+  "commandMenu": {
+    "title": "",
+    "placeholder": "",
+    "actions": "",
+    "monitors": "",
+    "pages": "",
+    "empty": "",
+    "newMonitor": "",
+    "newStatusPage": "",
+    "keys": ""
   },
   "notFound": {
     "message": "404: file o cartella inesistente"
@@ -95,7 +107,37 @@
     "down": "{count} down",
     "heartbeatLine": "heartbeat · atteso ogni {every}",
     "monitorLine": "{type} · {target} · ogni {every}",
-    "locations": "{count} località"
+    "locations": "{count} località",
+    "searchHint": "",
+    "sort": {
+      "title": "",
+      "label": "",
+      "status": "",
+      "name": "",
+      "uptime": "",
+      "latency": "",
+      "changed": ""
+    },
+    "bulk": {
+      "selectAll": "",
+      "select": "",
+      "selected": "",
+      "pause": "",
+      "resume": "",
+      "moveToGroup": "",
+      "noGroup": "",
+      "delete": "",
+      "clear": "",
+      "error": "",
+      "done": {
+        "pause": "",
+        "resume": "",
+        "delete": "",
+        "group": ""
+      },
+      "undo": "",
+      "undone": ""
+    }
   },
   "monitor": {
     "resumed": "monitor ripreso",
@@ -105,8 +147,6 @@
     "resume": "riprendi",
     "pause": "pausa",
     "edit": "modifica",
-    "deleteTitle": "eliminare {name}?",
-    "deleteText": "Tutti i risultati e gli incidenti di questo monitor saranno eliminati.",
     "none": "nessuna",
     "pushLine": "heartbeat · atteso ogni <hl>{every}</hl> · tolleranza {grace}",
     "checkLine": "{type} · <hl>{target}</hl> · ogni {every} · timeout {timeout}ms · tentativi {retries}",
@@ -149,7 +189,23 @@
     "ipv4Only": "solo IPv4",
     "ipv6Only": "solo IPv6",
     "ipBoth": "",
-    "degradedAtDefault": "degradato dalla soglia predefinita"
+    "degradedAtDefault": "degradato dalla soglia predefinita",
+    "checkNow": "",
+    "checking": "",
+    "duplicate": "",
+    "duplicateHint": "",
+    "undo": "",
+    "undone": "",
+    "deleteHint": ""
+  },
+  "resultsLog": {
+    "failedOnly": "",
+    "window": "",
+    "clearWindow": "",
+    "none": "",
+    "loadMore": "",
+    "loading": "",
+    "retentionHint": ""
   },
   "monitorForm": {
     "newTitle": "nuovo monitor",
@@ -330,7 +386,22 @@
         "lte": "<=",
         "matches": "corrisponde alla regex"
       }
-    }
+    },
+    "test": "",
+    "testing": "",
+    "testHint": "",
+    "unsaved": "",
+    "unsavedChanges": "",
+    "copyTitle": "",
+    "copyName": ""
+  },
+  "testCheck": {
+    "title": "",
+    "running": "",
+    "ok": "",
+    "fail": "",
+    "skipped": "",
+    "notStored": ""
   },
   "pushInfo": {
     "title": "url push",
@@ -410,7 +481,8 @@
     "noData": "nessun dato",
     "summary": "{pct} · {ok}/{total} up · media {avg}",
     "degradedChecks": "{count, plural, one {# controllo} other {# controlli}} con stato degradato",
-    "maintChecks": "+ {count, plural, one {# controllo} other {# controlli}} in manutenzione"
+    "maintChecks": "+ {count, plural, one {# controllo} other {# controlli}} in manutenzione",
+    "clickForChecks": ""
   },
   "incidents": {
     "title": "incidenti",
@@ -421,7 +493,18 @@
     "duration": "durata",
     "cause": "causa",
     "resolved": "risolto",
-    "ongoing": "in corso"
+    "ongoing": "in corso",
+    "filter": {
+      "all": "",
+      "open": "",
+      "resolved": "",
+      "period": "",
+      "anyTime": ""
+    },
+    "allMonitors": "",
+    "noMatch": "",
+    "count": "",
+    "showChecks": ""
   },
   "maintenance": {
     "title": "manutenzione",
@@ -583,10 +666,37 @@
     "updatingState": "aggiornamento…",
     "updateFailed": "aggiornamento fallito",
     "newVersion": "è disponibile una nuova versione",
-    "updatesOnReconnect": "si aggiorna quando l'agent si ricollega"
+    "updatesOnReconnect": "si aggiorna quando l'agent si ricollega",
+    "waiting": "",
+    "noMonitors": "",
+    "monitors": "",
+    "assign": ""
   },
   "agentInstall": {
     "hint": "L'agent si collega solo in uscita verso l'hub via HTTPS/WebSocket: nessuna porta da aprire. Il token è mostrato solo ora; rigeneralo per averne uno nuovo."
+  },
+  "agentAssign": {
+    "title": "",
+    "textOnline": "",
+    "text": "",
+    "loading": "",
+    "compatible": "",
+    "skipped": "",
+    "already": "",
+    "none": "",
+    "noneLeft": "",
+    "selectAll": "",
+    "selectNone": "",
+    "reasons": {
+      "no_ipv6": "",
+      "ipv6_unknown": "",
+      "docker": "",
+      "loopback": ""
+    },
+    "later": "",
+    "add": "",
+    "added": "",
+    "error": ""
   },
   "notifications": {
     "title": "notifiche",
@@ -1108,6 +1218,25 @@
     "keep": "conserva",
     "keepHint": "i backup pianificati più vecchi vengono eliminati",
     "saveSchedule": "salva pianificazione"
+  },
+  "kumaImport": {
+    "title": "",
+    "intro": "",
+    "chooseFile": "",
+    "reading": "",
+    "summary": "",
+    "action": {
+      "create": "",
+      "exists": "",
+      "skip": ""
+    },
+    "paused": "",
+    "import": "",
+    "importing": "",
+    "cancel": "",
+    "done": "",
+    "openDashboard": "",
+    "error": ""
   },
   "apiDocs": {
     "title": "riferimento API",
