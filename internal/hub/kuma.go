@@ -134,7 +134,7 @@ func (h *Hub) planKuma(b *kumaBackup) (*kumaPlan, error) {
 	plan := &kumaPlan{Version: b.Version, Monitors: []kumaPlanItem{}, Groups: []string{}, Tags: []string{}, Warnings: []string{}}
 	var notifiers []json.RawMessage
 	if json.Unmarshal(b.NotificationList, &notifiers) == nil && len(notifiers) > 0 {
-		plan.Warnings = append(plan.Warnings, fmt.Sprintf("%d notification channels are not imported: set them up again in pingtxt", len(notifiers)))
+		plan.Warnings = append(plan.Warnings, fmt.Sprintf("notification channels are not imported (%d in the file): set them up again in pingtxt", len(notifiers)))
 	}
 
 	// Kuma "group" monitors are folders: they become pingtxt groups.

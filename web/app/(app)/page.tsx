@@ -2,12 +2,11 @@
 
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Suspense, useCallback, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
-import { Confirm } from "@/components/confirm"
 
 import { ExpiryBadges } from "@/components/expiry"
 import { TagList, TagToggle, useLabels } from "@/components/labels"
@@ -29,7 +28,8 @@ import { Input } from "@/components/ui/input"
 import { useMinute } from "@/hooks/use-now"
 import { useHotkey } from "@/hooks/use-hotkey"
 import { api, useApi, useIsAdmin, type MonitorSummary, type Status } from "@/lib/api"
-import { ago, displayTarget, interval, ms, pct } from "@/lib/format"
+import { ago, datetime, displayTarget, interval, ms, pct } from "@/lib/format"
+import { deleteWithUndo, usePendingDeletes } from "@/lib/pending-delete"
 import { cn } from "@/lib/utils"
 
 const order: Record<Status, number> = {
@@ -136,6 +136,9 @@ function Monitors() {
     setQuery(q)
   }
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  const pendingDeletes = usePendingDeletes()
+  const collapsed = useCollapsedGroups()
+  const router = useRouter()
   const [busy, setBusy] = useState(false)
   const now = useMinute()
   useHotkey("/", () => document.getElementById("monitor-search")?.focus())
@@ -151,6 +154,7 @@ function Monitors() {
   const list = useMemo(() => {
     const s = query.toLowerCase()
     return (data ?? [])
+      .filter((m) => !pendingDeletes.has(m.id))
       .filter((m) => filter === "all" || m.status === filter)
       .filter(
         (m) =>
@@ -172,7 +176,7 @@ function Monitors() {
           groupById.get(m.group_id)?.name.toLowerCase().includes(s)
       )
       .sort((a, b) => compare(sort, a, b))
-  }, [data, query, filter, group, tag, sort, groupById, tagById])
+  }, [data, query, filter, group, tag, sort, groupById, tagById, pendingDeletes])
 
   // Selected monitors that still exist and are shown.
   const visibleSelected = list.filter((m) => selected.has(m.id))
@@ -188,8 +192,12 @@ function Monitors() {
   function toggleAll(on: boolean) {
     setSelected(on ? new Set(list.map((m) => m.id)) : new Set())
   }
-  async function bulk(action: "pause" | "resume" | "delete" | "group", groupId = 0) {
-    const ids = visibleSelected.map((m) => m.id)
+  async function bulk(
+    action: "pause" | "resume" | "group",
+    groupId = 0,
+    ids = visibleSelected.map((m) => m.id),
+    undoable = true
+  ) {
     if (ids.length === 0) return
     setBusy(true)
     try {
@@ -197,15 +205,48 @@ function Monitors() {
         method: "POST",
         body: { ids, action, group_id: groupId },
       })
-      toast.success(t(`bulk.done.${action}`, { count: ids.length }))
-      if (action === "delete") setSelected(new Set())
       await mutate()
+      if (!undoable) {
+        toast(t("bulk.undone"))
+        return
+      }
+      // Undo puts back the previous state of each monitor.
+      const before = (data ?? []).filter((m) => ids.includes(m.id))
+      const undo = () => {
+        if (action === "group") {
+          const byGroup = new Map<number, number[]>()
+          for (const m of before) byGroup.set(m.group_id, [...(byGroup.get(m.group_id) ?? []), m.id])
+          for (const [g, gIds] of byGroup) void bulk("group", g, gIds, false)
+          return
+        }
+        const changed = before.filter((m) => m.paused !== (action === "pause")).map((m) => m.id)
+        void bulk(action === "pause" ? "resume" : "pause", 0, changed, false)
+      }
+      toast.success(t(`bulk.done.${action}`, { count: ids.length }), {
+        action: { label: t("bulk.undo"), onClick: undo },
+      })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("bulk.error"))
     } finally {
       setBusy(false)
     }
   }
+
+  function bulkDelete() {
+    const ids = visibleSelected.map((m) => m.id)
+    setSelected(new Set())
+    deleteWithUndo(
+      ids,
+      {
+        done: t("bulk.done.delete", { count: ids.length }),
+        undo: t("bulk.undo"),
+        undone: t("bulk.undone"),
+        error: t("bulk.error"),
+      },
+      () => void mutate()
+    )
+  }
+
 
   // With groups, the list is split in one section per group (by name), with
   // monitors without a group last.
@@ -378,7 +419,13 @@ function Monitors() {
           {sections.map((sec) => (
             <div key={sec.key}>
               {sec.title && (
-                <div className="flex items-center gap-2 border-b border-dashed bg-muted/40 px-2 py-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => collapsed.toggle(sec.key)}
+                  aria-expanded={!collapsed.has(sec.key)}
+                  className="flex w-full items-center gap-2 border-b border-dashed bg-muted/40 px-2 py-1 text-left text-xs hover:bg-muted/70"
+                >
+                  <span className="w-3 text-muted-foreground">{collapsed.has(sec.key) ? "▸" : "▾"}</span>
                   <span className="font-medium">{sec.title}</span>
                   <span className="text-muted-foreground">
                     {sec.items.length}
@@ -389,9 +436,9 @@ function Monitors() {
                       </span>
                     )}
                   </span>
-                </div>
+                </button>
               )}
-              {sec.items.map((m) => (
+              {!(sec.title && collapsed.has(sec.key)) && sec.items.map((m) => (
                 <div
                   key={m.id}
                   className={cn(
@@ -435,6 +482,9 @@ function Monitors() {
                   <UptimeBars
                     bars={m.bars}
                     className="col-span-2 md:col-span-1"
+                    onSelect={(from, to) =>
+                      router.push(`/monitors/view/?id=${m.id}&from=${from}&to=${to}#log`)
+                    }
                   />
                   <span
                     className={cn(
@@ -451,7 +501,10 @@ function Monitors() {
                   <span className="hidden text-right text-muted-foreground md:block">
                     {ms(m.avg_ms_24h)}
                   </span>
-                  <span className="hidden text-right text-xs text-muted-foreground md:block">
+                  <span
+                    className="hidden text-right text-xs text-muted-foreground md:block"
+                    title={m.last?.ts ? datetime(m.last.ts) : undefined}
+                  >
                     {m.paused ? ts("paused") : ago(m.last?.ts)}
                   </span>
                 </Link>
@@ -494,16 +547,9 @@ function Monitors() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Confirm
-            title={t("bulk.deleteTitle", { count: visibleSelected.length })}
-            description={t("bulk.deleteText")}
-            onConfirm={() => bulk("delete")}
-            trigger={
-              <Button size="sm" variant="destructive" disabled={busy}>
-                {t("bulk.delete")}
-              </Button>
-            }
-          />
+          <Button size="sm" variant="destructive" disabled={busy} onClick={bulkDelete}>
+            {t("bulk.delete")}
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
             {t("bulk.clear")}
           </Button>
@@ -511,4 +557,31 @@ function Monitors() {
       )}
     </>
   )
+}
+
+const collapsedKey = "pingtxt.collapsedGroups"
+
+/** Group sections the user folded, remembered in this browser. */
+function useCollapsedGroups() {
+  const [keys, setKeys] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(collapsedKey) ?? "[]")
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- read once after mount (static export)
+      if (Array.isArray(v)) setKeys(new Set(v.map(String)))
+    } catch {}
+  }, [])
+  return {
+    has: (k: string) => keys.has(k),
+    toggle: (k: string) =>
+      setKeys((prev) => {
+        const next = new Set(prev)
+        if (next.has(k)) next.delete(k)
+        else next.add(k)
+        try {
+          localStorage.setItem(collapsedKey, JSON.stringify([...next]))
+        } catch {}
+        return next
+      }),
+  }
 }

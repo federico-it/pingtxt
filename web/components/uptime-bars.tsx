@@ -26,19 +26,48 @@ export function UptimeBars({
   className,
   height = "h-5",
   daily = false,
+  onSelect,
+  selected,
 }: {
   bars: Bar[]
   className?: string
   height?: string
   daily?: boolean
+  /** Makes the slots clickable: gets the slot's start and end (unix ms). */
+  onSelect?: (from: number, to: number) => void
+  /** Start of the highlighted slot. */
+  selected?: number
 }) {
   const t = useTranslations("uptimeBars")
+  // Slot length, from the spacing of the bars (one hour by default).
+  const step = bars.length > 1 ? bars[1].t - bars[0].t : 3600_000
   return (
     <div className={cn("flex items-stretch gap-px", height, className)}>
       {bars.map((b) => (
         <Tooltip key={b.t}>
           <TooltipTrigger
-            render={<span className={cn("min-w-0.5 flex-1 opacity-90 transition-opacity hover:opacity-100", barClass(b))} />}
+            render={
+              onSelect ? (
+                <button
+                  type="button"
+                  aria-label={datetime(b.t)}
+                  onClick={(e) => {
+                    // The bars can sit inside a link (dashboard rows).
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onSelect(b.t, b.t + step)
+                  }}
+                  className={cn(
+                    "min-w-0.5 flex-1 cursor-pointer opacity-90 transition-opacity hover:opacity-100",
+                    barClass(b),
+                    selected !== undefined && selected !== b.t && "opacity-40",
+                    selected === b.t && "opacity-100 ring-1 ring-foreground"
+                  )}
+                />
+              ) : (
+                <span className={cn("min-w-0.5 flex-1 opacity-90 transition-opacity hover:opacity-100", barClass(b))} />
+              )
+            }
           />
           <TooltipContent className="font-mono text-xs">
             <div>{daily ? utcDate(b.t) : datetime(b.t)}</div>
@@ -51,6 +80,7 @@ export function UptimeBars({
             </div>
             {b.total > 0 && !!b.degraded && <div className="text-warn">{t("degradedChecks", { count: b.degraded })}</div>}
             {b.total > 0 && b.maint > 0 && <div className="text-info">{t("maintChecks", { count: b.maint })}</div>}
+            {onSelect && <div className="text-muted-foreground">{t("clickForChecks")}</div>}
           </TooltipContent>
         </Tooltip>
       ))}

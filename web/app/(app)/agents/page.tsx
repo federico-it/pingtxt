@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { api, useApi, useIsAdmin, type Agent } from "@/lib/api"
-import { ago } from "@/lib/format"
+import { ago, datetime } from "@/lib/format"
 
 type AgentsResp = { agents: Agent[]; hub_url: string; hub_version: string; auto_update: boolean }
 
@@ -137,7 +137,7 @@ export default function AgentsPage() {
                 <TableCell className="hidden text-muted-foreground md:table-cell">
                   <VersionCell agent={a} hubVersion={data?.hub_version ?? ""} />
                 </TableCell>
-                <TableCell className="text-right text-muted-foreground">{a.online ? t("now") : ago(a.last_seen)}</TableCell>
+                <TableCell className="text-right text-muted-foreground" title={a.last_seen ? datetime(a.last_seen) : undefined}>{a.online ? t("now") : ago(a.last_seen)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap">
                   {isAdmin && (
                     <>
