@@ -317,7 +317,8 @@
       "labels": "",
       "schedule": "",
       "locations": "",
-      "expiry": ""
+      "expiry": "",
+      "notifications": ""
     },
     "noGroup": "",
     "noGrace": "",
@@ -1408,5 +1409,40 @@
       "critical": ""
     },
     "addUpdate": ""
+  },
+  "channelLinks": {
+    "events": "",
+    "eventsHint": "",
+    "event": {
+      "down": "",
+      "up": "",
+      "degraded": "",
+      "cert_expiry": "",
+      "domain_expiry": ""
+    },
+    "short": {
+      "down": "",
+      "up": "",
+      "degraded": "",
+      "cert_expiry": "",
+      "domain_expiry": ""
+    },
+    "monitors": "",
+    "allMonitors": "",
+    "allHint": "",
+    "scopeHint": "",
+    "groups": "",
+    "tags": "",
+    "noMonitorsYet": "",
+    "monitorCount": "",
+    "editEvents": "",
+    "reset": "",
+    "leftOut": "",
+    "noEvents": "",
+    "monitorHint": "",
+    "noChannels": "",
+    "channelOff": "",
+    "viaAll": "",
+    "viaLabels": ""
   }
 }
