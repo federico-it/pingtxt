@@ -16,6 +16,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import {
+  setTelemetry,
+  TELEMETRY_DOCS,
+  useTelemetry,
+} from "@/components/telemetry-notice"
 import { UPGRADE_DOCS } from "@/components/update-notice"
 import {
   api,
@@ -284,6 +289,8 @@ export function GeneralSettingsForm({
         </div>
       </Section>
 
+      <UsageStats />
+
       <Section title={t("defaults")}>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label={t("interval")} htmlFor="d_interval">
@@ -442,4 +449,75 @@ function parseDays(text: string): number[] {
     .map(Number)
     .filter((n) => Number.isInteger(n) && n >= 1 && n <= 365)
   return [...new Set(days)].sort((a, b) => b - a).slice(0, 8)
+}
+
+/** Anonymous usage stats: saved right away, apart from the form. */
+function UsageStats() {
+  const t = useTranslations("telemetry")
+  const tg = useTranslations("generalSettings")
+  const s = useTelemetry(true)
+  const [busy, setBusy] = useState(false)
+  if (!s.data) return null
+  const d = s.data
+
+  async function toggle(enabled: boolean) {
+    setBusy(true)
+    try {
+      await s.mutate(await setTelemetry(enabled), { revalidate: false })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Section title={t("title")}>
+      <div className="grid gap-4">
+        <Field label={t("label")} hint={t("hint")}>
+          <label className="flex h-8 items-center gap-2 text-xs">
+            <Switch
+              checked={d.enabled}
+              disabled={busy || d.forced_off}
+              onCheckedChange={toggle}
+            />
+            {d.enabled ? tg("enabled") : tg("disabled")}
+          </label>
+        </Field>
+        <div className="grid gap-1 text-xs text-muted-foreground">
+          {d.forced_off ? (
+            <span>{t("forcedOff")}</span>
+          ) : d.report ? (
+            <>
+              <span>{t("sends")}</span>
+              <code className="rounded border border-dashed px-2 py-1 break-all">
+                {JSON.stringify(d.report)}
+              </code>
+              <span>
+                {d.error ? (
+                  <span className="text-down">
+                    {t("failed", { error: d.error })}
+                  </span>
+                ) : d.sent_at > 0 ? (
+                  t("sent", { ago: ago(d.sent_at) })
+                ) : (
+                  t("notYet")
+                )}
+              </span>
+            </>
+          ) : (
+            <span>{t("off")}</span>
+          )}
+          <a
+            href={TELEMETRY_DOCS}
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            {t("what")}
+          </a>
+        </div>
+      </div>
+    </Section>
+  )
 }

@@ -63,7 +63,9 @@ func main() {
 		DisableLocal:  os.Getenv("PINGTXT_DISABLE_LOCAL") == "true",
 		// Off for offline or privacy-minded installs (first start only, then in settings).
 		DisableUpdateCheck: os.Getenv("PINGTXT_DISABLE_UPDATE_CHECK") == "true",
-		Version:            version,
+		// Anonymous usage stats can never be turned on.
+		DisableTelemetry: os.Getenv("PINGTXT_DISABLE_TELEMETRY") == "true",
+		Version:          version,
 	}
 
 	// PINGTXT_DB_URL selects PostgreSQL (postgres://) or MariaDB/MySQL

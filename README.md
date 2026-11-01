@@ -88,6 +88,13 @@ admins see a notice with the release notes and how to update (`docker compose pu
 Development and `main` builds never check. Turn it off in settings → updates; for offline installs,
 `PINGTXT_DISABLE_UPDATE_CHECK=true` turns it off from the first start, before any request is made.
 
+### Anonymous usage stats
+
+After installing, admins are asked once whether the hub may send anonymous usage stats. Nothing is sent
+before someone says yes. Once an hour the hub then sends a random id (made once, never changes), its version,
+how many monitors are active and how many agents are connected: nothing else. Change the answer in
+settings → usage stats, which shows the exact report. `PINGTXT_DISABLE_TELEMETRY=true` turns it off for good.
+
 ### Single sign-on (GitHub, Google, OpenID Connect)
 
 In **settings → authentication** turn on a provider, paste the client id and secret, and register

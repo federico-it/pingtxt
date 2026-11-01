@@ -6,6 +6,7 @@ import { useState } from "react"
 import { useTranslations } from "use-intl"
 
 import { LanguagePicker } from "@/components/language-picker"
+import { TelemetryNotice } from "@/components/telemetry-notice"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UpdateNotice, useVersionStatus } from "@/components/update-notice"
 import { Button } from "@/components/ui/button"
@@ -208,6 +209,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         )}
       </header>
       <UpdateNotice status={ver.data} />
+      <TelemetryNotice isAdmin={me.data.user.role === "admin"} />
       <main className="flex-1 py-8">{children}</main>
       <footer className="flex justify-between border-t border-dashed py-3 text-xs text-muted-foreground">
         <span>
