@@ -646,6 +646,7 @@
       "tls": "tls (465)",
       "none": "nessuna (25, relay locale)"
     },
+    "pushOff": "",
     "hints": {
       "commaSeparated": "separati da virgola",
       "appUsers": ""
@@ -974,8 +975,6 @@
     "relayUrl": "",
     "relayHint": "",
     "relayChanged": "",
-    "registrationToken": "",
-    "registrationTokenHint": "",
     "status": "",
     "notRegistered": "",
     "save": "",
@@ -983,10 +982,6 @@
     "error": "",
     "test": "",
     "testOk": "",
-    "register": "",
-    "registerTitle": "",
-    "registerText": "",
-    "registered": "",
     "channelHint": ""
   },
   "users": {
@@ -1118,6 +1113,23 @@
     "title": "riferimento API",
     "intro": "Tutti gli endpoint della REST API dell'hub. Try it out usa la tua sessione del browser; per provare un token, incollalo in Authorize. Account e impostazioni dell'istanza accettano solo la sessione del browser.",
     "error": "impossibile caricare il documento API: {error}"
+  },
+  "telemetry": {
+    "question": "",
+    "what": "",
+    "yes": "",
+    "no": "",
+    "thanks": "",
+    "declined": "",
+    "title": "",
+    "label": "",
+    "hint": "",
+    "forcedOff": "",
+    "sends": "",
+    "sent": "",
+    "notYet": "",
+    "failed": "",
+    "off": ""
   },
   "update": {
     "available": "è disponibile pingtxt <b>{latest}</b> (questo hub usa la {current}).",
