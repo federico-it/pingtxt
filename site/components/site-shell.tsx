@@ -50,7 +50,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           ·{" "}
           <a href={`${REPO}/blob/main/SECURITY.md`} className="underline-offset-4 hover:text-foreground hover:underline">
             security
-          </a>
+          </a>{" "}
+          ·{" "}
+          <Link href="/privacy/" className="underline-offset-4 hover:text-foreground hover:underline">
+            privacy
+          </Link>
         </span>
         <StatusLine />
         <span>
