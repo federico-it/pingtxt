@@ -147,7 +147,7 @@ export function ExpiryTable({
       })}
       {isAdmin && (
         <div>
-          <Button variant="outline" size="sm" onClick={refresh} disabled={busy}>
+          <Button variant="outline" onClick={refresh} disabled={busy}>
             {busy ? t("checking") : t("checkNow")}
           </Button>
         </div>

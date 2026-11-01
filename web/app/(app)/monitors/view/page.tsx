@@ -40,7 +40,7 @@ import { useNow } from "@/hooks/use-now"
 import { deleteWithUndo } from "@/lib/pending-delete"
 import { usePins } from "@/lib/pins"
 import { ago, datetime, displayTarget, duration, interval, ms, pct } from "@/lib/format"
-import { cn } from "@/lib/utils"
+import { segment } from "@/components/ui/control"
 
 const ranges = ["1h", "6h", "24h", "7d", "30d"] as const
 type Range = (typeof ranges)[number]
@@ -149,16 +149,15 @@ function View() {
         {isAdmin && (
           <>
             {d.type !== "push" && (
-              <Button variant="outline" size="sm" onClick={checkNow} disabled={testing}>
+              <Button variant="outline" onClick={checkNow} disabled={testing}>
                 {testing ? t("checking") : t("checkNow")}
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => setPaused(!d.paused)}>
+            <Button variant="outline" onClick={() => setPaused(!d.paused)}>
               {d.paused ? t("resume") : t("pause")}
             </Button>
             <Button
               variant="outline"
-              size="sm"
               render={<Link href={`/monitors/edit/?id=${id}`} />}
               nativeButton={false}
             >
@@ -166,14 +165,13 @@ function View() {
             </Button>
             <Button
               variant="outline"
-              size="sm"
               render={<Link href={`/monitors/new/?from=${id}`} />}
               nativeButton={false}
               title={t("duplicateHint")}
             >
               {t("duplicate")}
             </Button>
-            <Button variant="destructive" size="sm" onClick={remove} title={t("deleteHint")}>
+            <Button variant="destructive" onClick={remove} title={t("deleteHint")}>
               {tc("delete")}
             </Button>
           </>
@@ -284,10 +282,7 @@ function View() {
               <button
                 key={r}
                 onClick={() => setQuery({ range: r === "24h" ? null : r, start: null, end: null })}
-                className={cn(
-                  "px-1.5 hover:text-foreground",
-                  !zoom && range === r && "bg-accent text-foreground"
-                )}
+                className={segment({ active: !zoom && range === r })}
               >
                 {r}
               </button>
@@ -301,10 +296,7 @@ function View() {
               <button
                 key={String(p)}
                 onClick={() => setByPhase(p)}
-                className={cn(
-                  "px-1.5 hover:text-foreground",
-                  byPhase === p && "bg-accent text-foreground"
-                )}
+                className={segment({ active: byPhase === p })}
               >
                 {p ? t("byPhase") : t("byLocation")}
               </button>
@@ -316,10 +308,7 @@ function View() {
                   <button
                     key={l.id}
                     onClick={() => setPhaseLoc(l.id)}
-                    className={cn(
-                      "px-1.5 hover:text-foreground",
-                      phaseLoc === l.id && "bg-accent text-foreground"
-                    )}
+                    className={segment({ active: phaseLoc === l.id })}
                   >
                     {l.name}
                   </button>

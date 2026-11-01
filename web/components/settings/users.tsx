@@ -27,10 +27,12 @@ function RoleSelect({
   value,
   onChange,
   className,
+  size = "default",
 }: {
   value: Role
   onChange: (r: Role) => void
   className?: string
+  size?: "xs" | "default"
 }) {
   const roles = useRoles()
   return (
@@ -39,7 +41,7 @@ function RoleSelect({
       value={value}
       onValueChange={(v) => v && onChange(v as Role)}
     >
-      <SelectTrigger size="sm" className={className}>
+      <SelectTrigger size={size} className={className}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -120,6 +122,7 @@ export function UsersList({ meId }: { meId: number }) {
                   <RoleSelect
                     value={u.role}
                     onChange={(r) => setRole(u, r)}
+                    size="xs"
                     className="w-32"
                   />
                   {u.two_factor && (
@@ -164,7 +167,6 @@ export function UsersList({ meId }: { meId: number }) {
       ) : (
         <Button
           variant="outline"
-          size="sm"
           className="mt-3"
           onClick={() => setAdding(true)}
         >
@@ -232,12 +234,11 @@ function AddUser({ onDone }: { onDone: (added: boolean) => void }) {
         <RoleSelect value={role} onChange={setRole} className="w-full" />
       </Field>
       <div className="flex gap-2 sm:col-span-3">
-        <Button type="submit" size="sm" disabled={busy}>
+        <Button type="submit" disabled={busy}>
           {t("addShort")}
         </Button>
         <Button
           type="button"
-          size="sm"
           variant="ghost"
           onClick={() => onDone(false)}
         >

@@ -9,7 +9,7 @@ import { OkText } from "@/components/status"
 import { Button } from "@/components/ui/button"
 import { api, useApi, type ResultRow } from "@/lib/api"
 import { datetime, ms } from "@/lib/format"
-import { cn } from "@/lib/utils"
+import { segment } from "@/components/ui/control"
 
 const pageSize = 50
 
@@ -91,7 +91,7 @@ export function ResultsLog({
             <button
               type="button"
               onClick={onClearWindow}
-              className="bg-accent px-2 py-0.5 text-foreground"
+              className={segment({ active: true })}
               title={t("clearWindow")}
             >
               {t("window", {
@@ -108,10 +108,7 @@ export function ResultsLog({
             type="button"
             onClick={() => setFailed((f) => !f)}
             aria-pressed={failed}
-            className={cn(
-              "px-2 py-0.5 hover:text-foreground",
-              failed && "bg-accent text-foreground"
-            )}
+            className={segment({ active: failed })}
           >
             {t("failedOnly")}
           </button>
@@ -144,8 +141,8 @@ export function ResultsLog({
           <Button
             type="button"
             variant="ghost"
-            size="sm"
-            className="mt-1 h-6 px-1 text-xs"
+            size="xs"
+            className="mt-1 px-1"
             disabled={loading}
             onClick={loadMore}
           >

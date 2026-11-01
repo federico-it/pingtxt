@@ -43,8 +43,8 @@ export function TestResults({
           <Button
             type="button"
             variant="ghost"
-            size="sm"
-            className="ml-auto h-5 px-1"
+            size="xs"
+            className="ml-auto px-1"
             onClick={onClose}
           >
             [x]

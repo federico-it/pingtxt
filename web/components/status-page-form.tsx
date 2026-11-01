@@ -381,7 +381,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {available.map((m) => (
-              <Button key={m.id} type="button" variant="outline" size="sm" onClick={() => set("monitor_ids", [...d.monitor_ids, m.id])}>
+              <Button key={m.id} type="button" variant="outline" size="xs" onClick={() => set("monitor_ids", [...d.monitor_ids, m.id])}>
                 <PlusIcon /> {m.name}
               </Button>
             ))}
@@ -528,14 +528,13 @@ function LogoField({
                   if (f) run(() => apiRaw(base, f, "application/octet-stream"), t("logoSaved"))
                 }}
               />
-              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => input.current?.click()}>
+              <Button type="button" variant="outline" disabled={busy} onClick={() => input.current?.click()}>
                 <ImageUpIcon /> {busy ? t("logoUploading") : t("logoUpload")}
               </Button>
               {logo && (
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
                   disabled={busy}
                   onClick={() => run(() => api(base, { method: "DELETE" }), t("logoRemoved"))}
                 >

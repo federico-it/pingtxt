@@ -124,7 +124,6 @@ export function ResponseRules({
           <Button
             type="button"
             variant="outline"
-            size="sm"
             onClick={() =>
               onChange([...value, { path: "", op: "eq", value: "" }])
             }

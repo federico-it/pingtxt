@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
 import { api, useApi, type Group, type Tag, type TagColor } from "@/lib/api"
+import { chip } from "@/components/ui/control"
 import { cn } from "@/lib/utils"
 
 // Full class names, so Tailwind keeps them.
@@ -71,7 +72,7 @@ export function TagToggle({
       aria-pressed={on}
       onClick={() => onChange(!on)}
       className={cn(
-        "border border-dashed px-1.5 py-0.5 text-xs transition-colors",
+        chip,
         on
           ? cn(
               "border-solid",
@@ -181,7 +182,7 @@ export function TagPicker({
           }
         />
       ))}
-      <span className="inline-flex items-center border border-dashed">
+      <span className="inline-flex h-6 items-center border border-dashed">
         <input
           value={name}
           maxLength={32}
@@ -194,7 +195,7 @@ export function TagPicker({
               create()
             }
           }}
-          className="h-6 w-24 bg-transparent px-1.5 text-xs outline-none placeholder:text-muted-foreground"
+          className="h-full w-24 bg-transparent px-1.5 text-xs outline-none placeholder:text-muted-foreground"
         />
         <button
           type="button"
@@ -226,7 +227,7 @@ export function GroupToggle({
       aria-pressed={on}
       onClick={() => onChange(!on)}
       className={cn(
-        "border border-dashed px-1.5 py-0.5 text-xs transition-colors",
+        chip,
         on
           ? "border-solid border-info bg-info/15 text-foreground"
           : "text-muted-foreground hover:text-foreground"

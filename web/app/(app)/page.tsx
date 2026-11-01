@@ -32,6 +32,7 @@ import { ago, datetime, displayTarget, interval, ms, pct } from "@/lib/format"
 import { deleteWithUndo, usePendingDeletes } from "@/lib/pending-delete"
 import { usePins } from "@/lib/pins"
 import { PinButton } from "@/components/pin-button"
+import { segment } from "@/components/ui/control"
 import { cn } from "@/lib/utils"
 
 const order: Record<Status, number> = {
@@ -291,13 +292,13 @@ function Monitors() {
               e.currentTarget.blur()
             }
           }}
-          className="h-8 w-40"
+          className="w-40"
           title={t("searchHint")}
         />
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="outline" size="sm" title={t("sort.title")}>
+              <Button variant="outline" title={t("sort.title")}>
                 {t("sort.label", { sort: t(`sort.${sort}`) })}
               </Button>
             }
@@ -327,10 +328,7 @@ function Monitors() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={cn(
-              "px-2 py-0.5 text-muted-foreground hover:text-foreground",
-              filter === f && "bg-accent text-foreground"
-            )}
+            className={segment({ active: filter === f })}
           >
             {f === "all" ? t("all") : ts(f)}:{counts[f] ?? 0}
           </button>
@@ -353,10 +351,7 @@ function Monitors() {
                 <button
                   key={g.k}
                   onClick={() => setGroup(g.k)}
-                  className={cn(
-                    "px-2 py-0.5 text-muted-foreground hover:text-foreground",
-                    group === g.k && "bg-accent text-foreground"
-                  )}
+                  className={segment({ active: group === g.k })}
                 >
                   {g.label}
                 </button>
