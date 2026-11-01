@@ -97,6 +97,10 @@
     "fetching": "fetching",
     "noMatch": "no monitors match",
     "emptyState": "no monitors yet. <link>create the first one</link>",
+    "pinned": "pinned",
+    "others": "everything else",
+    "pin": "pin {name} to the top (in this browser)",
+    "unpin": "unpin {name}",
     "cols": {
       "name": "name",
       "last24h": "last 24h",
@@ -196,7 +200,35 @@
     "duplicateHint": "new monitor with the same settings",
     "undo": "undo",
     "undone": "undone",
-    "deleteHint": "deleted after a few seconds: you can undo it"
+    "deleteHint": "deleted after a few seconds: you can undo it",
+    "zoomHint": "drag across the chart to zoom in",
+    "zoomed": "{from} → {to}",
+    "zoomReset": "back to {range}"
+  },
+  "browserNotify": {
+    "title": "desktop notifications in this browser",
+    "hint": "while a pingtxt tab is open, even in the background, this browser tells you when a monitor goes down or comes back up. only for you, nothing is sent to others.",
+    "unsupported": "this browser cannot show notifications.",
+    "denied": "notifications are blocked for this site: allow them in the browser's site settings, then come back.",
+    "testTitle": "pingtxt notifications are on",
+    "testBody": "you will see one when a monitor goes down or comes back up.",
+    "down": "▼ {name} is down",
+    "downBody": "the monitor is failing its checks.",
+    "up": "▲ {name} is back up",
+    "upBody": "down for {duration}"
+  },
+  "periodStats": {
+    "uptime": "uptime",
+    "avg": "avg",
+    "p50Hint": "half of the checks were faster than this",
+    "p95Hint": "95% of the checks were faster than this",
+    "p99Hint": "99% of the checks were faster than this: the slowest 1% took longer",
+    "compared": "compared with {from} → {to}",
+    "partial": "percentiles since {from}: older checks are kept only as hourly averages",
+    "checks": "{count, plural, one {# check} other {# checks}}",
+    "flat": "= same",
+    "was": "before: {v}",
+    "points": "pts"
   },
   "resultsLog": {
     "failedOnly": "errors only",
@@ -208,6 +240,9 @@
     "retentionHint": "single checks are kept for the raw retention days set in settings; older hours only have totals."
   },
   "monitorForm": {
+    "curlHint": "tip: paste a curl command here to fill in method, headers and body",
+    "curlFilled": "filled in from the curl command",
+    "curlError": "could not read the curl command: {error}",
     "newTitle": "new monitor",
     "editTitle": "edit: {name}",
     "types": {
@@ -813,6 +848,10 @@
     "incidents": "incidents"
   },
   "statusPageForm": {
+    "preview": "preview",
+    "previewHint": "what visitors see, before saving",
+    "previewUntitled": "untitled page",
+    "previewSubscribe": "visitors can subscribe by email here.",
     "newTitle": "new status page",
     "editTitle": "edit: {name}",
     "saved": "status page saved",

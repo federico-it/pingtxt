@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
@@ -17,9 +17,10 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { api, useApi, type Monitor, type Notifier, type StatusPage } from "@/lib/api"
+import { StatusPageView } from "@/components/status-page-view"
+import { api, useApi, type Monitor, type Notifier, type PublicStatusPage, type StatusPage } from "@/lib/api"
 import { useUnsavedGuard } from "@/hooks/use-unsaved-guard"
-import { useMounted } from "@/hooks/use-now"
+import { useMounted, useNow } from "@/hooks/use-now"
 
 type Draft = Omit<StatusPage, "id" | "created_at">
 
@@ -113,7 +114,8 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   }
 
   return (
-    <form onSubmit={save} className="grid max-w-3xl gap-2">
+    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+    <form onSubmit={save} className="grid max-w-3xl content-start gap-2">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t("pageTitle")} htmlFor="sp-title">
           <Input
@@ -371,5 +373,61 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         {dirty && <span className="self-center text-xs text-muted-foreground">{tf("unsaved")}</span>}
       </div>
     </form>
+    <PagePreview draft={d} pageId={initial?.id} />
+    </div>
+  )
+}
+
+/**
+ * What visitors would see with the settings in the form, refreshed a moment
+ * after each change. Nothing is saved.
+ */
+function PagePreview({ draft, pageId }: { draft: Draft; pageId?: number }) {
+  const t = useTranslations("statusPageForm")
+  const now = useNow()
+  const [page, setPage] = useState<PublicStatusPage | null>(null)
+  const [error, setError] = useState("")
+  const body = JSON.stringify({ ...draft, id: pageId ?? 0, password: "" })
+
+  useEffect(() => {
+    let stale = false
+    const timer = setTimeout(() => {
+      api<PublicStatusPage>("/api/status-pages/preview", { method: "POST", body: JSON.parse(body) })
+        .then((p) => {
+          if (stale) return
+          setPage(p)
+          setError("")
+        })
+        .catch((e) => !stale && setError(e instanceof Error ? e.message : String(e)))
+    }, 400)
+    return () => {
+      stale = true
+      clearTimeout(timer)
+    }
+  }, [body])
+
+  return (
+    <aside className="min-w-0 xl:sticky xl:top-4 xl:self-start">
+      <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground uppercase">
+        <span>{t("preview")}</span>
+        <span className="normal-case">{t("previewHint")}</span>
+      </div>
+      <div className="overflow-hidden border xl:max-h-[calc(100svh-6rem)] xl:overflow-y-auto">
+        {error ? (
+          <div className="p-4 text-xs text-down">! {error}</div>
+        ) : page ? (
+          <div className="pointer-events-none origin-top text-sm select-none" aria-hidden>
+            <StatusPageView
+              data={{ ...page, title: page.title || t("previewUntitled") }}
+              now={now || page.updated_at}
+              preview
+              subscribe={page.subscribe ? <p className="mt-8 text-xs text-muted-foreground">{t("previewSubscribe")}</p> : null}
+            />
+          </div>
+        ) : (
+          <div className="h-40" />
+        )}
+      </div>
+    </aside>
   )
 }

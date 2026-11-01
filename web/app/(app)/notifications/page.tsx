@@ -6,6 +6,7 @@ import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
+import { BrowserNotifyCard } from "@/components/browser-notify-card"
 import { Confirm } from "@/components/confirm"
 import { Empty, PageHeader } from "@/components/page-header"
 import { PeriodicReports } from "@/components/reports"
@@ -172,6 +173,8 @@ export default function NotificationsPage() {
       <p className="-mt-3 mb-6 max-w-2xl text-xs text-muted-foreground">
         {t("intro")}
       </p>
+
+      <BrowserNotifyCard />
 
       {data && data.length === 0 ? (
         <Empty>{t("empty")}</Empty>

@@ -30,6 +30,7 @@ import {
   type Monitor,
   type MonitorType,
 } from "@/lib/api"
+import { isCurl, parseCurl, type CurlRequest } from "@/lib/curl"
 import { interval } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -204,6 +205,14 @@ export const emptyMonitor: MonitorInput = {
   paused: false,
 }
 
+function hostOf(url: string) {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return ""
+  }
+}
+
 function headersToText(h: Record<string, string>) {
   return Object.entries(h)
     .map(([k, v]) => `${k}: ${v}`)
@@ -344,6 +353,32 @@ export function MonitorForm({
     (m.ip_family === 6 || m.ip_family === 46) && m.type !== "docker"
   const badV6 = v6Only ? m.locations.filter((l) => noIPv6.has(l)) : []
 
+  // A curl command pasted in the target field fills in an HTTP monitor.
+  function pasteTarget(e: React.ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData("text")
+    if (!isCurl(text)) return
+    e.preventDefault()
+    let req: CurlRequest
+    try {
+      req = parseCurl(text)
+    } catch (err) {
+      toast.error(tr("curlError", { error: err instanceof Error ? err.message : String(err) }))
+      return
+    }
+    if (!isHTTP) setType("http")
+    setM((p) => ({
+      ...p,
+      type: p.type === "keyword" ? "keyword" : "http",
+      target: req.url,
+      method: methods.includes(req.method) ? req.method : "GET",
+      body: req.body,
+      ignore_tls: req.insecure,
+      name: p.name || hostOf(req.url),
+    }))
+    setHeaders(headersToText(req.headers))
+    toast.success(tr("curlFilled"))
+  }
+
   function setIPFamily(f: Monitor["ip_family"]) {
     setM((p) => {
       const next = { ...p, ip_family: f }
@@ -447,8 +482,12 @@ export function MonitorForm({
                 required
                 value={m.target}
                 onChange={(e) => set("target", e.target.value)}
+                onPaste={pasteTarget}
                 placeholder={t.placeholder}
               />
+              {isHTTP && !m.target && (
+                <p className="text-[11px] text-muted-foreground">{tr("curlHint")}</p>
+              )}
             </Field>
           )}
           {m.type === "docker" && (

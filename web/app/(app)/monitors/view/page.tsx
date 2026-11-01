@@ -10,6 +10,8 @@ import { MonitorBadges } from "@/components/badge-info"
 import { ExpiryTable } from "@/components/expiry"
 import { PushInfo } from "@/components/push-info"
 import { LatencyChart } from "@/components/latency-chart"
+import { PeriodStatsRow } from "@/components/period-stats"
+import { PinButton } from "@/components/pin-button"
 import { PhaseChart, hasPhases, phaseLocations, phaseTitle } from "@/components/phase-chart"
 import { TagList, useLabels } from "@/components/labels"
 import { KV, PageHeader, Section } from "@/components/page-header"
@@ -36,17 +38,32 @@ import {
 } from "@/lib/api"
 import { useNow } from "@/hooks/use-now"
 import { deleteWithUndo } from "@/lib/pending-delete"
+import { usePins } from "@/lib/pins"
 import { ago, datetime, displayTarget, duration, interval, ms, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 const ranges = ["1h", "6h", "24h", "7d", "30d"] as const
+type Range = (typeof ranges)[number]
 
 function View() {
   const router = useRouter()
   const params = useSearchParams()
   const id = Number(params.get("id"))
   const now = useNow()
-  const [range, setRange] = useState<(typeof ranges)[number]>("24h")
+  // Chart window, kept in the URL: ?range=7d, or ?start=&end= after a zoom.
+  const rangeParam = params.get("range")
+  const range: Range = ranges.includes(rangeParam as Range) ? (rangeParam as Range) : "24h"
+  const zStart = Number(params.get("start"))
+  const zEnd = Number(params.get("end"))
+  const zoom = zStart > 0 && zEnd > zStart ? { start: zStart, end: zEnd } : null
+  function setQuery(changes: Record<string, string | null>) {
+    const q = new URLSearchParams(params.toString())
+    for (const [k, v] of Object.entries(changes)) {
+      if (v === null) q.delete(k)
+      else q.set(k, v)
+    }
+    router.replace(`?${q.toString()}`, { scroll: false })
+  }
   const [byPhase, setByPhase] = useState(false)
   const [phaseLoc, setPhaseLoc] = useState("")
   const [testing, setTesting] = useState(false)
@@ -59,13 +76,15 @@ function View() {
   const [tested, setTested] = useState<TestResult[] | null>(null)
   const m = useApi<MonitorDetail>(id ? `/api/monitors/${id}` : null)
   const isAdmin = useIsAdmin()
+  const pins = usePins()
   const { groupById, tagById } = useLabels()
   const t = useTranslations("monitor")
   const tc = useTranslations("common")
   const tp = useTranslations("phaseChart")
   const series = useApi<Series>(
-    id ? `/api/monitors/${id}/series?range=${range}` : null,
-    { refreshInterval: 30_000 }
+    !id ? null : zoom ? `/api/monitors/${id}/series?start=${zoom.start}&end=${zoom.end}` : `/api/monitors/${id}/series?range=${range}`,
+    // A zoomed window is in the past: nothing new to fetch.
+    { refreshInterval: zoom ? 0 : 30_000, keepPreviousData: true }
   )
   const incidents = useApi<Incident[]>(
     id ? `/api/incidents?monitor=${id}` : null,
@@ -126,6 +145,7 @@ function View() {
   return (
     <>
       <PageHeader cmd={`pingtxt monitors show ${id}`} title={d.name}>
+        <PinButton id={id} name={d.name} pinned={pins.has(id)} className="h-8 border" />
         {isAdmin && (
           <>
             {d.type !== "push" && (
@@ -263,10 +283,10 @@ function View() {
             {ranges.map((r) => (
               <button
                 key={r}
-                onClick={() => setRange(r)}
+                onClick={() => setQuery({ range: r === "24h" ? null : r, start: null, end: null })}
                 className={cn(
                   "px-1.5 hover:text-foreground",
-                  range === r && "bg-accent text-foreground"
+                  !zoom && range === r && "bg-accent text-foreground"
                 )}
               >
                 {r}
@@ -311,9 +331,33 @@ function View() {
         {series.data && byPhase && hasPhases(series.data) ? (
           <PhaseChart series={series.data} location={phaseLoc} />
         ) : series.data ? (
-          <LatencyChart series={series.data} />
+          <LatencyChart
+            series={series.data}
+            live={!zoom}
+            onZoom={(start, end) => setQuery({ start: String(start), end: String(end) })}
+          />
         ) : (
           <div className="h-[180px]" />
+        )}
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[11px] text-muted-foreground">
+          {zoom ? (
+            <>
+              <span className="text-foreground">
+                {t("zoomed", { from: datetime(zoom.start), to: datetime(zoom.end) })}
+              </span>
+              <button
+                onClick={() => setQuery({ start: null, end: null })}
+                className="underline underline-offset-4 hover:text-foreground"
+              >
+                {t("zoomReset", { range })}
+              </button>
+            </>
+          ) : (
+            !byPhase && <span className="hidden sm:inline">{t("zoomHint")}</span>
+          )}
+        </div>
+        {series.data?.stats && (
+          <PeriodStatsRow current={series.data.stats.current} previous={series.data.stats.previous} />
         )}
       </Section>
 

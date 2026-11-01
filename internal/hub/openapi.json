@@ -3646,7 +3646,7 @@
         ],
         "summary": "Response time series",
         "operationId": "monitorSeries",
-        "description": "About 90 buckets per location over the range.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "description": "About 90 buckets per location over the range, or over a custom window with `start` and `end`. `stats` sums up the window and the one of the same length just before it.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
         "x-pingtxt-access": "read",
         "security": [
           {
@@ -3683,6 +3683,26 @@
               "default": "24h"
             },
             "description": "Time range."
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Custom window start, unix ms. With `end`, replaces `range`; 5 minutes to 400 days long."
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Custom window end, unix ms (capped at now)."
           }
         ],
         "responses": {
@@ -3726,6 +3746,108 @@
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/Bucket"
+                      }
+                    },
+                    "stats": {
+                      "type": "object",
+                      "properties": {
+                        "current": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "integer",
+                              "format": "int64"
+                            },
+                            "to": {
+                              "type": "integer",
+                              "format": "int64"
+                            },
+                            "uptime": {
+                              "type": "number",
+                              "description": "0..1, -1 = no checks."
+                            },
+                            "avg_ms": {
+                              "type": "number",
+                              "description": "Average latency of the successful checks."
+                            },
+                            "percentiles": {
+                              "type": "object",
+                              "description": "Latency percentiles of the successful checks, from single results only: older history is kept as hourly summaries.",
+                              "properties": {
+                                "n": {
+                                  "type": "integer",
+                                  "description": "Checks counted (0 = none)."
+                                },
+                                "from": {
+                                  "type": "integer",
+                                  "format": "int64",
+                                  "description": "Start of the checks counted: later than the window start when older single results were pruned."
+                                },
+                                "p50": {
+                                  "type": "number",
+                                  "description": "Median, ms."
+                                },
+                                "p95": {
+                                  "type": "number",
+                                  "description": "ms."
+                                },
+                                "p99": {
+                                  "type": "number",
+                                  "description": "ms."
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "previous": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "integer",
+                              "format": "int64"
+                            },
+                            "to": {
+                              "type": "integer",
+                              "format": "int64"
+                            },
+                            "uptime": {
+                              "type": "number",
+                              "description": "0..1, -1 = no checks."
+                            },
+                            "avg_ms": {
+                              "type": "number",
+                              "description": "Average latency of the successful checks."
+                            },
+                            "percentiles": {
+                              "type": "object",
+                              "description": "Latency percentiles of the successful checks, from single results only: older history is kept as hourly summaries.",
+                              "properties": {
+                                "n": {
+                                  "type": "integer",
+                                  "description": "Checks counted (0 = none)."
+                                },
+                                "from": {
+                                  "type": "integer",
+                                  "format": "int64",
+                                  "description": "Start of the checks counted: later than the window start when older single results were pruned."
+                                },
+                                "p50": {
+                                  "type": "number",
+                                  "description": "Median, ms."
+                                },
+                                "p95": {
+                                  "type": "number",
+                                  "description": "ms."
+                                },
+                                "p99": {
+                                  "type": "number",
+                                  "description": "ms."
+                                }
+                              }
+                            }
+                          },
+                          "description": "The window of the same length just before."
+                        }
                       }
                     }
                   }
@@ -5329,6 +5451,68 @@
           },
           "409": {
             "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/status-pages/preview": {
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Preview a status page",
+        "operationId": "previewStatusPage",
+        "description": "What visitors would see with these settings, without saving them. With the `id` of a saved page, the incidents written on it are included.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusPage"
+              },
+              "example": {
+                "slug": "acme",
+                "title": "Acme status",
+                "description": "",
+                "domain": "",
+                "published": true,
+                "show_incidents": true,
+                "monitor_ids": [
+                  7
+                ],
+                "group_ids": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicStatusPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }

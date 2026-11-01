@@ -168,6 +168,19 @@ export interface Series {
   size: number
   locations: { id: string; name: string }[]
   buckets: Bucket[]
+  /** the window and the one of the same length just before it */
+  stats?: { current: PeriodStats; previous: PeriodStats }
+}
+
+/** Summary of one window of a monitor's history. */
+export interface PeriodStats {
+  from: number
+  to: number
+  /** 0..1, -1 = no checks */
+  uptime: number
+  avg_ms: number
+  /** from single results only: `from` is later than the window when older ones were pruned */
+  percentiles: { n: number; from: number; p50: number; p95: number; p99: number }
 }
 
 export interface Incident {
