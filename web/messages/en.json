@@ -15,7 +15,7 @@
   "language": {
     "choose": "language",
     "title": "language",
-    "hint": "Saved in this browser. Missing your language, or found a wrong word? Help translate pingtxt on <link>Crowdin</link>."
+    "hint": "Saved in this browser. Missing your language, or found a wrong word? <link>Help translate pingtxt</link> on GitHub."
   },
   "time": {
     "never": "never",

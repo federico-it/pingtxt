@@ -46,7 +46,7 @@ export default function ProfileSettings() {
           {tl.rich("hint", {
             link: (c) => (
               <a
-                href="https://crowdin.com/project/pingtxt"
+                href="https://github.com/federico-it/pingtxt/blob/main/CONTRIBUTING.md#translating-the-interface"
                 target="_blank"
                 rel="noreferrer"
                 className="underline underline-offset-4"

@@ -76,27 +76,26 @@ The public website (pingtxt.com) lives in [`site/`](site/) and is a separate Nex
 
 ## Translating the interface
 
-The hub UI is translated on [Crowdin](https://crowdin.com/project/pingtxt). You don't need to touch the
-code: sign in on Crowdin, pick a language and translate. A maintainer merges the pull request that Crowdin
-opens with the new translations. Want a language that is not listed? Open an issue and we'll add it.
+Translations live in the repository, in [`web/messages`](web/messages): one JSON file per language, next
+to the English source `en.json`. To fix a wrong word or fill in a missing string, edit the file of your
+language and open a pull request. Want a language that is not listed? Copy the keys you can translate into
+a new `<code>.json` file and open a pull request (or an issue if you'd rather ask first).
 
 How it works, for developers:
 
 - All UI text lives in [`web/messages/en.json`](web/messages/en.json), grouped by page or component
   (`dashboard`, `monitorForm`, `settings`, ...). English is the source; the other files
-  (`it.json`, `es.json`, ...) are written by Crowdin, so don't edit them by hand except to seed a new
-  language.
+  (`it.json`, ...) hold the translations and are edited by hand.
 - Components read text with `useTranslations` from `use-intl`:
   `const t = useTranslations("dashboard")` then `t("title")`. Helpers outside components
   (like `lib/format.ts`) use `tr("time.never")` from `lib/i18n`.
 - Messages use ICU syntax: `{name}` for values, `{count, plural, one {# monitor} other {# monitors}}`
   for plurals and `<code>...</code>` tags rendered with `t.rich`. Keep commands, URLs and product names
   out of the strings when you can.
-- When you add or change text, update `en.json` only, in the namespace of the page you touched, and
-  translate it on Crowdin. Missing keys in a translation fall back to English. `tsc` fails on a key that doesn't exist in `en.json`.
-- [`crowdin.yml`](crowdin.yml) maps `web/messages/en.json` to `web/messages/<lang>.json`. Crowdin uploads
-  the source on every push to `main` and opens a pull request from `l10n_main` with the translations.
-  It exports only translated strings, so an untranslated key is left out and falls back to English.
+- When you add or change text, update `en.json` in the namespace of the page you touched, and add the
+  same key to `it.json` (and any other language you can write). Missing keys in a translation fall back
+  to English, so a language you can't write is fine to leave out. `tsc` fails on a key that doesn't
+  exist in `en.json`.
 - A language shows up in the picker once it is listed in `locales` and `loaders` in
   [`web/lib/i18n.tsx`](web/lib/i18n.tsx). Add it there when its file is reasonably complete.
 - The language is chosen per browser (saved in `localStorage`, otherwise taken from the browser

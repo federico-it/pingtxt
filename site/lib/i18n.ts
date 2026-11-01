@@ -1,6 +1,5 @@
 // The site is in English (at /) and Italian (at /it/). Texts live next to
-// each other in the page components: t("english", "italiano"). Italian is
-// written by hand in this repository, not on Crowdin (that is for the hub UI).
+// each other in the page components: t("english", "italiano").
 
 export const LANGS = ["en", "it"] as const
 export type Lang = (typeof LANGS)[number]

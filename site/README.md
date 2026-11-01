@@ -22,9 +22,8 @@ language.
 
 - Texts sit side by side in `content/*.tsx` and the components:
   `t("english", "italiano")` from `tx(lang)` (server) or `useT()` (client).
-  When you change a text, change both. Italian is written here by hand, not
-  on Crowdin: Crowdin translates the hub UI (`web/messages`), whose strings
-  are short keys; the site is long text with code and links inside.
+  When you change a text, change both. The site does not use the hub UI's
+  message files (`web/messages`): it is long text with code and links inside.
 - Internal links go through `localePath(lang, "/docs/")`. Section ids
   (`#install`, `#usage-stats`, ...) are the same in both languages.
 - The header has a `[it]` / `[en]` switch to the same page; on English pages a
