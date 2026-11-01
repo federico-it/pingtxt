@@ -211,7 +211,6 @@ func TestAppPush(t *testing.T) {
 	}
 }
 
-
 func TestAppMessage(t *testing.T) {
 	at := time.Now().UnixMilli()
 	down := appMessage(Event{MonitorID: 42, Monitor: "api", Target: "https://api", Status: StatusDown, Cause: "HTTP 503", At: at, DownSince: at - 5*60_000, Reminder: 1})
