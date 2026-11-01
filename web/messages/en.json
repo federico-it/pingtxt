@@ -970,7 +970,7 @@
   },
   "mobileApp": {
     "title": "mobile app",
-    "intro": "Send alerts to the pingtxt app on your team's phones. Notifications go through a push relay, which holds the app's Firebase key: monitor names and errors pass through it in the message text but are not stored there.",
+    "intro": "Send alerts to the pingtxt app on your team's phones. Notifications go through a push relay, which holds the app's Firebase key. The relay stores nothing: it has no database, it only forwards each message to Firebase and does not log its text (monitor names, errors) or the phones' tokens.",
     "enabled": "push notifications to the mobile app",
     "relayUrl": "push relay",
     "relayHint": "The official relay works with the app from the App Store.",
