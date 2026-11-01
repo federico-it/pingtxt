@@ -2506,6 +2506,184 @@
         }
       }
     },
+    "/api/monitors/test": {
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Test an unsaved monitor",
+        "operationId": "testDraftMonitor",
+        "description": "Runs the check once at each location of the monitor in the body and waits for the results (up to the timeout plus 5 seconds). Nothing is saved. Heartbeat (push) monitors cannot be tested.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitorInput"
+              },
+              "example": {
+                "type": "http",
+                "target": "https://example.com/health",
+                "timeout_ms": 10000,
+                "locations": [
+                  "local"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One result per location of the monitor. Nothing is stored and no alert is sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TestResult"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "results": [
+                    {
+                      "location": "local",
+                      "name": "hub",
+                      "ok": true,
+                      "latency_ms": 84.2,
+                      "status_code": 200
+                    },
+                    {
+                      "location": "agent:2",
+                      "name": "fra · Frankfurt",
+                      "ok": false,
+                      "skipped": true,
+                      "latency_ms": 0,
+                      "message": "agent offline"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/monitors/bulk": {
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Change several monitors",
+        "operationId": "bulkMonitors",
+        "description": "Pauses, resumes, deletes or moves to a group several monitors at once. Pausing resolves their open incidents. With action group, group_id 0 removes the monitors from their group.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "pause",
+                      "resume",
+                      "delete",
+                      "group"
+                    ]
+                  },
+                  "group_id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Action group only: the group, 0 for none."
+                  }
+                },
+                "required": [
+                  "ids",
+                  "action"
+                ]
+              },
+              "example": {
+                "ids": [
+                  1,
+                  2,
+                  3
+                ],
+                "action": "pause"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Number of monitors selected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "example": {
+                  "count": 3
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/api/monitors/{id}": {
       "get": {
         "tags": [
@@ -2853,6 +3031,88 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Monitor"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/monitors/{id}/test": {
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Check now",
+        "operationId": "testMonitor",
+        "description": "Runs the saved monitor's check once at each of its locations and returns the results. They are not stored and do not change the status.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One result per location of the monitor. Nothing is stored and no alert is sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TestResult"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "results": [
+                    {
+                      "location": "local",
+                      "name": "hub",
+                      "ok": true,
+                      "latency_ms": 84.2,
+                      "status_code": 200
+                    },
+                    {
+                      "location": "agent:2",
+                      "name": "fra · Frankfurt",
+                      "ok": false,
+                      "skipped": true,
+                      "latency_ms": 0,
+                      "message": "agent offline"
+                    }
+                  ]
                 }
               }
             }
@@ -9646,6 +9906,41 @@
             "description": "Unix time in milliseconds (0 = never / unknown)."
           }
         }
+      },
+      "TestResult": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "Location id: local or agent:<id>."
+          },
+          "name": {
+            "type": "string",
+            "description": "Location name."
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "skipped": {
+            "type": "boolean",
+            "description": "The location could not run the check (offline or turned off); message says why."
+          },
+          "latency_ms": {
+            "type": "number"
+          },
+          "status_code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "location",
+          "name",
+          "ok",
+          "latency_ms"
+        ]
       }
     }
   }

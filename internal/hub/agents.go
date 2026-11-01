@@ -203,7 +203,9 @@ func (h *Hub) ServeAgent(w http.ResponseWriter, r *http.Request) {
 		}
 		switch {
 		case msg.Type == protocol.TypeResult && msg.Result != nil:
-			h.HandleResult(loc, *msg.Result)
+			if !h.tests.deliver(*msg.Result) {
+				h.HandleResult(loc, *msg.Result)
+			}
 		case msg.Type == protocol.TypeNetwork && msg.Network != nil:
 			v := check.IPv6No
 			if msg.Network.IPv6 {
