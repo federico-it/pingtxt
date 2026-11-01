@@ -3,6 +3,8 @@
 import { ThemeProvider as NextThemes, useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 
+import { useT } from "@/components/lang"
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
     <NextThemes attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
@@ -33,6 +35,7 @@ const order = ["system", "light", "dark"] as const
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
+  const t = useT()
   const [mounted, setMounted] = useState(false)
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setMounted(true), [])
@@ -42,7 +45,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={() => setTheme(next)}
-      title="toggle theme (d)"
+      title={t("toggle theme (d)", "cambia tema (d)")}
       className="px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     >
       [{cur}]

@@ -60,6 +60,7 @@ ${docs.map(link).join("\n")}
 - [Source code](${REPO})
 - [Releases](${REPO}/releases)
 - [Privacy policy of the iOS app](${SITE}/privacy/)
+- [Italian version of the site](${SITE}/it/): the same pages in Italian (docs at ${SITE}/it/docs/)
 `
 }
 

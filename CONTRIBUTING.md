@@ -107,7 +107,8 @@ How it works, for developers:
 1. Fork the repo and create a branch from `main` (`fix-dns-timeout`, `add-matrix-notifier`...).
 2. Keep the PR focused on one thing. Unrelated refactors and formatting changes go in their own PR.
 3. Add or update tests for Go changes, and update the [README](README.md) and the site docs
-   (`site/app/docs/page.tsx`) when you change behavior users can see.
+   (`site/content/docs.tsx`, English and Italian side by side; if you don't write Italian,
+   leave the English text in both places and say so in the PR) when you change behavior users can see.
 4. Run `make test lint` (and `cd site && npm run typecheck && npm run build` if you touched `site/`).
 5. Open the PR against `main` and fill in the template. Link the issue it closes (`Closes #123`).
    Draft PRs are welcome if you want early feedback.
