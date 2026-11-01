@@ -97,6 +97,10 @@
     "fetching": "",
     "noMatch": "",
     "emptyState": "",
+    "pinned": "",
+    "others": "",
+    "pin": "",
+    "unpin": "",
     "cols": {
       "name": "",
       "last24h": "",
@@ -196,7 +200,35 @@
     "duplicateHint": "",
     "undo": "",
     "undone": "",
-    "deleteHint": ""
+    "deleteHint": "",
+    "zoomHint": "",
+    "zoomed": "",
+    "zoomReset": ""
+  },
+  "browserNotify": {
+    "title": "",
+    "hint": "",
+    "unsupported": "",
+    "denied": "",
+    "testTitle": "",
+    "testBody": "",
+    "down": "",
+    "downBody": "",
+    "up": "",
+    "upBody": ""
+  },
+  "periodStats": {
+    "uptime": "",
+    "avg": "",
+    "p50Hint": "",
+    "p95Hint": "",
+    "p99Hint": "",
+    "compared": "",
+    "partial": "",
+    "checks": "",
+    "flat": "",
+    "was": "",
+    "points": ""
   },
   "resultsLog": {
     "failedOnly": "",
@@ -208,6 +240,9 @@
     "retentionHint": ""
   },
   "monitorForm": {
+    "curlHint": "",
+    "curlFilled": "",
+    "curlError": "",
     "newTitle": "",
     "editTitle": "",
     "types": {
@@ -742,6 +777,8 @@
       "chatId": "",
       "topicUrl": "",
       "accessToken": "",
+      "provider": "",
+      "apiKey": "",
       "smtpHost": "",
       "port": "",
       "security": "",
@@ -752,6 +789,8 @@
       "users": ""
     },
     "options": {
+      "smtp": "",
+      "resend": "",
       "starttls": "",
       "tls": "",
       "none": ""
@@ -759,7 +798,8 @@
     "pushOff": "",
     "hints": {
       "commaSeparated": "",
-      "appUsers": ""
+      "appUsers": "",
+      "resendKey": ""
     }
   },
   "reports": {
@@ -813,6 +853,10 @@
     "incidents": ""
   },
   "statusPageForm": {
+    "preview": "",
+    "previewHint": "",
+    "previewUntitled": "",
+    "previewSubscribe": "",
     "newTitle": "",
     "editTitle": "",
     "saved": "",
@@ -858,7 +902,24 @@
     "passwordPlaceholder": "",
     "passwordSet": "",
     "passwordNew": "",
-    "incidents": ""
+    "incidents": "",
+    "headerTitle": "",
+    "headerUrl": "",
+    "headerUrlHint": "",
+    "headerUrlInvalid": "",
+    "logo": "",
+    "logoHint": "",
+    "logoNone": "",
+    "logoSaveFirst": "",
+    "logoUpload": "",
+    "logoUploading": "",
+    "logoUrl": "",
+    "logoImport": "",
+    "logoRemove": "",
+    "logoSaved": "",
+    "logoRemoved": "",
+    "hideTitle": "",
+    "hideTitleHint": ""
   },
   "statusPublic": {
     "banner": {
