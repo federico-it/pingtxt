@@ -25,6 +25,9 @@ const (
 	KindStatus = ""
 	KindCert   = "cert_expiry"
 	KindDomain = "domain_expiry"
+	// Degraded events: status "degraded" when some locations start failing,
+	// "up" when all of them work again.
+	KindDegraded = "degraded"
 )
 
 // Expiry event statuses.
@@ -36,7 +39,7 @@ const (
 
 // Event is a status change sent to notification channels.
 type Event struct {
-	Kind      string `json:"kind,omitempty"` // "", "cert_expiry" or "domain_expiry"
+	Kind      string `json:"kind,omitempty"` // "", "cert_expiry", "domain_expiry" or "degraded"
 	MonitorID int64  `json:"monitor_id"`
 	Monitor   string `json:"monitor"`
 	Target    string `json:"target"`
@@ -72,10 +75,14 @@ func (e Event) Title() string {
 	return "pingtxt: " + e.Monitor + " " + e.statusWord()
 }
 
-// statusWord is DOWN, STILL DOWN (reminders) or UP.
+// statusWord is DOWN, STILL DOWN (reminders) or UP, DEGRADED or OK (no
+// longer degraded).
 func (e Event) statusWord() string {
 	if e.Status == StatusDown && e.Reminder > 0 {
 		return "STILL DOWN"
+	}
+	if e.Kind == KindDegraded && e.Status != StatusDegraded {
+		return "OK"
 	}
 	return strings.ToUpper(e.Status)
 }
@@ -116,6 +123,16 @@ func (e Event) Text() string {
 	}
 	if e.Kind == KindCert || e.Kind == KindDomain {
 		return prefix + e.expiryText()
+	}
+	if e.Kind == KindDegraded {
+		if e.Status == StatusDegraded {
+			s := fmt.Sprintf("%s[DEGRADED] %s (%s) at %s", prefix, e.Monitor, e.Target, ts)
+			if e.Cause != "" {
+				s += "\n> " + e.Cause
+			}
+			return s
+		}
+		return fmt.Sprintf("%s[OK] %s (%s) is no longer degraded at %s", prefix, e.Monitor, e.Target, ts)
 	}
 	if e.Status == StatusDown {
 		var s string
@@ -197,25 +214,6 @@ func (n *Notifier) SendTo(nt *store.Notifier, e Event) {
 	}()
 }
 
-// Send delivers the event to every enabled channel, asynchronously.
-func (n *Notifier) Send(e Event) {
-	list, err := n.store.ListNotifiers()
-	if err != nil {
-		n.log.Error("list notifiers", "err", err)
-		return
-	}
-	for _, nt := range list {
-		if !nt.Enabled {
-			continue
-		}
-		go func(nt *store.Notifier) {
-			if err := n.Deliver(context.Background(), nt, e); err != nil {
-				n.log.Warn("notification failed", "notifier", nt.Name, "err", err)
-			}
-		}(nt)
-	}
-}
-
 // Deliver sends one event to one channel.
 func (n *Notifier) Deliver(ctx context.Context, nt *store.Notifier, e Event) error {
 	c := nt.Config
@@ -241,6 +239,8 @@ func (n *Notifier) Deliver(ctx context.Context, nt *store.Notifier, e Event) err
 			hdr["Tags"] = "red_circle"
 		case e.Alert():
 			hdr["Priority"] = "high"
+			hdr["Tags"] = "warning"
+		case e.Status == StatusDegraded:
 			hdr["Tags"] = "warning"
 		default:
 			hdr["Tags"] = "green_circle"

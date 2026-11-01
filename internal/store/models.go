@@ -239,6 +239,10 @@ type Monitor struct {
 	Locations []string `json:"locations"`
 	GroupID   int64    `json:"group_id"` // 0 = no group
 	TagIDs    []int64  `json:"tag_ids"`
+	// Notifiers are the channels linked to this monitor one by one, with
+	// their events. Channels whose scope covers the monitor need no link.
+	// On save, nil keeps the stored links.
+	Notifiers []ChannelLink `json:"notifiers"`
 	// Expiry alerts: TLS certificate (https targets) and domain registration.
 	CertExpiryAlert   bool   `json:"cert_expiry_alert"`
 	DomainExpiryAlert bool   `json:"domain_expiry_alert"`
@@ -305,9 +309,17 @@ func (s *Store) listMonitorsWhere(where string, args ...any) ([]*Monitor, error)
 	if err != nil {
 		return nil, err
 	}
+	links, err := s.monitorLinks(0)
+	if err != nil {
+		return nil, err
+	}
 	for _, m := range out {
 		if t := tags[m.ID]; t != nil {
 			m.TagIDs = t
+		}
+		m.Notifiers = links[m.ID]
+		if m.Notifiers == nil {
+			m.Notifiers = []ChannelLink{}
 		}
 	}
 	return out, nil
@@ -330,7 +342,18 @@ func (s *Store) Monitor(id int64) (*Monitor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m, s.loadMonitorTags(m)
+	if err := s.loadMonitorTags(m); err != nil {
+		return nil, err
+	}
+	links, err := s.monitorLinks(id)
+	if err != nil {
+		return nil, err
+	}
+	m.Notifiers = links[id]
+	if m.Notifiers == nil {
+		m.Notifiers = []ChannelLink{}
+	}
+	return m, nil
 }
 
 func (s *Store) CreateMonitor(m *Monitor) error {
@@ -354,6 +377,11 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 	if err := setMonitorTags(tx, m.ID, m.TagIDs); err != nil {
 		return err
 	}
+	if m.Notifiers != nil {
+		if err := setMonitorLinks(tx, m.ID, m.Notifiers); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -372,6 +400,11 @@ func (s *Store) UpdateMonitor(m *Monitor) error {
 	}
 	if err := setMonitorTags(tx, m.ID, m.TagIDs); err != nil {
 		return err
+	}
+	if m.Notifiers != nil {
+		if err := setMonitorLinks(tx, m.ID, m.Notifiers); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }
@@ -1176,12 +1209,25 @@ type Notifier struct {
 	DelayMin int `json:"delay_min"`
 	// RepeatMin repeats the alert every this many minutes while the monitor
 	// stays down (0 = once).
-	RepeatMin int   `json:"repeat_min"`
-	CreatedAt int64 `json:"created_at"`
+	RepeatMin int `json:"repeat_min"`
+	// Scope: the monitors the channel gets notifications for, unless a
+	// monitor has a link of its own (see ChannelLink). AllMonitors includes
+	// every monitor, also the ones added later; otherwise the monitors of
+	// GroupIDs and TagIDs.
+	AllMonitors bool    `json:"all_monitors"`
+	GroupIDs    []int64 `json:"group_ids"`
+	TagIDs      []int64 `json:"tag_ids"`
+	// Events are what the channel gets for the monitors of its scope.
+	Events []string `json:"events"`
+	// Monitors are the monitors linked one by one (API only, not stored here).
+	Monitors  []ChannelLink `json:"monitors"`
+	CreatedAt int64         `json:"created_at"`
 }
 
+const notifierCols = `id, name, type, config, enabled, delay_min, repeat_min, created_at, all_monitors, group_ids, tag_ids, events`
+
 func (s *Store) ListNotifiers() ([]*Notifier, error) {
-	rows, err := s.db.Query(`SELECT id, name, type, config, enabled, delay_min, repeat_min, created_at FROM notifiers ORDER BY name`)
+	rows, err := s.db.Query(`SELECT ` + notifierCols + ` FROM notifiers ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -1189,14 +1235,24 @@ func (s *Store) ListNotifiers() ([]*Notifier, error) {
 	out := []*Notifier{}
 	for rows.Next() {
 		n := &Notifier{}
-		var cfg string
-		if err := rows.Scan(&n.ID, &n.Name, &n.Type, &cfg, &n.Enabled, &n.DelayMin, &n.RepeatMin, &n.CreatedAt); err != nil {
+		var cfg, gids, tids, events string
+		if err := rows.Scan(&n.ID, &n.Name, &n.Type, &cfg, &n.Enabled, &n.DelayMin, &n.RepeatMin, &n.CreatedAt, &n.AllMonitors, &gids, &tids, &events); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(cfg), &n.Config)
 		if n.Config == nil {
 			n.Config = map[string]string{}
 		}
+		_ = json.Unmarshal([]byte(gids), &n.GroupIDs)
+		_ = json.Unmarshal([]byte(tids), &n.TagIDs)
+		_ = json.Unmarshal([]byte(events), &n.Events)
+		if n.GroupIDs == nil {
+			n.GroupIDs = []int64{}
+		}
+		if n.TagIDs == nil {
+			n.TagIDs = []int64{}
+		}
+		n.Events = CleanEvents(n.Events)
 		out = append(out, n)
 	}
 	return out, rows.Err()
@@ -1218,7 +1274,8 @@ func (s *Store) Notifier(id int64) (*Notifier, error) {
 func (s *Store) CreateNotifier(n *Notifier) error {
 	cfg, _ := json.Marshal(n.Config)
 	n.CreatedAt = now()
-	id, err := s.db.insert(s.db, `INSERT INTO notifiers (name, type, config, enabled, delay_min, repeat_min, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`, n.Name, n.Type, string(cfg), b2i(n.Enabled), n.DelayMin, n.RepeatMin, n.CreatedAt)
+	id, err := s.db.insert(s.db, `INSERT INTO notifiers (name, type, config, enabled, delay_min, repeat_min, created_at, all_monitors, group_ids, tag_ids, events) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.Name, n.Type, string(cfg), b2i(n.Enabled), n.DelayMin, n.RepeatMin, n.CreatedAt, b2i(n.AllMonitors), jsonIDs(n.GroupIDs), jsonIDs(n.TagIDs), jsonIDs(CleanEvents(n.Events)))
 	if err != nil {
 		return err
 	}
@@ -1228,7 +1285,8 @@ func (s *Store) CreateNotifier(n *Notifier) error {
 
 func (s *Store) UpdateNotifier(n *Notifier) error {
 	cfg, _ := json.Marshal(n.Config)
-	_, err := s.db.Exec(`UPDATE notifiers SET name = ?, type = ?, config = ?, enabled = ?, delay_min = ?, repeat_min = ? WHERE id = ?`, n.Name, n.Type, string(cfg), b2i(n.Enabled), n.DelayMin, n.RepeatMin, n.ID)
+	_, err := s.db.Exec(`UPDATE notifiers SET name = ?, type = ?, config = ?, enabled = ?, delay_min = ?, repeat_min = ?, all_monitors = ?, group_ids = ?, tag_ids = ?, events = ? WHERE id = ?`,
+		n.Name, n.Type, string(cfg), b2i(n.Enabled), n.DelayMin, n.RepeatMin, b2i(n.AllMonitors), jsonIDs(n.GroupIDs), jsonIDs(n.TagIDs), jsonIDs(CleanEvents(n.Events)), n.ID)
 	return err
 }
 

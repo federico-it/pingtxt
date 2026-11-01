@@ -965,6 +965,24 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
           <p>
             {t(
               <>
+                Each channel has a <B>scope</B>: all monitors (also future ones), or the monitors of some groups and tags,
+                or only the monitors linked one by one; and the <B>events</B> it gets: down, up, degraded (off by default),
+                certificate and domain expiry. Link a monitor one by one, from the channel or from the monitor form, to add
+                it, change its events or leave it out of an all-monitors channel. Existing channels keep getting everything
+                they got before.
+              </>,
+              <>
+                Ogni canale ha un <B>ambito</B>: tutti i monitor (anche quelli futuri), i monitor di alcuni gruppi e tag,
+                oppure solo i monitor collegati uno per uno; e gli <B>eventi</B> che riceve: down, up, degradato (spento di
+                default), scadenza del certificato e del dominio. Collega un monitor uno per uno, dal canale o dal form del
+                monitor, per aggiungerlo, cambiarne gli eventi o escluderlo da un canale su tutti i monitor. I canali già
+                esistenti continuano a ricevere tutto quello che ricevevano prima.
+              </>,
+            )}
+          </p>
+          <p>
+            {t(
+              <>
                 Escalation and reminders are set per channel. <B>send after</B> N minutes alerts the channel only if the
                 monitor is still down by then (an on-call phone, a manager), so short outages never reach it.{" "}
                 <B>repeat every</B> N minutes sends a STILL DOWN reminder while the monitor stays down (at least 5). Webhooks

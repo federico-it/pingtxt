@@ -174,6 +174,18 @@ func statusMailView(v *mailView, e Event) {
 	v.Badge = e.statusWord()
 	v.Note = e.Cause
 	v.Rows = append(v.Rows, mailRow{Key: "monitor", Value: e.Monitor}, mailRow{Key: "target", Value: e.Target})
+	if e.Kind == KindDegraded {
+		if e.Status == StatusDegraded {
+			v.Tone = toneWarn
+			v.Lead = "Some locations fail their checks."
+			v.Rows = append(v.Rows, mailRow{Key: "degraded since", Value: mailTime(e.At)})
+			return
+		}
+		v.Tone = toneUp
+		v.Lead = "Every location passes its checks again."
+		v.Rows = append(v.Rows, mailRow{Key: "ok since", Value: mailTime(e.At)})
+		return
+	}
 	if e.Status == StatusDown {
 		v.Tone = toneDown
 		since := e.At

@@ -570,6 +570,10 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	since := m.StatusSince
 	name := m.Name
 	alert := h.alertLocked(st)
+	degraded := ""
+	if changed && !m.Paused {
+		degraded = degradedChange(prev, display)
+	}
 	row := &store.ResultRow{
 		MonitorID: r.MonitorID, Location: loc, TS: r.At, OK: r.OK, LatencyMs: r.LatencyMs,
 		StatusCode: r.StatusCode, Message: r.Message, CertExpiry: r.CertExpiry, Maint: inMaint,
@@ -590,6 +594,27 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		h.log.Info("status change", "monitor", name, "from", prev, "to", display)
 	}
 	h.raise(m, alert, strings.Join(causes, "; "), r.At)
+	if degraded != "" {
+		ev := Event{Kind: KindDegraded, MonitorID: m.ID, Monitor: name, Target: eventTarget(m), Status: degraded, At: r.At}
+		if degraded == StatusDegraded {
+			ev.Cause = strings.Join(causes, "; ")
+		}
+		h.sendEvent(ev, m)
+	}
+}
+
+// degradedChange gives the degraded event of a status change: "degraded"
+// when the monitor turns degraded from up or down, "up" when it goes from
+// degraded back to up, "" otherwise. Maintenance and the first checks
+// (pending) send nothing.
+func degradedChange(prev, cur string) string {
+	switch {
+	case cur == StatusDegraded && (prev == StatusUp || prev == StatusDown):
+		return StatusDegraded
+	case prev == StatusDegraded && cur == StatusUp:
+		return StatusUp
+	}
+	return ""
 }
 
 // phasesOf converts the phases a check measured (nil from old agents and

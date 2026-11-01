@@ -9015,6 +9015,13 @@
               "format": "int64"
             }
           },
+          "notifiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelLink"
+            },
+            "description": "Notification channels linked to this monitor one by one (notifier_id + events). Channels whose scope covers the monitor need no link. Left out on update: the links are kept; [] removes them."
+          },
           "cert_expiry_alert": {
             "type": "boolean",
             "description": "Alert before the TLS certificate expires (https targets)."
@@ -9771,6 +9778,47 @@
             "minimum": 0,
             "maximum": 10080,
             "description": "Repeat the alert every this many minutes while the monitor stays down (0 = once, otherwise at least 5). Reminders carry reminder=1, 2, ... and down_since in the webhook payload. Nothing is sent during maintenance windows."
+          },
+          "all_monitors": {
+            "type": "boolean",
+            "description": "The channel covers every monitor, also the ones added later. Default true when left out on create."
+          },
+          "group_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Without all_monitors: the channel covers the monitors of these groups."
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Without all_monitors: the channel covers the monitors with one of these tags."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "down",
+                "up",
+                "degraded",
+                "cert_expiry",
+                "domain_expiry"
+              ]
+            },
+            "description": "What the channel gets for the monitors it covers. Default on create: down, up, cert_expiry, domain_expiry. down = the monitor went down (and the reminders of repeat_min), up = it is back up (only to channels that got the down alert), degraded = some locations fail and when that ends, cert_expiry / domain_expiry = the TLS certificate or the domain registration expires soon, expired or was renewed."
+          },
+          "monitors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelLink"
+            },
+            "description": "Monitors linked one by one (monitor_id + events), the same links as the monitors' notifiers. Left out on update: kept; [] removes them."
           },
           "created_at": {
             "type": "integer",
@@ -11095,6 +11143,39 @@
             "description": "Version of the logo (when it was last changed, Unix ms)."
           }
         }
+      },
+      "ChannelLink": {
+        "type": "object",
+        "description": "A notification channel linked to one monitor with its own events. It wins over the channel's scope: it adds the monitor, changes its events, or with no events leaves the monitor out of a channel that covers it.",
+        "properties": {
+          "monitor_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "In a channel's monitors list."
+          },
+          "notifier_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "In a monitor's notifiers list."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "down",
+                "up",
+                "degraded",
+                "cert_expiry",
+                "domain_expiry"
+              ]
+            },
+            "description": "down = the monitor went down (and the reminders of repeat_min), up = it is back up (only to channels that got the down alert), degraded = some locations fail and when that ends, cert_expiry / domain_expiry = the TLS certificate or the domain registration expires soon, expired or was renewed."
+          }
+        },
+        "required": [
+          "events"
+        ]
       }
     }
   }

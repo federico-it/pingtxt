@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -88,6 +89,12 @@ type cfgTag struct {
 type cfgNotifier struct {
 	store.Notifier
 	CreatedAt int64 `json:"created_at,omitempty"`
+	// Files from before channels had a scope leave these out: such a
+	// channel covers every monitor with the default events. Links to single
+	// monitors are exported with the monitors.
+	AllMonitors *bool               `json:"all_monitors,omitempty"`
+	Events      *[]string           `json:"events,omitempty"`
+	Monitors    []store.ChannelLink `json:"monitors,omitempty"`
 }
 
 type cfgMonitor struct {
@@ -198,7 +205,8 @@ func (h *Hub) ExportConfig(secrets bool) (*ConfigDoc, error) {
 				}
 			}
 		}
-		doc.Notifiers = append(doc.Notifiers, cfgNotifier{Notifier: *n})
+		all, events := n.AllMonitors, n.Events
+		doc.Notifiers = append(doc.Notifiers, cfgNotifier{Notifier: *n, AllMonitors: &all, Events: &events})
 	}
 	monitors, err := h.store.ListMonitors()
 	if err != nil {
@@ -581,6 +589,16 @@ func (im *importer) importNotifiers(old []*store.Notifier) error {
 		n := x.Notifier
 		docID := n.ID
 		n.ID = 0
+		n.AllMonitors, n.Events = true, slices.Clone(store.DefaultNotifyEvents)
+		if x.AllMonitors != nil {
+			n.AllMonitors = *x.AllMonitors
+		}
+		if x.Events != nil {
+			n.Events = store.CleanEvents(*x.Events)
+		}
+		n.GroupIDs = im.mapIDs(n.GroupIDs, im.groups)
+		n.TagIDs = im.mapIDs(n.TagIDs, im.tags)
+		n.Monitors = nil
 		if n.Config == nil {
 			n.Config = map[string]string{}
 		}
@@ -681,6 +699,15 @@ func (im *importer) importMonitors(old []*store.Monitor) error {
 		m.ID = 0
 		m.GroupID = im.groups[m.GroupID]
 		m.TagIDs = im.mapIDs(m.TagIDs, im.tags)
+		if m.Notifiers != nil { // nil in files from before channel links: keep them
+			links := []store.ChannelLink{}
+			for _, l := range m.Notifiers {
+				if id, ok := im.notifiers[l.NotifierID]; ok {
+					links = append(links, store.ChannelLink{NotifierID: id, Events: l.Events})
+				}
+			}
+			m.Notifiers = links
+		}
 		locs := []string{}
 		for _, l := range m.Locations {
 			if id, ok := parseAgentLocation(l); ok {

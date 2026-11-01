@@ -317,7 +317,8 @@
       "labels": "group & tags",
       "schedule": "schedule",
       "locations": "locations",
-      "expiry": "expiry alerts"
+      "expiry": "expiry alerts",
+      "notifications": "notifications"
     },
     "noGroup": "no group",
     "noGrace": "none",
@@ -741,7 +742,7 @@
     "sendingTo": "sending test to {name}...",
     "sending": "sending test...",
     "testSent": "test notification sent",
-    "intro": "Every enabled channel receives a message when a monitor goes down and when it recovers. A channel can also wait before alerting, to escalate long outages to another contact, and repeat the alert while the monitor stays down.",
+    "intro": "Pick for each channel which monitors it covers (all of them, also future ones, or some groups and tags) and which events it gets; a monitor can also be linked to a channel one by one. A channel can wait before alerting, to escalate long outages to another contact, and repeat the alert while the monitor stays down.",
     "empty": "no channels. you won't be alerted when something breaks.",
     "test": "test",
     "edit": "edit",
@@ -1408,5 +1409,40 @@
       "critical": "critical"
     },
     "addUpdate": "add an update"
+  },
+  "channelLinks": {
+    "events": "events",
+    "eventsHint": "What this channel gets for the monitors it covers. Recoveries go only to channels that got the down alert.",
+    "event": {
+      "down": "down",
+      "up": "back up",
+      "degraded": "degraded",
+      "cert_expiry": "certificate expiry",
+      "domain_expiry": "domain expiry"
+    },
+    "short": {
+      "down": "down",
+      "up": "up",
+      "degraded": "degraded",
+      "cert_expiry": "cert",
+      "domain_expiry": "domain"
+    },
+    "monitors": "monitors",
+    "allMonitors": "all monitors",
+    "allHint": "Every monitor, also the ones added later. Untick a monitor to leave it out, or click its events to send something else for it.",
+    "scopeHint": "Monitors of the selected groups and tags are included, also the ones added later. Tick other monitors one by one; click the events of a monitor to change them.",
+    "groups": "groups",
+    "tags": "tags",
+    "noMonitorsYet": "no monitors yet",
+    "monitorCount": "{count, plural, =0 {no monitors} one {# monitor} other {# monitors}}",
+    "editEvents": "change the events for this one",
+    "reset": "use the channel's events",
+    "leftOut": "left out",
+    "noEvents": "no events",
+    "monitorHint": "Channels that get alerts about this monitor. Channels set to all monitors, or to this monitor's group or tags, are ticked unless you untick them; click the events to send something else for this monitor.",
+    "noChannels": "No notification channels yet: <link>add one</link>.",
+    "channelOff": "disabled",
+    "viaAll": "all monitors",
+    "viaLabels": "group or tag"
   }
 }

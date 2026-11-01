@@ -74,7 +74,7 @@ func (s *alertSink) wait(t *testing.T, total int) map[string][]Event {
 
 func (s *alertSink) channel(t *testing.T, st *store.Store, name string, delay, repeat int) {
 	t.Helper()
-	n := &store.Notifier{Name: name, Type: "webhook", Enabled: true, DelayMin: delay, RepeatMin: repeat,
+	n := &store.Notifier{Name: name, Type: "webhook", Enabled: true, AllMonitors: true, Events: store.DefaultNotifyEvents, DelayMin: delay, RepeatMin: repeat,
 		Config: map[string]string{"url": s.srv.URL + "/?ch=" + name}}
 	if err := validateNotifier(n); err != nil {
 		t.Fatal(err)
