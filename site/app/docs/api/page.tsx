@@ -12,12 +12,14 @@ import {
   type Operation,
   type Schema,
 } from "@/lib/openapi";
+import { pageMeta } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "api reference",
+export const metadata: Metadata = pageMeta({
+  title: "REST API reference",
   description:
     "Every endpoint of the pingtxt REST API: authentication with API tokens, roles, parameters and examples.",
-};
+  path: "/docs/api/",
+});
 
 const methodColor: Record<string, string> = {
   get: "text-up",

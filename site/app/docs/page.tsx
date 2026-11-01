@@ -2,11 +2,14 @@ import type { Metadata } from "next"
 
 import { CopyBlock } from "@/components/copy-block"
 import { Prompt, REPO, SectionTitle } from "@/components/site-shell"
+import { pageMeta } from "@/lib/seo"
 
-export const metadata: Metadata = {
-  title: "docs",
-  description: "Install and configure pingtxt: hub, agents, login, notifications, status pages, API, MCP and Prometheus.",
-}
+export const metadata: Metadata = pageMeta({
+  title: "docs: install and configure",
+  description:
+    "Install pingtxt with Docker, add monitoring locations, set up check types, status pages, alerts, single sign-on, the API, MCP and Prometheus.",
+  path: "/docs/",
+})
 
 const RAW = "https://raw.githubusercontent.com/federico-it/pingtxt/main"
 
@@ -20,7 +23,7 @@ const toc = [
   ["phases", "response time per phase"],
   ["ipv6", "ipv6"],
   ["response-checks", "response checks (JSON)"],
-  ["mcp", "mcp servers"],
+  ["mcp-checks", "mcp servers"],
   ["heartbeat", "heartbeat monitors"],
   ["status-pages", "status pages"],
   ["maintenance", "maintenance"],
@@ -98,7 +101,7 @@ export default function Docs() {
       <div className="min-w-0 space-y-12">
         <div className="space-y-2">
           <Prompt>man pingtxt</Prompt>
-          <h1 className="text-xl font-semibold">docs</h1>
+          <h1 className="text-xl font-semibold">pingtxt docs</h1>
           <p className="max-w-2xl text-muted-foreground">
             Everything except two env vars is configured from the web UI and stored in the database. The{" "}
             <a href={`${REPO}#readme`} className="text-foreground underline underline-offset-4">
@@ -379,7 +382,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
           </ul>
         </Section>
 
-        <Section id="mcp" title="mcp servers">
+        <Section id="mcp-checks" title="mcp servers">
           <p>
             An <b className="text-foreground">mcp server</b> monitor checks a remote Model Context Protocol server: it runs the{" "}
             <C>initialize</C> handshake and, when the server has tools, lists them with <C>tools/list</C>. The result shows the
