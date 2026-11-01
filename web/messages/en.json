@@ -646,9 +646,10 @@
       "tls": "tls (465)",
       "none": "none (25, local relay)"
     },
+    "pushOff": "Push notifications to the mobile app are off: turn them on in <settings>Settings, mobile app</settings> to enable this channel.",
     "hints": {
       "commaSeparated": "comma separated",
-      "appUsers": "Comma separated. Empty = every user. Each user gets the alerts on the phones signed in with the pingtxt app; push must be on in settings."
+      "appUsers": "Comma separated. Empty = every user. Each user gets the alerts on the phones signed in with the pingtxt app."
     }
   },
   "reports": {
@@ -969,13 +970,11 @@
   },
   "mobileApp": {
     "title": "mobile app",
-    "intro": "Send alerts to the pingtxt app on your team's phones. Notifications go through a push relay, which holds the app's Firebase key: monitor names and errors pass through it in the message text but are not stored there.",
+    "intro": "Send alerts to the pingtxt app on your team's phones. Notifications go through a push relay, which holds the app's Firebase key. The relay stores nothing: it has no database, it only forwards each message to Firebase and does not log its text (monitor names, errors) or the phones' tokens.",
     "enabled": "push notifications to the mobile app",
     "relayUrl": "push relay",
     "relayHint": "The official relay works with the app from the App Store.",
     "relayChanged": "A different relay registers this hub again: every phone has to enroll again (the app does it on its next start).",
-    "registrationToken": "registration token (optional)",
-    "registrationTokenHint": "Only for a self-hosted relay that requires one. Not stored.",
     "status": "registered as {hub} · {count, plural, =0 {no phones yet} one {1 phone} other {# phones}}",
     "notRegistered": "Not registered: turning push on registers this hub with the relay.",
     "save": "save",
@@ -983,10 +982,6 @@
     "error": "error",
     "test": "test relay",
     "testOk": "the relay accepts this hub",
-    "register": "register again",
-    "registerTitle": "register this hub again?",
-    "registerText": "The hub gets a new id from the relay and forgets every phone. The apps enroll again on their next start.",
-    "registered": "registered again",
     "channelHint": "Then add a \"pingtxt app\" channel in notifications to choose who gets the alerts."
   },
   "users": {

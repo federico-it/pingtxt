@@ -24,9 +24,9 @@ export function PageHeader({
   )
 }
 
-export function Section({ title, children, className, actions }: { title: string; children: React.ReactNode; className?: string; actions?: React.ReactNode }) {
+export function Section({ id, title, children, className, actions }: { id?: string; title: string; children: React.ReactNode; className?: string; actions?: React.ReactNode }) {
   return (
-    <section className={cn("mt-8", className)}>
+    <section id={id} className={cn("mt-8 scroll-mt-20", className)}>
       <div className="mb-2 flex items-center gap-3 text-xs text-muted-foreground uppercase">
         <span className="shrink-0">── {title}</span>
         <span className="h-px flex-1 border-t border-dashed" />

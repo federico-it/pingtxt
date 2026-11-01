@@ -3148,7 +3148,7 @@
         ],
         "summary": "Create a notification channel",
         "operationId": "createNotifier",
-        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.\n\nAn enabled `app` channel needs push notifications on in Settings, Mobile app: 409 otherwise.",
         "x-pingtxt-access": "write",
         "security": [
           {
@@ -3195,6 +3195,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         }
       }
@@ -3273,7 +3276,7 @@
         ],
         "summary": "Update a notification channel",
         "operationId": "updateNotifier",
-        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.\n\nAn enabled `app` channel needs push notifications on in Settings, Mobile app: 409 otherwise.",
         "x-pingtxt-access": "write",
         "security": [
           {
@@ -3332,6 +3335,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         }
       },
@@ -6833,7 +6839,7 @@
         ],
         "summary": "Save mobile app push settings",
         "operationId": "putPushSettings",
-        "description": "Turning push on registers the hub with the relay the first time. A different relay URL drops the registration and every phone (they enroll again).\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "description": "Turning push on registers the hub with the relay the first time, and again when the relay no longer accepts the hub token (its secret changed): the phones then enroll again. A different relay URL drops the registration and every phone (they enroll again).\n\n**Access:** Browser session of an admin only: API tokens get 403.",
         "x-pingtxt-access": "admin",
         "security": [
           {
@@ -6852,10 +6858,6 @@
                   },
                   "relay_url": {
                     "type": "string"
-                  },
-                  "registration_token": {
-                    "type": "string",
-                    "description": "Only for relays that require one to register (RELAY_REGISTRATION=token). Not stored."
                   }
                 }
               },
@@ -6879,59 +6881,6 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "502": {
-            "$ref": "#/components/responses/BadGateway"
-          }
-        }
-      }
-    },
-    "/api/settings/push/register": {
-      "post": {
-        "tags": [
-          "Settings"
-        ],
-        "summary": "Register with the push relay again",
-        "operationId": "registerPush",
-        "description": "Gets a new hub id and token from the relay and removes every phone: the apps enroll again on their next start.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
-        "x-pingtxt-access": "admin",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "registration_token": {
-                    "type": "string"
-                  }
-                }
-              },
-              "example": {}
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Registered.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PushSettings"
-                }
-              }
-            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"

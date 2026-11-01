@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
@@ -14,7 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { api, useApi, useIsAdmin, type Notifier, type NotifierType } from "@/lib/api"
+import { api, useApi, useIsAdmin, type Notifier, type NotifierType, type PushSettings } from "@/lib/api"
 import type en from "@/messages/en.json"
 
 type FieldLabel = keyof (typeof en)["notifications"]["fields"]
@@ -93,6 +94,9 @@ export default function NotificationsPage() {
   const isAdmin = useIsAdmin()
   const t = useTranslations("notifications")
   const [draft, setDraft] = useState<Draft | null>(null)
+  // App channels need push on in Settings (admins only can read it).
+  const { data: push } = useApi<PushSettings>(isAdmin ? "/api/settings/push" : null, { refreshInterval: 0 })
+  const pushOff = !!push && !(push.enabled && push.registered)
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -129,7 +133,11 @@ export default function NotificationsPage() {
   }
 
   async function toggle(n: Notifier, enabled: boolean) {
-    await api(`/api/notifiers/${n.id}`, { method: "PUT", body: { ...n, enabled } })
+    try {
+      await api(`/api/notifiers/${n.id}`, { method: "PUT", body: { ...n, enabled } })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("error"))
+    }
     mutate()
   }
 
@@ -171,7 +179,7 @@ export default function NotificationsPage() {
         <div className="border-t border-dashed">
           {(data ?? []).map((n) => (
             <div key={n.id} className="flex flex-wrap items-center gap-3 border-b border-dashed px-2 py-2.5">
-              <Switch checked={n.enabled} onCheckedChange={(v) => toggle(n, v)} disabled={!isAdmin} />
+              <Switch checked={n.enabled} onCheckedChange={(v) => toggle(n, v)} disabled={!isAdmin || (n.type === "app" && pushOff && !n.enabled)} />
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{n.name}</div>
                 <div className="text-xs text-muted-foreground">
@@ -183,6 +191,7 @@ export default function NotificationsPage() {
                     .filter(Boolean)
                     .join(" · ")}
                 </div>
+                {n.type === "app" && pushOff && <PushOffNote />}
               </div>
               {isAdmin && (
                 <>
@@ -242,6 +251,7 @@ export default function NotificationsPage() {
               <Label htmlFor="n-name">{t("name")}</Label>
               <Input id="n-name" required value={draft?.name ?? ""} onChange={(e) => setDraft((p) => p && { ...p, name: e.target.value })} placeholder={t("namePlaceholder")} />
             </div>
+            {draft?.type === "app" && pushOff && <PushOffNote box />}
             <div className="grid grid-cols-2 gap-4">
               {kind?.fields.map((f) => (
                 <NotifierField key={`${draft?.type}-${f.key}`} field={f} config={draft?.config ?? {}} onChange={setConfig} />
@@ -263,12 +273,30 @@ export default function NotificationsPage() {
               <Button type="button" variant="outline" onClick={testDraft}>
                 {t("sendTest")}
               </Button>
-              <Button type="submit">{t("save")}</Button>
+              <Button type="submit" disabled={draft?.type === "app" && pushOff && draft.enabled}>
+                {t("save")}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+/** App channels cannot be enabled while push is off in Settings. */
+function PushOffNote({ box }: { box?: boolean }) {
+  const t = useTranslations("notifications")
+  return (
+    <p className={box ? "border border-dashed border-warn/40 p-3 text-xs text-warn" : "mt-0.5 text-xs text-warn"}>
+      {t.rich("pushOff", {
+        settings: (chunks) => (
+          <Link href="/settings#mobile-app" className="underline underline-offset-2">
+            {chunks}
+          </Link>
+        ),
+      })}
+    </p>
   )
 }
 

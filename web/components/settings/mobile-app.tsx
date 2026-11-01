@@ -1,10 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
-import { Confirm } from "@/components/confirm"
 import { Section } from "@/components/page-header"
 import { Field } from "@/components/settings/field"
 import { Button } from "@/components/ui/button"
@@ -18,8 +17,30 @@ const defaultRelay = "https://push.pingtxt.com"
 export function MobileAppSettings() {
   const { data, mutate } = useApi<PushSettings>("/api/settings/push", { refreshInterval: 0 })
   const t = useTranslations("mobileApp")
+  const loaded = !!data
+  // Links from the notification channels land here (/settings#mobile-app).
+  // The sections above fill in after the jump, so follow the layout for a
+  // moment, until the user scrolls.
+  useEffect(() => {
+    const el = document.getElementById("mobile-app")
+    if (!loaded || !el || window.location.hash !== "#mobile-app") return
+    const go = () => el.scrollIntoView()
+    go()
+    const ro = new ResizeObserver(go)
+    ro.observe(document.body)
+    const stop = () => ro.disconnect()
+    const timer = setTimeout(stop, 3000)
+    window.addEventListener("wheel", stop, { once: true })
+    window.addEventListener("touchstart", stop, { once: true })
+    return () => {
+      clearTimeout(timer)
+      stop()
+      window.removeEventListener("wheel", stop)
+      window.removeEventListener("touchstart", stop)
+    }
+  }, [loaded])
   return (
-    <Section title={t("title")}>
+    <Section id="mobile-app" title={t("title")}>
       {data && <MobileAppForm key={JSON.stringify(data)} settings={data} onSaved={(s) => mutate(s, { revalidate: false })} />}
     </Section>
   )
@@ -29,7 +50,6 @@ function MobileAppForm({ settings, onSaved }: { settings: PushSettings; onSaved:
   const t = useTranslations("mobileApp")
   const [enabled, setEnabled] = useState(settings.enabled)
   const [relay, setRelay] = useState(settings.relay_url || defaultRelay)
-  const [regToken, setRegToken] = useState("")
   const [busy, setBusy] = useState(false)
   const relayChanged = settings.registered && relay.replace(/\/+$/, "") !== settings.relay_url
 
@@ -49,7 +69,7 @@ function MobileAppForm({ settings, onSaved }: { settings: PushSettings; onSaved:
     return run(async () => {
       const s = await api<PushSettings>("/api/settings/push", {
         method: "PUT",
-        body: { enabled, relay_url: relay, registration_token: regToken },
+        body: { enabled, relay_url: relay },
       })
       toast.success(t("saved"))
       onSaved(s)
@@ -60,16 +80,6 @@ function MobileAppForm({ settings, onSaved }: { settings: PushSettings; onSaved:
     run(async () => {
       await api("/api/settings/push/test", { method: "POST" })
       toast.success(t("testOk"))
-    })
-
-  const register = () =>
-    run(async () => {
-      const s = await api<PushSettings>("/api/settings/push/register", {
-        method: "POST",
-        body: { registration_token: regToken },
-      })
-      toast.success(t("registered"))
-      onSaved(s)
     })
 
   return (
@@ -83,9 +93,6 @@ function MobileAppForm({ settings, onSaved }: { settings: PushSettings; onSaved:
         <Field label={t("relayUrl")} htmlFor="push-relay" hint={relayChanged ? <span className="text-warn">{t("relayChanged")}</span> : t("relayHint")}>
           <Input id="push-relay" type="url" value={relay} placeholder={defaultRelay} onChange={(e) => setRelay(e.target.value)} />
         </Field>
-        <Field label={t("registrationToken")} htmlFor="push-reg" hint={t("registrationTokenHint")}>
-          <Input id="push-reg" type="password" autoComplete="off" value={regToken} onChange={(e) => setRegToken(e.target.value)} />
-        </Field>
       </div>
       <div className="text-muted-foreground">
         {settings.registered ? t("status", { hub: settings.hub_id, count: settings.devices }) : t("notRegistered")}
@@ -95,22 +102,9 @@ function MobileAppForm({ settings, onSaved }: { settings: PushSettings; onSaved:
           {t("save")}
         </Button>
         {settings.registered && (
-          <>
-            <Button type="button" variant="ghost" disabled={busy} onClick={test}>
-              {t("test")}
-            </Button>
-            <Confirm
-              trigger={
-                <Button type="button" variant="ghost" disabled={busy}>
-                  {t("register")}
-                </Button>
-              }
-              title={t("registerTitle")}
-              description={t("registerText")}
-              action={t("register")}
-              onConfirm={register}
-            />
-          </>
+          <Button type="button" variant="ghost" disabled={busy} onClick={test}>
+            {t("test")}
+          </Button>
         )}
       </div>
       <p className="text-[11px] text-muted-foreground">{t("channelHint")}</p>
