@@ -173,6 +173,11 @@ type Notifier struct {
 	client *http.Client
 	// tlsConfig overrides the TLS config used for SMTP (tests only).
 	tlsConfig *tls.Config
+	// resendURL overrides the Resend API address (tests only).
+	resendURL string
+	// resendWait overrides the waits between Resend requests (0) and after
+	// a rate limit (the try number), for tests.
+	resendWait func(try int) time.Duration
 	// publicURL returns the public URL setting, to link the hub from emails.
 	publicURL func() string
 	// pushRetry overrides the waits before retrying failed phones (tests only).
