@@ -94,7 +94,6 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	// Push notifications to the mobile app, see apppush.go.
 	mux.HandleFunc("GET /api/settings/push", admin(h.getPushSettings))
 	mux.HandleFunc("PUT /api/settings/push", admin(h.putPushSettings))
-	mux.HandleFunc("POST /api/settings/push/register", admin(h.registerPush))
 	mux.HandleFunc("POST /api/settings/push/test", admin(h.testPush))
 	mux.HandleFunc("GET /api/mobile/config", auth(h.mobileConfig))
 	mux.HandleFunc("GET /api/mobile/devices", personal(h.listMobileDevices))
@@ -1418,6 +1417,9 @@ func (h *Hub) createNotifier(w http.ResponseWriter, r *http.Request, _ *store.Us
 		writeErr(w, 400, err.Error())
 		return
 	}
+	if !h.appPushAllowed(w, &n) {
+		return
+	}
 	if err := h.store.CreateNotifier(&n); err != nil {
 		h.internalErr(w, err)
 		return
@@ -1440,6 +1442,9 @@ func (h *Hub) updateNotifier(w http.ResponseWriter, r *http.Request, _ *store.Us
 	n.ID = id
 	if err := validateNotifier(&n); err != nil {
 		writeErr(w, 400, err.Error())
+		return
+	}
+	if !h.appPushAllowed(w, &n) {
 		return
 	}
 	h.keepSecrets(&n)

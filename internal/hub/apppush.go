@@ -146,12 +146,12 @@ func (n *Notifier) relayCall(ctx context.Context, method, base, path, token stri
 }
 
 // registerHub asks the relay for a new hub id and token.
-func (n *Notifier) registerHub(ctx context.Context, relay, registrationToken string) (id, token string, err error) {
+func (n *Notifier) registerHub(ctx context.Context, relay string) (id, token string, err error) {
 	var out struct {
 		HubID    string `json:"hub_id"`
 		HubToken string `json:"hub_token"`
 	}
-	if err := n.relayCall(ctx, http.MethodPost, relay, "/v1/hubs", registrationToken, nil, &out); err != nil {
+	if err := n.relayCall(ctx, http.MethodPost, relay, "/v1/hubs", "", nil, &out); err != nil {
 		return "", "", err
 	}
 	if out.HubID == "" || out.HubToken == "" {
@@ -407,6 +407,24 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 	return nil
 }
 
+// appPushAllowed refuses to save an enabled app channel while push is off in
+// Settings: it could never deliver anything.
+func (h *Hub) appPushAllowed(w http.ResponseWriter, n *store.Notifier) bool {
+	if n.Type != "app" || !n.Enabled {
+		return true
+	}
+	ps, err := h.notify.pushSettings()
+	if err != nil {
+		h.internalErr(w, err)
+		return false
+	}
+	if !ps.ready() {
+		writeErr(w, 409, "push notifications to the mobile app are off: turn them on in Settings, Mobile app first")
+		return false
+	}
+	return true
+}
+
 // ---------- settings API (admins) ----------
 
 type pushSettingsView struct {
@@ -443,9 +461,8 @@ func (h *Hub) getPushSettings(w http.ResponseWriter, r *http.Request, _ *store.U
 // new registration, and the phones enroll again.
 func (h *Hub) putPushSettings(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	var in struct {
-		Enabled           bool   `json:"enabled"`
-		RelayURL          string `json:"relay_url"`
-		RegistrationToken string `json:"registration_token"`
+		Enabled  bool   `json:"enabled"`
+		RelayURL string `json:"relay_url"`
 	}
 	if readJSON(r, &in) != nil {
 		writeErr(w, 400, "invalid body")
@@ -468,36 +485,19 @@ func (h *Hub) putPushSettings(w http.ResponseWriter, r *http.Request, _ *store.U
 	if reset {
 		ps.HubID, ps.HubToken = "", ""
 	}
+	if ps.Enabled && ps.HubToken != "" && !reset && h.notify.hubTokenRejected(r.Context(), ps) {
+		// The relay no longer knows this hub (its secret changed): register
+		// again, the phones enroll again on their next start.
+		ps.HubID, ps.HubToken, reset = "", "", true
+	}
 	if ps.Enabled && ps.HubToken == "" {
-		ps.HubID, ps.HubToken, err = h.notify.registerHub(r.Context(), relay, strings.TrimSpace(in.RegistrationToken))
+		ps.HubID, ps.HubToken, err = h.notify.registerHub(r.Context(), relay)
 		if err != nil {
 			writeErr(w, 502, err.Error())
 			return
 		}
 	}
 	h.savePushSettings(w, ps, reset)
-}
-
-// registerPush registers the hub again: a new hub id, every phone enrolls again.
-func (h *Hub) registerPush(w http.ResponseWriter, r *http.Request, _ *store.User) {
-	var in struct {
-		RegistrationToken string `json:"registration_token"`
-	}
-	_ = readJSON(r, &in) // the body is optional
-	h.pushMu.Lock()
-	defer h.pushMu.Unlock()
-	ps, err := h.notify.pushSettings()
-	if err != nil {
-		h.internalErr(w, err)
-		return
-	}
-	id, token, err := h.notify.registerHub(r.Context(), ps.RelayURL, strings.TrimSpace(in.RegistrationToken))
-	if err != nil {
-		writeErr(w, 502, err.Error())
-		return
-	}
-	ps.HubID, ps.HubToken, ps.Enabled = id, token, true
-	h.savePushSettings(w, ps, true)
 }
 
 func (h *Hub) savePushSettings(w http.ResponseWriter, ps PushSettings, dropDevices bool) {
@@ -517,6 +517,14 @@ func (h *Hub) savePushSettings(w http.ResponseWriter, ps PushSettings, dropDevic
 		return
 	}
 	writeJSON(w, 200, v)
+}
+
+// hubTokenRejected reports whether the relay answers 401 to the hub token.
+// Other errors (relay down) keep the registration.
+func (n *Notifier) hubTokenRejected(ctx context.Context, ps PushSettings) bool {
+	err := n.relayCall(ctx, http.MethodGet, ps.RelayURL, "/v1/hubs/me", ps.HubToken, nil, nil)
+	var re *relayError
+	return errors.As(err, &re) && re.Status == http.StatusUnauthorized
 }
 
 // testPush checks the hub token at the relay.

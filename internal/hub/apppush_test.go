@@ -15,13 +15,14 @@ import (
 
 // fakeRelay mimics the push relay: one hub, answers per device from status.
 type fakeRelay struct {
-	mu       sync.Mutex
-	srv      *httptest.Server
-	hubs     int
-	pushes   []pushMessage
-	status   map[string]string // device handle -> result status (default sent)
-	fcm      bool
-	regToken string
+	mu      sync.Mutex
+	srv     *httptest.Server
+	hubs    int
+	pushes  []pushMessage
+	status  map[string]string // device handle -> result status (default sent)
+	fcm     bool
+	down    bool
+	revoked string // hub token the relay no longer accepts
 }
 
 func newFakeRelay(t *testing.T) *fakeRelay {
@@ -32,15 +33,18 @@ func newFakeRelay(t *testing.T) *fakeRelay {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.Method + " " + r.URL.Path {
 		case "POST /v1/hubs":
-			if f.regToken != "" && r.Header.Get("Authorization") != "Bearer "+f.regToken {
-				w.WriteHeader(401)
-				json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized", "message": "registration token required"})
+			if f.down {
+				w.WriteHeader(503)
 				return
 			}
 			f.hubs++
 			w.WriteHeader(201)
 			json.NewEncoder(w).Encode(map[string]string{"hub_id": "hub" + string(rune('0'+f.hubs)), "hub_token": "prh_tok" + string(rune('0'+f.hubs))})
 		case "GET /v1/hubs/me":
+			if f.revoked != "" && r.Header.Get("Authorization") == "Bearer "+f.revoked {
+				w.WriteHeader(401)
+				return
+			}
 			json.NewEncoder(w).Encode(map[string]any{"hub_id": "hub1", "fcm": f.fcm})
 		case "POST /v1/push":
 			if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer prh_") {
@@ -101,15 +105,24 @@ func TestAppPush(t *testing.T) {
 		t.Fatalf("enroll while off: %d", res.StatusCode)
 	}
 
+	// An app channel cannot be enabled while push is off.
+	if res := admin.do("POST", "/api/notifiers", map[string]any{"name": "early", "type": "app", "enabled": true}); res.StatusCode != 409 {
+		t.Fatalf("app channel while off: %d", res.StatusCode)
+	}
+	if res := admin.do("POST", "/api/notifiers", map[string]any{"name": "early", "type": "app", "enabled": false}); res.StatusCode != 201 {
+		t.Fatalf("disabled app channel while off: %d", res.StatusCode)
+	}
+
 	// Turning it on registers the hub with the relay, once.
 	if res := admin.do("PUT", "/api/settings/push", map[string]any{"enabled": true, "relay_url": "ftp://x"}); res.StatusCode != 400 {
 		t.Fatalf("bad relay url: %d", res.StatusCode)
 	}
-	relay.regToken = "letmein"
+	relay.down = true
 	if res := admin.do("PUT", "/api/settings/push", map[string]any{"enabled": true, "relay_url": relay.srv.URL}); res.StatusCode != 502 {
-		t.Fatalf("registration without token: %d", res.StatusCode)
+		t.Fatalf("relay down: %d", res.StatusCode)
 	}
-	v := decode[pushSettingsView](t, admin.do("PUT", "/api/settings/push", map[string]any{"enabled": true, "relay_url": relay.srv.URL + "/", "registration_token": "letmein"}))
+	relay.down = false
+	v := decode[pushSettingsView](t, admin.do("PUT", "/api/settings/push", map[string]any{"enabled": true, "relay_url": relay.srv.URL + "/"}))
 	if !v.Enabled || !v.Registered || v.HubID != "hub1" || v.RelayURL != relay.srv.URL {
 		t.Fatalf("settings: %+v", v)
 	}
@@ -208,6 +221,18 @@ func TestAppPush(t *testing.T) {
 	v = decode[pushSettingsView](t, admin.do("PUT", "/api/settings/push", map[string]any{"enabled": true, "relay_url": other.srv.URL}))
 	if other.hubs != 1 || v.Devices != 0 {
 		t.Fatalf("relay change: %+v", v)
+	}
+
+	// The relay forgot the hub (new secret): saving registers it again.
+	bearerDo(t, srv.URL, "pma_admin2", "POST", "/api/mobile/devices", map[string]string{"device": "prd_y"})
+	other.revoked = "prh_tok1"
+	v = decode[pushSettingsView](t, admin.do("PUT", "/api/settings/push", map[string]any{"enabled": true, "relay_url": other.srv.URL}))
+	if other.hubs != 2 || v.HubID != "hub2" || v.Devices != 0 {
+		t.Fatalf("token rejected: %+v, %d registrations", v, other.hubs)
+	}
+	decode[pushSettingsView](t, admin.do("PUT", "/api/settings/push", map[string]any{"enabled": true, "relay_url": other.srv.URL}))
+	if other.hubs != 2 {
+		t.Fatalf("registered again with a valid token: %d", other.hubs)
 	}
 }
 
