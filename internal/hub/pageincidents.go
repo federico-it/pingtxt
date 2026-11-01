@@ -361,7 +361,7 @@ func (h *Hub) deletePageSubscriber(w http.ResponseWriter, r *http.Request, _ *st
 
 // ---------- public API: subscriptions ----------
 
-// subscribeChannel returns the SMTP settings that send the page's emails, or
+// subscribeChannel returns the email settings (SMTP or Resend) that send the page's emails, or
 // nil when subscriptions are off (no channel, disabled or not an email
 // channel, or an invalid configuration).
 func (h *Hub) subscribeChannel(p *store.StatusPage) *emailConfig {
@@ -520,8 +520,8 @@ func (h *Hub) serveSubscribe(w http.ResponseWriter, r *http.Request, slug string
 		return
 	}
 	links := h.linksFor(r, p)
-	msg := buildConfirmEmail(ec, p, sub, links, time.Now())
-	h.sendBackground(ec, []outMail{{to: []string{sub.Email}, data: msg}}, "subscription confirmation", p.Slug)
+	msg := buildConfirmEmail(p, sub, links, time.Now())
+	h.sendBackground(ec, []outMail{{to: []string{sub.Email}, msg: msg}}, "subscription confirmation", p.Slug)
 	ok()
 }
 
@@ -599,7 +599,7 @@ func (h *Hub) notifySubscribers(r *http.Request, p *store.StatusPage, inc *store
 	now := time.Now()
 	msgs := make([]outMail, len(subs))
 	for i, s := range subs {
-		msgs[i] = outMail{to: []string{s.Email}, data: buildUpdateEmail(ec, p, inc, u, s, links, now)}
+		msgs[i] = outMail{to: []string{s.Email}, msg: buildUpdateEmail(p, inc, u, s, links, now)}
 	}
 	h.sendBackground(ec, msgs, "incident update", p.Slug)
 	return len(msgs)
@@ -638,7 +638,7 @@ func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-func buildConfirmEmail(ec *emailConfig, p *store.StatusPage, s *store.PageSubscriber, l pageLinks, now time.Time) []byte {
+func buildConfirmEmail(p *store.StatusPage, s *store.PageSubscriber, l pageLinks, now time.Time) mailMsg {
 	title := oneLine(p.Title)
 	link := l.confirm(s.Token)
 	v := mailView{
@@ -653,7 +653,7 @@ func buildConfirmEmail(ec *emailConfig, p *store.StatusPage, s *store.PageSubscr
 			"The link expires in 7 days. If you did not ask for this, ignore this email: you will not get anything else.",
 		},
 	}
-	return writeMail(ec, mailHeaders{to: s.Email, subject: "Confirm your subscription to " + title}, v.renderText(""), v.renderHTML(nil), now)
+	return newMail(mailHeaders{to: s.Email, subject: "Confirm your subscription to " + title}, v.renderText(""), v.renderHTML(nil), now)
 }
 
 // updateTone colors an incident update: resolved is green, monitoring blue,
@@ -670,7 +670,7 @@ func updateTone(status, impact string) string {
 	return toneWarn
 }
 
-func buildUpdateEmail(ec *emailConfig, p *store.StatusPage, inc *store.PageIncident, u store.PageIncidentUpdate, s *store.PageSubscriber, l pageLinks, now time.Time) []byte {
+func buildUpdateEmail(p *store.StatusPage, inc *store.PageIncident, u store.PageIncidentUpdate, s *store.PageSubscriber, l pageLinks, now time.Time) mailMsg {
 	title := oneLine(p.Title)
 	status := reportStatusText(u.Status)
 	v := mailView{
@@ -700,5 +700,5 @@ func buildUpdateEmail(ec *emailConfig, p *store.StatusPage, inc *store.PageIncid
 		v.Preheader = clip(v.Preheader, 140)
 	}
 	subject := fmt.Sprintf("[%s] %s: %s", title, status, inc.Title)
-	return writeMail(ec, mailHeaders{to: s.Email, subject: subject, unsubscribe: l.oneClick(s.Token)}, v.renderText(""), v.renderHTML(nil), now)
+	return newMail(mailHeaders{to: s.Email, subject: subject, unsubscribe: l.oneClick(s.Token)}, v.renderText(""), v.renderHTML(nil), now)
 }

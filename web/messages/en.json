@@ -767,7 +767,7 @@
       "slack": "slack",
       "telegram": "telegram",
       "ntfy": "ntfy",
-      "email": "email (smtp)",
+      "email": "email",
       "app": "pingtxt app (push)"
     },
     "fields": {
@@ -777,6 +777,8 @@
       "chatId": "chat id",
       "topicUrl": "topic url",
       "accessToken": "access token (optional)",
+      "provider": "send with",
+      "apiKey": "resend api key",
       "smtpHost": "smtp host",
       "port": "port",
       "security": "security",
@@ -787,6 +789,8 @@
       "users": "users (emails)"
     },
     "options": {
+      "smtp": "smtp server",
+      "resend": "resend (http api)",
       "starttls": "starttls (587)",
       "tls": "tls (465)",
       "none": "none (25, local relay)"
@@ -794,7 +798,8 @@
     "pushOff": "Push notifications to the mobile app are off: turn them on in <settings>Settings, mobile app</settings> to enable this channel.",
     "hints": {
       "commaSeparated": "comma separated",
-      "appUsers": "Comma separated. Empty = every user. Each user gets the alerts on the phones signed in with the pingtxt app."
+      "appUsers": "Comma separated. Empty = every user. Each user gets the alerts on the phones signed in with the pingtxt app.",
+      "resendKey": "Create a key with sending access in <link>Resend, API keys</link>. The from address must be on a domain verified in Resend."
     }
   },
   "reports": {
@@ -887,7 +892,7 @@
     "subscribeChannel": "send updates through",
     "subscribeOff": "off: visitors cannot subscribe",
     "channelDisabled": "disabled",
-    "subscribeHint": "Visitors can subscribe by email to the incidents you post. Emails go out through the SMTP server and sender of this email channel, not to its recipients.",
+    "subscribeHint": "Visitors can subscribe by email to the incidents you post. Emails go out through the SMTP server or Resend account and the sender of this email channel, not to its recipients.",
     "subscribeNoChannel": "Add an email channel in notifications to let visitors subscribe.",
     "passwordTitle": "password",
     "protected": "protect with a password",
@@ -897,7 +902,24 @@
     "passwordPlaceholder": "at least 6 characters",
     "passwordSet": "A password is set. Leave the field empty to keep it; a new one logs out every visitor.",
     "passwordNew": "Share it with the people who should see the page.",
-    "incidents": "incidents"
+    "incidents": "incidents",
+    "headerTitle": "header",
+    "headerUrl": "name link (optional)",
+    "headerUrlHint": "Clicking the page name or logo opens this address, for example your website. Empty: the name is not a link.",
+    "headerUrlInvalid": "use an address that starts with http:// or https://",
+    "logo": "logo",
+    "logoHint": "SVG, PNG, JPEG, GIF, WebP or AVIF, up to 4 MB. Images are resized and served as AVIF and WebP; SVG files are kept as vectors, without scripts.",
+    "logoNone": "no logo: the header shows the page name.",
+    "logoSaveFirst": "Save the page first, then add its logo.",
+    "logoUpload": "upload file",
+    "logoUploading": "uploading...",
+    "logoUrl": "or import from a URL",
+    "logoImport": "import",
+    "logoRemove": "remove logo",
+    "logoSaved": "logo updated",
+    "logoRemoved": "logo removed",
+    "hideTitle": "show only the logo",
+    "hideTitleHint": "for logos that already contain the name. The name stays the browser tab title."
   },
   "statusPublic": {
     "banner": {

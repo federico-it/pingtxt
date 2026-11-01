@@ -8317,6 +8317,272 @@
           }
         }
       }
+    },
+    "/api/status-pages/{id}/logo": {
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Upload a status page logo",
+        "operationId": "uploadPageLogo",
+        "description": "Raw image file as the body (`Content-Type: application/octet-stream`), up to 4 MB: SVG, PNG, JPEG, GIF, WebP or AVIF. An SVG is kept as a vector, without scripts, event handlers or external references. Other images are trimmed of transparent borders, scaled down to fit 960×192 pixels and stored as AVIF, WebP and PNG. Replaces the current logo.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "logo": {
+                      "$ref": "#/components/schemas/PageLogo"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Remove a status page logo",
+        "operationId": "deletePageLogo",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}/logo/url": {
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Import a status page logo from a URL",
+        "operationId": "importPageLogo",
+        "description": "The hub downloads the image (public http or https addresses only: private and local networks are refused) and stores it like an upload.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "example": "https://example.com/logo.svg"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "logo": {
+                      "$ref": "#/components/schemas/PageLogo"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/public/status/{slug}/logo/{file}": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Status page logo",
+        "operationId": "publicPageLogo",
+        "description": "One format of the page logo: `logo.svg`, or `logo.avif`, `logo.webp` and `logo.png`. Same access rules as the page (drafts for logged-in users, password protected pages need the unlock cookie). With the current `?v=` the file is cached for a year. On a custom domain the path is `/api/public/status/logo/{file}`.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "logo.svg",
+                "logo.avif",
+                "logo.webp",
+                "logo.png"
+              ]
+            }
+          },
+          {
+            "name": "v",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Logo version from the page JSON."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image.",
+            "content": {
+              "image/svg+xml": {},
+              "image/avif": {},
+              "image/webp": {},
+              "image/png": {}
+            }
+          },
+          "403": {
+            "description": "Password required."
+          },
+          "404": {
+            "description": "No such page or logo."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -9539,6 +9805,19 @@
             "type": "string",
             "description": "Optional custom domain serving the page, e.g. status.example.com."
           },
+          "header_url": {
+            "type": "string",
+            "description": "Optional http(s) address the page name links to, e.g. the company website. Empty = the name is not a link."
+          },
+          "hide_title": {
+            "type": "boolean",
+            "description": "Show only the logo in the page header, without the page name (it stays the browser tab title). Ignored when the page has no logo."
+          },
+          "logo": {
+            "$ref": "#/components/schemas/PageLogo",
+            "readOnly": true,
+            "description": "The page logo, only in the answer of GET /api/status-pages/{id}. Change it with the logo routes."
+          },
           "published": {
             "type": "boolean",
             "description": "Drafts are visible only to logged-in users."
@@ -9597,6 +9876,18 @@
           },
           "description": {
             "type": "string"
+          },
+          "header_url": {
+            "type": "string",
+            "description": "Address the page name links to, empty = no link."
+          },
+          "logo": {
+            "$ref": "#/components/schemas/PageLogo",
+            "description": "Present when the page has a logo."
+          },
+          "hide_title": {
+            "type": "boolean",
+            "description": "Show only the logo in the header."
           },
           "published": {
             "type": "boolean"
@@ -10781,6 +11072,29 @@
           "ok",
           "latency_ms"
         ]
+      },
+      "PageLogo": {
+        "type": "object",
+        "description": "Logo of a status page. The files are served next to the page JSON: `/api/public/status/{slug}/logo/logo.svg` for a vector logo, else `logo.avif`, `logo.webp` and `logo.png`, each with `?v={v}` to be cached for long.",
+        "properties": {
+          "svg": {
+            "type": "boolean",
+            "description": "The logo is an SVG (cleaned of scripts and external references); otherwise it is an image served as AVIF, WebP and PNG."
+          },
+          "width": {
+            "type": "integer",
+            "description": "Pixel width of the images, or the SVG viewBox width (0 = unknown)."
+          },
+          "height": {
+            "type": "integer",
+            "description": "Pixel height of the images, or the SVG viewBox height (0 = unknown)."
+          },
+          "v": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Version of the logo (when it was last changed, Unix ms)."
+          }
+        }
       }
     }
   }

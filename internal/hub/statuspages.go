@@ -86,6 +86,8 @@ func (h *Hub) customDomains(next http.Handler, ui fs.FS) http.Handler {
 			h.serveSubscribe(w, r, slug, true)
 		case p == "/api/public/status/unlock" && r.Method == http.MethodPost:
 			h.serveUnlock(w, r, slug)
+		case strings.HasPrefix(p, "/api/public/status/logo/") && r.Method == http.MethodGet:
+			h.servePageLogo(w, r, slug, strings.TrimPrefix(p, "/api/public/status/logo/"), true)
 		case p == "/api/health", strings.HasPrefix(p, "/api/public/subscriptions/"), strings.HasPrefix(p, "/_next/"), p == "/icon.svg",
 			strings.HasPrefix(p, "/api/badge/"+slug+"/"): // badges of this page only
 			next.ServeHTTP(w, r)
@@ -118,6 +120,10 @@ func (h *Hub) validateStatusPage(r *http.Request, p *store.StatusPage) error {
 		p.Domain = u.Host // pasted as a URL
 	}
 	p.Domain = normalizeHost(p.Domain)
+	p.HeaderURL = strings.TrimSpace(p.HeaderURL)
+	if p.HeaderURL != "" && safeHeaderURL(p.HeaderURL) == "" {
+		return errors.New("name link must be an http:// or https:// address")
+	}
 	if p.Title == "" {
 		return errors.New("title is required")
 	}
@@ -178,6 +184,19 @@ func (h *Hub) validateStatusPage(r *http.Request, p *store.StatusPage) error {
 	return nil
 }
 
+// safeHeaderURL returns u when it is an absolute http(s) address that a
+// visitor can safely follow, else "".
+func safeHeaderURL(u string) string {
+	if len(u) > 2048 {
+		return ""
+	}
+	pu, err := url.Parse(u)
+	if err != nil || (pu.Scheme != "http" && pu.Scheme != "https") || pu.Host == "" || pu.User != nil {
+		return ""
+	}
+	return u
+}
+
 func (h *Hub) listStatusPages(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	list, err := h.store.ListStatusPages()
 	if err != nil {
@@ -201,7 +220,15 @@ func (h *Hub) getStatusPage(w http.ResponseWriter, r *http.Request, _ *store.Use
 		h.internalErr(w, err)
 		return
 	}
-	writeJSON(w, 200, p)
+	logo, err := h.store.PageLogoInfo(p.ID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		h.internalErr(w, err)
+		return
+	}
+	writeJSON(w, 200, struct {
+		*store.StatusPage
+		Logo *publicLogo `json:"logo,omitempty"`
+	}{p, publicLogoOf(logo)})
 }
 
 func (h *Hub) saveStatusPage(w http.ResponseWriter, r *http.Request, _ *store.User) {
@@ -320,9 +347,14 @@ const (
 // publicPage is what anonymous visitors see: no targets, no error messages,
 // no locations.
 type publicPage struct {
-	Slug          string           `json:"slug"`
-	Title         string           `json:"title"`
-	Description   string           `json:"description"`
+	Slug        string `json:"slug"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	// HeaderURL is where the page name links to, "" = no link.
+	HeaderURL string `json:"header_url"`
+	// Logo is set when the page has one, see pagelogo.go.
+	Logo          *publicLogo      `json:"logo,omitempty"`
+	HideTitle     bool             `json:"hide_title"`
 	Published     bool             `json:"published"`
 	Status        string           `json:"status"`
 	Days          int              `json:"days"`
@@ -429,10 +461,17 @@ func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).UnixMilli()
 	from := today - int64(days-1)*day
 	p := &publicPage{
-		Slug: sp.Slug, Title: sp.Title, Description: sp.Description, Published: sp.Published,
+		Slug: sp.Slug, Title: sp.Title, Description: sp.Description, HeaderURL: safeHeaderURL(strings.TrimSpace(sp.HeaderURL)), HideTitle: sp.HideTitle, Published: sp.Published,
 		Days: days, ShowIncidents: sp.ShowIncidents, Monitors: []publicMonitor{}, Incidents: []publicIncident{},
 		Subscribe: h.subscribeChannel(sp) != nil, UpdatedAt: now.UnixMilli(),
 		id: sp.ID, passHash: sp.PasswordHash,
+	}
+	if sp.ID != 0 {
+		if l, err := h.store.PageLogoInfo(sp.ID); err == nil {
+			p.Logo = publicLogoOf(l)
+		} else if !errors.Is(err, store.ErrNotFound) {
+			return nil, err
+		}
 	}
 	reports, err := h.store.PublicPageIncidents(sp.ID, from, publicReportLimit)
 	if err != nil {

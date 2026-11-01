@@ -108,12 +108,14 @@ type cfgStatusPage struct {
 	CreatedAt int64 `json:"created_at,omitempty"`
 	// PasswordHash is the visitors' password, only in exports with secrets.
 	PasswordHash string `json:"password_hash,omitempty"`
+	// Logo is the page logo file (SVG or PNG), base64 in JSON.
+	Logo []byte `json:"logo,omitempty"`
 }
 
 // notifierSecrets are the config keys redacted from exports without secrets.
 // Discord and Slack webhook URLs carry their token in the path.
 var notifierSecrets = map[string][]string{
-	"email":    {"password"},
+	"email":    {"password", "api_key"},
 	"telegram": {"bot_token"},
 	"ntfy":     {"token"},
 	"discord":  {"url"},
@@ -234,6 +236,14 @@ func (h *Hub) ExportConfig(secrets bool) (*ConfigDoc, error) {
 		c := cfgStatusPage{StatusPage: *p}
 		if secrets {
 			c.PasswordHash = p.PasswordHash
+		}
+		if l, err := h.store.PageLogo(p.ID); err == nil {
+			c.Logo = l.SVG
+			if len(c.Logo) == 0 {
+				c.Logo = l.PNG
+			}
+		} else if !errors.Is(err, store.ErrNotFound) {
+			return nil, err
 		}
 		doc.StatusPages = append(doc.StatusPages, c)
 	}
@@ -860,6 +870,16 @@ func (im *importer) importStatusPages() error {
 		}
 		if err != nil {
 			return err
+		}
+		if len(x.Logo) > 0 {
+			l, err := processLogo(x.Logo)
+			if err == nil {
+				l.PageID = p.ID
+				err = st.SetPageLogo(l)
+			}
+			if err != nil {
+				im.res.warn("status page %q: logo skipped: %v", p.Slug, err)
+			}
 		}
 	}
 	return nil

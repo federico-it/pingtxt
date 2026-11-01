@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
-import { ArrowDownIcon, ArrowUpIcon, PlusIcon, XIcon } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { ArrowDownIcon, ArrowUpIcon, ImageUpIcon, LinkIcon, PlusIcon, Trash2Icon, XIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
@@ -17,18 +17,20 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { StatusPageView } from "@/components/status-page-view"
-import { api, useApi, type Monitor, type Notifier, type PublicStatusPage, type StatusPage } from "@/lib/api"
+import { LogoImage, StatusPageView } from "@/components/status-page-view"
+import { api, apiRaw, useApi, type Monitor, type Notifier, type PageLogo, type PublicStatusPage, type StatusPage } from "@/lib/api"
 import { useUnsavedGuard } from "@/hooks/use-unsaved-guard"
 import { useMounted, useNow } from "@/hooks/use-now"
 
-type Draft = Omit<StatusPage, "id" | "created_at">
+type Draft = Omit<StatusPage, "id" | "created_at" | "logo">
 
 const empty: Draft = {
   slug: "",
   title: "",
   description: "",
   domain: "",
+  header_url: "",
+  hide_title: false,
   published: true,
   show_incidents: true,
   monitor_ids: [],
@@ -47,12 +49,20 @@ function slugify(s: string) {
     .slice(0, 50)
 }
 
+/** The fields of a page the form edits: the logo has its own routes. */
+function toDraft(p: StatusPage): Draft {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id, created_at, logo, ...rest } = p
+  return { ...rest, group_ids: p.group_ids ?? [], header_url: p.header_url ?? "", hide_title: !!p.hide_title }
+}
+
 export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   const router = useRouter()
   const mounted = useMounted()
   const monitors = useApi<Monitor[]>("/api/monitors", { refreshInterval: 0 })
   const notifiers = useApi<Notifier[]>("/api/notifiers", { refreshInterval: 0 })
-  const [d, setD] = useState<Draft>(initial ? { ...initial, group_ids: initial.group_ids ?? [] } : empty)
+  const [d, setD] = useState<Draft>(initial ? toDraft(initial) : empty)
+  const [logo, setLogo] = useState<PageLogo | null>(initial?.logo ?? null)
   const { groups, groupById } = useLabels()
   const [slugTouched, setSlugTouched] = useState(!!initial)
   const [busy, setBusy] = useState(false)
@@ -61,7 +71,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   const t = useTranslations("statusPageForm")
   const tf = useTranslations("monitorForm")
   // What was last saved (or loaded), to tell whether the form has changes.
-  const [baseline, setBaseline] = useState(() => JSON.stringify(initial ? { ...initial, group_ids: initial.group_ids ?? [] } : empty))
+  const [baseline, setBaseline] = useState(() => JSON.stringify(initial ? toDraft(initial) : empty))
   const dirty = JSON.stringify(d) !== baseline
   const guard = useUnsavedGuard(dirty, tf("unsavedChanges"))
 
@@ -102,8 +112,8 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         guard.release()
         router.replace(`/status-pages/edit/?id=${saved.id}`)
       } else {
-        setD(saved)
-        setBaseline(JSON.stringify(saved))
+        setD(toDraft(saved))
+        setBaseline(JSON.stringify(toDraft(saved)))
         setHasPassword(saved.protected)
       }
     } catch (err) {
@@ -178,6 +188,34 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
           </span>
         </label>
       </div>
+
+      <Section title={t("headerTitle")}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t("headerUrl")} htmlFor="sp-header-url" className="sm:col-span-2" hint={t("headerUrlHint")}>
+            <Input
+              id="sp-header-url"
+              type="url"
+              inputMode="url"
+              maxLength={2048}
+              pattern="https?://.+"
+              title={t("headerUrlInvalid")}
+              value={d.header_url}
+              placeholder="https://example.com"
+              onChange={(e) => set("header_url", e.target.value)}
+            />
+          </Field>
+          <LogoField pageId={initial?.id} slug={initial?.slug} logo={logo} onChange={setLogo} />
+          {logo && (
+            <label className="flex items-center gap-2.5 sm:col-span-2">
+              <Switch checked={d.hide_title} onCheckedChange={(v) => set("hide_title", v)} />
+              <span>
+                {t("hideTitle")}
+                <span className="block text-[11px] text-muted-foreground">{t("hideTitleHint")}</span>
+              </span>
+            </label>
+          )}
+        </div>
+      </Section>
 
       <Section title={t("subscribeTitle")}>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -373,7 +411,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         {dirty && <span className="self-center text-xs text-muted-foreground">{tf("unsaved")}</span>}
       </div>
     </form>
-    <PagePreview draft={d} pageId={initial?.id} />
+    <PagePreview draft={d} pageId={initial?.id} slug={initial?.slug} logoV={logo?.v ?? 0} />
     </div>
   )
 }
@@ -382,12 +420,12 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
  * What visitors would see with the settings in the form, refreshed a moment
  * after each change. Nothing is saved.
  */
-function PagePreview({ draft, pageId }: { draft: Draft; pageId?: number }) {
+function PagePreview({ draft, pageId, slug, logoV }: { draft: Draft; pageId?: number; slug?: string; logoV: number }) {
   const t = useTranslations("statusPageForm")
   const now = useNow()
   const [page, setPage] = useState<PublicStatusPage | null>(null)
   const [error, setError] = useState("")
-  const body = JSON.stringify({ ...draft, id: pageId ?? 0, password: "" })
+  const body = JSON.stringify({ ...draft, id: pageId ?? 0, password: "", logoV })
 
   useEffect(() => {
     let stale = false
@@ -421,6 +459,7 @@ function PagePreview({ draft, pageId }: { draft: Draft; pageId?: number }) {
               data={{ ...page, title: page.title || t("previewUntitled") }}
               now={now || page.updated_at}
               preview
+              logoBase={slug ? `/api/public/status/${encodeURIComponent(slug)}/logo/` : undefined}
               subscribe={page.subscribe ? <p className="mt-8 text-xs text-muted-foreground">{t("previewSubscribe")}</p> : null}
             />
           </div>
@@ -429,5 +468,109 @@ function PagePreview({ draft, pageId }: { draft: Draft; pageId?: number }) {
         )}
       </div>
     </aside>
+  )
+}
+
+/**
+ * Logo of a saved page: upload a file or import it from a URL. Changes are
+ * stored right away (they are files, not form fields).
+ */
+function LogoField({
+  pageId,
+  slug,
+  logo,
+  onChange,
+}: {
+  pageId?: number
+  slug?: string
+  logo: PageLogo | null
+  onChange: (l: PageLogo | null) => void
+}) {
+  const t = useTranslations("statusPageForm")
+  const [url, setUrl] = useState("")
+  const [busy, setBusy] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
+
+  async function run(f: () => Promise<{ logo?: PageLogo } | unknown>, done: string) {
+    setBusy(true)
+    try {
+      const res = (await f()) as { logo?: PageLogo } | null
+      onChange(res && typeof res === "object" && "logo" in res ? (res.logo ?? null) : null)
+      toast.success(done)
+      setUrl("")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("error"))
+    } finally {
+      setBusy(false)
+      if (input.current) input.current.value = ""
+    }
+  }
+
+  const base = `/api/status-pages/${pageId}/logo`
+  return (
+    <Field label={t("logo")} className="sm:col-span-2" hint={pageId ? t("logoHint") : t("logoSaveFirst")}>
+      {pageId ? (
+        <div className="grid gap-3">
+          <div className="flex min-h-12 flex-wrap items-center gap-3 border border-dashed px-3 py-2">
+            {logo && slug ? (
+              <LogoImage logo={logo} base={`/api/public/status/${encodeURIComponent(slug)}/logo/`} alt={t("logo")} className="h-10" />
+            ) : (
+              <span className="text-xs text-muted-foreground">{t("logoNone")}</span>
+            )}
+            <div className="ml-auto flex flex-wrap gap-2">
+              <input
+                ref={input}
+                type="file"
+                className="hidden"
+                accept="image/svg+xml,image/png,image/jpeg,image/gif,image/webp,image/avif,.svg"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) run(() => apiRaw(base, f, "application/octet-stream"), t("logoSaved"))
+                }}
+              />
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => input.current?.click()}>
+                <ImageUpIcon /> {busy ? t("logoUploading") : t("logoUpload")}
+              </Button>
+              {logo && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => run(() => api(base, { method: "DELETE" }), t("logoRemoved"))}
+                >
+                  <Trash2Icon /> {t("logoRemove")}
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type="url"
+              inputMode="url"
+              aria-label={t("logoUrl")}
+              value={url}
+              placeholder={`${t("logoUrl")}: https://example.com/logo.svg`}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter would submit the page form.
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  if (url.trim()) run(() => api(`${base}/url`, { method: "POST", body: { url: url.trim() } }), t("logoSaved"))
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy || !url.trim()}
+              onClick={() => run(() => api(`${base}/url`, { method: "POST", body: { url: url.trim() } }), t("logoSaved"))}
+            >
+              <LinkIcon /> {t("logoImport")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </Field>
   )
 }

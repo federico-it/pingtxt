@@ -224,9 +224,23 @@ type mailHeaders struct {
 	unsubscribe string // one-click unsubscribe URL (RFC 8058), optional
 }
 
+// mailMsg is a rendered email: SMTP sends it as MIME (writeMail), Resend
+// as JSON.
+type mailMsg struct {
+	hd   mailHeaders
+	text string
+	html string
+	date time.Time
+}
+
+func newMail(hd mailHeaders, text, html string, now time.Time) mailMsg {
+	return mailMsg{hd: hd, text: text, html: html, date: now}
+}
+
 // writeMail renders a multipart/alternative message (plain text and HTML)
 // from the channel's sender.
-func writeMail(ec *emailConfig, hd mailHeaders, text, html string, now time.Time) []byte {
+func writeMail(ec *emailConfig, m mailMsg) []byte {
+	hd, text, html, now := m.hd, m.text, m.html, m.date
 	domain := ec.From.Address[strings.LastIndexByte(ec.From.Address, '@')+1:]
 	rb := make([]byte, 12)
 	_, _ = rand.Read(rb)

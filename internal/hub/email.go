@@ -16,15 +16,21 @@ import (
 	"time"
 )
 
-// Email channel config keys: host, port, security, username, password, from, to.
+// Email channel config keys: provider, host, port, security, username,
+// password, api_key, from, to.
+//
+// provider is "smtp" (default, stored as no key) or "resend": Resend sends
+// over its HTTP API with api_key, and the SMTP keys are dropped.
 //
 // security is "starttls" (default, usually port 587), "tls" (implicit TLS,
 // usually port 465) or "none" (plain SMTP, e.g. a local relay on port 25).
-// The password is write-only: the API never returns it.
+// The password and the api key are write-only: the API never returns them.
 
 const emailTimeout = 20 * time.Second
 
 type emailConfig struct {
+	Provider string // "smtp" or "resend"
+	APIKey   string // resend only
 	Host     string
 	Port     int
 	Security string
@@ -52,26 +58,22 @@ func parseEmailConfig(c map[string]string) (*emailConfig, error) {
 			return nil, fmt.Errorf("%s contains a line break", k)
 		}
 	}
-	ec := &emailConfig{Host: c["host"], Security: c["security"], Username: c["username"], Password: c["password"]}
-	if ec.Host == "" {
-		return nil, errors.New("smtp host is required")
-	}
-	if ec.Security == "" {
-		ec.Security = "starttls"
-	}
-	if ec.Security != "starttls" && ec.Security != "tls" && ec.Security != "none" {
-		return nil, errors.New("security must be starttls, tls or none")
-	}
-	c["security"] = ec.Security
-	if c["port"] == "" {
-		ec.Port = defaultSMTPPort(ec.Security)
-		c["port"] = strconv.Itoa(ec.Port)
-	} else {
-		p, err := strconv.Atoi(c["port"])
-		if err != nil || p < 1 || p > 65535 {
-			return nil, errors.New("invalid smtp port")
+	ec := &emailConfig{Provider: c["provider"]}
+	switch ec.Provider {
+	case "", "smtp":
+		ec.Provider = "smtp"
+		delete(c, "provider")
+		delete(c, "api_key")
+		if err := parseSMTPConfig(c, ec); err != nil {
+			return nil, err
 		}
-		ec.Port = p
+	case "resend":
+		for _, k := range []string{"host", "port", "security", "username", "password"} {
+			delete(c, k)
+		}
+		ec.APIKey = c["api_key"]
+	default:
+		return nil, errors.New("provider must be smtp or resend")
 	}
 	from, err := mail.ParseAddress(c["from"])
 	if err != nil {
@@ -82,8 +84,36 @@ func parseEmailConfig(c map[string]string) (*emailConfig, error) {
 	if err != nil || len(list) == 0 {
 		return nil, errors.New("at least one valid recipient is required")
 	}
+	if ec.Provider == "resend" && len(list) > resendMaxTo {
+		return nil, fmt.Errorf("resend accepts at most %d recipients", resendMaxTo)
+	}
 	ec.To = list
 	return ec, nil
+}
+
+func parseSMTPConfig(c map[string]string, ec *emailConfig) error {
+	ec.Host, ec.Security, ec.Username, ec.Password = c["host"], c["security"], c["username"], c["password"]
+	if ec.Host == "" {
+		return errors.New("smtp host is required")
+	}
+	if ec.Security == "" {
+		ec.Security = "starttls"
+	}
+	if ec.Security != "starttls" && ec.Security != "tls" && ec.Security != "none" {
+		return errors.New("security must be starttls, tls or none")
+	}
+	c["security"] = ec.Security
+	if c["port"] == "" {
+		ec.Port = defaultSMTPPort(ec.Security)
+		c["port"] = strconv.Itoa(ec.Port)
+	} else {
+		p, err := strconv.Atoi(c["port"])
+		if err != nil || p < 1 || p > 65535 {
+			return errors.New("invalid smtp port")
+		}
+		ec.Port = p
+	}
+	return nil
 }
 
 func emailSubject(e Event) string {
@@ -106,13 +136,13 @@ func newMessageID(host string) string {
 
 // buildEmail renders the alert email of an event. base is the hub address
 // (publicBase), used to link the monitor; it can be empty.
-func buildEmail(ec *emailConfig, e Event, base string, now time.Time) []byte {
+func buildEmail(ec *emailConfig, e Event, base string, now time.Time) mailMsg {
 	to := make([]string, len(ec.To))
 	for i, a := range ec.To {
 		to[i] = a.String()
 	}
 	v := eventMailView(e, base)
-	return writeMail(ec, mailHeaders{to: strings.Join(to, ", "), subject: emailSubject(e)}, v.renderText(""), v.renderHTML(nil), now)
+	return newMail(mailHeaders{to: strings.Join(to, ", "), subject: emailSubject(e)}, v.renderText(""), v.renderHTML(nil), now)
 }
 
 // eventMailView lays out a status or expiry event.
@@ -197,7 +227,7 @@ func expiryMailView(v *mailView, e Event) {
 	v.Rows = append(v.Rows, mailRow{Key: "monitor", Value: e.Monitor}, mailRow{Key: "target", Value: e.Target})
 }
 
-// sendEmail delivers the event over SMTP.
+// sendEmail delivers the event over SMTP or Resend.
 func (n *Notifier) sendEmail(ctx context.Context, c map[string]string, e Event) error {
 	cfg := make(map[string]string, len(c))
 	for k, v := range c {
@@ -214,27 +244,31 @@ func (n *Notifier) sendEmail(ctx context.Context, c map[string]string, e Event) 
 	return n.deliverEmail(ctx, ec, buildEmail(ec, e, base, time.Now()))
 }
 
-// deliverEmail sends a complete message to the recipients of ec over SMTP.
-func (n *Notifier) deliverEmail(ctx context.Context, ec *emailConfig, msg []byte) error {
+// deliverEmail sends a message to the recipients of ec.
+func (n *Notifier) deliverEmail(ctx context.Context, ec *emailConfig, msg mailMsg) error {
 	to := make([]string, len(ec.To))
 	for i, a := range ec.To {
 		to[i] = a.Address
 	}
 	ctx, cancel := context.WithTimeout(ctx, emailTimeout)
 	defer cancel()
-	return n.deliver(ctx, ec, []outMail{{to: to, data: msg}}, nil)
+	return n.deliver(ctx, ec, []outMail{{to: to, msg: msg}}, nil)
 }
 
 // outMail is one message for deliver: its envelope recipients and content.
 type outMail struct {
-	to   []string
-	data []byte
+	to  []string
+	msg mailMsg
 }
 
-// deliver sends the messages over one SMTP connection, in order. A message
-// refused by the server is reported to failed (when set) and the others are
-// still sent; any other error stops the delivery.
+// deliver sends the messages in order, over one SMTP connection or through
+// the Resend API. A message refused by the server is reported to failed
+// (when set) and the others are still sent; any other error stops the
+// delivery.
 func (n *Notifier) deliver(ctx context.Context, ec *emailConfig, msgs []outMail, failed func(i int, err error)) error {
+	if ec.Provider == "resend" {
+		return n.deliverResend(ctx, ec, msgs, failed)
+	}
 	addr := net.JoinHostPort(ec.Host, strconv.Itoa(ec.Port))
 	tlsCfg := &tls.Config{ServerName: ec.Host, MinVersion: tls.VersionTLS12}
 	if n.tlsConfig != nil {
@@ -291,7 +325,7 @@ func (n *Notifier) deliver(ctx context.Context, ec *emailConfig, msgs []outMail,
 		}
 	}
 	for i, m := range msgs {
-		if err := sendOne(cl, ec.From.Address, m); err != nil {
+		if err := sendOne(cl, ec, m); err != nil {
 			var perr *textproto.Error
 			if failed == nil || !errors.As(err, &perr) {
 				return err
@@ -311,8 +345,8 @@ func (n *Notifier) deliver(ctx context.Context, ec *emailConfig, msgs []outMail,
 	return nil
 }
 
-func sendOne(cl *smtp.Client, from string, m outMail) error {
-	if err := cl.Mail(from); err != nil {
+func sendOne(cl *smtp.Client, ec *emailConfig, m outMail) error {
+	if err := cl.Mail(ec.From.Address); err != nil {
 		return fmt.Errorf("mail from: %w", err)
 	}
 	for _, a := range m.to {
@@ -324,7 +358,7 @@ func sendOne(cl *smtp.Client, from string, m outMail) error {
 	if err != nil {
 		return fmt.Errorf("data: %w", err)
 	}
-	if _, err := w.Write(m.data); err != nil {
+	if _, err := w.Write(writeMail(ec, m.msg)); err != nil {
 		return fmt.Errorf("data: %w", err)
 	}
 	if err := w.Close(); err != nil {

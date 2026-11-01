@@ -9,7 +9,7 @@ import { LanguagePicker } from "@/components/language-picker"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UptimeBars } from "@/components/uptime-bars"
 import { reportImpactBorder, reportImpactText, ReportStatusText, ReportTimeline } from "@/components/report-timeline"
-import type { PageIncident, PageStatus, PublicStatusPage } from "@/lib/api"
+import type { PageIncident, PageLogo, PageStatus, PublicStatusPage } from "@/lib/api"
 import { ago, datetime, duration, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -32,12 +32,15 @@ export function StatusPageView({
   notice,
   subscribe,
   preview = false,
+  logoBase,
 }: {
   data: PublicStatusPage
   now: number
   notice?: React.ReactNode
   subscribe?: React.ReactNode
   preview?: boolean
+  /** path of the logo files: the page JSON path + "/logo/" */
+  logoBase?: string
 }) {
   const t = useTranslations("statusPublic")
   const status = banner[data.status] ? data.status : "unknown"
@@ -51,8 +54,8 @@ export function StatusPageView({
   return (
     <div className={cn("mx-auto flex w-full max-w-3xl flex-col px-4 sm:px-6", !preview && "min-h-svh")}>
       <header className="flex items-center gap-4 border-b border-dashed py-3">
-        <h1 className="min-w-0 truncate font-semibold tracking-tight">
-          <span className="text-primary">&gt;</span> {data.title}
+        <h1 className="min-w-0 font-semibold tracking-tight">
+          <PageBrand data={data} logoBase={logoBase} />
         </h1>
         {!data.published && <span className="text-xs text-warn">[{t("draft")}]</span>}
         {!preview && (
@@ -174,6 +177,46 @@ export function StatusPageView({
         <span>{t("refreshes")}</span>
       </footer>
     </div>
+  )
+}
+
+/** Logo and name of the page, a link when the page sets one. */
+function PageBrand({ data, logoBase }: { data: PublicStatusPage; logoBase?: string }) {
+  const logo = data.logo && logoBase ? <LogoImage logo={data.logo} base={logoBase} alt={data.title} /> : null
+  const showTitle = !logo || !data.hide_title
+  const inner = (
+    <>
+      {logo ?? <span className="text-primary">&gt;</span>}
+      {showTitle && <span className="truncate">{data.title}</span>}
+    </>
+  )
+  const cls = "flex min-w-0 items-center gap-2"
+  if (data.header_url) {
+    return (
+      <a href={data.header_url} rel="noopener" className={cn(cls, "underline-offset-4 hover:underline")} title={data.header_url}>
+        {inner}
+      </a>
+    )
+  }
+  return <span className={cls}>{inner}</span>
+}
+
+/** A vector logo as is; an image as AVIF or WebP, with PNG for old browsers. */
+export function LogoImage({ logo, base, alt, className }: { logo: PageLogo; base: string; alt: string; className?: string }) {
+  const v = `?v=${logo.v}`
+  const size = logo.width > 0 && logo.height > 0 ? { width: logo.width, height: logo.height } : {}
+  const cls = cn("h-8 w-auto max-w-[240px] shrink-0 object-contain object-left", className)
+  if (logo.svg) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={`${base}logo.svg${v}`} alt={alt} {...size} className={cls} />
+  }
+  return (
+    <picture className="shrink-0">
+      <source type="image/avif" srcSet={`${base}logo.avif${v}`} />
+      <source type="image/webp" srcSet={`${base}logo.webp${v}`} />
+      { }
+      <img src={`${base}logo.png${v}`} alt={alt} {...size} className={cls} />
+    </picture>
   )
 }
 
