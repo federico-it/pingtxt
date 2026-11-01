@@ -1,7 +1,7 @@
 import Link from "next/link"
 
-import { StatusLine, StatusLink } from "@/components/status-dot"
-import { ThemeToggle } from "@/components/theme"
+import { SiteHeader } from "@/components/site-header"
+import { StatusLine } from "@/components/status-dot"
 
 export const REPO = "https://github.com/federico-it/pingtxt"
 
@@ -16,22 +16,7 @@ const nav = [
 export function SiteShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="mx-auto flex min-h-svh w-full max-w-6xl flex-col px-4 sm:px-6">
-      <header className="sticky top-0 z-30 -mx-4 flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-dashed bg-background/90 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
-        <Link href="/" className="font-semibold tracking-tight">
-          <span className="text-up">&gt;</span> pingtxt<span className="cursor-blink text-up">_</span>
-        </Link>
-        <nav className="flex flex-wrap items-center gap-1 text-muted-foreground">
-          {nav.map((n) => (
-            <Link key={n.href} href={n.href} className="px-1.5 py-0.5 transition-colors hover:bg-accent hover:text-foreground">
-              {n.label}
-            </Link>
-          ))}
-          <StatusLink className="px-1.5 py-0.5 transition-colors hover:bg-accent hover:text-foreground" />
-        </nav>
-        <div className="ml-auto">
-          <ThemeToggle />
-        </div>
-      </header>
+      <SiteHeader nav={nav} />
       <main className="flex-1">{children}</main>
       <footer className="mt-16 flex flex-wrap items-center justify-between gap-2 border-t border-dashed py-4 text-xs text-muted-foreground">
         <span>
