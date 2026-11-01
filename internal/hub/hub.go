@@ -120,6 +120,9 @@ type Hub struct {
 	backupMu sync.Mutex // one snapshot at a time
 	importMu sync.Mutex // one configuration import at a time
 	pushMu   sync.Mutex // one push relay registration at a time
+
+	la     liveActivities // Live Activity pushes, see liveactivity.go
+	laWait time.Duration  // overrides laDebounce (tests only)
 }
 
 // New creates a hub.
@@ -138,6 +141,7 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 	h.httpClient = &http.Client{Timeout: 15 * time.Second}
 	h.releases.wake = make(chan struct{}, 1)
 	h.telemetry.wake = make(chan struct{}, 1)
+	h.la.wake = make(chan struct{}, 1)
 	h.expiry.domains = expiry.NewDomains(h.httpClient)
 	h.expiry.cache = map[string]domainCacheEntry{}
 	if err := h.loadSettings(); err != nil {
@@ -185,6 +189,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.telemetryLoop(ctx)
 	go h.agentUpdateLoop(ctx)
 	go h.escalationLoop(ctx)
+	go h.liveActivityLoop(ctx)
 	go h.localIPv6.Run(ctx, 10*time.Minute)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
@@ -224,6 +229,7 @@ func (h *Hub) reloadAll() error {
 
 // MonitorChanged reloads one monitor after an API change (or removes it).
 func (h *Hub) MonitorChanged(id int64) {
+	h.LiveActivitiesChanged() // paused, renamed or deleted: the incidents shown change
 	m, err := h.store.Monitor(id)
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -659,6 +665,7 @@ func (h *Hub) raise(m *store.Monitor, alert, cause string, at int64) {
 		_ = h.store.ResolveIncident(m.ID, at)
 		h.closeAlerts(m, at)
 	}
+	h.LiveActivitiesChanged()
 }
 
 func (h *Hub) locationNameLocked(loc string) string {

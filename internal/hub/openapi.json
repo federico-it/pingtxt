@@ -7039,7 +7039,7 @@
         ],
         "summary": "Push config for the mobile app",
         "operationId": "getMobileConfig",
-        "description": "Where the app enrolls its phone: it sends hub_id and its FCM token to {relay_url}/v1/devices and gives the handle it gets to POST /api/mobile/devices. enabled is false (and the other fields empty) when push is off.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "description": "Where the app enrolls its phone: it sends hub_id and its FCM token to {relay_url}/v1/devices and gives the handle it gets to POST /api/mobile/devices. live_activity is true when the hub also pushes Live Activity updates (PUT /api/mobile/live-activity/...). enabled is false (and the other fields empty) when push is off.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
         "x-pingtxt-access": "read",
         "security": [
           {
@@ -7065,13 +7065,17 @@
                     },
                     "hub_id": {
                       "type": "string"
+                    },
+                    "live_activity": {
+                      "type": "boolean"
                     }
                   }
                 },
                 "example": {
                   "enabled": true,
                   "relay_url": "https://push.pingtxt.com",
-                  "hub_id": "PrBlwRm8tbClvg8f5PEy4w"
+                  "hub_id": "PrBlwRm8tbClvg8f5PEy4w",
+                  "live_activity": true
                 }
               }
             }
@@ -7246,6 +7250,250 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/mobile/live-activity/start-token": {
+      "put": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Set my Live Activity push-to-start token",
+        "operationId": "putLiveActivityStartToken",
+        "description": "Stores the ActivityKit push-to-start token of the app (iOS 17.2+, Activity<OutageActivityAttributes>.pushToStartTokenUpdates) and the hub URL the app signed in with. When a monitor goes down and this phone has no activity running, the hub starts one through the push relay with attributes {\"hub\": hub_url}. Send it again whenever iOS gives a new one.\n\n**Access:** Only the pingtxt app's OAuth access tokens (pma_...), also of read-only users: phones are personal. The phone must be registered first with POST /api/mobile/devices (409 otherwise).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "hub_url"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "pattern": "^[0-9a-fA-F]{16,1024}$"
+                  },
+                  "hub_url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              },
+              "example": {
+                "token": "80f4c3...",
+                "hub_url": "https://status.example.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Remove my Live Activity push-to-start token",
+        "operationId": "deleteLiveActivityStartToken",
+        "description": "The hub no longer starts the activity on this phone (for example, Live Activities turned off in the app).\n\n**Access:** Only the pingtxt app's OAuth access tokens (pma_...), also of read-only users: phones are personal. The phone must be registered first with POST /api/mobile/devices (409 otherwise).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/mobile/live-activity/token": {
+      "put": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Set the token of my running Live Activity",
+        "operationId": "putLiveActivityToken",
+        "description": "Stores the push token of the activity running on this phone (activity.pushTokenUpdates). The hub sends it update and end pushes when incidents open or close, and refreshes it every 15 minutes while incidents stay open. Send it again when it rotates.\n\n**Access:** Only the pingtxt app's OAuth access tokens (pma_...), also of read-only users: phones are personal. The phone must be registered first with POST /api/mobile/devices (409 otherwise).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "pattern": "^[0-9a-fA-F]{16,1024}$"
+                  }
+                }
+              },
+              "example": {
+                "token": "6a0d1e..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Remove the token of my Live Activity",
+        "operationId": "deleteLiveActivityToken",
+        "description": "Call it when the activity ends on the phone (ended by the app or dismissed by the user).\n\n**Access:** Only the pingtxt app's OAuth access tokens (pma_...), also of read-only users: phones are personal. The phone must be registered first with POST /api/mobile/devices (409 otherwise).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         }
       }

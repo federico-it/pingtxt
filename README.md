@@ -235,6 +235,9 @@ registration.
 - Refresh tokens (`pmr_...`) last 30 days from their last use and rotate at every refresh. Using an old refresh token
   again revokes the sign-in, so the app refreshes one request at a time and stores the new token before using it.
 - Each sign-in shows up in **settings → api tokens → connected apps**, where it can be disconnected.
+- With mobile app notifications on, the hub also keeps the app's **Live Activity** current with the app closed: the app
+  sends its ActivityKit tokens to `PUT /api/mobile/live-activity/start-token` and `/token`, and the hub starts (iOS
+  17.2+), updates and ends the activity through the push relay whenever incidents open or close.
 
 ### Prometheus
 
