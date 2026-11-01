@@ -1049,6 +1049,25 @@ func (s *Store) IncidentsBetween(from, to int64) ([]*Incident, error) {
 	return out, rows.Err()
 }
 
+// OpenIncidents returns the unresolved incidents, oldest first.
+func (s *Store) OpenIncidents() ([]*Incident, error) {
+	rows, err := s.db.Query(`SELECT i.id, i.monitor_id, m.name, i.started_at, i.resolved_at, i.cause FROM incidents i JOIN monitors m ON m.id = i.monitor_id
+		WHERE i.resolved_at = 0 ORDER BY i.started_at, i.id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*Incident{}
+	for rows.Next() {
+		i := &Incident{}
+		if err := rows.Scan(&i.ID, &i.MonitorID, &i.MonitorName, &i.StartedAt, &i.ResolvedAt, &i.Cause); err != nil {
+			return nil, err
+		}
+		out = append(out, i)
+	}
+	return out, rows.Err()
+}
+
 // OpenIncidentMonitors returns the ids of the monitors with an open incident.
 func (s *Store) OpenIncidentMonitors() (map[int64]bool, error) {
 	rows, err := s.db.Query(`SELECT DISTINCT monitor_id FROM incidents WHERE resolved_at = 0`)

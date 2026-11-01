@@ -13,9 +13,17 @@ type PushDevice struct {
 	Name       string `json:"name"`
 	CreatedAt  int64  `json:"created_at"`
 	LastSeenAt int64  `json:"last_seen_at"`
+
+	// Live Activity tokens (hex, from ActivityKit). StartToken starts one
+	// remotely (iOS 17.2+) with HubURL in its attributes; Token updates and
+	// ends the running one. LAStartedAt: last remote start, unix ms.
+	LAStartToken string `json:"-"`
+	LAHubURL     string `json:"-"`
+	LAToken      string `json:"-"`
+	LAStartedAt  int64  `json:"-"`
 }
 
-const pushDeviceCols = `id, user_id, grant_id, handle, name, created_at, last_seen_at`
+const pushDeviceCols = `id, user_id, grant_id, handle, name, created_at, last_seen_at, la_start_token, la_hub_url, la_token, la_started_at`
 
 func scanPushDevices(rows interface {
 	Next() bool
@@ -27,7 +35,8 @@ func scanPushDevices(rows interface {
 	out := []*PushDevice{}
 	for rows.Next() {
 		d := &PushDevice{}
-		if err := rows.Scan(&d.ID, &d.UserID, &d.GrantID, &d.Handle, &d.Name, &d.CreatedAt, &d.LastSeenAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.UserID, &d.GrantID, &d.Handle, &d.Name, &d.CreatedAt, &d.LastSeenAt,
+			&d.LAStartToken, &d.LAHubURL, &d.LAToken, &d.LAStartedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -111,4 +120,62 @@ func (s *Store) DeletePushDeviceByID(id int64, handle string) error {
 func (s *Store) DeleteAllPushDevices() error {
 	_, err := s.db.Exec(`DELETE FROM push_devices`)
 	return err
+}
+
+// PushDeviceByGrant returns the device of an app sign-in.
+func (s *Store) PushDeviceByGrant(grantID int64) (*PushDevice, error) {
+	rows, err := s.db.Query(`SELECT `+pushDeviceCols+` FROM push_devices WHERE grant_id = ?`, grantID)
+	if err != nil {
+		return nil, err
+	}
+	list, err := scanPushDevices(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, ErrNotFound
+	}
+	return list[0], nil
+}
+
+// SetLiveActivityStart stores the push-to-start token of a device and the
+// hub URL the app knows ("" clears both).
+func (s *Store) SetLiveActivityStart(id int64, token, hubURL string) error {
+	_, err := s.db.Exec(`UPDATE push_devices SET la_start_token = ?, la_hub_url = ? WHERE id = ?`, token, hubURL, id)
+	return err
+}
+
+// SetLiveActivityToken stores the token of the running activity of a device
+// ("" when it ended).
+func (s *Store) SetLiveActivityToken(id int64, token string) error {
+	_, err := s.db.Exec(`UPDATE push_devices SET la_token = ? WHERE id = ?`, token, id)
+	return err
+}
+
+// ClearLiveActivityToken forgets an activity token the relay reported gone,
+// unless the app sent a new one in the meantime.
+func (s *Store) ClearLiveActivityToken(id int64, token string) error {
+	_, err := s.db.Exec(`UPDATE push_devices SET la_token = '' WHERE id = ? AND la_token = ?`, id, token)
+	return err
+}
+
+// ClearLiveActivityStart forgets a push-to-start token the relay reported gone.
+func (s *Store) ClearLiveActivityStart(id int64, token string) error {
+	_, err := s.db.Exec(`UPDATE push_devices SET la_start_token = '' WHERE id = ? AND la_start_token = ?`, id, token)
+	return err
+}
+
+// MarkLiveActivityStarted records a remote start of the activity of a device.
+func (s *Store) MarkLiveActivityStarted(id, at int64) error {
+	_, err := s.db.Exec(`UPDATE push_devices SET la_started_at = ? WHERE id = ?`, at, id)
+	return err
+}
+
+// LiveActivityDevices lists the devices with a Live Activity token.
+func (s *Store) LiveActivityDevices() ([]*PushDevice, error) {
+	rows, err := s.db.Query(`SELECT ` + pushDeviceCols + ` FROM push_devices WHERE la_token <> '' OR la_start_token <> '' ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	return scanPushDevices(rows)
 }

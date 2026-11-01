@@ -460,6 +460,23 @@ var laterMigrations = []migration{
 		FOREIGN KEY (grant_id) REFERENCES oauth_grants(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 24: Live Activity of the app on each phone: the push-to-start token
+	// (iOS 17.2+) with the hub URL the app signed in with, the token of the
+	// running activity, and when the hub last started one remotely.
+	{
+		sqlite: `ALTER TABLE push_devices ADD COLUMN la_start_token TEXT NOT NULL DEFAULT '';
+	ALTER TABLE push_devices ADD COLUMN la_hub_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE push_devices ADD COLUMN la_token TEXT NOT NULL DEFAULT '';
+	ALTER TABLE push_devices ADD COLUMN la_started_at INTEGER NOT NULL DEFAULT 0;`,
+		postgres: `ALTER TABLE push_devices ADD COLUMN la_start_token TEXT NOT NULL DEFAULT '';
+	ALTER TABLE push_devices ADD COLUMN la_hub_url TEXT NOT NULL DEFAULT '';
+	ALTER TABLE push_devices ADD COLUMN la_token TEXT NOT NULL DEFAULT '';
+	ALTER TABLE push_devices ADD COLUMN la_started_at BIGINT NOT NULL DEFAULT 0;`,
+		mysql: `ALTER TABLE push_devices ADD COLUMN la_start_token VARCHAR(1024) NOT NULL DEFAULT '';
+	ALTER TABLE push_devices ADD COLUMN la_hub_url VARCHAR(1024) NOT NULL DEFAULT '';
+	ALTER TABLE push_devices ADD COLUMN la_token VARCHAR(1024) NOT NULL DEFAULT '';
+	ALTER TABLE push_devices ADD COLUMN la_started_at BIGINT NOT NULL DEFAULT 0;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

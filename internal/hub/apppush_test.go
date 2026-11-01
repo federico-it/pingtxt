@@ -19,6 +19,8 @@ type fakeRelay struct {
 	srv     *httptest.Server
 	hubs    int
 	pushes  []pushMessage
+	las     []laMessage       // POST /v1/live-activity
+	laStat  map[string]string // activity token -> result status (default sent)
 	status  map[string]string // device handle -> result status (default sent)
 	fcm     bool
 	down    bool
@@ -26,7 +28,7 @@ type fakeRelay struct {
 }
 
 func newFakeRelay(t *testing.T) *fakeRelay {
-	f := &fakeRelay{status: map[string]string{}, fcm: true}
+	f := &fakeRelay{status: map[string]string{}, laStat: map[string]string{}, fcm: true}
 	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
@@ -61,6 +63,19 @@ func newFakeRelay(t *testing.T) *fakeRelay {
 					st = "sent"
 				}
 				res = append(res, pushResult{Device: d, Status: st})
+			}
+			json.NewEncoder(w).Encode(map[string]any{"results": res})
+		case "POST /v1/live-activity":
+			var m laMessage
+			json.NewDecoder(r.Body).Decode(&m)
+			f.las = append(f.las, m)
+			res := []pushResult{}
+			for _, tg := range m.Targets {
+				st := f.laStat[tg.Token]
+				if st == "" {
+					st = "sent"
+				}
+				res = append(res, pushResult{Device: tg.Device, Status: st})
 			}
 			json.NewEncoder(w).Encode(map[string]any{"results": res})
 		default:

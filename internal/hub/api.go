@@ -99,6 +99,10 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/mobile/devices", personal(h.listMobileDevices))
 	mux.HandleFunc("POST /api/mobile/devices", personal(h.saveMobileDevice))
 	mux.HandleFunc("DELETE /api/mobile/devices/{id}", personal(h.deleteMobileDevice))
+	mux.HandleFunc("PUT /api/mobile/live-activity/start-token", personal(h.putLAStartToken))
+	mux.HandleFunc("DELETE /api/mobile/live-activity/start-token", personal(h.deleteLAStartToken))
+	mux.HandleFunc("PUT /api/mobile/live-activity/token", personal(h.putLAToken))
+	mux.HandleFunc("DELETE /api/mobile/live-activity/token", personal(h.deleteLAToken))
 	mux.HandleFunc("GET /api/config/export", auth(h.exportConfig)) // secrets only with a session
 	mux.HandleFunc("POST /api/config/import", admin(h.importConfig))
 	mux.HandleFunc("POST /api/import/uptime-kuma", admin(h.importKuma))

@@ -562,7 +562,9 @@ func (h *Hub) mobileConfig(w http.ResponseWriter, r *http.Request, _ *store.User
 		h.internalErr(w, err)
 		return
 	}
-	v := map[string]any{"enabled": ps.ready(), "relay_url": "", "hub_id": ""}
+	// live_activity: the hub starts, updates and ends the app's Live
+	// Activity with pushes (PUT /api/mobile/live-activity/...).
+	v := map[string]any{"enabled": ps.ready(), "relay_url": "", "hub_id": "", "live_activity": ps.ready()}
 	if ps.ready() {
 		v["relay_url"], v["hub_id"] = ps.RelayURL, ps.HubID
 	}
