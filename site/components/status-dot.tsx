@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 
+import { useT } from "@/components/lang"
+
 // The status page of the official push relay (push.pingtxt.com), served by a
 // pingtxt hub. Its public JSON allows cross-origin reads.
 export const STATUS_URL = "https://status.pingtxt.com/"
@@ -10,12 +12,17 @@ const REFRESH_MS = 60_000
 
 type State = "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown"
 
-const states: Record<State, { color: string; label: string }> = {
-  operational: { color: "text-up", label: "all systems operational" },
-  degraded: { color: "text-warn", label: "degraded performance" },
-  partial_outage: { color: "text-down", label: "partial outage" },
-  major_outage: { color: "text-down", label: "major outage" },
-  unknown: { color: "text-muted-foreground", label: "status" },
+const states: Record<State, { color: string; en: string; it: string }> = {
+  operational: { color: "text-up", en: "all systems operational", it: "tutti i sistemi operativi" },
+  degraded: { color: "text-warn", en: "degraded performance", it: "prestazioni ridotte" },
+  partial_outage: { color: "text-down", en: "partial outage", it: "disservizio parziale" },
+  major_outage: { color: "text-down", en: "major outage", it: "disservizio grave" },
+  unknown: { color: "text-muted-foreground", en: "status", it: "stato" },
+}
+
+function useLabel(s: State) {
+  const t = useT()
+  return t(states[s].en, states[s].it)
 }
 
 function useStatus(): State {
@@ -46,26 +53,31 @@ function useStatus(): State {
 
 // StatusLink is the "status" entry of the header, with a colored dot.
 export function StatusLink({ className }: { className?: string }) {
-  const s = states[useStatus()]
+  const state = useStatus()
+  const s = states[state]
+  const label = useLabel(state)
   return (
-    <a href={STATUS_URL} className={className} title={s.label}>
+    <a href={STATUS_URL} className={className} title={label}>
       <span className={s.color} aria-hidden>
         ●
       </span>{" "}
-      status<span className="sr-only">: {s.label}</span>
+      status<span className="sr-only">: {label}</span>
     </a>
   )
 }
 
 // StatusLine is the footer version: the dot and the state in words.
 export function StatusLine() {
-  const s = states[useStatus()]
+  const state = useStatus()
+  const s = states[state]
+  const label = useLabel(state)
+  const t = useT()
   return (
     <a href={STATUS_URL} className="inline-flex items-center gap-1.5 underline-offset-4 hover:text-foreground hover:underline">
       <span className={s.color} aria-hidden>
         ●
       </span>
-      {s.label === "status" ? "service status" : s.label}
+      {state === "unknown" ? t("service status", "stato dei servizi") : label}
     </a>
   )
 }

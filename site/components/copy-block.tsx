@@ -2,9 +2,12 @@
 
 import { useState } from "react"
 
+import { useT } from "@/components/lang"
+
 // A shell snippet with a copy button. Lines starting with "#" are shown dimmed.
 export function CopyBlock({ code, label }: { code: string; label?: string }) {
   const [copied, setCopied] = useState(false)
+  const t = useT()
   async function copy() {
     try {
       await navigator.clipboard.writeText(code)
@@ -31,7 +34,7 @@ export function CopyBlock({ code, label }: { code: string; label?: string }) {
         onClick={copy}
         className="absolute right-2 bottom-2 border border-dashed bg-background px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
       >
-        {copied ? "copied" : "copy"}
+        {copied ? t("copied", "copiato") : t("copy", "copia")}
       </button>
     </div>
   )
