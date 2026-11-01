@@ -105,6 +105,7 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/mobile/live-activity/token", personal(h.deleteLAToken))
 	mux.HandleFunc("GET /api/config/export", auth(h.exportConfig)) // secrets only with a session
 	mux.HandleFunc("POST /api/config/import", admin(h.importConfig))
+	mux.HandleFunc("POST /api/import/uptime-kuma", admin(h.importKuma))
 
 	mux.HandleFunc("GET /api/overview", auth(h.overview))
 	mux.HandleFunc("GET /api/version", auth(h.getVersion))
@@ -113,10 +114,13 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("PUT /api/telemetry", admin(h.putTelemetry))
 	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
 	mux.HandleFunc("POST /api/monitors", auth(h.createMonitor))
+	mux.HandleFunc("POST /api/monitors/test", auth(h.testDraftMonitor))
+	mux.HandleFunc("POST /api/monitors/bulk", auth(h.bulkMonitors))
 	mux.HandleFunc("GET /api/monitors/{id}", auth(h.getMonitor))
 	mux.HandleFunc("PUT /api/monitors/{id}", auth(h.updateMonitor))
 	mux.HandleFunc("DELETE /api/monitors/{id}", auth(h.deleteMonitor))
 	mux.HandleFunc("POST /api/monitors/{id}/pause", auth(h.pauseMonitor))
+	mux.HandleFunc("POST /api/monitors/{id}/test", auth(h.testSavedMonitor))
 	mux.HandleFunc("GET /api/monitors/{id}/series", auth(h.monitorSeries))
 	mux.HandleFunc("GET /api/monitors/{id}/results", auth(h.monitorResults))
 	mux.HandleFunc("POST /api/monitors/{id}/push-token", auth(h.rotatePushToken))
@@ -145,6 +149,8 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/agents/{id}", auth(h.deleteAgent))
 	mux.HandleFunc("POST /api/agents/{id}/token", auth(h.rotateAgentToken))
 	mux.HandleFunc("POST /api/agents/{id}/update", auth(h.updateAgentNow))
+	mux.HandleFunc("GET /api/agents/{id}/monitors", auth(h.agentMonitors))
+	mux.HandleFunc("POST /api/agents/{id}/monitors", auth(h.assignAgent))
 	mux.HandleFunc("PUT /api/settings/agent-updates", auth(h.putAgentUpdateSettings))
 
 	mux.HandleFunc("GET /api/notifiers", auth(h.listNotifiers))
@@ -1143,11 +1149,16 @@ func (h *Hub) monitorResults(w http.ResponseWriter, r *http.Request, _ *store.Us
 		writeErr(w, 400, "invalid id")
 		return
 	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	qs := r.URL.Query()
+	limit, _ := strconv.Atoi(qs.Get("limit"))
 	if limit <= 0 || limit > 500 {
 		limit = 50
 	}
-	rows, err := h.store.RecentResults(id, limit)
+	q := store.ResultQuery{Limit: limit, Failed: qs.Get("failed") == "1" || qs.Get("failed") == "true"}
+	q.Before, _ = strconv.ParseInt(qs.Get("before"), 10, 64)
+	q.From, _ = strconv.ParseInt(qs.Get("from"), 10, 64)
+	q.To, _ = strconv.ParseInt(qs.Get("to"), 10, 64)
+	rows, err := h.store.QueryResults(id, q)
 	if err != nil {
 		h.internalErr(w, err)
 		return
@@ -1156,8 +1167,19 @@ func (h *Hub) monitorResults(w http.ResponseWriter, r *http.Request, _ *store.Us
 }
 
 func (h *Hub) listIncidents(w http.ResponseWriter, r *http.Request, _ *store.User) {
-	mid, _ := strconv.ParseInt(r.URL.Query().Get("monitor"), 10, 64)
-	list, err := h.store.ListIncidents(mid, 100)
+	qs := r.URL.Query()
+	q := store.IncidentQuery{State: qs.Get("state")}
+	q.MonitorID, _ = strconv.ParseInt(qs.Get("monitor"), 10, 64)
+	q.Since, _ = strconv.ParseInt(qs.Get("since"), 10, 64)
+	q.Limit, _ = strconv.Atoi(qs.Get("limit"))
+	if q.Limit <= 0 || q.Limit > 500 {
+		q.Limit = 100
+	}
+	if q.State != "" && q.State != "open" && q.State != "resolved" {
+		writeErr(w, 400, "state must be open or resolved")
+		return
+	}
+	list, err := h.store.FindIncidents(q)
 	if err != nil {
 		h.internalErr(w, err)
 		return
@@ -1171,6 +1193,8 @@ type agentView struct {
 	*store.Agent
 	LocationID string `json:"location_id"`
 	Online     bool   `json:"online"`
+	// Monitors counts the monitors that check from this agent.
+	Monitors int `json:"monitors"`
 	updateView
 }
 
@@ -1223,9 +1247,18 @@ func (h *Hub) listAgents(w http.ResponseWriter, r *http.Request, _ *store.User) 
 		h.internalErr(w, err)
 		return
 	}
+	ms, err := h.store.ListMonitors()
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	used := agentMonitorCounts(ms)
 	out := make([]agentView, 0, len(agents))
 	for _, a := range agents {
-		out = append(out, agentView{Agent: a, LocationID: AgentLocation(a.ID), Online: h.AgentOnline(a.ID), updateView: h.agentUpdateView(a)})
+		loc := AgentLocation(a.ID)
+		// The live IPv6 state: the stored one lags behind a fresh connection.
+		a.IPv6 = int(h.locationIPv6(loc))
+		out = append(out, agentView{Agent: a, LocationID: loc, Online: h.AgentOnline(a.ID), Monitors: used[loc], updateView: h.agentUpdateView(a)})
 	}
 	writeJSON(w, 200, map[string]any{
 		"agents": out, "hub_url": h.hubURL(r),

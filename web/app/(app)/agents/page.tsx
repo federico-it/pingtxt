@@ -5,6 +5,7 @@ import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
+import { AgentAssign } from "@/components/agent-assign"
 import { AgentInstall } from "@/components/agent-install"
 import { Confirm } from "@/components/confirm"
 import { Empty, PageHeader } from "@/components/page-header"
@@ -16,19 +17,56 @@ import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { api, useApi, useIsAdmin, type Agent } from "@/lib/api"
-import { ago } from "@/lib/format"
+import { ago, datetime } from "@/lib/format"
 
 type AgentsResp = { agents: Agent[]; hub_url: string; hub_version: string; auto_update: boolean }
+
+// Agents already asked about (per browser), so the prompt shows once.
+const ASKED_KEY = "pingtxt.agents.assignAsked"
+
+function loadAsked(): number[] {
+  try {
+    return JSON.parse(localStorage.getItem(ASKED_KEY) ?? "[]")
+  } catch {
+    return []
+  }
+}
+
+function saveAsked(ids: number[]) {
+  try {
+    localStorage.setItem(ASKED_KEY, JSON.stringify(ids.slice(-100)))
+  } catch {
+    // private mode: the prompt may show again
+  }
+}
 
 export default function AgentsPage() {
   const isAdmin = useIsAdmin()
   const t = useTranslations("agents")
-  const { data, mutate } = useApi<AgentsResp>("/api/agents", {
-    // Poll while an update runs so the new version shows up on its own.
-    refreshInterval: (d) => (d?.agents.some((a) => a.update_state === "updating") ? 2000 : 15000),
-  })
   const [edit, setEdit] = useState<{ id?: number; name: string; location: string } | null>(null)
-  const [install, setInstall] = useState<{ name: string; token: string; hub: string } | null>(null)
+  const [install, setInstall] = useState<{ id: number; name: string; token: string; hub: string; isNew: boolean } | null>(null)
+  const [assignId, setAssignId] = useState<number | null>(null)
+  const { data, mutate } = useApi<AgentsResp>("/api/agents", {
+    // Poll fast while an update runs or a new agent is expected, so the change
+    // shows up on its own.
+    refreshInterval: (d) =>
+      d?.agents.some((a) => a.update_state === "updating") || install?.isNew || (assignId && d?.agents.find((a) => a.id === assignId)?.ipv6 === 0)
+        ? 2000
+        : 15000,
+    // A new agent that comes online and checks no monitor yet: ask once
+    // whether to add it to the compatible monitors.
+    onSuccess: (d) => {
+      if (!isAdmin || assignId) return
+      const asked = loadAsked()
+      const fresh = d.agents.find((a) => a.online && a.monitors === 0 && !asked.includes(a.id))
+      if (!fresh) return
+      saveAsked([...asked, fresh.id])
+      // The install commands are done once their agent connected.
+      setInstall((i) => (i && i.id === fresh.id ? null : i))
+      setAssignId(fresh.id)
+    },
+  })
+  const assignAgent = data?.agents.find((a) => a.id === assignId) ?? null
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -39,7 +77,7 @@ export default function AgentsPage() {
         toast.success(t("updated"))
       } else {
         const r = await api<{ agent: Agent; token: string; hub_url: string }>("/api/agents", { method: "POST", body: edit })
-        setInstall({ name: r.agent.name, token: r.token, hub: r.hub_url })
+        setInstall({ id: r.agent.id, name: r.agent.name, token: r.token, hub: r.hub_url, isNew: true })
       }
       setEdit(null)
       mutate()
@@ -50,7 +88,7 @@ export default function AgentsPage() {
 
   async function rotate(a: Agent) {
     const r = await api<{ token: string; hub_url: string }>(`/api/agents/${a.id}/token`, { method: "POST" })
-    setInstall({ name: a.name, token: r.token, hub: r.hub_url })
+    setInstall({ id: a.id, name: a.name, token: r.token, hub: r.hub_url, isNew: false })
     mutate()
   }
 
@@ -126,7 +164,10 @@ export default function AgentsPage() {
             {(data?.agents ?? []).map((a) => (
               <TableRow key={a.id}>
                 <TableCell>{a.online ? <span className="text-up">● {t("online")}</span> : <span className="text-muted-foreground">○ {t("offline")}</span>}</TableCell>
-                <TableCell className="font-medium">{a.name}</TableCell>
+                <TableCell>
+                  <div className="font-medium">{a.name}</div>
+                  <MonitorsLine agent={a} onAssign={isAdmin ? () => setAssignId(a.id) : undefined} />
+                </TableCell>
                 <TableCell>{a.location || <span className="text-muted-foreground">--</span>}</TableCell>
                 <TableCell className="hidden text-muted-foreground md:table-cell">
                   {a.hostname ? `${a.hostname} · ${a.platform} · ${a.remote_addr}` : t("neverConnected")}
@@ -137,7 +178,7 @@ export default function AgentsPage() {
                 <TableCell className="hidden text-muted-foreground md:table-cell">
                   <VersionCell agent={a} hubVersion={data?.hub_version ?? ""} />
                 </TableCell>
-                <TableCell className="text-right text-muted-foreground">{a.online ? t("now") : ago(a.last_seen)}</TableCell>
+                <TableCell className="text-right text-muted-foreground" title={a.last_seen ? datetime(a.last_seen) : undefined}>{a.online ? t("now") : ago(a.last_seen)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap">
                   {isAdmin && (
                     <>
@@ -208,10 +249,33 @@ export default function AgentsPage() {
             <DialogDescription>{t("installText")}</DialogDescription>
           </DialogHeader>
           {install && <AgentInstall hub={install.hub} token={install.token} />}
+          {install?.isNew && (
+            <p className="text-xs text-muted-foreground">
+              <span className="animate-pulse">●</span> {t("waiting", { name: install.name })}
+            </p>
+          )}
           <DialogFooter showCloseButton />
         </DialogContent>
       </Dialog>
+      <AgentAssign key={assignId ?? 0} agent={assignAgent} onClose={() => setAssignId(null)} onDone={() => mutate()} />
     </>
+  )
+}
+
+function MonitorsLine({ agent: a, onAssign }: { agent: Agent; onAssign?: () => void }) {
+  const t = useTranslations("agents")
+  return (
+    <div className="text-xs text-muted-foreground">
+      {a.monitors === 0 ? <span className="text-warn">{t("noMonitors")}</span> : t("monitors", { count: a.monitors })}
+      {onAssign && (
+        <>
+          {" · "}
+          <button type="button" className="underline-offset-2 hover:text-foreground hover:underline" onClick={onAssign}>
+            {t("assign")}
+          </button>
+        </>
+      )}
+    </div>
   )
 }
 

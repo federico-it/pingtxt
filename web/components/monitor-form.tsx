@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { TestResults, type TestResult } from "@/components/test-results"
+import { useUnsavedGuard } from "@/hooks/use-unsaved-guard"
 import {
   api,
   useApi,
@@ -251,12 +253,26 @@ export function MonitorForm({
   })
   const [headers, setHeaders] = useState(headersToText(initial.headers))
   const [busy, setBusy] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [tested, setTested] = useState<TestResult[] | null>(null)
   const locations = useApi<Location[]>("/api/locations", {
     refreshInterval: 15_000,
   })
   const labels = useLabels()
   const tr = useTranslations("monitorForm")
   const tc = useTranslations("common")
+  const start = useMemo(
+    () =>
+      JSON.stringify({
+        ...initial,
+        assertions: initial.assertions ?? [],
+        headers: textToHeaders(headersToText(initial.headers)),
+      }),
+    [initial]
+  )
+  const dirty =
+    JSON.stringify({ ...m, headers: textToHeaders(headers) }) !== start
+  const guard = useUnsavedGuard(dirty, tr("unsavedChanges"))
   const groupItems = [
     { value: "0", label: tr("noGroup") },
     ...(labels.groups.data ?? []).map((g) => ({
@@ -358,10 +374,27 @@ export function MonitorForm({
         { method: id ? "PUT" : "POST", body }
       )
       toast.success(id ? tr("updated") : tr("created"))
+      guard.release()
       router.push(`/monitors/view/?id=${res.id}`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tr("error"))
       setBusy(false)
+    }
+  }
+
+  async function runTest() {
+    setTesting(true)
+    setTested(null)
+    try {
+      const res = await api<{ results: TestResult[] }>("/api/monitors/test", {
+        method: "POST",
+        body: { ...m, headers: textToHeaders(headers) },
+      })
+      setTested(res.results)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : tr("error"))
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -902,13 +935,39 @@ export function MonitorForm({
         </Section>
       )}
 
-      <div className="mt-8 flex gap-2 border-t border-dashed pt-4">
+      <TestResults
+        results={tested}
+        running={testing}
+        onClose={() => setTested(null)}
+        className="mt-8"
+      />
+      <div className="mt-8 flex flex-wrap gap-2 border-t border-dashed pt-4">
         <Button type="submit" disabled={busy}>
           {busy ? tr("saving") : id ? tr("save") : tr("create")}
         </Button>
-        <Button type="button" variant="ghost" onClick={() => router.back()}>
+        {!isPush && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={testing || !m.target.trim()}
+            onClick={runTest}
+            title={tr("testHint")}
+          >
+            {testing ? tr("testing") : tr("test")}
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => guard.confirmLeave() && router.back()}
+        >
           {tc("cancel")}
         </Button>
+        {dirty && (
+          <span className="self-center text-xs text-muted-foreground">
+            {tr("unsaved")}
+          </span>
+        )}
       </div>
     </form>
   )

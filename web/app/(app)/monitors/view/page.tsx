@@ -6,7 +6,6 @@ import { Suspense, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
-import { Confirm } from "@/components/confirm"
 import { MonitorBadges } from "@/components/badge-info"
 import { ExpiryTable } from "@/components/expiry"
 import { PushInfo } from "@/components/push-info"
@@ -16,6 +15,8 @@ import { TagList, useLabels } from "@/components/labels"
 import { KV, PageHeader, Section } from "@/components/page-header"
 import { OkText, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
+import { ResultsLog, type TimeWindow } from "@/components/results-log"
+import { TestResults, type TestResult } from "@/components/test-results"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -31,10 +32,10 @@ import {
   useIsAdmin,
   type Incident,
   type MonitorDetail,
-  type ResultRow,
   type Series,
 } from "@/lib/api"
 import { useNow } from "@/hooks/use-now"
+import { deleteWithUndo } from "@/lib/pending-delete"
 import { ago, datetime, displayTarget, duration, interval, ms, pct } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -42,11 +43,20 @@ const ranges = ["1h", "6h", "24h", "7d", "30d"] as const
 
 function View() {
   const router = useRouter()
-  const id = Number(useSearchParams().get("id"))
+  const params = useSearchParams()
+  const id = Number(params.get("id"))
   const now = useNow()
   const [range, setRange] = useState<(typeof ranges)[number]>("24h")
   const [byPhase, setByPhase] = useState(false)
   const [phaseLoc, setPhaseLoc] = useState("")
+  const [testing, setTesting] = useState(false)
+  // Slot of the uptime bars whose checks the log shows (?from=&to= from the dashboard).
+  const [slot, setSlot] = useState<TimeWindow | null>(() => {
+    const from = Number(params.get("from"))
+    const to = Number(params.get("to"))
+    return from > 0 && to > from ? { from, to } : null
+  })
+  const [tested, setTested] = useState<TestResult[] | null>(null)
   const m = useApi<MonitorDetail>(id ? `/api/monitors/${id}` : null)
   const isAdmin = useIsAdmin()
   const { groupById, tagById } = useLabels()
@@ -57,10 +67,6 @@ function View() {
     id ? `/api/monitors/${id}/series?range=${range}` : null,
     { refreshInterval: 30_000 }
   )
-  const results = useApi<{
-    results: ResultRow[]
-    locations: Record<string, string>
-  }>(id ? `/api/monitors/${id}/results?limit=30` : null)
   const incidents = useApi<Incident[]>(
     id ? `/api/incidents?monitor=${id}` : null,
     { refreshInterval: 30_000 }
@@ -75,31 +81,59 @@ function View() {
     )
   const d = m.data
 
-  async function togglePause() {
+  async function setPaused(paused: boolean, undo = true) {
     try {
-      await api(`/api/monitors/${id}/pause`, {
-        method: "POST",
-        body: { paused: !d.paused },
-      })
-      toast.success(d.paused ? t("resumed") : t("paused"))
+      await api(`/api/monitors/${id}/pause`, { method: "POST", body: { paused } })
       m.mutate()
+      if (!undo) {
+        toast(t("undone"))
+        return
+      }
+      toast.success(paused ? t("paused") : t("resumed"), {
+        action: { label: t("undo"), onClick: () => setPaused(!paused, false) },
+      })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("error"))
     }
   }
 
-  async function remove() {
-    await api(`/api/monitors/${id}`, { method: "DELETE" })
-    toast.success(t("deleted"))
+  async function checkNow() {
+    setTesting(true)
+    setTested(null)
+    try {
+      const res = await api<{ results: TestResult[] }>(`/api/monitors/${id}/test`, {
+        method: "POST",
+      })
+      setTested(res.results)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("error"))
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  function remove() {
+    deleteWithUndo([id], {
+      done: t("deleted"),
+      undo: t("undo"),
+      undone: t("undone"),
+      error: t("error"),
+    })
     router.push("/")
   }
+
 
   return (
     <>
       <PageHeader cmd={`pingtxt monitors show ${id}`} title={d.name}>
         {isAdmin && (
           <>
-            <Button variant="outline" size="sm" onClick={togglePause}>
+            {d.type !== "push" && (
+              <Button variant="outline" size="sm" onClick={checkNow} disabled={testing}>
+                {testing ? t("checking") : t("checkNow")}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setPaused(!d.paused)}>
               {d.paused ? t("resume") : t("pause")}
             </Button>
             <Button
@@ -110,16 +144,18 @@ function View() {
             >
               {t("edit")}
             </Button>
-            <Confirm
-              title={t("deleteTitle", { name: d.name })}
-              description={t("deleteText")}
-              onConfirm={remove}
-              trigger={
-                <Button variant="destructive" size="sm">
-                  {tc("delete")}
-                </Button>
-              }
-            />
+            <Button
+              variant="outline"
+              size="sm"
+              render={<Link href={`/monitors/new/?from=${id}`} />}
+              nativeButton={false}
+              title={t("duplicateHint")}
+            >
+              {t("duplicate")}
+            </Button>
+            <Button variant="destructive" size="sm" onClick={remove} title={t("deleteHint")}>
+              {tc("delete")}
+            </Button>
           </>
         )}
       </PageHeader>
@@ -155,6 +191,12 @@ function View() {
           </>
         )}
       </div>
+      <TestResults
+        results={tested}
+        running={testing}
+        onClose={() => setTested(null)}
+        className="-mt-2 mb-6"
+      />
       {(groupById.has(d.group_id) || (d.tag_ids?.length ?? 0) > 0) && (
         <div className="-mt-4 mb-6 flex flex-wrap items-center gap-2 text-xs">
           {groupById.has(d.group_id) && (
@@ -197,7 +239,15 @@ function View() {
       )}
 
       <Section title={t("last24h")}>
-        <UptimeBars bars={d.bars} height="h-8" />
+        <UptimeBars
+          bars={d.bars}
+          height="h-8"
+          selected={slot?.from}
+          onSelect={(from, to) => {
+            setSlot(slot?.from === from ? null : { from, to })
+            document.getElementById("log")?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }}
+        />
       </Section>
 
       {d.expiry.length > 0 && (
@@ -300,7 +350,10 @@ function View() {
                 <TableCell className="max-w-72 truncate text-muted-foreground">
                   {l.last?.message}
                 </TableCell>
-                <TableCell className="text-right text-muted-foreground">
+                <TableCell
+                  className="text-right text-muted-foreground"
+                  title={l.last?.ts ? datetime(l.last.ts) : undefined}
+                >
                   {ago(l.last?.ts)}
                 </TableCell>
               </TableRow>
@@ -340,36 +393,12 @@ function View() {
 
       <MonitorBadges monitorId={id} groupId={d.group_id} />
 
-      <Section title={t("log")}>
-        <div className="max-h-96 overflow-y-auto border bg-muted/30 p-3 text-xs leading-6">
-          {(results.data?.results ?? []).map((r) => (
-            <div key={r.id} className="flex gap-3 whitespace-nowrap">
-              <span className="text-muted-foreground">{datetime(r.ts)}</span>
-              <span className="w-24 shrink-0 truncate">
-                {results.data?.locations[r.location] ?? r.location}
-              </span>
-              <span className="w-8 shrink-0">
-                <OkText ok={r.ok} />
-              </span>
-              <span
-                className="w-16 shrink-0 text-right"
-                title={phaseTitle(r.timing, r.latency_ms, tp)}
-              >
-                {ms(r.latency_ms)}
-              </span>
-              <span className="truncate text-muted-foreground">
-                {r.maint && <span className="text-info">[{t("maint")}] </span>}
-                {r.message}
-              </span>
-            </div>
-          ))}
-          {results.data?.results.length === 0 && (
-            <span className="text-muted-foreground">
-              {t("waitingFirst")}
-            </span>
-          )}
-        </div>
-      </Section>
+      <ResultsLog
+        monitorId={id}
+        slot={slot}
+        onClearWindow={() => setSlot(null)}
+        waitingText={t("waitingFirst")}
+      />
     </>
   )
 }

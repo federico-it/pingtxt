@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { api, useApi, type Monitor, type Notifier, type StatusPage } from "@/lib/api"
+import { useUnsavedGuard } from "@/hooks/use-unsaved-guard"
 import { useMounted } from "@/hooks/use-now"
 
 type Draft = Omit<StatusPage, "id" | "created_at">
@@ -57,6 +58,11 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   // A password is stored: the field can stay empty to keep it.
   const [hasPassword, setHasPassword] = useState(!!initial?.protected)
   const t = useTranslations("statusPageForm")
+  const tf = useTranslations("monitorForm")
+  // What was last saved (or loaded), to tell whether the form has changes.
+  const [baseline, setBaseline] = useState(() => JSON.stringify(initial ? { ...initial, group_ids: initial.group_ids ?? [] } : empty))
+  const dirty = JSON.stringify(d) !== baseline
+  const guard = useUnsavedGuard(dirty, tf("unsavedChanges"))
 
   const byId = useMemo(() => new Map((monitors.data ?? []).map((m) => [m.id, m])), [monitors.data])
   // Monitors of a picked group are on the page already.
@@ -91,9 +97,12 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
         body: d,
       })
       toast.success(t("saved"))
-      if (!initial) router.replace(`/status-pages/edit/?id=${saved.id}`)
-      else {
+      if (!initial) {
+        guard.release()
+        router.replace(`/status-pages/edit/?id=${saved.id}`)
+      } else {
         setD(saved)
+        setBaseline(JSON.stringify(saved))
         setHasPassword(saved.protected)
       }
     } catch (err) {
@@ -356,9 +365,10 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
             {t("incidents")}
           </Button>
         )}
-        <Button type="button" variant="ghost" onClick={() => router.push("/status-pages/")}>
+        <Button type="button" variant="ghost" onClick={() => guard.confirmLeave() && router.push("/status-pages/")}>
           {t("back")}
         </Button>
+        {dirty && <span className="self-center text-xs text-muted-foreground">{tf("unsaved")}</span>}
       </div>
     </form>
   )

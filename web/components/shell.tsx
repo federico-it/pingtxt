@@ -1,15 +1,18 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { useTranslations } from "use-intl"
+
+import { CommandMenu } from "@/components/command-menu"
 
 import { LanguagePicker } from "@/components/language-picker"
 import { TelemetryNotice } from "@/components/telemetry-notice"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UpdateNotice, useVersionStatus } from "@/components/update-notice"
 import { Button } from "@/components/ui/button"
+import { useHotkey } from "@/hooks/use-hotkey"
 import { api, useApi, type Me, type Overview } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import type en from "@/messages/en.json"
@@ -48,6 +51,25 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
   const ver = useVersionStatus(me.data?.user.role === "admin")
   const tu = useTranslations("update")
+  const tk = useTranslations("commandMenu")
+  const router = useRouter()
+  const [cmdOpen, setCmdOpen] = useState(false)
+  const isAdmin = me.data?.user.role === "admin"
+
+  // Ctrl+K / ⌘K opens the jump menu, also from inside text fields.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setCmdOpen((o) => !o)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
+  useHotkey("n", () => router.push("/monitors/new/"), isAdmin)
+
+  useStatusInTab(ov.data, pathname)
 
   async function logout() {
     await api("/api/auth/logout", { method: "POST" }).catch(() => {})
@@ -208,6 +230,19 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         )}
       </header>
+      <CommandMenu
+        open={cmdOpen}
+        onOpenChange={setCmdOpen}
+        pages={links.map((n) => ({ href: n.href, label: n.label }))}
+        actions={
+          isAdmin
+            ? [
+                { href: "/monitors/new/", label: tk("newMonitor") },
+                { href: "/status-pages/edit/", label: tk("newStatusPage") },
+              ]
+            : []
+        }
+      />
       <UpdateNotice status={ver.data} />
       <TelemetryNotice isAdmin={me.data.user.role === "admin"} />
       <main className="flex-1 py-8">{children}</main>
@@ -228,7 +263,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </>
           )}
         </span>
-        <span>
+        <span className="hidden sm:inline">
+          <button
+            type="button"
+            onClick={() => setCmdOpen(true)}
+            className="hover:text-foreground"
+          >
+            {t.rich("jumpHint", {
+              kbd: (c) => <kbd className="border px-1">{c}</kbd>,
+            })}
+          </button>
+          {" · "}
           {t.rich("themeHint", {
             kbd: (c) => <kbd className="border px-1">{c}</kbd>,
           })}
@@ -236,4 +281,41 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </footer>
     </div>
   )
+}
+
+// Original tab title and icon, restored when nothing is down.
+const baseTitle = "pingtxt"
+const baseIcon = "/icon.svg"
+
+/** The prompt icon with a status dot in the corner, as a data URL. */
+function iconWithDot(color: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="#111"/><path d="M6 10l6 6-6 6" stroke="#4ade80" stroke-width="3" fill="none" stroke-linecap="square"/><rect x="15" y="20" width="11" height="3" fill="#4ade80"/><circle cx="25" cy="7" r="6.5" fill="${color}" stroke="#111" stroke-width="2"/></svg>`
+  return "data:image/svg+xml," + encodeURIComponent(svg)
+}
+
+/**
+ * Shows how many monitors are down in the browser tab: "(2) pingtxt" and a
+ * red dot on the icon (amber when only degraded), so it is visible from
+ * another tab.
+ */
+function useStatusInTab(ov: Overview | undefined, pathname: string) {
+  const down = ov?.status.down ?? 0
+  const degraded = ov?.status.degraded ?? 0
+  useEffect(() => {
+    if (!ov) return
+    const title = document.title.replace(/^\(\d+\)\s*/, "") || baseTitle
+    document.title = down > 0 ? `(${down}) ${title}` : title
+    const icon = down > 0 ? iconWithDot("#ef4444") : degraded > 0 ? iconWithDot("#f59e0b") : baseIcon
+    let links = document.querySelectorAll<HTMLLinkElement>("link[rel~='icon']")
+    if (links.length === 0) {
+      const l = document.createElement("link")
+      l.rel = "icon"
+      document.head.appendChild(l)
+      links = document.querySelectorAll<HTMLLinkElement>("link[rel~='icon']")
+    }
+    links.forEach((l) => {
+      l.type = "image/svg+xml"
+      l.href = icon
+    })
+  }, [ov, down, degraded, pathname])
 }

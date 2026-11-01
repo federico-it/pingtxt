@@ -9,6 +9,7 @@ import { PageHeader, Section } from "@/components/page-header"
 import { ApiTokens } from "@/components/settings/api-tokens"
 import { AuthSettingsForm } from "@/components/settings/auth-settings"
 import { ConfigTransfer, DatabaseBackups } from "@/components/settings/backups"
+import { KumaImport } from "@/components/settings/kuma-import"
 import { GeneralSettingsForm } from "@/components/settings/general-settings"
 import { MobileAppSettings } from "@/components/settings/mobile-app"
 import { TwoFactor } from "@/components/settings/two-factor"
@@ -157,6 +158,7 @@ export default function SettingsPage() {
                 options.mutate()
               }}
             />
+            <KumaImport />
             <DatabaseBackups />
           </>
         )}
