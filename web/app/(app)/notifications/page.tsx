@@ -7,7 +7,9 @@ import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
 import { BrowserNotifyCard } from "@/components/browser-notify-card"
+import { covers, EventChips, LinkRow, linkState, useEventList } from "@/components/channel-links"
 import { Confirm } from "@/components/confirm"
+import { GroupToggle, TagToggle, useLabels } from "@/components/labels"
 import { Empty, PageHeader } from "@/components/page-header"
 import { PeriodicReports } from "@/components/reports"
 import { Button } from "@/components/ui/button"
@@ -16,7 +18,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { api, useApi, useIsAdmin, type Notifier, type NotifierType, type PushSettings } from "@/lib/api"
+import {
+  api,
+  defaultNotifyEvents,
+  useApi,
+  useIsAdmin,
+  type ChannelLink,
+  type Monitor,
+  type Notifier,
+  type NotifierType,
+  type NotifyEvent,
+  type PushSettings,
+} from "@/lib/api"
 import type en from "@/messages/en.json"
 
 type FieldLabel = keyof (typeof en)["notifications"]["fields"]
@@ -90,7 +103,26 @@ type Draft = {
   enabled: boolean
   delay_min: number
   repeat_min: number
+  all_monitors: boolean
+  group_ids: number[]
+  tag_ids: number[]
+  events: NotifyEvent[]
+  monitors: ChannelLink[]
 }
+
+const newDraft = (): Draft => ({
+  name: "",
+  type: "webhook",
+  config: {},
+  enabled: true,
+  delay_min: 0,
+  repeat_min: 0,
+  all_monitors: true,
+  group_ids: [],
+  tag_ids: [],
+  events: [...defaultNotifyEvents],
+  monitors: [],
+})
 
 // Same limits as the hub: repeat at least every 5 minutes, at most one week.
 const minRepeat = 5
@@ -102,7 +134,11 @@ export default function NotificationsPage() {
   const { data, mutate } = useApi<Notifier[]>("/api/notifiers", { refreshInterval: 0 })
   const isAdmin = useIsAdmin()
   const t = useTranslations("notifications")
+  const tl = useTranslations("channelLinks")
+  const eventList = useEventList()
   const [draft, setDraft] = useState<Draft | null>(null)
+  const { data: monitors } = useApi<Monitor[]>("/api/monitors", { refreshInterval: 0 })
+  const { groups, tags } = useLabels()
   // App channels need push on in Settings (admins only can read it).
   const { data: push } = useApi<PushSettings>(isAdmin ? "/api/settings/push" : null, { refreshInterval: 0 })
   const pushOff = !!push && !(push.enabled && push.registered)
@@ -157,6 +193,28 @@ export default function NotificationsPage() {
 
   const kind = draft ? kinds[draft.type] : null
 
+  function toggleID(k: "group_ids" | "tag_ids", id: number, on: boolean) {
+    setDraft((p) => p && { ...p, [k]: on ? [...p[k], id] : p[k].filter((x) => x !== id) })
+  }
+
+  /** Sets the link of one monitor (undefined = follow the scope). */
+  function setLink(monitorID: number, events: NotifyEvent[] | undefined) {
+    setDraft((p) => {
+      if (!p) return p
+      const rest = p.monitors.filter((l) => l.monitor_id !== monitorID)
+      return { ...p, monitors: events ? [...rest, { monitor_id: monitorID, events }] : rest }
+    })
+  }
+
+  /** "all monitors", or how many monitors the channel hears about. */
+  function scopeSummary(n: Notifier) {
+    const links = n.monitors ?? []
+    if (n.all_monitors && !links.some((l) => l.events.length === 0)) return tl("allMonitors")
+    if (!monitors) return ""
+    const count = monitors.filter((m) => linkState(covers(n, m), n.events ?? [], links.find((l) => l.monitor_id === m.id)?.events).on).length
+    return tl("monitorCount", { count })
+  }
+
   function setConfig(patch: Record<string, string>) {
     setDraft((p) => {
       if (!p) return p
@@ -173,7 +231,7 @@ export default function NotificationsPage() {
     <>
       <PageHeader cmd="pingtxt notify ls" title={t("title")}>
         {isAdmin && (
-          <Button onClick={() => setDraft({ name: "", type: "webhook", config: {}, enabled: true, delay_min: 0, repeat_min: 0 })}>
+          <Button onClick={() => setDraft(newDraft())}>
             <PlusIcon /> {t("add")}
           </Button>
         )}
@@ -203,6 +261,11 @@ export default function NotificationsPage() {
                     .filter(Boolean)
                     .join(" · ")}
                 </div>
+                <div className="text-xs text-muted-foreground">
+                  {[scopeSummary(n), eventList(n.events ?? [])]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
                 {n.type === "app" && pushOff && <PushOffNote />}
               </div>
               {isAdmin && (
@@ -210,7 +273,7 @@ export default function NotificationsPage() {
                   <Button variant="ghost" size="xs" onClick={() => test(n)}>
                     {t("test")}
                   </Button>
-                  <Button variant="ghost" size="xs" onClick={() => setDraft({ ...n })}>
+                  <Button variant="ghost" size="xs" onClick={() => setDraft({ ...newDraft(), ...n, monitors: n.monitors ?? [] })}>
                     {t("edit")}
                   </Button>
                   <Confirm
@@ -232,7 +295,7 @@ export default function NotificationsPage() {
       {data && isAdmin !== undefined && <PeriodicReports notifiers={data} isAdmin={isAdmin} />}
 
       <Dialog open={!!draft} onOpenChange={(o) => !o && setDraft(null)}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
           <form onSubmit={save} className="grid gap-4">
             <DialogHeader>
               <DialogTitle>{draft?.id ? t("editTitle") : t("add")}</DialogTitle>
@@ -283,6 +346,58 @@ export default function NotificationsPage() {
                 <p className="text-xs text-muted-foreground">{t("repeatHint", { min: minRepeat })}</p>
               </div>
             </div>
+            {draft && (
+              <div className="grid gap-4 border-t border-dashed pt-4">
+                <div className="grid gap-1.5">
+                  <Label>{tl("events")}</Label>
+                  <EventChips value={draft.events} onChange={(events) => setDraft((p) => p && { ...p, events })} />
+                  <p className="text-xs text-muted-foreground">{tl("eventsHint")}</p>
+                </div>
+                <div className="grid gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label>{tl("monitors")}</Label>
+                    <label className="flex cursor-pointer items-center gap-2 text-xs">
+                      <Switch checked={draft.all_monitors} onCheckedChange={(v) => setDraft((p) => p && { ...p, all_monitors: v })} />
+                      {tl("allMonitors")}
+                    </label>
+                  </div>
+                  {!draft.all_monitors && (groups.data?.length ?? 0) > 0 && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="mr-1 text-xs text-muted-foreground">{tl("groups")}</span>
+                      {(groups.data ?? []).map((g) => (
+                        <GroupToggle key={g.id} group={g} on={draft.group_ids.includes(g.id)} onChange={(on) => toggleID("group_ids", g.id, on)} />
+                      ))}
+                    </div>
+                  )}
+                  {!draft.all_monitors && (tags.data?.length ?? 0) > 0 && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="mr-1 text-xs text-muted-foreground">{tl("tags")}</span>
+                      {(tags.data ?? []).map((tg) => (
+                        <TagToggle key={tg.id} tag={tg} on={draft.tag_ids.includes(tg.id)} onChange={(on) => toggleID("tag_ids", tg.id, on)} />
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">{draft.all_monitors ? tl("allHint") : tl("scopeHint")}</p>
+                  <div className="max-h-56 overflow-y-auto border border-dashed text-sm">
+                    {(monitors ?? []).map((m) => {
+                      const covered = covers(draft, m)
+                      const link = draft.monitors.find((l) => l.monitor_id === m.id)
+                      return (
+                        <LinkRow
+                          key={m.id}
+                          label={m.name}
+                          state={linkState(covered, draft.events, link?.events)}
+                          covered={covered}
+                          defaults={draft.events}
+                          onChange={(events) => setLink(m.id, events)}
+                        />
+                      )
+                    })}
+                    {monitors?.length === 0 && <p className="px-2 py-1.5 text-xs text-muted-foreground">{tl("noMonitorsYet")}</p>}
+                  </div>
+                </div>
+              </div>
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={testDraft}>
                 {t("sendTest")}

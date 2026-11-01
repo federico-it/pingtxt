@@ -180,10 +180,28 @@ func (h *Hub) checkExpiries(ctx context.Context, monitorID int64, force bool) {
 			sent[id] = true
 			if !dup {
 				h.log.Info("expiry alert", "monitor", m.Name, "kind", t.kind, "subject", t.subject, "status", ev.Status)
-				h.notify.Send(*ev)
+				h.sendEvent(*ev, h.sharingSubject(m, rows, t.kind, t.subject)...)
 			}
 		}
 	}
+}
+
+// sharingSubject returns m and the other monitors that check the same
+// certificate or domain: the channels of any of them hear about it once.
+func (h *Hub) sharingSubject(m *store.Monitor, rows []*store.ExpiryCheck, kind, subject string) []*store.Monitor {
+	out := []*store.Monitor{m}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, r := range rows {
+		if r.MonitorID == m.ID || r.Kind != kind || r.Subject != subject {
+			continue
+		}
+		if st := h.monitors[r.MonitorID]; st != nil && !st.m.Paused {
+			c := *st.m
+			out = append(out, &c)
+		}
+	}
+	return out
 }
 
 func expiryDue(row *store.ExpiryCheck, now time.Time) bool {

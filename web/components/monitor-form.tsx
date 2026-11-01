@@ -1,10 +1,12 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
+import { covers, LinkRow, linkState } from "@/components/channel-links"
 import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
 import { ResponseRules } from "@/components/response-rules"
@@ -29,6 +31,8 @@ import {
   type Location,
   type Monitor,
   type MonitorType,
+  type Notifier,
+  type NotifyEvent,
 } from "@/lib/api"
 import { isCurl, parseCurl, type CurlRequest } from "@/lib/curl"
 import { interval } from "@/lib/format"
@@ -200,6 +204,7 @@ export const emptyMonitor: MonitorInput = {
   locations: ["local"],
   group_id: 0,
   tag_ids: [],
+  notifiers: [],
   cert_expiry_alert: true,
   domain_expiry_alert: true,
   paused: false,
@@ -268,6 +273,8 @@ export function MonitorForm({
     refreshInterval: 15_000,
   })
   const labels = useLabels()
+  const channels = useApi<Notifier[]>("/api/notifiers", { refreshInterval: 0 })
+  const tl = useTranslations("channelLinks")
   const tr = useTranslations("monitorForm")
   const tc = useTranslations("common")
   const start = useMemo(
@@ -387,6 +394,19 @@ export function MonitorForm({
         if (ok.length > 0) next.locations = ok
       }
       return next
+    })
+  }
+
+  /** Sets the link to one channel (undefined = follow the channel's scope). */
+  function setLink(notifierID: number, events: NotifyEvent[] | undefined) {
+    setM((p) => {
+      const rest = (p.notifiers ?? []).filter((l) => l.notifier_id !== notifierID)
+      return {
+        ...p,
+        notifiers: events
+          ? [...rest, { notifier_id: notifierID, events }]
+          : rest,
+      }
     })
   }
 
@@ -973,6 +993,52 @@ export function MonitorForm({
           </div>
         </Section>
       )}
+
+      <Section title={tr("sections.notifications")}>
+        <p className="mb-3 text-xs text-muted-foreground">
+          {tl("monitorHint")}
+        </p>
+        {channels.data?.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {tl.rich("noChannels", {
+              link: (chunks) => (
+                <Link
+                  href="/notifications"
+                  className="underline underline-offset-2"
+                >
+                  {chunks}
+                </Link>
+              ),
+            })}
+          </p>
+        ) : (
+          <div className="border border-dashed text-sm">
+            {(channels.data ?? []).map((n) => {
+              const covered = covers(n, m)
+              const link = (m.notifiers ?? []).find(
+                (l) => l.notifier_id === n.id
+              )
+              const events = n.events ?? []
+              return (
+                <LinkRow
+                  key={n.id}
+                  label={n.name}
+                  note={[
+                    !n.enabled && tl("channelOff"),
+                    !link && covered && (n.all_monitors ? tl("viaAll") : tl("viaLabels")),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  state={linkState(covered, events, link?.events)}
+                  covered={covered}
+                  defaults={events}
+                  onChange={(ev) => setLink(n.id, ev)}
+                />
+              )
+            })}
+          </div>
+        )}
+      </Section>
 
       <TestResults
         results={tested}

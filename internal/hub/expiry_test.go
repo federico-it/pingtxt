@@ -144,7 +144,7 @@ func TestCertExpiryNotifiesOnce(t *testing.T) {
 		mu.Unlock()
 	}))
 	defer hook.Close()
-	if err := st.CreateNotifier(&store.Notifier{Name: "hook", Type: "webhook", Config: map[string]string{"url": hook.URL}, Enabled: true}); err != nil {
+	if err := st.CreateNotifier(&store.Notifier{Name: "hook", Type: "webhook", Config: map[string]string{"url": hook.URL}, Enabled: true, AllMonitors: true, Events: store.DefaultNotifyEvents}); err != nil {
 		t.Fatal(err)
 	}
 

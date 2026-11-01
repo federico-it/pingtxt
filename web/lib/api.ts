@@ -68,6 +68,8 @@ export interface Monitor {
   /** 0 = no group */
   group_id: number
   tag_ids: number[]
+  /** Channels linked one by one, with their events (see ChannelLink). */
+  notifiers: ChannelLink[]
   cert_expiry_alert: boolean
   domain_expiry_alert: boolean
   paused: boolean
@@ -311,6 +313,24 @@ export interface Tag {
 export type NotifierType =
   "webhook" | "discord" | "slack" | "telegram" | "ntfy" | "email" | "app"
 
+/** What a channel can be sent about a monitor. */
+export type NotifyEvent = "down" | "up" | "degraded" | "cert_expiry" | "domain_expiry"
+
+export const notifyEvents: NotifyEvent[] = ["down", "up", "degraded", "cert_expiry", "domain_expiry"]
+
+/** Events of a new channel: everything but degraded, as before channels had events. */
+export const defaultNotifyEvents: NotifyEvent[] = ["down", "up", "cert_expiry", "domain_expiry"]
+
+/**
+ * A channel linked to one monitor with its own events. It wins over the
+ * channel's scope: no events leaves the monitor out.
+ */
+export interface ChannelLink {
+  monitor_id?: number
+  notifier_id?: number
+  events: NotifyEvent[]
+}
+
 export interface Notifier {
   id: number
   name: string
@@ -321,6 +341,14 @@ export interface Notifier {
   delay_min: number
   /** Repeat the alert every this many minutes while down (0 = once). */
   repeat_min: number
+  /** Every monitor, also future ones; otherwise the monitors of group_ids and tag_ids. */
+  all_monitors: boolean
+  group_ids: number[]
+  tag_ids: number[]
+  /** What the channel gets for the monitors of its scope. */
+  events: NotifyEvent[]
+  /** Monitors linked one by one. */
+  monitors: ChannelLink[]
   created_at: number
 }
 

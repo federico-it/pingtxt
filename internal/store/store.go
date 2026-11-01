@@ -520,6 +520,48 @@ var laterMigrations = []migration{
 		FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 26: which monitors and events each notification channel gets. A
+	// channel covers every monitor (all_monitors, also future ones) or the
+	// monitors of some groups and tags, for its events. monitor_notifiers
+	// links one monitor to one channel with events of its own (none = left
+	// out). Existing channels keep getting everything they got before.
+	{
+		sqlite: `ALTER TABLE notifiers ADD COLUMN all_monitors INTEGER NOT NULL DEFAULT 1;
+	ALTER TABLE notifiers ADD COLUMN group_ids TEXT NOT NULL DEFAULT '[]';
+	ALTER TABLE notifiers ADD COLUMN tag_ids TEXT NOT NULL DEFAULT '[]';
+	ALTER TABLE notifiers ADD COLUMN events TEXT NOT NULL DEFAULT '["down","up","cert_expiry","domain_expiry"]';
+	CREATE TABLE monitor_notifiers (
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		notifier_id INTEGER NOT NULL REFERENCES notifiers(id) ON DELETE CASCADE,
+		events TEXT NOT NULL,
+		PRIMARY KEY (monitor_id, notifier_id)
+	);
+	CREATE INDEX monitor_notifiers_notifier ON monitor_notifiers(notifier_id);`,
+		postgres: `ALTER TABLE notifiers ADD COLUMN all_monitors INTEGER NOT NULL DEFAULT 1;
+	ALTER TABLE notifiers ADD COLUMN group_ids TEXT NOT NULL DEFAULT '[]';
+	ALTER TABLE notifiers ADD COLUMN tag_ids TEXT NOT NULL DEFAULT '[]';
+	ALTER TABLE notifiers ADD COLUMN events TEXT NOT NULL DEFAULT '["down","up","cert_expiry","domain_expiry"]';
+	CREATE TABLE monitor_notifiers (
+		monitor_id BIGINT NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		notifier_id BIGINT NOT NULL REFERENCES notifiers(id) ON DELETE CASCADE,
+		events TEXT NOT NULL,
+		PRIMARY KEY (monitor_id, notifier_id)
+	);
+	CREATE INDEX monitor_notifiers_notifier ON monitor_notifiers(notifier_id);`,
+		mysql: `ALTER TABLE notifiers ADD COLUMN all_monitors INT NOT NULL DEFAULT 1;
+	ALTER TABLE notifiers ADD COLUMN group_ids TEXT NOT NULL DEFAULT ('[]');
+	ALTER TABLE notifiers ADD COLUMN tag_ids TEXT NOT NULL DEFAULT ('[]');
+	ALTER TABLE notifiers ADD COLUMN events TEXT NOT NULL DEFAULT ('["down","up","cert_expiry","domain_expiry"]');
+	CREATE TABLE monitor_notifiers (
+		monitor_id BIGINT NOT NULL,
+		notifier_id BIGINT NOT NULL,
+		events TEXT NOT NULL,
+		PRIMARY KEY (monitor_id, notifier_id),
+		INDEX monitor_notifiers_notifier (notifier_id),
+		FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE,
+		FOREIGN KEY (notifier_id) REFERENCES notifiers(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

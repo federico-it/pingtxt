@@ -50,15 +50,16 @@ type pendingAlert struct {
 }
 
 // dueAlertsLocked marks as sent and returns the alerts due for a monitor at
-// now (unix ms). Call with h.mu held.
-func (h *Hub) dueAlertsLocked(st *monState, list []*store.Notifier, now int64) []pendingAlert {
+// now (unix ms) to the channels that want down alerts for it. Call with
+// h.mu held.
+func (h *Hub) dueAlertsLocked(st *monState, list []*store.Notifier, rt routing, now int64) []pendingAlert {
 	a := st.alerts
 	if a == nil || !st.incident || st.inMaint || st.m.Paused {
 		return nil
 	}
 	var out []pendingAlert
 	for _, nt := range list {
-		if !nt.Enabled || !a.due(nt, now) {
+		if !rt.wants(nt, st.m, store.EventDown) || !a.due(nt, now) {
 			continue
 		}
 		prev := a.sent[nt.ID]
@@ -90,7 +91,7 @@ func (h *Hub) sendAlerts(list []pendingAlert) {
 // openAlerts starts following a new incident and sends the alerts due right
 // away (channels without a delay).
 func (h *Hub) openAlerts(m *store.Monitor, incident, at int64, cause string) {
-	list, err := h.store.ListNotifiers()
+	list, rt, err := h.loadRouting()
 	if err != nil {
 		h.log.Error("list notifiers", "err", err)
 	}
@@ -98,14 +99,14 @@ func (h *Hub) openAlerts(m *store.Monitor, incident, at int64, cause string) {
 	var due []pendingAlert
 	if st := h.monitors[m.ID]; st != nil {
 		st.alerts = &alertState{incident: incident, started: at, cause: cause, sent: map[int64]store.AlertSent{}}
-		due = h.dueAlertsLocked(st, list, at)
+		due = h.dueAlertsLocked(st, list, rt, at)
 	}
 	h.mu.Unlock()
 	h.sendAlerts(due)
 }
 
 // closeAlerts stops following the incident and tells the channels that were
-// alerted about it that the monitor is back up.
+// alerted about it, and want recoveries, that the monitor is back up.
 func (h *Hub) closeAlerts(m *store.Monitor, at int64) {
 	var a *alertState
 	h.mu.Lock()
@@ -113,7 +114,7 @@ func (h *Hub) closeAlerts(m *store.Monitor, at int64) {
 		a, st.alerts = st.alerts, nil
 	}
 	h.mu.Unlock()
-	list, err := h.store.ListNotifiers()
+	list, rt, err := h.loadRouting()
 	if err != nil {
 		h.log.Error("list notifiers", "err", err)
 		return
@@ -123,7 +124,7 @@ func (h *Hub) closeAlerts(m *store.Monitor, at int64) {
 		ev.DownSince = a.started
 	}
 	for _, nt := range list {
-		if !nt.Enabled {
+		if !rt.wants(nt, m, store.EventUp) {
 			continue
 		}
 		if a != nil {
@@ -145,15 +146,17 @@ func (h *Hub) loadAlerts(now int64) map[int64]*alertState {
 		return nil
 	}
 	var list []*store.Notifier
+	var rt routing
 	out := map[int64]*alertState{}
 	for id, inc := range open {
 		a := newAlertState(inc)
 		if len(a.sent) == 0 {
 			if list == nil {
-				list, _ = h.store.ListNotifiers()
+				list, rt, _ = h.loadRouting()
 			}
+			m, _ := h.store.Monitor(id)
 			for _, nt := range list {
-				if nt.Enabled && a.due(nt, now) {
+				if rt.wants(nt, m, store.EventDown) && a.due(nt, now) {
 					a.sent[nt.ID] = store.AlertSent{At: now, Count: 1}
 				}
 			}
@@ -190,7 +193,7 @@ func (h *Hub) escalate(now time.Time) {
 	if !open {
 		return
 	}
-	list, err := h.store.ListNotifiers()
+	list, rt, err := h.loadRouting()
 	if err != nil {
 		h.log.Error("list notifiers", "err", err)
 		return
@@ -199,7 +202,7 @@ func (h *Hub) escalate(now time.Time) {
 	var due []pendingAlert
 	h.mu.Lock()
 	for _, st := range h.monitors {
-		due = append(due, h.dueAlertsLocked(st, list, ms)...)
+		due = append(due, h.dueAlertsLocked(st, list, rt, ms)...)
 	}
 	h.mu.Unlock()
 	h.sendAlerts(due)

@@ -884,6 +884,9 @@ func (h *Hub) createMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 	if err == nil {
 		err = h.checkIPv6Locations(&m)
 	}
+	if err == nil {
+		err = h.validateMonitorLinks(&m)
+	}
 	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
@@ -1011,6 +1014,9 @@ func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 	err = h.validateMonitor(&m)
 	if err == nil {
 		err = h.checkIPv6Locations(&m)
+	}
+	if err == nil {
+		err = h.validateMonitorLinks(&m)
 	}
 	if err != nil {
 		writeErr(w, 400, err.Error())
@@ -1451,6 +1457,9 @@ func validateNotifier(n *store.Notifier) error {
 
 func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, u *store.User) {
 	list, err := h.store.ListNotifiers()
+	if err == nil {
+		err = h.withMonitors(list...)
+	}
 	if err != nil {
 		h.internalErr(w, err)
 		return
@@ -1506,24 +1515,45 @@ func (h *Hub) keepSecrets(n *store.Notifier) {
 }
 
 func (h *Hub) createNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {
-	var n store.Notifier
-	if readJSON(r, &n) != nil {
+	var b notifierBody
+	if readJSON(r, &b) != nil {
 		writeErr(w, 400, "invalid body")
 		return
 	}
-	if err := validateNotifier(&n); err != nil {
+	n := b.apply(nil)
+	err := validateNotifier(n)
+	if err == nil {
+		err = h.validateScope(n)
+	}
+	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
 	}
-	if !h.appPushAllowed(w, &n) {
+	if !h.appPushAllowed(w, n) {
 		return
 	}
-	if err := h.store.CreateNotifier(&n); err != nil {
+	if err := h.store.CreateNotifier(n); err != nil {
 		h.internalErr(w, err)
 		return
 	}
-	maskNotifier(&n)
-	writeJSON(w, 201, n)
+	h.saveChannelMonitors(w, n, 201)
+}
+
+// saveChannelMonitors stores the monitor links of a saved channel (when
+// given) and answers with the channel.
+func (h *Hub) saveChannelMonitors(w http.ResponseWriter, n *store.Notifier, code int) {
+	if n.Monitors != nil {
+		if err := h.store.SetChannelMonitors(n.ID, n.Monitors); err != nil {
+			h.internalErr(w, err)
+			return
+		}
+	}
+	if err := h.withMonitors(n); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	maskNotifier(n)
+	writeJSON(w, code, n)
 }
 
 func (h *Hub) updateNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {
@@ -1532,26 +1562,35 @@ func (h *Hub) updateNotifier(w http.ResponseWriter, r *http.Request, _ *store.Us
 		writeErr(w, 400, "invalid id")
 		return
 	}
-	var n store.Notifier
-	if readJSON(r, &n) != nil {
+	cur, err := h.store.Notifier(id)
+	if err != nil {
+		writeErr(w, 404, "notifier not found")
+		return
+	}
+	var b notifierBody
+	if readJSON(r, &b) != nil {
 		writeErr(w, 400, "invalid body")
 		return
 	}
+	n := b.apply(cur)
 	n.ID = id
-	if err := validateNotifier(&n); err != nil {
+	err = validateNotifier(n)
+	if err == nil {
+		err = h.validateScope(n)
+	}
+	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
 	}
-	if !h.appPushAllowed(w, &n) {
+	if !h.appPushAllowed(w, n) {
 		return
 	}
-	h.keepSecrets(&n)
-	if err := h.store.UpdateNotifier(&n); err != nil {
+	h.keepSecrets(n)
+	if err := h.store.UpdateNotifier(n); err != nil {
 		h.internalErr(w, err)
 		return
 	}
-	maskNotifier(&n)
-	writeJSON(w, 200, n)
+	h.saveChannelMonitors(w, n, 200)
 }
 
 func (h *Hub) deleteNotifier(w http.ResponseWriter, r *http.Request, _ *store.User) {

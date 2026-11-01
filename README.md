@@ -309,6 +309,21 @@ it through a link (valid 7 days); then every update posted with *email subscribe
 an unsubscribe link and a one-click `List-Unsubscribe` header. Admins see and remove subscribers under the incidents of
 the page. Links point to the custom domain of the page, or else to the public URL from the settings, so set it.
 
+## Which monitors and events each channel gets
+
+Each notification channel has a **scope** and **events**:
+
+- **scope**: *all monitors* (also the ones added later), or the monitors of some **groups** and **tags**, or none
+  (only the monitors linked one by one).
+- **events**: `down` (with its reminders), `up` (recovery, only to channels that got the alert), `degraded` (some
+  locations fail, and when that ends; off by default), `cert_expiry` and `domain_expiry`.
+
+A monitor can also be linked to a channel **one by one**, from the channel (its monitor list) or from the monitor
+form (*notifications*): the link has events of its own and wins over the scope, so it adds a monitor, changes what
+it sends, or leaves the monitor out of an *all monitors* channel. Channels created before this existed cover all
+monitors with every event except `degraded`, so nothing changes until you edit them. Webhooks carry `kind`
+(`""`, `degraded`, `cert_expiry`, `domain_expiry`) and `status`.
+
 ## Escalation and reminders
 
 Each notification channel has two optional settings, in minutes:

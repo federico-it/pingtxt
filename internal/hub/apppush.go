@@ -216,6 +216,15 @@ func appMessage(e Event) pushMessage {
 		}
 		m.Title = first
 		body = append(body, strings.TrimPrefix(rest, "> "))
+	case KindDegraded:
+		m.Title = e.Monitor + " is degraded"
+		if e.Status != StatusDegraded {
+			m.Title = e.Monitor + " is no longer degraded"
+		}
+		body = append(body, e.Target)
+		if e.Cause != "" && e.Status == StatusDegraded {
+			body = append(body, e.Cause)
+		}
 	default:
 		if e.Status == StatusDown {
 			m.Priority = "high"
