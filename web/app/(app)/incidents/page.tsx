@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useApi, type Incident, type MonitorSummary } from "@/lib/api"
 import { useMinute, useNow } from "@/hooks/use-now"
 import { datetime, duration } from "@/lib/format"
-import { cn } from "@/lib/utils"
+import { segment } from "@/components/ui/control"
 
 const states = ["all", "open", "resolved"] as const
 const periods = ["24h", "7d", "30d", "all"] as const
@@ -74,7 +74,7 @@ function Incidents() {
           value={String(monitor)}
           onValueChange={(v) => set("monitor", v && v !== "0" ? v : null)}
         >
-          <SelectTrigger className="h-8 w-48" aria-label={t("monitor")}>
+          <SelectTrigger className="w-48" aria-label={t("monitor")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -93,10 +93,7 @@ function Incidents() {
             <button
               key={s}
               onClick={() => set("state", s === "all" ? null : s)}
-              className={cn(
-                "px-2 py-0.5 text-muted-foreground hover:text-foreground",
-                state === s && "bg-accent text-foreground"
-              )}
+              className={segment({ active: state === s })}
             >
               {t(`filter.${s}`)}
             </button>
@@ -108,10 +105,7 @@ function Incidents() {
             <button
               key={p}
               onClick={() => set("period", p === "all" ? null : p)}
-              className={cn(
-                "px-2 py-0.5 text-muted-foreground hover:text-foreground",
-                period === p && "bg-accent text-foreground"
-              )}
+              className={segment({ active: period === p })}
             >
               {p === "all" ? t("filter.anyTime") : p}
             </button>

@@ -26,7 +26,7 @@ import {
   type Settings,
 } from "@/lib/api"
 import { isLocale, locales, useLocale, type Locale } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+import { option } from "@/components/ui/control"
 
 export default function SettingsPage() {
   const me = useApi<Me>("/api/auth/me", { refreshInterval: 0 })
@@ -65,10 +65,7 @@ export default function SettingsPage() {
               <button
                 key={th}
                 onClick={() => setTheme(th)}
-                className={cn(
-                  "border border-dashed px-3 py-1.5 hover:bg-accent",
-                  theme === th && "border-solid border-primary text-primary"
-                )}
+                className={option({ active: theme === th })}
               >
                 {tc(`theme.${th}`)}
               </button>
@@ -83,10 +80,7 @@ export default function SettingsPage() {
                 key={l}
                 lang={l}
                 onClick={() => isLocale(l) && setLocale(l)}
-                className={cn(
-                  "border border-dashed px-3 py-1.5 hover:bg-accent",
-                  locale === l && "border-solid border-primary text-primary"
-                )}
+                className={option({ active: locale === l })}
               >
                 {locales[l]}
               </button>

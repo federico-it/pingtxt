@@ -20,6 +20,7 @@ import { useNow } from "@/hooks/use-now"
 import { api, useApi, useIsAdmin, type Maintenance, type MaintenanceKind, type Monitor } from "@/lib/api"
 import { datetime, duration } from "@/lib/format"
 import { tr } from "@/lib/i18n"
+import { chip } from "@/components/ui/control"
 import { cn } from "@/lib/utils"
 
 const kinds: MaintenanceKind[] = ["once", "daily", "weekly", "monthly"]
@@ -393,7 +394,7 @@ function DayToggle({ on, onChange, children }: { on: boolean; onChange: (on: boo
       type="button"
       onClick={() => onChange(!on)}
       className={cn(
-        "border border-dashed px-2 py-1 text-xs transition-colors",
+        chip,
         on ? "border-info bg-info/15 text-foreground" : "text-muted-foreground hover:text-foreground"
       )}
     >

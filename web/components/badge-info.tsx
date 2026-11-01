@@ -7,7 +7,7 @@ import { useTranslations } from "use-intl"
 import { CopyBlock } from "@/components/copy-block"
 import { Section } from "@/components/page-header"
 import { useApi, type StatusPage } from "@/lib/api"
-import { cn } from "@/lib/utils"
+import { segment } from "@/components/ui/control"
 
 const kinds = ["status", "uptime", "response"] as const
 const periods = ["24h", "7d", "30d", "90d"] as const
@@ -34,7 +34,7 @@ function Tabs<T extends string>({ items, value, onChange, label }: { items: read
           key={k}
           type="button"
           onClick={() => onChange(k)}
-          className={cn("px-1.5 text-muted-foreground hover:text-foreground", value === k && "bg-accent text-foreground")}
+          className={segment({ active: value === k })}
         >
           {label(k)}
         </button>

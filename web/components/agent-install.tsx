@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useTranslations } from "use-intl"
 
 import { CopyBlock } from "@/components/copy-block"
-import { cn } from "@/lib/utils"
+import { segment } from "@/components/ui/control"
 
 const AGENT_IMAGE = "ghcr.io/federico-it/pingtxt-agent:latest"
 
@@ -42,7 +42,7 @@ PINGTXT_HUB=${hub} PINGTXT_TOKEN=${token} ./pingtxt-agent`,
             key={k}
             type="button"
             onClick={() => setTab(k)}
-            className={cn("px-2 py-0.5 text-muted-foreground hover:text-foreground", tab === k && "bg-accent text-foreground")}
+            className={segment({ active: tab === k })}
           >
             {k}
           </button>

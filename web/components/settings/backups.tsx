@@ -22,7 +22,7 @@ import {
 } from "@/lib/api"
 import { datetime } from "@/lib/format"
 import { tr } from "@/lib/i18n"
-import { cn } from "@/lib/utils"
+import { option } from "@/components/ui/control"
 
 function bytes(n: number) {
   if (n < 1024) return `${n} B`
@@ -169,10 +169,7 @@ export function ConfigTransfer({ onImported }: { onImported?: () => void }) {
                       key={m}
                       type="button"
                       onClick={() => setMode(m)}
-                      className={cn(
-                        "border border-dashed px-3 py-1.5 text-xs hover:bg-accent",
-                        mode === m && "border-solid border-primary text-primary"
-                      )}
+                      className={option({ active: mode === m })}
                     >
                       {t(`modes.${m}`)}
                     </button>
