@@ -21,3 +21,6 @@ npm run build    # static files in site/out
 - The home page has schema.org JSON-LD (`SoftwareApplication`).
 - Screenshots (`components/shot.tsx`) need a descriptive `alt` and their
   `width`/`height`; `label` is only the fake command in the title bar.
+- `llms.txt` (map of the site for AI assistants, `lib/llms.ts`) and
+  `llms-full.txt` (the repository README, read at build time). New docs
+  sections go in the list in `lib/llms.ts` too.
