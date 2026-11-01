@@ -707,6 +707,11 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             No names, targets, addresses, results or emails, and the service does not store IP addresses. Start the hub with{" "}
             <C>PINGTXT_DISABLE_TELEMETRY=true</C> to turn the stats off for good and hide the question. Development builds never send.
           </p>
+          <p>
+            The totals are public at <a href="https://telemetry.pingtxt.com/" className="text-foreground underline underline-offset-4">telemetry.pingtxt.com</a>{" "}
+            (JSON at <C>/v1/stats</C>): live hubs, monitors and agents, versions in use and 90 days of history. Never a single
+            hub&apos;s report.
+          </p>
         </Section>
 
         <Section id="verify" title="verify a release">

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { CopyBlock } from "@/components/copy-block"
 import { Shot } from "@/components/shot"
 import { Prompt, REPO, SectionTitle } from "@/components/site-shell"
+import { UsageStats } from "@/components/usage-stats"
 
 const features: { title: string; body: string }[] = [
   {
@@ -150,6 +151,8 @@ export default function Home() {
           <Shot light="/screenshots/agent-install.png" alt="pingtxt agents add" caption="Add a location in one command." />
         </div>
       </section>
+
+      <UsageStats />
 
       <section id="install" className="space-y-6">
         <SectionTitle>install</SectionTitle>
