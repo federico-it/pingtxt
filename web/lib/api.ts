@@ -193,6 +193,8 @@ export interface Agent {
   last_seen: number
   created_at: number
   online: boolean
+  /** number of monitors that check from this agent */
+  monitors: number
   /** version differs from the hub's */
   update_available: boolean
   /** the connected agent can replace its own binary */
@@ -201,6 +203,25 @@ export interface Agent {
   no_update_reason?: string
   update_state?: "updating" | "failed"
   update_error?: string
+}
+
+/** Why a monitor cannot get a new agent: IPv6 monitor and the agent has no
+ * IPv6 (or has not reported it yet), Docker check, or localhost target. */
+export type AgentSkipReason = "no_ipv6" | "ipv6_unknown" | "docker" | "loopback"
+
+export interface AgentMonitor {
+  id: number
+  name: string
+  type: string
+  target: string
+  reason?: AgentSkipReason
+}
+
+export interface AgentMonitorPlan {
+  compatible: AgentMonitor[]
+  skipped: AgentMonitor[]
+  /** monitors that already check from this agent */
+  already: number
 }
 
 /** 0 instance default (monitors only), 1 IPv4 or IPv6 (first to answer),

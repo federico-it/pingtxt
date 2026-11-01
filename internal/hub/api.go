@@ -145,6 +145,8 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/agents/{id}", auth(h.deleteAgent))
 	mux.HandleFunc("POST /api/agents/{id}/token", auth(h.rotateAgentToken))
 	mux.HandleFunc("POST /api/agents/{id}/update", auth(h.updateAgentNow))
+	mux.HandleFunc("GET /api/agents/{id}/monitors", auth(h.agentMonitors))
+	mux.HandleFunc("POST /api/agents/{id}/monitors", auth(h.assignAgent))
 	mux.HandleFunc("PUT /api/settings/agent-updates", auth(h.putAgentUpdateSettings))
 
 	mux.HandleFunc("GET /api/notifiers", auth(h.listNotifiers))
@@ -1187,6 +1189,8 @@ type agentView struct {
 	*store.Agent
 	LocationID string `json:"location_id"`
 	Online     bool   `json:"online"`
+	// Monitors counts the monitors that check from this agent.
+	Monitors int `json:"monitors"`
 	updateView
 }
 
@@ -1239,9 +1243,18 @@ func (h *Hub) listAgents(w http.ResponseWriter, r *http.Request, _ *store.User) 
 		h.internalErr(w, err)
 		return
 	}
+	ms, err := h.store.ListMonitors()
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	used := agentMonitorCounts(ms)
 	out := make([]agentView, 0, len(agents))
 	for _, a := range agents {
-		out = append(out, agentView{Agent: a, LocationID: AgentLocation(a.ID), Online: h.AgentOnline(a.ID), updateView: h.agentUpdateView(a)})
+		loc := AgentLocation(a.ID)
+		// The live IPv6 state: the stored one lags behind a fresh connection.
+		a.IPv6 = int(h.locationIPv6(loc))
+		out = append(out, agentView{Agent: a, LocationID: loc, Online: h.AgentOnline(a.ID), Monitors: used[loc], updateView: h.agentUpdateView(a)})
 	}
 	writeJSON(w, 200, map[string]any{
 		"agents": out, "hub_url": h.hubURL(r),
