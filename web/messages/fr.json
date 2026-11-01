@@ -55,7 +55,19 @@
     "readOnlyHint": "",
     "menu": "",
     "logout": "",
-    "themeHint": ""
+    "themeHint": "",
+    "jumpHint": ""
+  },
+  "commandMenu": {
+    "title": "",
+    "placeholder": "",
+    "actions": "",
+    "monitors": "",
+    "pages": "",
+    "empty": "",
+    "newMonitor": "",
+    "newStatusPage": "",
+    "keys": ""
   },
   "notFound": {
     "message": ""
@@ -95,7 +107,37 @@
     "down": "",
     "heartbeatLine": "",
     "monitorLine": "",
-    "locations": ""
+    "locations": "",
+    "searchHint": "",
+    "sort": {
+      "title": "",
+      "label": "",
+      "status": "",
+      "name": "",
+      "uptime": "",
+      "latency": "",
+      "changed": ""
+    },
+    "bulk": {
+      "selectAll": "",
+      "select": "",
+      "selected": "",
+      "pause": "",
+      "resume": "",
+      "moveToGroup": "",
+      "noGroup": "",
+      "delete": "",
+      "clear": "",
+      "error": "",
+      "done": {
+        "pause": "",
+        "resume": "",
+        "delete": "",
+        "group": ""
+      },
+      "undo": "",
+      "undone": ""
+    }
   },
   "monitor": {
     "resumed": "",
@@ -105,8 +147,6 @@
     "resume": "",
     "pause": "",
     "edit": "",
-    "deleteTitle": "",
-    "deleteText": "",
     "none": "",
     "pushLine": "",
     "checkLine": "",
@@ -149,7 +189,23 @@
     "ipv4Only": "",
     "ipv6Only": "",
     "ipBoth": "",
-    "degradedAtDefault": ""
+    "degradedAtDefault": "",
+    "checkNow": "",
+    "checking": "",
+    "duplicate": "",
+    "duplicateHint": "",
+    "undo": "",
+    "undone": "",
+    "deleteHint": ""
+  },
+  "resultsLog": {
+    "failedOnly": "",
+    "window": "",
+    "clearWindow": "",
+    "none": "",
+    "loadMore": "",
+    "loading": "",
+    "retentionHint": ""
   },
   "monitorForm": {
     "newTitle": "",
@@ -330,7 +386,22 @@
         "lte": "",
         "matches": ""
       }
-    }
+    },
+    "test": "",
+    "testing": "",
+    "testHint": "",
+    "unsaved": "",
+    "unsavedChanges": "",
+    "copyTitle": "",
+    "copyName": ""
+  },
+  "testCheck": {
+    "title": "",
+    "running": "",
+    "ok": "",
+    "fail": "",
+    "skipped": "",
+    "notStored": ""
   },
   "pushInfo": {
     "title": "",
@@ -410,7 +481,8 @@
     "noData": "",
     "summary": "",
     "degradedChecks": "",
-    "maintChecks": ""
+    "maintChecks": "",
+    "clickForChecks": ""
   },
   "incidents": {
     "title": "",
@@ -421,7 +493,18 @@
     "duration": "",
     "cause": "",
     "resolved": "",
-    "ongoing": ""
+    "ongoing": "",
+    "filter": {
+      "all": "",
+      "open": "",
+      "resolved": "",
+      "period": "",
+      "anyTime": ""
+    },
+    "allMonitors": "",
+    "noMatch": "",
+    "count": "",
+    "showChecks": ""
   },
   "maintenance": {
     "title": "",
@@ -583,10 +666,37 @@
     "updatingState": "",
     "updateFailed": "",
     "newVersion": "",
-    "updatesOnReconnect": ""
+    "updatesOnReconnect": "",
+    "waiting": "",
+    "noMonitors": "",
+    "monitors": "",
+    "assign": ""
   },
   "agentInstall": {
     "hint": ""
+  },
+  "agentAssign": {
+    "title": "",
+    "textOnline": "",
+    "text": "",
+    "loading": "",
+    "compatible": "",
+    "skipped": "",
+    "already": "",
+    "none": "",
+    "noneLeft": "",
+    "selectAll": "",
+    "selectNone": "",
+    "reasons": {
+      "no_ipv6": "",
+      "ipv6_unknown": "",
+      "docker": "",
+      "loopback": ""
+    },
+    "later": "",
+    "add": "",
+    "added": "",
+    "error": ""
   },
   "notifications": {
     "title": "",
@@ -1108,6 +1218,25 @@
     "keep": "",
     "keepHint": "",
     "saveSchedule": ""
+  },
+  "kumaImport": {
+    "title": "",
+    "intro": "",
+    "chooseFile": "",
+    "reading": "",
+    "summary": "",
+    "action": {
+      "create": "",
+      "exists": "",
+      "skip": ""
+    },
+    "paused": "",
+    "import": "",
+    "importing": "",
+    "cancel": "",
+    "done": "",
+    "openDashboard": "",
+    "error": ""
   },
   "apiDocs": {
     "title": "",
