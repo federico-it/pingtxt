@@ -9,7 +9,7 @@ import { CopyBlock } from "@/components/copy-block"
 import { Section } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { api } from "@/lib/api"
-import { cn } from "@/lib/utils"
+import { segment } from "@/components/ui/control"
 
 const examples = (url: string, c: { cron: string; failure: string }) => ({
   cron: `# ${c.cron}
@@ -50,10 +50,7 @@ export function PushInfo({
             <button
               key={k}
               onClick={() => setTab(k)}
-              className={cn(
-                "px-1.5 hover:text-foreground",
-                tab === k && "bg-accent text-foreground"
-              )}
+              className={segment({ active: tab === k })}
             >
               {t(`tabs.${k}`)}
             </button>

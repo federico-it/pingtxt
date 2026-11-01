@@ -215,10 +215,10 @@ function IncidentCard({
           <Input required maxLength={200} value={title} aria-label={t("incidentTitle")} onChange={(e) => setTitle(e.target.value)} />
           <Choice value={impact} items={impactItems} onChange={setImpact} />
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={busy}>
+            <Button type="submit" disabled={busy}>
               {t("save")}
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+            <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
               {t("cancel")}
             </Button>
           </div>
@@ -274,7 +274,7 @@ function IncidentCard({
             onChange={(e) => setMessage(e.target.value)}
           />
           <div className="flex flex-wrap items-center gap-4 sm:col-start-2">
-            <Button type="submit" size="sm" disabled={busy}>
+            <Button type="submit" disabled={busy}>
               {t("postUpdate")}
             </Button>
             {subscribers && <NotifyBox checked={notify} onChange={setNotify} />}

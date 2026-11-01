@@ -20,7 +20,7 @@ import {
   type ReportSettings,
 } from "@/lib/api"
 import { datetime } from "@/lib/format"
-import { cn } from "@/lib/utils"
+import { option } from "@/components/ui/control"
 
 const kinds: ReportKind[] = ["weekly", "monthly"]
 
@@ -68,10 +68,7 @@ function Toggle({
       disabled={disabled}
       onClick={onClick}
       aria-pressed={on}
-      className={cn(
-        "border border-dashed px-3 py-1.5 text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60",
-        on && "border-solid border-primary text-primary"
-      )}
+      className={option({ active: on })}
     >
       {children}
     </button>
