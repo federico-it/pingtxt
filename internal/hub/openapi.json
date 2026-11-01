@@ -3717,6 +3717,96 @@
         }
       }
     },
+    "/api/telemetry": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Anonymous usage stats",
+        "operationId": "getTelemetry",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.\n\nWhether an admin answered the opt-in question, whether stats are on, and the exact report sent once an hour (random instance id, version, active monitors, connected agents).",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage stats status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Turn anonymous usage stats on or off",
+        "operationId": "setTelemetry",
+        "description": "**Access:** Browser session of an admin only: API tokens get 403.\n\nRecords the admin's answer. The instance id is made the first time stats are turned on and never changes.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "enabled"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Usage stats status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "description": "Usage stats are turned off on this hub (PINGTXT_DISABLE_TELEMETRY or a development build)."
+          }
+        }
+      }
+    },
     "/api/public/status/{slug}": {
       "get": {
         "tags": [
@@ -9045,6 +9135,54 @@
           "error": {
             "type": "string",
             "description": "Why the last check failed."
+          }
+        }
+      },
+      "TelemetryStatus": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "asked": {
+            "type": "boolean",
+            "description": "An admin answered the opt-in question."
+          },
+          "forced_off": {
+            "type": "boolean",
+            "description": "PINGTXT_DISABLE_TELEMETRY is set or this is a development build."
+          },
+          "report": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Exactly what the next hourly report sends (null when off).",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Random instance id, never changes."
+              },
+              "version": {
+                "type": "string"
+              },
+              "monitors": {
+                "type": "integer",
+                "description": "Monitors not paused."
+              },
+              "agents": {
+                "type": "integer",
+                "description": "Agents connected now."
+              }
+            }
+          },
+          "sent_at": {
+            "type": "integer",
+            "description": "Last report sent (unix ms), 0 if none yet."
+          },
+          "error": {
+            "type": "string",
+            "description": "Last send error."
           }
         }
       },

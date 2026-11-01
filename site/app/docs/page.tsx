@@ -33,6 +33,7 @@ const toc = [
   ["apps", "native apps"],
   ["prometheus", "prometheus"],
   ["upgrade", "upgrade + backup"],
+  ["usage-stats", "usage stats"],
   ["verify", "verify a release"],
   ["build", "build from source"],
   ["contributing", "contributing"],
@@ -678,6 +679,33 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
             Release builds ask GitHub for the latest release every 12 hours and show admins a notice when a newer one is out.
             Turn it off in <b className="text-foreground">settings → updates</b>, or start the hub with{" "}
             <C>PINGTXT_DISABLE_UPDATE_CHECK=true</C> so it never contacts GitHub.
+          </p>
+        </Section>
+
+        <Section id="usage-stats" title="usage stats">
+          <p>
+            After installing, admins are asked once whether the hub may send anonymous usage stats. Nothing is sent until
+            someone says yes, and the answer can be changed any time in <b className="text-foreground">settings → usage stats</b>,
+            which also shows the exact next report.
+          </p>
+          <p>Once an hour the hub sends to <C>telemetry.pingtxt.com</C> only this:</p>
+          <ul>
+            <li>
+              <C>id</C>: a random id made the first time stats are turned on. It never changes and says nothing about the hub.
+            </li>
+            <li>
+              <C>version</C>: the pingtxt version.
+            </li>
+            <li>
+              <C>monitors</C>: how many monitors are not paused.
+            </li>
+            <li>
+              <C>agents</C>: how many agents are connected.
+            </li>
+          </ul>
+          <p>
+            No names, targets, addresses, results or emails, and the service does not store IP addresses. Start the hub with{" "}
+            <C>PINGTXT_DISABLE_TELEMETRY=true</C> to turn the stats off for good and hide the question. Development builds never send.
           </p>
         </Section>
 

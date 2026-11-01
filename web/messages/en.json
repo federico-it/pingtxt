@@ -1119,6 +1119,23 @@
     "intro": "Every endpoint of the hub's REST API. Try it out uses your browser session; to test a token, paste it in Authorize. Account and instance settings accept the browser session only.",
     "error": "could not load the API document: {error}"
   },
+  "telemetry": {
+    "question": "Help improve pingtxt? This hub can send anonymous usage stats once an hour: a random id, its version and how many monitors and agents it runs. Nothing else.",
+    "what": "what is sent",
+    "yes": "yes, send",
+    "no": "no, thanks",
+    "thanks": "thanks! you can turn it off in settings",
+    "declined": "nothing will be sent. you can change this in settings",
+    "title": "usage stats",
+    "label": "send anonymous usage stats",
+    "hint": "once an hour: a random id that never changes, the version, active monitors and connected agents. no names, targets or addresses",
+    "forcedOff": "turned off on this hub (PINGTXT_DISABLE_TELEMETRY or a development build).",
+    "sends": "next report:",
+    "sent": "last sent {ago}",
+    "notYet": "not sent yet",
+    "failed": "last send failed: {error}",
+    "off": "off: nothing is sent."
+  },
   "update": {
     "available": "pingtxt <b>{latest}</b> is available (this hub runs {current}).",
     "notes": "release notes",

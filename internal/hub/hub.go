@@ -48,6 +48,8 @@ type Config struct {
 	DisableLocal  bool
 	// DisableUpdateCheck turns the release check off on first start.
 	DisableUpdateCheck bool
+	// DisableTelemetry turns the anonymous usage stats off for good.
+	DisableTelemetry bool
 }
 
 type locState struct {
@@ -111,6 +113,7 @@ type Hub struct {
 	metricsCache metricsCache
 	updates      agentUpdates
 	releases     releaseChecker
+	telemetry    telemetry
 
 	reports reportRunner // periodic email reports
 
@@ -134,6 +137,7 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 	h.notify.publicURL = func() string { return h.generalSettings().PublicURL }
 	h.httpClient = &http.Client{Timeout: 15 * time.Second}
 	h.releases.wake = make(chan struct{}, 1)
+	h.telemetry.wake = make(chan struct{}, 1)
 	h.expiry.domains = expiry.NewDomains(h.httpClient)
 	h.expiry.cache = map[string]domainCacheEntry{}
 	if err := h.loadSettings(); err != nil {
@@ -178,6 +182,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.backupLoop(ctx)
 	go h.reportLoop(ctx)
 	go h.releaseLoop(ctx)
+	go h.telemetryLoop(ctx)
 	go h.agentUpdateLoop(ctx)
 	go h.escalationLoop(ctx)
 	go h.localIPv6.Run(ctx, 10*time.Minute)

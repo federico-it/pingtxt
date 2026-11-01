@@ -422,6 +422,24 @@ export interface GeneralSettings {
   update_check: { disabled: boolean }
 }
 
+/** Anonymous usage stats (admins only), see /api/telemetry. */
+export interface TelemetryStatus {
+  enabled: boolean
+  /** an admin answered the opt-in question */
+  asked: boolean
+  /** PINGTXT_DISABLE_TELEMETRY or a development build */
+  forced_off: boolean
+  /** exactly what the next hourly report sends (null when off) */
+  report: {
+    id: string
+    version: string
+    monitors: number
+    agents: number
+  } | null
+  sent_at: number
+  error?: string
+}
+
 export interface ReleaseInfo {
   version: string
   name: string

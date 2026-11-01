@@ -106,6 +106,8 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/overview", auth(h.overview))
 	mux.HandleFunc("GET /api/version", auth(h.getVersion))
 	mux.HandleFunc("POST /api/version/check", admin(h.checkVersionNow))
+	mux.HandleFunc("GET /api/telemetry", admin(h.getTelemetry))
+	mux.HandleFunc("PUT /api/telemetry", admin(h.putTelemetry))
 	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
 	mux.HandleFunc("POST /api/monitors", auth(h.createMonitor))
 	mux.HandleFunc("GET /api/monitors/{id}", auth(h.getMonitor))
