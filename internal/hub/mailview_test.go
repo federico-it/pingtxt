@@ -20,7 +20,7 @@ func mailSamples(t *testing.T) map[string]fakeMail {
 	base := "https://hub.example.com"
 	days := func(n int) *int { return &n }
 	out := map[string]fakeMail{}
-	add := func(name string, b []byte) { out[name] = fakeMail{data: string(b)} }
+	add := func(name string, m mailMsg) { out[name] = fakeMail{data: string(writeMail(ec, m))} }
 
 	add("alert-down", buildEmail(ec, Event{MonitorID: 3, Monitor: "hub api", Target: "https://api.example.com/health", Status: StatusDown, Cause: "http 503: Service Unavailable", At: at}, base, now))
 	add("alert-still-down", buildEmail(ec, Event{MonitorID: 3, Monitor: "hub api", Target: "https://api.example.com/health", Status: StatusDown, Cause: "dial tcp 10.0.0.4:443: connect: connection refused", At: at, DownSince: at - 47*60_000, Reminder: 2}, base, now))
@@ -56,12 +56,12 @@ func mailSamples(t *testing.T) map[string]fakeMail {
 	page := &store.StatusPage{Title: "Acme <Status>", Slug: "acme"}
 	sub := &store.PageSubscriber{Email: "jane@example.com", Token: strings.Repeat("ab", 24)}
 	links := pageLinks{page: "https://status.acme.test/", api: "https://status.acme.test"}
-	add("subscribe-confirm", buildConfirmEmail(ec, page, sub, links, now))
+	add("subscribe-confirm", buildConfirmEmail(page, sub, links, now))
 	inc := &store.PageIncident{Title: "Slow API responses", Impact: store.ImpactMajor, CreatedAt: at - 40*60_000}
-	add("incident-update", buildUpdateEmail(ec, page, inc, store.PageIncidentUpdate{Status: store.ReportIdentified, Message: "A database node is slow.\nWe are failing over to the replica."}, sub, links, now))
+	add("incident-update", buildUpdateEmail(page, inc, store.PageIncidentUpdate{Status: store.ReportIdentified, Message: "A database node is slow.\nWe are failing over to the replica."}, sub, links, now))
 	inc2 := *inc
 	inc2.ResolvedAt = at
-	add("incident-resolved", buildUpdateEmail(ec, page, &inc2, store.PageIncidentUpdate{Status: store.ReportResolved, Message: "Latency is back to normal."}, sub, links, now))
+	add("incident-resolved", buildUpdateEmail(page, &inc2, store.PageIncidentUpdate{Status: store.ReportResolved, Message: "Latency is back to normal."}, sub, links, now))
 	return out
 }
 

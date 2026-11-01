@@ -476,7 +476,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
 
         <Section id="notifications" title="notifications">
           <p>
-            Webhook (JSON), Discord, Slack, Telegram, ntfy and email (SMTP with STARTTLS/TLS). Add them under{" "}
+            Webhook (JSON), Discord, Slack, Telegram, ntfy and email (SMTP with STARTTLS/TLS, or the Resend API with an API key from a verified domain). Add them under{" "}
             <b className="text-foreground">notify</b>, test them before saving, and attach them to monitors.
           </p>
           <p>

@@ -13,7 +13,7 @@ but plain text, monospace, light and dark.
   Uptime follows that status: a check counts as downtime only while the monitor is down, so one failing location among
   several does not lower it.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.
-- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, configured from the UI),
+- Notifications: webhook (JSON), Discord, Slack, Telegram, ntfy, email (SMTP with STARTTLS/TLS, or the [Resend](https://resend.com) API with a key; configured from the UI),
   with **escalation** (a channel alerted only after X minutes down) and **reminders** while a monitor stays down.
 - **Periodic email reports**, weekly (Mondays) or monthly (on the 1st): uptime, incidents and downtime per monitor group,
   compared with the period before, sent through your email channels at the hour and in the time zone you pick.
@@ -304,7 +304,7 @@ page banner at least *degraded* (minor), *partial outage* (major) or *major outa
 history for the shown days.
 
 To let visitors **subscribe by email**, pick an email notification channel under *email subscriptions* in the page
-settings: its SMTP server and sender are used (not its recipients). Visitors enter their address on the page and confirm
+settings: its SMTP server or Resend account and its sender are used (not its recipients). Visitors enter their address on the page and confirm
 it through a link (valid 7 days); then every update posted with *email subscribers* checked reaches them. Each email has
 an unsubscribe link and a one-click `List-Unsubscribe` header. Admins see and remove subscribers under the incidents of
 the page. Links point to the custom domain of the page, or else to the public URL from the settings, so set it.

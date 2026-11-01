@@ -1433,6 +1433,7 @@ func validateNotifier(n *store.Notifier) error {
 	}
 	if n.Type == "email" {
 		delete(n.Config, "password_set")
+		delete(n.Config, "api_key_set")
 		_, err := parseEmailConfig(n.Config)
 		return err
 	}
@@ -1460,7 +1461,7 @@ func (h *Hub) listNotifiers(w http.ResponseWriter, r *http.Request, u *store.Use
 
 // writeOnlyKeys are config values the API accepts but never returns.
 // An empty value on update keeps the stored one.
-var writeOnlyKeys = map[string][]string{"email": {"password"}}
+var writeOnlyKeys = map[string][]string{"email": {"password", "api_key"}}
 
 // maskNotifier removes write-only secrets, replacing each with <key>_set.
 func maskNotifier(n *store.Notifier) {
@@ -1475,7 +1476,7 @@ func maskNotifier(n *store.Notifier) {
 // secretBoundKeys are the settings a write-only secret belongs to: when one
 // of them changes the stored secret is not reused, so it cannot be sent to
 // another server (or in clear text) by editing the channel or testing a draft.
-var secretBoundKeys = map[string][]string{"email": {"host", "port", "username", "security"}}
+var secretBoundKeys = map[string][]string{"email": {"provider", "host", "port", "username", "security"}}
 
 // keepSecrets fills empty write-only values of n from the stored channel,
 // as long as they would go to the same server.

@@ -686,12 +686,12 @@ func reportHTMLBody(r *Report, from, to time.Time) (string, error) {
 }
 
 // buildReportEmail renders a multipart/alternative message: plain text and HTML.
-func buildReportEmail(ec *emailConfig, subject, text, html string, now time.Time) []byte {
+func buildReportEmail(ec *emailConfig, subject, text, html string, now time.Time) mailMsg {
 	to := make([]string, len(ec.To))
 	for i, a := range ec.To {
 		to[i] = a.String()
 	}
-	return writeMail(ec, mailHeaders{to: strings.Join(to, ", "), subject: subject}, text+"\n-- \nsent by pingtxt\n", html, now)
+	return newMail(mailHeaders{to: strings.Join(to, ", "), subject: subject}, text+"\n-- \nsent by pingtxt\n", html, now)
 }
 
 // sendReport builds the report of [from, to) and emails it to the channels

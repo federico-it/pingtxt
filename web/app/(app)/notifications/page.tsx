@@ -33,8 +33,13 @@ type Field = {
   options?: string[]
   half?: boolean
   required?: boolean
-  hint?: "commaSeparated" | "appUsers"
+  hint?: "commaSeparated" | "appUsers" | "resendKey"
+  /** Shown only when this returns true for the current config. */
+  when?: (config: Record<string, string>) => boolean
 }
+
+const isResend = (c: Record<string, string>) => c.provider === "resend"
+const isSMTP = (c: Record<string, string>) => !isResend(c)
 
 // Kind labels are in notifications.kinds.<type>.
 const kinds: Record<NotifierType, { fields: Field[] }> = {
@@ -55,15 +60,18 @@ const kinds: Record<NotifierType, { fields: Field[] }> = {
   },
   email: {
     fields: [
-      { key: "host", label: "smtpHost", placeholder: "smtp.example.com", required: true, half: true },
-      { key: "port", label: "port", placeholder: "587", half: true },
+      { key: "provider", label: "provider", options: ["smtp", "resend"] },
+      { key: "host", label: "smtpHost", placeholder: "smtp.example.com", required: true, half: true, when: isSMTP },
+      { key: "port", label: "port", placeholder: "587", half: true, when: isSMTP },
       {
         key: "security",
         label: "security",
         options: ["starttls", "tls", "none"],
+        when: isSMTP,
       },
-      { key: "username", label: "username", placeholder: "alerts@example.com", half: true },
-      { key: "password", label: "password", secret: true, writeOnly: true, half: true },
+      { key: "username", label: "username", placeholder: "alerts@example.com", half: true, when: isSMTP },
+      { key: "password", label: "password", secret: true, writeOnly: true, half: true, when: isSMTP },
+      { key: "api_key", label: "apiKey", placeholder: "re_...", secret: true, writeOnly: true, hint: "resendKey", when: isResend },
       { key: "from", label: "from", placeholder: "pingtxt <alerts@example.com>", required: true },
       { key: "to", label: "to", placeholder: "ops@example.com, oncall@example.com", required: true, hint: "commaSeparated" },
     ],
@@ -188,6 +196,7 @@ export default function NotificationsPage() {
                 <div className="text-xs text-muted-foreground">
                   {[
                     kinds[n.type] ? t(`kinds.${n.type}`) : n.type,
+                    n.type === "email" && (isResend(n.config) ? "resend" : "smtp"),
                     n.delay_min > 0 && t("afterDown", { min: n.delay_min }),
                     n.repeat_min > 0 && t("everyMin", { min: n.repeat_min }),
                   ]
@@ -256,9 +265,11 @@ export default function NotificationsPage() {
             </div>
             {draft?.type === "app" && pushOff && <PushOffNote box />}
             <div className="grid grid-cols-2 gap-4">
-              {kind?.fields.map((f) => (
-                <NotifierField key={`${draft?.type}-${f.key}`} field={f} config={draft?.config ?? {}} onChange={setConfig} />
-              ))}
+              {kind?.fields
+                .filter((f) => !f.when || f.when(draft?.config ?? {}))
+                .map((f) => (
+                  <NotifierField key={`${draft?.type}-${f.key}`} field={f} config={draft?.config ?? {}} onChange={setConfig} />
+                ))}
             </div>
             <div className="grid grid-cols-2 gap-4 border-t border-dashed pt-4">
               <div className="col-span-2 grid content-start gap-1.5 sm:col-span-1">
@@ -338,7 +349,19 @@ function NotifierField({ field: f, config, onChange }: { field: Field; config: R
           placeholder={saved ? "••••••••" : f.placeholder}
         />
       )}
-      {f.hint && <p className="text-xs text-muted-foreground">{t(`hints.${f.hint}`)}</p>}
+      {f.hint === "resendKey" ? (
+        <p className="text-xs text-muted-foreground">
+          {t.rich("hints.resendKey", {
+            link: (chunks) => (
+              <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                {chunks}
+              </a>
+            ),
+          })}
+        </p>
+      ) : (
+        f.hint && <p className="text-xs text-muted-foreground">{t(`hints.${f.hint}`)}</p>
+      )}
     </div>
   )
 }
