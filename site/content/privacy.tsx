@@ -293,15 +293,15 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
             </li>
             <li>
               {t(
-                "like any web request, your IP address and the language of your device (sent by iOS in the request headers).",
-                "come ogni richiesta web, il tuo indirizzo IP e la lingua del dispositivo (inviata da iOS nelle intestazioni della richiesta).",
+                "like any web request, your IP address, which the server does not store or use.",
+                "come ogni richiesta web, il tuo indirizzo IP, che il server non conserva né usa.",
               )}
             </li>
           </ul>
           <p>
             {t(
-              "The server answers with the latest version and whether yours is still supported. The installation id is stored only as a one-way hash, to roll out new versions gradually and to count active installations, versions and languages. Nothing about your hubs, monitors or account is sent. The request is skipped if the server cannot be reached; the app works the same.",
-              "Il server risponde con l'ultima versione e se la tua è ancora supportata. L'id di installazione viene conservato solo come hash non reversibile, per distribuire le nuove versioni in modo graduale e contare installazioni attive, versioni e lingue. Non viene inviato nulla sui tuoi hub, monitor o account. Se il server non è raggiungibile la richiesta viene saltata e l'app funziona lo stesso.",
+              "The server answers with the latest version and whether yours is still supported. The installation id is stored only as a one-way hash, to roll out new versions gradually and to count active installations and versions. Nothing about your hubs, monitors or account is sent. The request is skipped if the server cannot be reached; the app works the same.",
+              "Il server risponde con l'ultima versione e se la tua è ancora supportata. L'id di installazione viene conservato solo come hash non reversibile, per distribuire le nuove versioni in modo graduale e contare installazioni attive e versioni. Non viene inviato nulla sui tuoi hub, monitor o account. Se il server non è raggiungibile la richiesta viene saltata e l'app funziona lo stesso.",
             )}
           </p>
         </Section>
@@ -389,8 +389,8 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
             </li>
             <li>
               {t(
-                "The update check keeps the hashed installation id with the app version, iOS version and language it last reported, and the daily counts made from them. It does not keep your IP address with them.",
-                "Il controllo aggiornamenti conserva l'hash dell'id di installazione con l'ultima versione dell'app, versione di iOS e lingua che ha inviato, e i conteggi giornalieri che ne derivano. Non conserva con questi il tuo indirizzo IP.",
+                "The update check keeps only the hashed installation id with the app and iOS version it last reported, and the daily counts made from them. It keeps no IP addresses.",
+                "Il controllo aggiornamenti conserva solo l'hash dell'id di installazione con l'ultima versione dell'app e di iOS che ha inviato, e i conteggi giornalieri che ne derivano. Non conserva indirizzi IP.",
               )}
             </li>
             <li>
