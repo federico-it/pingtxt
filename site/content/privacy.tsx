@@ -26,6 +26,8 @@ const CONTACT = "privacy@pingtxt.com"
 const UPDATED = { en: "November 1, 2026", it: "1 novembre 2026" }
 
 const RELAY_REPO = "https://github.com/federico-it/pingtxt-push-relay"
+// The app asks this server whether a newer version exists.
+const UPDATES_HOST = "federicomengascini.com"
 
 const toc: [string, string, string][] = [
   ["summary", "summary", "in breve"],
@@ -34,6 +36,7 @@ const toc: [string, string, string][] = [
   ["device", "on your iphone", "sul tuo iphone"],
   ["push", "push notifications", "notifiche push"],
   ["live-activity", "live activity", "live activity"],
+  ["updates", "update check", "controllo aggiornamenti"],
   ["not-collected", "what we don't collect", "cosa non raccogliamo"],
   ["third-parties", "third parties", "terze parti"],
   ["retention", "retention + deletion", "conservazione + cancellazione"],
@@ -104,20 +107,28 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
             </li>
             <li>
               {t(
-                "We have no user accounts, no analytics, no advertising and no tracking. We don't sell or share personal data.",
-                "Non abbiamo account utente, analytics, pubblicità né tracciamento. Non vendiamo né condividiamo dati personali.",
+                "We have no user accounts, no advertising and no tracking. We don't sell or share personal data.",
+                "Non abbiamo account utente, pubblicità né tracciamento. Non vendiamo né condividiamo dati personali.",
               )}
             </li>
             <li>
               {t(
                 <>
-                  The only service we run that the app uses is the push relay at <C>push.pingtxt.com</C>. It forwards alerts
-                  from your hub to your phone through Apple and Google Firebase, and it stores nothing.
+                  The app uses two services that we run: the push relay at <C>push.pingtxt.com</C>, which forwards alerts
+                  from your hub to your phone through Apple and Google Firebase and stores nothing, and an update check at{" "}
+                  <C>{UPDATES_HOST}</C>, which tells the app when a new version is out.
                 </>,
                 <>
-                  L&apos;unico servizio gestito da noi che l&apos;app usa è il relay push su <C>push.pingtxt.com</C>. Inoltra
-                  gli avvisi dal tuo hub al tuo telefono tramite Apple e Google Firebase, e non conserva nulla.
+                  L&apos;app usa due servizi gestiti da noi: il relay push su <C>push.pingtxt.com</C>, che inoltra gli avvisi
+                  dal tuo hub al tuo telefono tramite Apple e Google Firebase e non conserva nulla, e un controllo degli
+                  aggiornamenti su <C>{UPDATES_HOST}</C>, che avvisa l&apos;app quando esce una nuova versione.
                 </>,
+              )}
+            </li>
+            <li>
+              {t(
+                "The update check uses a random installation id to count active installations. It is not linked to you, your hub or your phone.",
+                "Il controllo degli aggiornamenti usa un id di installazione casuale per contare le installazioni attive. Non è collegato a te, al tuo hub né al tuo telefono.",
               )}
             </li>
           </ul>
@@ -128,12 +139,12 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
             {t(
               <>
                 pingtxt is an open source project (<A href={`${REPO}/blob/main/LICENSE`}>AGPL-3.0</A>) maintained by {OWNER},
-                who is the controller for the data handled by the push relay and this website. Write to {mail} for anything
+                who is the controller for the data handled by the push relay, the update check and this website. Write to {mail} for anything
                 about this policy.
               </>,
               <>
                 pingtxt è un progetto open source (<A href={`${REPO}/blob/main/LICENSE`}>AGPL-3.0</A>) mantenuto da {OWNER},
-                titolare del trattamento dei dati gestiti dal relay push e da questo sito. Scrivi a {mail} per qualsiasi
+                titolare del trattamento dei dati gestiti dal relay push, dal controllo degli aggiornamenti e da questo sito. Scrivi a {mail} per qualsiasi
                 domanda su questa informativa.
               </>,
             )}
@@ -149,8 +160,14 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
           </p>
           <p>
             {t(
-              "Everything the app shows (monitors, check results, incidents, maintenance windows, agents, your account) is read from your hub, and every change you make is sent to your hub. The hub stores which phone is signed in (the sign-in, the device name set in iOS, and an encrypted push handle when notifications are on).",
-              "Tutto quello che l'app mostra (monitor, risultati dei controlli, incidenti, finestre di manutenzione, agent, il tuo account) viene letto dal tuo hub, e ogni modifica che fai viene inviata al tuo hub. L'hub conserva quale telefono ha effettuato l'accesso (l'accesso, il nome del dispositivo impostato in iOS e, se le notifiche sono attive, un identificativo push cifrato).",
+              "Everything the app shows (monitors, check results, incidents, maintenance windows, status pages, agents, your account) is read from your hub, and every change you make is sent to your hub. The hub stores which phone is signed in: the sign-in, the device name that iOS gives apps (the model, such as \"iPhone\", not the name you chose) and, when notifications are on, an encrypted push handle.",
+              "Tutto quello che l'app mostra (monitor, risultati dei controlli, incidenti, finestre di manutenzione, pagine di stato, agent, il tuo account) viene letto dal tuo hub, e ogni modifica che fai viene inviata al tuo hub. L'hub conserva quale telefono ha effettuato l'accesso: l'accesso, il nome del dispositivo che iOS dà alle app (il modello, per esempio \"iPhone\", non il nome che hai scelto) e, se le notifiche sono attive, un identificativo push cifrato.",
+            )}
+          </p>
+          <p>
+            {t(
+              "If Background App Refresh is on, iOS lets the app load the status of your hubs now and then while it is closed, and the widgets load it from your hub too, so that widgets and Live Activities stay current. These requests go only to your hubs.",
+              "Se l'aggiornamento app in background è attivo, iOS lascia che l'app carichi ogni tanto lo stato dei tuoi hub anche quando è chiusa, e anche i widget lo caricano dal tuo hub, così widget e Live Activity restano aggiornati. Queste richieste vanno solo ai tuoi hub.",
             )}
           </p>
           <p>
@@ -171,14 +188,14 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
             </li>
             <li>
               {t(
-                "The addresses of hubs you used and a few preferences are kept in the app's settings (UserDefaults), and the latest hub status is shared with the pingtxt widgets through an App Group on the device.",
-                "Gli indirizzi degli hub che hai usato e alcune preferenze sono conservati nelle impostazioni dell'app (UserDefaults), e l'ultimo stato dell'hub è condiviso con i widget di pingtxt tramite un App Group sul dispositivo.",
+                "The addresses of hubs you used, a few preferences, the random installation id of the update check and its last answer are kept in the app's settings (UserDefaults), and the latest hub status is shared with the pingtxt widgets through an App Group on the device.",
+                "Gli indirizzi degli hub che hai usato, alcune preferenze, l'id di installazione casuale del controllo aggiornamenti e la sua ultima risposta sono conservati nelle impostazioni dell'app (UserDefaults), e l'ultimo stato dell'hub è condiviso con i widget di pingtxt tramite un App Group sul dispositivo.",
               )}
             </li>
             <li>
               {t(
-                "Nothing of this is backed up to us. Signing out or deleting the app removes it.",
-                "Niente di tutto questo viene salvato da noi. Uscendo dall'account o eliminando l'app viene rimosso.",
+                "Nothing of this is backed up to us. Signing out removes the tokens of that hub; deleting the app removes everything.",
+                "Niente di tutto questo viene salvato da noi. Uscendo da un hub vengono rimossi i suoi token; eliminando l'app viene rimosso tutto.",
               )}
             </li>
           </ul>
@@ -242,12 +259,59 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
           </p>
         </Section>
 
+        <Section id="updates" title={t("update check", "controllo aggiornamenti")}>
+          <p>
+            {t(
+              <>
+                When the app starts and when you come back to it, it asks <C>{UPDATES_HOST}</C> whether a newer version is
+                available or required. The request carries:
+              </>,
+              <>
+                Quando l&apos;app si avvia e quando ci torni, chiede a <C>{UPDATES_HOST}</C> se è disponibile o necessaria una
+                versione più recente. La richiesta contiene:
+              </>,
+            )}
+          </p>
+          <ul>
+            <li>
+              {t(
+                "the installed app version, the iOS version (for example 26.1) and the platform (ios);",
+                "la versione dell'app installata, la versione di iOS (per esempio 26.1) e la piattaforma (ios);",
+              )}
+            </li>
+            <li>
+              {t(
+                "where the app was installed from (App Store, TestFlight or a development build);",
+                "da dove è stata installata l'app (App Store, TestFlight o una build di sviluppo);",
+              )}
+            </li>
+            <li>
+              {t(
+                "a random installation id made by the app on first use. It is not the device id, the advertising id or anything from your hub, and it changes if you delete and install the app again;",
+                "un id di installazione casuale creato dall'app al primo utilizzo. Non è l'id del dispositivo, l'identificativo pubblicitario né qualcosa del tuo hub, e cambia se elimini e reinstalli l'app;",
+              )}
+            </li>
+            <li>
+              {t(
+                "like any web request, your IP address and the language of your device (sent by iOS in the request headers).",
+                "come ogni richiesta web, il tuo indirizzo IP e la lingua del dispositivo (inviata da iOS nelle intestazioni della richiesta).",
+              )}
+            </li>
+          </ul>
+          <p>
+            {t(
+              "The server answers with the latest version and whether yours is still supported. The installation id is stored only as a one-way hash, to roll out new versions gradually and to count active installations, versions and languages. Nothing about your hubs, monitors or account is sent. The request is skipped if the server cannot be reached; the app works the same.",
+              "Il server risponde con l'ultima versione e se la tua è ancora supportata. L'id di installazione viene conservato solo come hash non reversibile, per distribuire le nuove versioni in modo graduale e contare installazioni attive, versioni e lingue. Non viene inviato nulla sui tuoi hub, monitor o account. Se il server non è raggiungibile la richiesta viene saltata e l'app funziona lo stesso.",
+            )}
+          </p>
+        </Section>
+
         <Section id="not-collected" title={t("what we don't collect", "cosa non raccogliamo")}>
           <ul>
             <li>
               {t(
-                "No analytics or crash reporting: Firebase Analytics is not included and is turned off.",
-                "Nessun analytics né segnalazione dei crash: Firebase Analytics non è incluso ed è disattivato.",
+                "No analytics SDK or crash reporting: Firebase Analytics is not included and is turned off. The only count we keep is the anonymous one of the update check.",
+                "Nessun SDK di analytics né segnalazione dei crash: Firebase Analytics non è incluso ed è disattivato. L'unico conteggio che teniamo è quello anonimo del controllo aggiornamenti.",
               )}
             </li>
             <li>
@@ -325,6 +389,12 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
             </li>
             <li>
               {t(
+                "The update check keeps the hashed installation id with the app version, iOS version and language it last reported, and the daily counts made from them. It does not keep your IP address with them.",
+                "Il controllo aggiornamenti conserva l'hash dell'id di installazione con l'ultima versione dell'app, versione di iOS e lingua che ha inviato, e i conteggi giornalieri che ne derivano. Non conserva con questi il tuo indirizzo IP.",
+              )}
+            </li>
+            <li>
+              {t(
                 "To delete everything: sign out of each hub in the app, then delete the app. Data kept on a hub can be removed by its operator.",
                 "Per cancellare tutto: esci da ogni hub nell'app, poi elimina l'app. I dati conservati su un hub possono essere rimossi dal suo gestore.",
               )}
@@ -339,7 +409,9 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
                 Depending on where you live (for example under the EU/UK GDPR or Californian law) you can ask to access,
                 correct, delete or export your personal data, object to or limit its processing, and complain to your data
                 protection authority. The legal basis for the push relay is the performance of the service you asked for
-                (delivering your alerts). Because the relay stores nothing, we usually hold no data about you; for data on a
+                (delivering your alerts); for the update check it is our legitimate interest in keeping the app up to date
+                and knowing how many installations use each version. Because the relay stores nothing and the installation id
+                is anonymous, we usually hold no data about you; for data on a
                 hub, contact its operator. Write to {mail}.
               </>,
               <>
@@ -347,8 +419,10 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
                 California) puoi chiedere di accedere ai tuoi dati personali, correggerli, cancellarli o esportarli,
                 opporti al loro trattamento o limitarlo, e presentare reclamo all&apos;autorità per la protezione dei dati (in
                 Italia il Garante per la protezione dei dati personali). La base giuridica del relay push è
-                l&apos;esecuzione del servizio che hai richiesto (consegnare i tuoi avvisi). Poiché il relay non conserva
-                nulla, di solito non abbiamo dati che ti riguardano; per i dati su un hub, contatta il suo gestore. Scrivi a{" "}
+                l&apos;esecuzione del servizio che hai richiesto (consegnare i tuoi avvisi); per il controllo degli
+                aggiornamenti è il nostro legittimo interesse a tenere aggiornata l&apos;app e sapere quante installazioni usano
+                ogni versione. Poiché il relay non conserva nulla e l&apos;id di installazione è anonimo, di solito non abbiamo
+                dati che ti riguardano; per i dati su un hub, contatta il suo gestore. Scrivi a{" "}
                 {mail}.
               </>,
             )}
@@ -412,12 +486,12 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
           <p>
             {t(
               <>
-                We will update this page when the app or the relay changes what it handles, and change the date at the top.
+                We will update this page when the app, the relay or the update check changes what it handles, and change the date at the top.
                 The history is public in the <A href={`${REPO}/commits/main/site/content/privacy.tsx`}>repository</A>. The
                 relay source code is public too: <A href={RELAY_REPO}>pingtxt-push-relay</A>.
               </>,
               <>
-                Aggiorneremo questa pagina quando l&apos;app o il relay cambiano i dati che trattano, e cambieremo la data in
+                Aggiorneremo questa pagina quando l&apos;app, il relay o il controllo aggiornamenti cambiano i dati che trattano, e cambieremo la data in
                 alto. Lo storico è pubblico nel <A href={`${REPO}/commits/main/site/content/privacy.tsx`}>repository</A>.
                 Anche il codice sorgente del relay è pubblico: <A href={RELAY_REPO}>pingtxt-push-relay</A>.
               </>,
