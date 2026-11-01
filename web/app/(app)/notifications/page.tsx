@@ -420,7 +420,7 @@ function PushOffNote({ box }: { box?: boolean }) {
     <p className={box ? "border border-dashed border-warn/40 p-3 text-xs text-warn" : "mt-0.5 text-xs text-warn"}>
       {t.rich("pushOff", {
         settings: (chunks) => (
-          <Link href="/settings#mobile-app" className="underline underline-offset-2">
+          <Link href="/settings/integrations/#mobile-app" className="underline underline-offset-2">
             {chunks}
           </Link>
         ),

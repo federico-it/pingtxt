@@ -1002,7 +1002,38 @@
     "disconnect": "disconnect",
     "disconnectTitle": "disconnect {provider}?",
     "disconnectText": "You will no longer be able to log in with this account.",
-    "connect": "connect"
+    "connect": "connect",
+    "nav": {
+      "label": "settings categories",
+      "personal": "personal",
+      "instance": "instance",
+      "back": "settings"
+    },
+    "cats": {
+      "profile": "profile",
+      "account": "account",
+      "tokens": "tokens",
+      "general": "general",
+      "monitors": "monitors",
+      "access": "access",
+      "integrations": "integrations",
+      "data": "data"
+    },
+    "catHints": {
+      "profile": "appearance, language",
+      "account": "password, connected logins, two-factor",
+      "tokens": "api tokens, connected apps",
+      "general": "public url, history, updates, usage stats",
+      "monitors": "defaults, degraded, ip, expiry alerts",
+      "access": "login, single sign-on, users",
+      "integrations": "mobile app, prometheus metrics",
+      "data": "export, import, backups"
+    },
+    "adminOnly": "only admins can change these settings.",
+    "unsaved": "unsaved changes",
+    "discard": "discard",
+    "save": "save",
+    "unsavedLeave": "You have unsaved changes in the settings. Leave without saving?"
   },
   "generalSettings": {
     "saved": "settings saved",

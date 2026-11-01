@@ -7,8 +7,8 @@ import { useTranslations } from "use-intl"
 import { CopyBlock } from "@/components/copy-block"
 import { Section } from "@/components/page-header"
 import { Field } from "@/components/settings/field"
+import { SaveBar } from "@/components/settings/save-bar"
 import { useRoles } from "@/components/settings/users"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -125,7 +125,7 @@ export function AuthSettingsForm({
 
   return (
     <form onSubmit={save}>
-      <Section title={t("title")}>
+      <Section title={t("title")} className="mt-0">
         <div className="grid gap-3">
           <Toggle
             checked={a.password_login}
@@ -309,17 +309,15 @@ export function AuthSettingsForm({
             ! {t("needProvider")}
           </div>
         )}
-        <div className="mt-4 flex items-center gap-3">
-          <Button type="submit" variant="outline" disabled={busy || !dirty}>
-            {busy ? "..." : t("save")}
-          </Button>
-          {dirty && (
-            <span className="text-[11px] text-muted-foreground">
-              {t("unsaved")}
-            </span>
-          )}
-        </div>
       </Section>
+      <SaveBar
+        dirty={dirty}
+        busy={busy}
+        onDiscard={() => {
+          setA(settings.auth)
+          setDomains(settings.auth.allowed_domains.join(", "))
+        }}
+      />
     </form>
   )
 }

@@ -18,7 +18,7 @@ export function MobileAppSettings() {
   const { data, mutate } = useApi<PushSettings>("/api/settings/push", { refreshInterval: 0 })
   const t = useTranslations("mobileApp")
   const loaded = !!data
-  // Links from the notification channels land here (/settings#mobile-app).
+  // Links from the notification channels land here (/settings/integrations/#mobile-app).
   // The sections above fill in after the jump, so follow the layout for a
   // moment, until the user scrolls.
   useEffect(() => {
