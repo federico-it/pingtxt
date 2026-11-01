@@ -1,9 +1,19 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 
 import { CopyBlock } from "@/components/copy-block"
 import { Shot } from "@/components/shot"
 import { Prompt, REPO, SectionTitle } from "@/components/site-shell"
 import { UsageStats } from "@/components/usage-stats"
+import { jsonLd, NAME, pageMeta, softwareJsonLd } from "@/lib/seo"
+
+export const metadata: Metadata = pageMeta({
+  title: `${NAME} · open source, self-hosted uptime monitoring`,
+  absoluteTitle: true,
+  description:
+    "Open source, self-hosted uptime monitoring. HTTP, TCP, ping, DNS, database and more checks from multiple locations, status pages and alerts, in one Docker container.",
+  path: "/",
+})
 
 const features: { title: string; body: string }[] = [
   {
@@ -77,6 +87,7 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- \\
 export default function Home() {
   return (
     <div className="space-y-20 py-12">
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLd(softwareJsonLd)} />
       <section className="space-y-6">
         <Prompt>pingtxt --help</Prompt>
         <h1 className="max-w-3xl text-2xl font-semibold leading-tight tracking-tight sm:text-4xl">
@@ -118,7 +129,11 @@ export default function Home() {
           <Shot
             light="/screenshots/dashboard-light.png"
             dark="/screenshots/dashboard-dark.png"
-            alt="pingtxt monitors ls"
+            label="pingtxt monitors ls"
+            alt="pingtxt dashboard: list of monitors with status, uptime bars and response time per location"
+            width={1280}
+            height={860}
+            priority
           />
         </div>
       </section>
@@ -140,15 +155,39 @@ export default function Home() {
       <section className="space-y-6">
         <SectionTitle>screenshots</SectionTitle>
         <div className="grid gap-8 lg:grid-cols-2 [&>*]:min-w-0">
-          <Shot light="/screenshots/monitor.png" alt="pingtxt monitors show" caption="Response time and log per location." />
+          <Shot
+            light="/screenshots/monitor.png"
+            label="pingtxt monitors show"
+            alt="Monitor detail page with a response time chart and the check log per location"
+            width={1280}
+            height={1388}
+            caption="Response time and log per location."
+          />
           <Shot
             light="/screenshots/status-page-light.png"
             dark="/screenshots/status-page-dark.png"
-            alt="status.example.com"
+            label="status.example.com"
+            alt="Public status page with 90-day uptime history per service"
+            width={1200}
+            height={900}
             caption="A public status page, on its own domain if you like."
           />
-          <Shot light="/screenshots/check-types.png" alt="pingtxt monitors new" caption="Pick a check type." />
-          <Shot light="/screenshots/agent-install.png" alt="pingtxt agents add" caption="Add a location in one command." />
+          <Shot
+            light="/screenshots/check-types.png"
+            label="pingtxt monitors new"
+            alt="New monitor form with the list of check types: HTTP, keyword, TCP, ping, DNS, databases and more"
+            width={1280}
+            height={900}
+            caption="Pick a check type."
+          />
+          <Shot
+            light="/screenshots/agent-install.png"
+            label="pingtxt agents add"
+            alt="Adding a monitoring location: the one-line agent install command"
+            width={1280}
+            height={900}
+            caption="Add a location in one command."
+          />
         </div>
       </section>
 

@@ -5,9 +5,9 @@ name: pages
 on:
   push:
     branches: [main]
-    paths: ["site/**", "internal/hub/openapi.json", ".github/workflows/pages.yml"]
+    paths: ["site/**", "README.md", "internal/hub/openapi.json", ".github/workflows/pages.yml"]
   pull_request:
-    paths: ["site/**", "internal/hub/openapi.json", ".github/workflows/pages.yml"]
+    paths: ["site/**", "README.md", "internal/hub/openapi.json", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
