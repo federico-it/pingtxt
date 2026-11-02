@@ -168,6 +168,7 @@ type pushMessage struct {
 	Priority   string            `json:"priority,omitempty"`
 	ThreadID   string            `json:"thread_id,omitempty"`
 	CollapseID string            `json:"collapse_id,omitempty"`
+	Category   string            `json:"category,omitempty"`
 	TTL        int               `json:"ttl,omitempty"`
 	Data       map[string]string `json:"data,omitempty"`
 }
@@ -189,6 +190,18 @@ func truncateUTF8(s string, n int) string {
 	}
 	return s
 }
+
+// Notification categories (aps.category). The app registers a
+// UNNotificationCategory with action buttons for each of them; ids are part
+// of the contract with pingtxt-ios, do not rename.
+const (
+	CategoryMonitorDown     = "MONITOR_DOWN"
+	CategoryMonitorUp       = "MONITOR_UP"
+	CategoryMonitorDegraded = "MONITOR_DEGRADED"
+	CategoryExpiry          = "EXPIRY"
+	CategoryAgentOffline    = "AGENT_OFFLINE"
+	CategoryAgentOnline     = "AGENT_ONLINE"
+)
 
 // appMessage turns an event into a notification for the app.
 func appMessage(e Event) pushMessage {
@@ -215,13 +228,16 @@ func appMessage(e Event) pushMessage {
 			first = after
 		}
 		m.Title = first
+		m.Category = CategoryExpiry
 		body = append(body, strings.TrimPrefix(rest, "> "))
 	case KindAgent:
 		m.Data["type"] = "agent"
 		m.Data["agent_id"] = strconv.FormatInt(e.AgentID, 10)
 		id := "agent-" + strconv.FormatInt(e.AgentID, 10)
 		m.ThreadID, m.CollapseID = id, id
+		m.Category = CategoryAgentOnline
 		if e.Status == AgentOffline {
+			m.Category = CategoryAgentOffline
 			m.Priority = "high"
 			m.Title = "Agent " + e.Agent + " is offline"
 			if e.Target != "" {
@@ -238,8 +254,10 @@ func appMessage(e Event) pushMessage {
 		}
 	case KindDegraded:
 		m.Title = e.Monitor + " is degraded"
+		m.Category = CategoryMonitorDegraded
 		if e.Status != StatusDegraded {
 			m.Title = e.Monitor + " is no longer degraded"
+			m.Category = CategoryMonitorUp
 		}
 		body = append(body, e.Target)
 		if e.Cause != "" && e.Status == StatusDegraded {
@@ -248,6 +266,7 @@ func appMessage(e Event) pushMessage {
 	default:
 		if e.Status == StatusDown {
 			m.Priority = "high"
+			m.Category = CategoryMonitorDown
 			m.Title = e.Monitor + " is down"
 			if e.Reminder > 0 {
 				m.Title = e.Monitor + " is still down"
@@ -261,6 +280,7 @@ func appMessage(e Event) pushMessage {
 			}
 		} else {
 			m.Title = e.Monitor + " is back up"
+			m.Category = CategoryMonitorUp
 			line := e.Target
 			if d := e.downFor(); d != "" {
 				line += " · after " + d + " down"
@@ -272,6 +292,7 @@ func appMessage(e Event) pushMessage {
 		m.Title = "[test] " + m.Title
 		m.ThreadID, m.CollapseID = "test", "test"
 		m.Data["test"] = "true"
+		m.Category = "" // no buttons that would act on real monitors
 	}
 	m.Title = truncateUTF8(m.Title, maxPushTitle)
 	m.Body = truncateUTF8(strings.Join(body, "\n"), maxPushBody)

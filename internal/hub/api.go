@@ -122,6 +122,7 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/monitors/{id}", auth(h.deleteMonitor))
 	mux.HandleFunc("POST /api/monitors/{id}/pause", auth(h.pauseMonitor))
 	mux.HandleFunc("POST /api/monitors/{id}/test", auth(h.testSavedMonitor))
+	mux.HandleFunc("POST /api/monitors/{id}/check", auth(h.checkMonitorNow))
 	mux.HandleFunc("GET /api/monitors/{id}/series", auth(h.monitorSeries))
 	mux.HandleFunc("GET /api/monitors/{id}/results", auth(h.monitorResults))
 	mux.HandleFunc("POST /api/monitors/{id}/push-token", auth(h.rotatePushToken))
@@ -1117,6 +1118,36 @@ func (h *Hub) pauseMonitor(w http.ResponseWriter, r *http.Request, _ *store.User
 		return
 	}
 	writeJSON(w, 200, got)
+}
+
+// checkMonitorNow runs the scheduled check of a monitor right away, at every
+// location, as if its interval had elapsed: unlike /test the results are
+// recorded and can open or resolve an incident. Used by the app's "check
+// again" notification action.
+func (h *Hub) checkMonitorNow(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return
+	}
+	m, err := h.store.Monitor(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, "monitor not found")
+		return
+	} else if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	switch {
+	case m.Type == check.TypePush:
+		writeErr(w, 400, "heartbeat monitors are checked when the job calls the push URL")
+		return
+	case m.Paused:
+		writeErr(w, 409, "the monitor is paused")
+		return
+	}
+	h.CheckNow(id)
+	writeJSON(w, 202, map[string]any{"monitor_id": id, "scheduled_at": time.Now().UnixMilli()})
 }
 
 var ranges = map[string]time.Duration{
