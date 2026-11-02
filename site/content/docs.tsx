@@ -326,6 +326,12 @@ curl -fsSL https://status.example.com/install-agent.sh | sudo sh -s -- --uninsta
               "Con più località il monitor è down quando ne fallisce più della metà, e degradato oltre la soglia impostata nelle impostazioni. L'uptime segue questo stato, non i singoli controlli: una sola località che fallisce tra tante non lo abbassa.",
             )}
           </p>
+          <p>
+            {t(
+              "A monitor can also have a slow threshold in ms. A location is slow when the median of its last 3 successful checks is above it, and slow locations count like failing ones toward the degraded threshold, never toward down. With one location, being slow is enough. Uptime does not change: degraded counts as up.",
+              "Un monitor può avere anche una soglia di lentezza in ms. Una località è lenta quando la mediana dei suoi ultimi 3 controlli riusciti la supera, e le località lente contano come quelle in errore per la soglia di degradato, mai per il down. Con una sola località basta che sia lenta. L'uptime non cambia: degradato conta come su.",
+            )}
+          </p>
         </Section>
 
         <Section id="agent-updates" title={t("agent updates", "aggiornamento degli agent")}>
