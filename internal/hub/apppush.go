@@ -378,6 +378,9 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 		byHandle[d.Handle] = append(byHandle[d.Handle], d)
 	}
 	msg := appMessage(e)
+	// The app may be signed in to several hubs: hub_id (also in
+	// /api/mobile/config) tells it which one a notification's actions call.
+	msg.Data["hub_id"] = ps.HubID
 	delays := n.pushRetry
 	if delays == nil {
 		delays = []time.Duration{10 * time.Second, time.Minute}

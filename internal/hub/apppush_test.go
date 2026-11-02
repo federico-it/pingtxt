@@ -197,7 +197,7 @@ func TestAppPush(t *testing.T) {
 	if res := admin.do("POST", "/api/notifiers/"+itoa(all.ID)+"/test", nil); res.StatusCode != 200 {
 		t.Fatalf("test channel: %d", res.StatusCode)
 	}
-	if len(relay.pushes) != 1 || len(relay.pushes[0].Devices) != 2 || !strings.HasPrefix(relay.pushes[0].Title, "[test] ") || relay.pushes[0].Priority != "high" {
+	if len(relay.pushes) != 1 || len(relay.pushes[0].Devices) != 2 || relay.pushes[0].Data["hub_id"] != "hub1" || !strings.HasPrefix(relay.pushes[0].Title, "[test] ") || relay.pushes[0].Priority != "high" {
 		t.Fatalf("pushes: %+v", relay.pushes)
 	}
 	if list := decode[[]store.PushDevice](t, bearerDo(t, srv.URL, "pma_viewer", "GET", "/api/mobile/devices", nil)); len(list) != 0 {
