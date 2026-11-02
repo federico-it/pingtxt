@@ -377,6 +377,8 @@
     "retries": "retries",
     "retriesHint": "consecutive failures before a location is down",
     "locationsHint": "The monitor is down when more than half of the online locations fail, degraded when at least the threshold below fails.",
+    "selectAllLocations": "select all",
+    "deselectAllLocations": "deselect all",
     "builtIn": "built-in",
     "online": "online",
     "offline": "offline",

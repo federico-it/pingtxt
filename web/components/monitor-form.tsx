@@ -428,6 +428,18 @@ export function MonitorForm({
     )
   }
 
+  // Locations "select all" can pick: not the ones without IPv6 on an
+  // IPv6-only monitor.
+  const pickable = (locations.data ?? [])
+    .filter((l) => !(v6Only && l.ipv6 === 2))
+    .map((l) => l.id)
+  const allPicked =
+    pickable.length > 0 && pickable.every((l) => m.locations.includes(l))
+
+  function toggleAllLocs() {
+    set("locations", allPicked ? [] : pickable)
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
@@ -969,6 +981,18 @@ export function MonitorForm({
               </Field>
             )}
           </div>
+          {(locations.data ?? []).length > 1 && (
+            <div className="mb-2 flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={toggleAllLocs}
+              >
+                {allPicked ? tr("deselectAllLocations") : tr("selectAllLocations")}
+              </Button>
+            </div>
+          )}
           <div className="grid gap-2 sm:grid-cols-2">
             {(locations.data ?? []).map((l) => {
               const checked = m.locations.includes(l.id)

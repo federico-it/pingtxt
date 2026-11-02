@@ -28,7 +28,7 @@ over WebSocket: no open port, works behind NAT, reconnects with backoff and keep
 (`PINGTXT_HUB=http://[2001:db8::1]:8090`).
 
 When a new agent connects, the hub offers to add it to every monitor it can run. Otherwise tick the location in
-the monitors you want: the hub plans every check and sends it to the agents.
+the monitors you want (**select all** in the locations section ticks every location the monitor can use): the hub plans every check and sends it to the agents.
 
 The agents page shows each agent's version, address, whether it reaches IPv6 and when it was last seen.
 **rotate** gives an agent a new token: the old one stops working at once and the agent disconnects.

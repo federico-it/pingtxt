@@ -28,7 +28,7 @@ l'hub via WebSocket: nessuna porta aperta, funziona dietro NAT, si ricollega con
 anche gli hub su IPv6 (`PINGTXT_HUB=http://[2001:db8::1]:8090`).
 
 Quando un nuovo agent si collega, l'hub propone di aggiungerlo a tutti i monitor che può eseguire. Altrimenti spunta
-la località nei monitor che vuoi: l'hub pianifica ogni controllo e lo manda agli agent.
+la località nei monitor che vuoi (**seleziona tutte** nella sezione località spunta tutte quelle che il monitor può usare): l'hub pianifica ogni controllo e lo manda agli agent.
 
 La pagina degli agent mostra di ognuno versione, indirizzo, se raggiunge IPv6 e quando è stato visto l'ultima volta.
 **rigenera** dà a un agent un nuovo token: quello vecchio smette subito di funzionare e l'agent si disconnette.
