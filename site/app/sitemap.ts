@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next"
 
+import { DOC_PAGES } from "@/lib/docs"
 import { LANGS, localePath } from "@/lib/i18n"
 import { languages, SITE } from "@/lib/seo"
 
@@ -10,6 +11,7 @@ export const dynamic = "force-static"
 const pages: { path: string; priority: number }[] = [
   { path: "/", priority: 1 },
   { path: "/docs/", priority: 0.8 },
+  ...DOC_PAGES.map((slug) => ({ path: `/docs/${slug}/`, priority: 0.7 })),
   { path: "/docs/api/", priority: 0.6 },
   { path: "/privacy/", priority: 0.2 },
 ]

@@ -14,9 +14,9 @@ Closes #
 
 ## Checklist
 
-- [ ] `make test lint` passes (and `cd site && npm run typecheck && npm run build` if `site/` changed)
+- [ ] `make test lint` passes (and `cd site && npm run typecheck && npm run build` if `site/` or `docs/` changed)
 - [ ] Tests added or updated for Go changes
-- [ ] README and site docs updated if user-facing behavior changed
+- [ ] Docs in `docs/en` and `docs/it` updated if user-facing behavior changed
 - [ ] New database migrations are appended at the end of the list in `internal/store/store.go`
 - [ ] No secrets are logged, exported without secrets, or shown to read-only users
 - [ ] I have read [CONTRIBUTING.md](https://github.com/federico-it/pingtxt/blob/main/CONTRIBUTING.md) and agree to license my contribution under the project license

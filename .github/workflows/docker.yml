@@ -89,7 +89,7 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
       # Keyless signature tied to this workflow's GitHub identity, so users
-      # can check an image was built here (see "Verify a release" in README).
+      # can check an image was built here (see "Verify a release" in docs/en/administration.md).
       - uses: sigstore/cosign-installer@v4.1.2
       - name: Sign image
         env:

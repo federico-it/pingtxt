@@ -58,21 +58,129 @@ make docker        # build both images locally
 ```
 
 Production builds, cross-compiling and local Docker images are described in
-[Build from source](README.md#build-from-source).
+[Build from source](#build-from-source).
 
 The public website (pingtxt.com) lives in [`site/`](site/) and is a separate Next.js app:
 `cd site && npm ci && npm run dev`.
 
 ### Project layout
 
+```
+            ┌──────────────── hub container ────────────────┐
+ browser ──▶│  Go http server ─ /api/*  ─ SQLite/PG/MariaDB │
+            │        │          /        ─ Next.js export   │
+            │   scheduler ──▶ local probe ("hub" location)  │
+            │        │                                       │
+            └────────┼───────────────────────────────────────┘
+                     │ jobs / results over WebSocket (agent dials out)
+          ┌──────────┴──────────┐
+     agent (Frankfurt)     agent (home lab) ...
+```
+
 - `cmd/pingtxt`, `cmd/pingtxt-agent` – hub and agent binaries.
 - `internal/check` – probes, shared by hub and agents. A new check type goes here, with tests.
+- `internal/expiry` – certificate and domain (RDAP / WHOIS) expiry lookups, run by the hub.
 - `internal/hub` – scheduler, status, incidents, notifications, HTTP API, agent WebSocket.
-- `internal/store` – SQLite. Migrations are an ordered list in `internal/store/store.go`: **always append**
-  a new migration at the end, never edit one that already shipped.
-- `internal/expiry` – certificate and domain expiry lookups.
-- `web/` – the hub UI (Next.js static export, shadcn/ui, Tailwind 4).
-- `site/` – the public website and docs.
+- `internal/store` – SQLite (pure Go driver `modernc.org/sqlite`, no CGO), PostgreSQL (`lib/pq`) and
+  MariaDB/MySQL (`go-sql-driver/mysql`). Queries are written once for SQLite and rewritten for the other two.
+  Migrations are an ordered list in `internal/store/store.go`: **always append** a new migration at the end
+  (with a `postgres` / `mysql` variant when the SQLite text does not work there), never edit one that already
+  shipped.
+- `web/` – the hub UI (Next.js 16 static export, shadcn/ui on Base UI, Tailwind 4).
+- `site/` – the public website; it renders the docs from `docs/`.
+- `docs/` – the user docs in Markdown, English and Italian.
+
+**Why Go for the backend:** the agent must be a tiny static binary that runs anywhere (amd64/arm64/arm,
+Linux/macOS). The same language lets the hub and the agents share the probe code and the wire protocol, Go's
+concurrency fits thousands of periodic checks, and the hub compiles to one binary with the UI embedded, so the
+container needs no Node runtime.
+
+### Tests on PostgreSQL and MariaDB
+
+The store and hub tests run on SQLite by default. To run them on a database server (each test creates and drops
+its own scratch database, so the user needs `CREATE DATABASE`):
+
+```sh
+docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pingtxt postgres:17-alpine
+PINGTXT_TEST_DB_URL="postgres://postgres:pingtxt@127.0.0.1:5432/postgres?sslmode=disable" go test ./internal/store/... ./internal/hub/...
+
+docker run -d --name maria -p 3306:3306 -e MARIADB_ROOT_PASSWORD=pingtxt mariadb:11
+PINGTXT_TEST_DB_URL="mariadb://root:pingtxt@127.0.0.1:3306/mysql" go test ./internal/store/... ./internal/hub/...
+```
+
+CI runs the tests on SQLite, PostgreSQL, MariaDB and MySQL.
+
+## Build from source
+
+You need **Go 1.26+** (the version in [go.mod](go.mod)), **Node.js 22+** with npm, `make` and `git`.
+No C compiler: everything is built with `CGO_ENABLED=0`. Docker is only needed for the images.
+
+```sh
+git clone https://github.com/federico-it/pingtxt.git && cd pingtxt
+git checkout v1.2.3        # optional: a release tag; main is the development version
+make web hub agent agents
+```
+
+| target | output | |
+| --- | --- | --- |
+| `make web` | `internal/ui/dist` | builds the Next.js UI (`web/out`) and copies it where the hub embeds it. Run it before `make hub`, or the hub has no web UI |
+| `make hub` | `dist/pingtxt` | the hub, with the UI inside, for this machine |
+| `make agent` | `dist/pingtxt-agent` | the agent for this machine |
+| `make agents` | `dist/agents/pingtxt-agent-<os>-<arch>` | agents for linux amd64/arm64/arm and darwin amd64/arm64, served by the hub for the install script and agent updates |
+
+The version comes from `git describe` (`v1.2.3`, or the commit on main); set it with `make hub agents VERSION=v1.2.3`.
+Agents update themselves to the hub version, so build hub and agents from the same checkout. To run the binaries
+(data folder, ping permissions, a systemd unit), see [Install without Docker](docs/en/install.md#without-docker).
+
+**Cross-compiling** for another platform (the UI is the same for all of them, build it once with `make web`):
+
+```sh
+V=$(git describe --tags --always)
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=$V" -o dist/pingtxt-linux-arm64 ./cmd/pingtxt
+CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -trimpath -ldflags "-s -w -X main.version=$V" -o dist/pingtxt-agent-linux-armv7 ./cmd/pingtxt-agent
+```
+
+**Docker images.** The Dockerfiles build everything inside the image (Node and Go included), so only Docker is needed:
+
+```sh
+make docker                                   # pingtxt:dev and pingtxt-agent:dev for this machine
+docker build --build-arg VERSION=$(git describe --tags --always) -t pingtxt:dev .
+docker build --build-arg VERSION=$(git describe --tags --always) -f Dockerfile.agent -t pingtxt-agent:dev .
+# both architectures, pushed to your registry
+docker buildx build --platform linux/amd64,linux/arm64 -t registry.example.com/pingtxt:dev --push .
+```
+
+To run the compose files with an image built from your checkout, add
+[docker-compose.build.yml](docker-compose.build.yml) after any of them. It works the same with SQLite,
+PostgreSQL and MariaDB (create the `.env` with the passwords first):
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+docker compose -f docker-compose.postgres.yml -f docker-compose.build.yml up -d --build
+docker compose -f docker-compose.mariadb.yml -f docker-compose.build.yml up -d --build
+```
+
+Pushing a `v*` tag publishes a GitHub release with the hub and agent binaries and `SHA256SUMS`, plus the Docker
+images for that tag, which also become `:latest` (pre-releases excepted). Merges on main only update the `:main`
+images.
+
+## Writing docs
+
+The user docs are Markdown files in [`docs/`](docs/): `docs/en/<page>.md` and the same page in
+`docs/it/<page>.md`. GitHub shows them as they are, and pingtxt.com/docs renders them (the site reads them at
+build time, see [`site/lib/docs.ts`](site/lib/docs.ts)).
+
+- Change the English and the Italian page together. Both must have the same headings in the same order: the site
+  build fails otherwise. If you don't write Italian, copy the English text into the Italian page and say so in
+  the PR.
+- Link other pages with relative links (`[alerts](alerts.md#escalation-and-reminders)`), files of the repository
+  with `../../path`. Anchors follow GitHub's rules (lower case, punctuation dropped, spaces to `-`), and the site
+  build fails on a link to a page or anchor that does not exist.
+- Write for someone running pingtxt, not for someone reading the code: what to click, what to set, what happens.
+  Name settings as the UI does (**settings → monitors**).
+- A new page needs its file in both languages and an entry in `DOC_PAGES` in `site/lib/docs.ts`, plus a line in
+  `docs/en/README.md` and `docs/it/README.md`.
+- Check the result with `cd site && npm run build` (or `npm run dev`).
 
 ## Translating the interface
 
@@ -105,10 +213,9 @@ How it works, for developers:
 
 1. Fork the repo and create a branch from `main` (`fix-dns-timeout`, `add-matrix-notifier`...).
 2. Keep the PR focused on one thing. Unrelated refactors and formatting changes go in their own PR.
-3. Add or update tests for Go changes, and update the [README](README.md) and the site docs
-   (`site/content/docs.tsx`, English and Italian side by side; if you don't write Italian,
-   leave the English text in both places and say so in the PR) when you change behavior users can see.
-4. Run `make test lint` (and `cd site && npm run typecheck && npm run build` if you touched `site/`).
+3. Add or update tests for Go changes, and update the docs in [`docs/`](docs/) (English and Italian, see
+   [Writing docs](#writing-docs)) when you change behavior users can see.
+4. Run `make test lint` (and `cd site && npm run typecheck && npm run build` if you touched `site/` or `docs/`).
 5. Open the PR against `main` and fill in the template. Link the issue it closes (`Closes #123`).
    Draft PRs are welcome if you want early feedback.
 
@@ -118,7 +225,7 @@ How it works, for developers:
 A PR can be merged when:
 
 - the required CI checks are green: **go** (`go vet` + `go test`) and **web** (`eslint`, `tsc`, `next build`).
-  Changes in `site/` also run the **pages** build;
+  Changes in `site/` or `docs/` also run the **pages** build;
 - a maintainer has reviewed and approved it;
 - the branch is up to date with `main` and has no conflicts (use **Update branch** or rebase).
 

@@ -147,7 +147,7 @@ func (s *Store) Close() error { return s.db.Close() }
 // postgres/mysql variant when the SQLite text does not fit them.
 //
 // To change the schema, append a migration (never edit an old one) and test
-// it on all three databases (see Development in the README).
+// it on all three databases (see "Tests on PostgreSQL and MariaDB" in CONTRIBUTING.md).
 type migration struct {
 	sqlite   string
 	postgres string // "" = same as sqlite

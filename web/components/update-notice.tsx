@@ -6,7 +6,7 @@ import { useTranslations } from "use-intl"
 import { useApi, type VersionStatus } from "@/lib/api"
 
 const DISMISS_KEY = "pingtxt.update-dismissed"
-export const UPGRADE_DOCS = "https://pingtxt.com/docs/#upgrade"
+export const UPGRADE_DOCS = "https://pingtxt.com/docs/administration/#upgrade"
 
 /** Version status for admins (null for read-only users: they cannot update). */
 export function useVersionStatus(isAdmin: boolean) {
