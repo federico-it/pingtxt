@@ -10,7 +10,7 @@ but plain text, monospace, light and dark.
   databases (**PostgreSQL**, **MySQL/MariaDB**, **Redis**, **MongoDB**), **Docker containers**, **gRPC health**, **SMTP**,
   remote **MCP servers** (handshake, tools), and **heartbeat (push)** monitors for cron jobs and workers.
 - Status across locations: **down** when more than half of the online locations fail, **degraded** when at least 35% fail (configurable in settings and per monitor).
-- Optional slow threshold per monitor: a location whose median response time over its last 3 checks is above it counts toward **degraded** (never down).
+- Optional slow threshold per monitor, fixed or automatic (per location, 3× its usual response time over 7 days): a location whose median response time over its last 3 checks is above it counts toward **degraded** (never down).
   Uptime follows that status: a check counts as downtime only while the monitor is down, so one failing location among
   several does not lower it.
 - Incidents, uptime 24h/7d/30d, response time per location, raw check log.

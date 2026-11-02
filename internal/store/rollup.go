@@ -136,3 +136,39 @@ func (s *Store) PruneRollups(before int64) (int64, error) {
 		}
 	}
 }
+
+// HourlyLatencies returns, for the given monitors, the average response
+// time of the successful checks of each summarized hour since since, per
+// monitor and location (maintenance left out).
+func (s *Store) HourlyLatencies(ids []int64, since int64) (map[int64]map[string][]float64, error) {
+	out := map[int64]map[string][]float64{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	args := []any{since}
+	marks := make([]string, len(ids))
+	for i, id := range ids {
+		marks[i] = "?"
+		args = append(args, id)
+	}
+	rows, err := s.db.Query(`SELECT monitor_id, location, up_lat_sum, up_lat_n FROM result_rollups
+		WHERE start >= ? AND up_lat_n > 0 AND monitor_id IN (`+strings.Join(marks, ",")+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var loc string
+		var sum float64
+		var n int
+		if err := rows.Scan(&id, &loc, &sum, &n); err != nil {
+			return nil, err
+		}
+		if out[id] == nil {
+			out[id] = map[string][]float64{}
+		}
+		out[id][loc] = append(out[id][loc], sum/float64(n))
+	}
+	return out, rows.Err()
+}

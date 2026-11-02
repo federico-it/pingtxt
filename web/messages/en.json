@@ -195,6 +195,7 @@
     "ipBoth": "IPv4 and IPv6",
     "degradedAtDefault": "degraded at default",
     "slowAt": "slow above {ms} ms",
+    "slowAuto": "slow threshold automatic",
     "checkNow": "check now",
     "checking": "checking...",
     "duplicate": "duplicate",
@@ -394,10 +395,16 @@
     "degradedPct": "degraded at (% of locations)",
     "degradedPctHint": "empty = instance default (settings)",
     "degradedPctPlaceholder": "default",
-    "slowMs": "slow above (ms)",
-    "slowMsHint": "degraded when the median of the last 3 checks of a location is above it, counted like a failing location. empty = off",
-    "slowMsHintPush": "degraded when the median of the last 3 reported durations (ping=) is above it. empty = off",
-    "slowMsPlaceholder": "off",
+    "slow": {
+      "label": "slow threshold",
+      "off": "off",
+      "auto": "automatic",
+      "fixed": "fixed (ms)",
+      "ms": "slow threshold in ms",
+      "hint": "degraded when the median of the last 3 checks of a location is above it, counted like a failing location",
+      "hintPush": "degraded when the median of the last 3 reported durations (ping=) is above it",
+      "hintAuto": "each location gets its own: 3× its usual response time (at least +100 ms), from the last 7 days. starts after 24 hours of history"
+    },
     "ipFamily": {
       "label": "ip version",
       "hint": "on a dual-stack host, IPv4 or IPv6 passes with whichever answers first: check both, or one of them, to catch the other broken. Locations without IPv6 check over IPv4 and cannot be used for IPv6.",
@@ -506,6 +513,7 @@
     "now": "now",
     "slow": "slow {ms}",
     "slowLegend": "slow above {ms}",
+    "slowLegendPerLocation": "slow threshold per location",
     "failed": "{count, plural, one {# failed check} other {# failed checks}}"
   },
   "phaseChart": {

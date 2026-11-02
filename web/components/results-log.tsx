@@ -30,11 +30,11 @@ export function ResultsLog({
   slot,
   onClearWindow,
   waitingText,
-  slowMs = 0,
+  slow = {},
 }: {
   monitorId: number
-  /** latencies above it are marked (0 = no threshold) */
-  slowMs?: number
+  /** slow threshold (ms) of each location: latencies above it are marked */
+  slow?: Record<string, number>
   slot: TimeWindow | null
   onClearWindow: () => void
   waitingText: string
@@ -130,7 +130,7 @@ export function ResultsLog({
             <span
               className={cn(
                 "w-16 shrink-0 text-right",
-                r.ok && slowMs > 0 && r.latency_ms > slowMs && "text-warn"
+                r.ok && slow[r.location] > 0 && r.latency_ms > slow[r.location] && "text-warn"
               )}
               title={phaseTitle(r.timing, r.latency_ms, tp)}
             >

@@ -9030,7 +9030,7 @@
           },
           "slow_ms": {
             "type": "integer",
-            "description": "Response time in ms above which a location is slow: when the median of its last 3 successful checks is higher. Slow locations count with failing ones toward degraded_pct, never toward down. 0 = off. Below timeout_ms (push monitors: up to 3600000)."
+            "description": "Response time in ms above which a location is slow: when the median of its last 3 successful checks is higher. Slow locations count with failing ones toward degraded_pct, never toward down. 0 = off, -1 = automatic: each location gets max(3 × its usual time, usual time + 100 ms), the usual time being the median of its hourly averages over 7 days, once it has 24 hours of history. A fixed value must be below timeout_ms (push monitors: up to 3600000)."
           },
           "locations": {
             "type": "array",
@@ -9352,6 +9352,10 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "slow_ms": {
+                      "type": "number",
+                      "description": "Slow threshold in use at this location (fixed or automatic), 0 = none."
                     }
                   }
                 }

@@ -165,6 +165,7 @@ function withValue(list: { value: string; label: string }[], sec: number) {
 const methods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 const records = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"]
 const ipFamilies = [0, 1, 4, 6, 46] as const
+const slowModes = ["off", "auto", "fixed"] as const
 const ipFamilyKey = {
   0: "default",
   1: "either",
@@ -306,6 +307,8 @@ export function MonitorForm({
   const isHTTPS =
     (isHTTP || isMCP) && m.target.trim().toLowerCase().startsWith("https://")
   const isPush = m.type === "push"
+  const slowMode =
+    m.slow_ms === -1 ? "auto" : m.slow_ms > 0 ? "fixed" : "off"
   const isSQL = m.type === "postgres" || m.type === "mysql"
   const hasTLS = [
     "postgres",
@@ -780,20 +783,63 @@ export function MonitorForm({
             </>
           )}
           <Field
-            label={tr("slowMs")}
-            hint={isPush ? tr("slowMsHintPush") : tr("slowMsHint")}
+            label={tr("slow.label")}
+            hint={tr(
+              m.slow_ms === -1
+                ? "slow.hintAuto"
+                : isPush
+                  ? "slow.hintPush"
+                  : "slow.hint"
+            )}
           >
-            <Input
-              type="number"
-              min={0}
-              max={isPush ? 3600000 : Math.max(m.timeout_ms - 1, 0)}
-              step={50}
-              placeholder={tr("slowMsPlaceholder")}
-              value={m.slow_ms || ""}
-              onChange={(e) =>
-                set("slow_ms", Math.max(Number(e.target.value) || 0, 0))
-              }
-            />
+            <div className="flex gap-2">
+              <Select
+                items={slowModes.map((v) => ({
+                  value: v,
+                  label: tr(`slow.${v}`),
+                }))}
+                value={slowMode}
+                onValueChange={(v) =>
+                  v &&
+                  set(
+                    "slow_ms",
+                    v === "off"
+                      ? 0
+                      : v === "auto"
+                        ? -1
+                        : Math.min(
+                            1000,
+                            isPush ? 1000 : Math.max(m.timeout_ms - 500, 100)
+                          )
+                  )
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {slowModes.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {tr(`slow.${v}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {slowMode === "fixed" && (
+                <Input
+                  type="number"
+                  aria-label={tr("slow.ms")}
+                  className="w-28 shrink-0"
+                  min={1}
+                  max={isPush ? 3600000 : Math.max(m.timeout_ms - 1, 1)}
+                  step={50}
+                  value={m.slow_ms}
+                  onChange={(e) =>
+                    set("slow_ms", Math.max(Number(e.target.value) || 1, 1))
+                  }
+                />
+              )}
+            </div>
           </Field>
         </div>
       </Section>

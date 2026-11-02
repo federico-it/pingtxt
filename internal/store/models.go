@@ -277,7 +277,8 @@ type Monitor struct {
 	// IPFamily forces the checks over IPv4 (4) or IPv6 (6); 0 uses either.
 	IPFamily int `json:"ip_family"`
 	// SlowMs is the response time (ms) above which a location counts as
-	// slow, which can make the monitor degraded. 0 = off.
+	// slow, which can make the monitor degraded. 0 = off, SlowAuto = from
+	// each location's usual response time.
 	SlowMs    int      `json:"slow_ms"`
 	Locations []string `json:"locations"`
 	GroupID   int64    `json:"group_id"` // 0 = no group
@@ -294,6 +295,10 @@ type Monitor struct {
 	StatusSince       int64  `json:"status_since"`
 	CreatedAt         int64  `json:"created_at"`
 }
+
+// SlowAuto as Monitor.SlowMs sets the slow threshold of each location from
+// its own history.
+const SlowAuto = -1
 
 const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms`
 
