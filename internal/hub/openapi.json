@@ -4,7 +4,7 @@
     "title": "pingtxt API",
     "version": "dev",
     "summary": "REST API of the pingtxt hub.",
-    "description": "Everything the web UI does goes through this API.\n\n## Authentication\n\nCreate a personal token in **settings → api tokens** and send it as a bearer token:\n\n```\ncurl -H \"Authorization: Bearer ptk_...\" https://status.example.com/api/monitors\n```\n\n- **read** tokens can call every `GET` endpoint marked *read*.\n- **write** tokens can also create, change and delete. Only admins can create them.\n- Account and instance settings (users, tokens, 2FA, settings, backups) need a browser session: tokens get `403`.\n\n## Native apps (OAuth 2.1)\n\nApps sign the user in with OAuth 2.1, authorization code + PKCE (S256), through the hub's own login page (password, 2FA, single sign-on), and get a bearer access token (`pma_...`) that works on the whole API like a token above.\n\n- The iOS app is the built-in public client `pingtxt-ios` with redirect URI `pingtxt://oauth` (no secret, no registration). Other clients register with `POST /oauth/register`.\n- Scopes: `read` or `write`. `write` is granted only to admins; viewers always get `read`. The scope the user picked is in the token response.\n- Access tokens last 1 hour. Refresh tokens last 30 days from their last use and rotate at every refresh: keep only the newest one. Presenting an already used refresh token revokes the sign-in.\n- Sign out with `POST /oauth/revoke`. Users see and disconnect apps in **settings → api tokens → connected apps**.\n- Metadata: `/.well-known/oauth-authorization-server` (RFC 8414) and `/.well-known/oauth-protected-resource/api` (RFC 9728).\n\n## Roles\n\nAdmins can change everything. **Viewers** are read-only: every request that is not `GET` answers `403`, and secrets in monitors and notification channels are replaced by `********`.\n\n## Conventions\n\n- Bodies are JSON (`Content-Type: application/json`); other content types on writes get `415`.\n- Times are Unix milliseconds. Ids are integers.\n- Errors are `{\"error\": \"message\"}` with a 4xx/5xx status.\n- Browser requests from another origin are refused (`403`).\n\nAI assistants can use the same API through the MCP server on `/mcp`.",
+    "description": "Everything the web UI does goes through this API.\n\n## Updates\n\n`PUT` changes only the fields in the body: the others keep their stored value, so a client that does not know a newer field never resets it. Send a field to change it, also to empty it (`[]`, `\"\"`, `0`). New fields are always optional, and fields are not renamed or removed without a deprecation.\n\n## Authentication\n\nCreate a personal token in **settings → api tokens** and send it as a bearer token:\n\n```\ncurl -H \"Authorization: Bearer ptk_...\" https://status.example.com/api/monitors\n```\n\n- **read** tokens can call every `GET` endpoint marked *read*.\n- **write** tokens can also create, change and delete. Only admins can create them.\n- Account and instance settings (users, tokens, 2FA, settings, backups) need a browser session: tokens get `403`.\n\n## Native apps (OAuth 2.1)\n\nApps sign the user in with OAuth 2.1, authorization code + PKCE (S256), through the hub's own login page (password, 2FA, single sign-on), and get a bearer access token (`pma_...`) that works on the whole API like a token above.\n\n- The iOS app is the built-in public client `pingtxt-ios` with redirect URI `pingtxt://oauth` (no secret, no registration). Other clients register with `POST /oauth/register`.\n- Scopes: `read` or `write`. `write` is granted only to admins; viewers always get `read`. The scope the user picked is in the token response.\n- Access tokens last 1 hour. Refresh tokens last 30 days from their last use and rotate at every refresh: keep only the newest one. Presenting an already used refresh token revokes the sign-in.\n- Sign out with `POST /oauth/revoke`. Users see and disconnect apps in **settings → api tokens → connected apps**.\n- Metadata: `/.well-known/oauth-authorization-server` (RFC 8414) and `/.well-known/oauth-protected-resource/api` (RFC 9728).\n\n## Roles\n\nAdmins can change everything. **Viewers** are read-only: every request that is not `GET` answers `403`, and secrets in monitors and notification channels are replaced by `********`.\n\n## Conventions\n\n- Bodies are JSON (`Content-Type: application/json`); other content types on writes get `415`.\n- Times are Unix milliseconds. Ids are integers.\n- Errors are `{\"error\": \"message\"}` with a 4xx/5xx status.\n- Browser requests from another origin are refused (`403`).\n\nAI assistants can use the same API through the MCP server on `/mcp`.",
     "license": {
       "name": "AGPL-3.0-only",
       "identifier": "AGPL-3.0-only"
@@ -2071,7 +2071,7 @@
         ],
         "summary": "Update a group",
         "operationId": "updateGroup",
-        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "description": "Fields left out of the body keep their stored value; a field that is sent replaces it (also with `[]`, `\"\"` or `0`).\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
         "x-pingtxt-access": "write",
         "security": [
           {
@@ -2601,7 +2601,7 @@
         ],
         "summary": "Update a maintenance window",
         "operationId": "updateMaintenance",
-        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "description": "Fields left out of the body keep their stored value; a field that is sent replaces it (also with `[]`, `\"\"` or `0`).\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
         "x-pingtxt-access": "write",
         "security": [
           {
@@ -3140,7 +3140,7 @@
         ],
         "summary": "Update a monitor",
         "operationId": "updateMonitor",
-        "description": "Replaces the monitor: send every field.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "description": "Fields left out of the body keep their stored value; a field that is sent replaces it (also with `[]`, `\"\"` or `0`).\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
         "x-pingtxt-access": "write",
         "security": [
           {
@@ -5390,7 +5390,7 @@
         ],
         "summary": "Save backup schedule",
         "operationId": "putBackupSettings",
-        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "description": "Fields left out of the body keep their stored value; a field that is sent replaces it (also with `[]`, `\"\"` or `0`).\n\n**Access:** Browser session of an admin only: API tokens get 403.",
         "x-pingtxt-access": "admin",
         "security": [
           {
@@ -5442,7 +5442,7 @@
         ],
         "summary": "Save general settings",
         "operationId": "putGeneralSettings",
-        "description": "**Access:** Browser session of an admin only: API tokens get 403.",
+        "description": "Fields left out of the body keep their stored value; a field that is sent replaces it (also with `[]`, `\"\"` or `0`).\n\n**Access:** Browser session of an admin only: API tokens get 403.",
         "x-pingtxt-access": "admin",
         "security": [
           {
@@ -5809,7 +5809,7 @@
         ],
         "summary": "Update a status page",
         "operationId": "updateStatusPage",
-        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "description": "Fields left out of the body keep their stored value; a field that is sent replaces it (also with `[]`, `\"\"` or `0`).\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
         "x-pingtxt-access": "write",
         "security": [
           {
@@ -6034,7 +6034,7 @@
         ],
         "summary": "Update a tag",
         "operationId": "updateTag",
-        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "description": "Fields left out of the body keep their stored value; a field that is sent replaces it (also with `[]`, `\"\"` or `0`).\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
         "x-pingtxt-access": "write",
         "security": [
           {
@@ -6697,7 +6697,7 @@
         ],
         "summary": "Save report settings",
         "operationId": "putReports",
-        "description": "Turns the weekly and monthly reports on or off and picks the email channels, the groups, the hour and the time zone. A report that is turned on starts with the next period.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "description": "Fields left out of the body keep their stored value; a field that is sent replaces it (also with `[]`, `\"\"` or `0`).\n\nTurns the weekly and monthly reports on or off and picks the email channels, the groups, the hour and the time zone. A report that is turned on starts with the next period.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
         "x-pingtxt-access": "write",
         "security": [
           {

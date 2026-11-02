@@ -27,6 +27,10 @@ hub also serves:
 - an interactive Swagger UI at `/api/docs` (linked from **settings → tokens**), where requests run with your browser
   session or a token set in *Authorize*.
 
+`PUT` on a monitor, maintenance window, group, tag or status page, and on the general, backup and report settings,
+changes only the fields in the body: the others keep their value. Send a field to change it, also to empty it (`[]`,
+`""`, `0`). A script or an older app that does not know a newer field so never resets it.
+
 ## MCP server
 
 The hub is also an [MCP](https://modelcontextprotocol.io) server at `/mcp` (Streamable HTTP), so an AI assistant

@@ -87,17 +87,12 @@ func (h *Hub) listGroups(w http.ResponseWriter, r *http.Request, _ *store.User) 
 
 func (h *Hub) saveGroup(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	var g store.Group
-	if readJSON(r, &g) != nil {
-		writeErr(w, 400, "invalid body")
+	id, ok := readSave(h, w, r, h.store.Group, &g, "group")
+	if !ok {
 		return
 	}
 	create := r.Method == http.MethodPost
 	if !create {
-		id, ok := pathID(r)
-		if !ok {
-			writeErr(w, 400, "invalid id")
-			return
-		}
 		g.ID = id
 	}
 	if err := validateGroup(&g); err != nil {
@@ -218,17 +213,12 @@ func (h *Hub) listTags(w http.ResponseWriter, r *http.Request, _ *store.User) {
 
 func (h *Hub) saveTag(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	var t store.Tag
-	if readJSON(r, &t) != nil {
-		writeErr(w, 400, "invalid body")
+	id, ok := readSave(h, w, r, h.store.Tag, &t, "tag")
+	if !ok {
 		return
 	}
 	create := r.Method == http.MethodPost
 	if !create {
-		id, ok := pathID(r)
-		if !ok {
-			writeErr(w, 400, "invalid id")
-			return
-		}
 		t.ID = id
 	}
 	if err := validateTag(&t); err != nil {

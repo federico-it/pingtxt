@@ -251,7 +251,7 @@ func (h *Hub) updateMaintenance(w http.ResponseWriter, r *http.Request, _ *store
 		return
 	}
 	var m store.Maintenance
-	if readJSON(r, &m) != nil {
+	if readJSONOver(r, old, &m) != nil {
 		writeErr(w, 400, "invalid body")
 		return
 	}

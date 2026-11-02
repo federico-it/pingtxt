@@ -236,17 +236,12 @@ func (h *Hub) getStatusPage(w http.ResponseWriter, r *http.Request, _ *store.Use
 
 func (h *Hub) saveStatusPage(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	var p store.StatusPage
-	if readJSON(r, &p) != nil {
-		writeErr(w, 400, "invalid body")
+	id, ok := readSave(h, w, r, h.store.StatusPage, &p, "status page")
+	if !ok {
 		return
 	}
 	create := r.Method == http.MethodPost
 	if !create {
-		id, ok := pathID(r)
-		if !ok {
-			writeErr(w, 400, "invalid id")
-			return
-		}
 		p.ID = id
 	}
 	if err := h.validateStatusPage(r, &p); err != nil {

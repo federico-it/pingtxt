@@ -397,7 +397,7 @@ func (h *Hub) getSettings(w http.ResponseWriter, r *http.Request, _ *store.User)
 
 func (h *Hub) putGeneralSettings(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	var g GeneralSettings
-	if readJSON(r, &g) != nil {
+	if readJSONOver(r, h.generalSettings(), &g) != nil {
 		writeErr(w, 400, "invalid body")
 		return
 	}
