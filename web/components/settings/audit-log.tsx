@@ -391,18 +391,16 @@ export function AuditTrail({ type, id }: { type: string; id: number }) {
       {data.entries.length === 0 ? (
         <div className="text-xs text-muted-foreground">{t("noChanges")}</div>
       ) : (
-        <div className="grid gap-1">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-1">
           {data.entries.map((e) => (
-            <div key={e.id} className="flex flex-wrap gap-x-3 text-xs">
+            <div key={e.id} className="flex min-w-0 flex-wrap gap-x-3 text-xs">
               <span className="text-muted-foreground tabular-nums">{datetime(e.at)}</span>
               <span className="text-primary">{e.action}</span>
               <span>{actor(e, t)}</span>
               <span className="text-muted-foreground">[{e.source}]</span>
               {e.result !== "ok" && <span className="text-down">{t(`results.${e.result}`)}</span>}
               <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                {Object.keys(e.changes ?? {})
-                  .filter((k) => !k.startsWith("_"))
-                  .join(", ")}
+                {changeSummary(e, t)}
               </span>
             </div>
           ))}
@@ -410,6 +408,16 @@ export function AuditTrail({ type, id }: { type: string; id: number }) {
       )}
     </Section>
   )
+}
+
+/** Short description of an entry's changes: a created or deleted object
+ * says so, an update lists the fields that changed. */
+function changeSummary(e: AuditEntry, t: ReturnType<typeof useTranslations>) {
+  if (e.action.endsWith(".create")) return t("created")
+  if (e.action.endsWith(".delete")) return t("deleted")
+  return Object.keys(e.changes ?? {})
+    .filter((k) => !k.startsWith("_"))
+    .join(", ")
 }
 
 /** The user's own logins, two-factor changes, tokens and app sign-ins. */

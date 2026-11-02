@@ -1583,7 +1583,9 @@
     "fullLog": "registro completo",
     "noChanges": "ancora nessuna modifica registrata.",
     "activityIntro": "I tuoi accessi, le modifiche alla verifica in due passaggi, i token api e gli accessi delle app degli ultimi 30 giorni. Qualcosa che non riconosci? Cambia la password e revoca i token e le app che non usi.",
-    "noActivity": "niente negli ultimi 30 giorni."
+    "noActivity": "niente negli ultimi 30 giorni.",
+    "created": "creato",
+    "deleted": "eliminato"
   },
   "diagnostics": {
     "loading": "carico la diagnostica…",
