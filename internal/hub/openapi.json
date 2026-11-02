@@ -9634,6 +9634,12 @@
             "type": "integer",
             "description": "Response time in ms above which a location is slow: when the median of its last 3 successful checks is higher. Slow locations count with failing ones toward degraded_pct, never toward down. 0 = off, -1 = automatic: each location gets max(3 × its usual time, usual time + 100 ms), the usual time being the median of its hourly averages over 7 days, once it has 24 hours of history. A fixed value must be below timeout_ms (push monitors: up to 3600000)."
           },
+          "ping_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20,
+            "description": "ping: echo requests per check, 1 to 20, sent 300 ms apart; 0 or missing = 3. The timeout must be at least (ping_count - 1) x 300 + 500 ms. Agents older than this setting send 3. Always 0 on other types."
+          },
           "locations": {
             "type": "array",
             "items": {

@@ -44,6 +44,11 @@ I monitor HTTP accettano anche metodo, header e body della richiesta, i codici d
 errori del certificato TLS. Gli agent più vecchi di un tipo di controllo segnalano `unknown monitor type`:
 aggiornali.
 
+I monitor ping inviano di default **3 richieste echo** per controllo, a 300 ms l'una dall'altra; imposta
+**pacchetti per controllo** da 1 a 20 (API `ping_count`). Il controllo è up se torna almeno una risposta, e il
+risultato dice quante, ad esempio `9/10 packets, 10% loss`. Il timeout copre tutto l'invio, quindi deve essere almeno
+(pacchetti - 1) x 300 + 500 ms. Gli agent più vecchi di questa impostazione inviano 3 pacchetti: aggiornali.
+
 ## Controlli sulla risposta (JSON)
 
 I monitor HTTP e con parola chiave possono controllare il body JSON della risposta, per esempio un endpoint di health

@@ -204,6 +204,7 @@ export const emptyMonitor: MonitorInput = {
   grace_sec: 300,
   degraded_pct: 0,
   slow_ms: 0,
+  ping_count: 3,
   ip_family: 0,
   diagnostics: 0,
   locations: ["local"],
@@ -644,6 +645,27 @@ export function MonitorForm({
                 </label>
               </Field>
             </>
+          )}
+          {m.type === "ping" && (
+            <Field
+              label={tr("pingCount")}
+              hint={tr("pingCountHint", {
+                ms: pingTimeout(m.ping_count || 3),
+              })}
+            >
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                value={m.ping_count || 3}
+                onChange={(e) =>
+                  set(
+                    "ping_count",
+                    Math.min(Math.max(Number(e.target.value) || 1, 1), 20)
+                  )
+                }
+              />
+            </Field>
           )}
           {m.type === "dns" && (
             <>
@@ -1167,4 +1189,9 @@ export function MonitorForm({
       </div>
     </form>
   )
+}
+
+/** Shortest timeout (ms) for count echo requests sent 300 ms apart, as the hub checks it. */
+function pingTimeout(count: number) {
+  return (Math.max(count, 1) - 1) * 300 + 500
 }

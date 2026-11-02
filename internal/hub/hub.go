@@ -352,6 +352,7 @@ func jobFor(m *store.Monitor) check.Job {
 		Headers:        m.Headers,
 		Body:           m.Body,
 		Assertions:     m.Assertions,
+		PingCount:      m.PingCount,
 	}
 }
 

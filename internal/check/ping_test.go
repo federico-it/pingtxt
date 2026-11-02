@@ -6,6 +6,7 @@ import (
 	"os"
 	"syscall"
 	"testing"
+	"time"
 )
 
 func TestConfiguredPingMode(t *testing.T) {
@@ -27,5 +28,16 @@ func TestPermissionError(t *testing.T) {
 	}
 	if permissionError(&net.DNSError{Err: "no such host", Name: "x.invalid"}) {
 		t.Error("a DNS error is not a permission error")
+	}
+}
+
+func TestPingCount(t *testing.T) {
+	for in, want := range map[int]int{0: DefaultPingCount, -2: DefaultPingCount, 1: 1, 7: 7, MaxPingCount + 5: MaxPingCount} {
+		if got := (Job{PingCount: in}).pingCount(); got != want {
+			t.Errorf("PingCount %d: sends %d, want %d", in, got, want)
+		}
+	}
+	if got := MinPingTimeout(3); got != 1100*time.Millisecond {
+		t.Errorf("MinPingTimeout(3) = %v", got)
 	}
 }

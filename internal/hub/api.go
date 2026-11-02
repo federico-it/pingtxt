@@ -682,6 +682,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	if err := checkSlowMs(m); err != nil {
 		return err
 	}
+	if err := checkPingCount(m); err != nil {
+		return err
+	}
 	if m.Headers == nil {
 		m.Headers = map[string]string{}
 	}
@@ -1837,6 +1840,27 @@ const maxPushSlowMs = 3600000
 
 // checkSlowMs validates the slow threshold: a check that takes longer than
 // the timeout fails, so the threshold must be below it.
+// checkPingCount fills in and checks the echo requests of a ping monitor.
+// The timeout must leave room for them; a monitor saved before the setting
+// (count 0) keeps working with the default whatever its timeout.
+func checkPingCount(m *store.Monitor) error {
+	if m.Type != check.TypePing {
+		m.PingCount = 0
+		return nil
+	}
+	explicit := m.PingCount != 0
+	if !explicit {
+		m.PingCount = check.DefaultPingCount
+	}
+	if m.PingCount < 1 || m.PingCount > check.MaxPingCount {
+		return fmt.Errorf("ping_count must be between 1 and %d", check.MaxPingCount)
+	}
+	if need := check.MinPingTimeout(m.PingCount).Milliseconds(); explicit && int64(m.TimeoutMs) < need {
+		return fmt.Errorf("timeout must be at least %d ms for %d packets", need, m.PingCount)
+	}
+	return nil
+}
+
 func checkSlowMs(m *store.Monitor) error {
 	switch {
 	case m.SlowMs < store.SlowAuto:

@@ -69,14 +69,35 @@ func ping(ctx context.Context, j Job, timeout time.Duration, privileged bool) (*
 	if err := p.Resolve(); err != nil {
 		return nil, err
 	}
-	p.Count = 3
-	p.Interval = 300 * time.Millisecond
+	p.Count = j.pingCount()
+	p.Interval = PingInterval
 	p.Timeout = timeout
 	p.SetPrivileged(privileged)
 	if err := p.RunWithContext(ctx); err != nil {
 		return nil, err
 	}
 	return p.Statistics(), nil
+}
+
+// Ping count limits and the gap between echo requests.
+const (
+	DefaultPingCount = 3
+	MaxPingCount     = 20
+	PingInterval     = 300 * time.Millisecond
+)
+
+// pingCount is the number of echo requests to send for j.
+func (j Job) pingCount() int {
+	if j.PingCount <= 0 {
+		return DefaultPingCount
+	}
+	return min(j.PingCount, MaxPingCount)
+}
+
+// MinPingTimeout is the shortest timeout that leaves room for count echo
+// requests: the gaps between them plus 500 ms for the last reply.
+func MinPingTimeout(count int) time.Duration {
+	return time.Duration(max(count-1, 0))*PingInterval + 500*time.Millisecond
 }
 
 func pingResult(s *probing.Statistics, err error) Result {

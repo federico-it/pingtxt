@@ -358,6 +358,8 @@
     "record": "record",
     "resolver": "resolver",
     "resolverHint": "empty = system resolver",
+    "pingCount": "packets per check",
+    "pingCountHint": "1 to 20, sent 300 ms apart · needs a timeout of at least {ms} ms",
     "expectedAnswer": "expected answer",
     "expectedAnswerHint": "optional: fail if no answer contains this",
     "group": "group",

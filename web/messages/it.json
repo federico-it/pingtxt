@@ -358,6 +358,8 @@
     "record": "record",
     "resolver": "resolver",
     "resolverHint": "vuoto = resolver di sistema",
+    "pingCount": "pacchetti per controllo",
+    "pingCountHint": "da 1 a 20, a 300 ms l'uno dall'altro · serve un timeout di almeno {ms} ms",
     "expectedAnswer": "risposta attesa",
     "expectedAnswerHint": "facoltativa: fallisce se nessuna risposta la contiene",
     "group": "gruppo",

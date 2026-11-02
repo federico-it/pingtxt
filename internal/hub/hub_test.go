@@ -525,6 +525,36 @@ func TestCheckSlowMs(t *testing.T) {
 	}
 }
 
+func TestCheckPingCount(t *testing.T) {
+	cases := []struct {
+		typ       string
+		count     int
+		timeout   int
+		wantCount int
+		wantErr   bool
+	}{
+		{check.TypePing, 0, 10000, 3, false},
+		{check.TypePing, 0, 500, 3, false}, // saved before the setting: kept as is
+		{check.TypePing, 1, 500, 1, false},
+		{check.TypePing, 10, 10000, 10, false},
+		{check.TypePing, 20, 6200, 20, false},
+		{check.TypePing, 20, 6199, 0, true}, // timeout too short for 20 packets
+		{check.TypePing, 21, 60000, 0, true},
+		{check.TypePing, -1, 10000, 0, true},
+		{"http", 5, 10000, 0, false}, // dropped on other types
+	}
+	for _, c := range cases {
+		m := &store.Monitor{Type: c.typ, TimeoutMs: c.timeout, PingCount: c.count}
+		err := checkPingCount(m)
+		if (err != nil) != c.wantErr {
+			t.Errorf("%s %d/%d ms: err = %v", c.typ, c.count, c.timeout, err)
+		}
+		if err == nil && m.PingCount != c.wantCount {
+			t.Errorf("%s %d: count %d, want %d", c.typ, c.count, m.PingCount, c.wantCount)
+		}
+	}
+}
+
 func TestAutoSlowLimit(t *testing.T) {
 	flat := func(n int, v float64) []float64 {
 		out := make([]float64, n)

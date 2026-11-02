@@ -43,6 +43,11 @@ Paste a `curl` command in the URL field of an HTTP monitor to fill in the method
 HTTP monitors also take a method, request headers and body, the accepted status codes and whether to skip TLS
 verification. Agents older than a check type report `unknown monitor type`: update them.
 
+Ping monitors send **3 echo requests** per check by default, 300 ms apart; set **packets per check** from 1 to 20
+(API `ping_count`). The check is up when at least one reply comes back, and the result shows how many did, e.g.
+`9/10 packets, 10% loss`. The timeout covers the whole run, so it must be at least (packets - 1) x 300 + 500 ms.
+Agents older than this setting send 3 packets: update them.
+
 ## Response checks (JSON)
 
 HTTP and keyword monitors can check the JSON body of the response, for example a health endpoint that returns

@@ -698,6 +698,9 @@ var laterMigrations = []migration{
 		FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 31: echo requests per ping check (0 = default, 3).
+	{sqlite: `ALTER TABLE monitors ADD COLUMN ping_count INTEGER NOT NULL DEFAULT 0;
+	UPDATE monitors SET ping_count = 3 WHERE type = 'ping';`},
 }
 
 func sqliteOnly(list []string) []migration {

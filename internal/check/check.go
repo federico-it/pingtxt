@@ -63,6 +63,9 @@ type Job struct {
 	// Diagnose asks for diagnostics (DNS, TCP, TLS, HTTP headers,
 	// traceroute) if the check fails. Older agents ignore it.
 	Diagnose bool `json:"diagnose,omitempty"`
+	// PingCount is how many echo requests a ping check sends; 0 means
+	// DefaultPingCount. Older agents ignore it and send DefaultPingCount.
+	PingCount int `json:"ping_count,omitempty"`
 }
 
 // Result is the outcome of a Job.

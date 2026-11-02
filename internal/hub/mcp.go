@@ -507,6 +507,7 @@ func monitorFields() map[string]any {
 		"diagnostics":         map[string]any{"type": "integer", "enum": []int{0, 1, 2}, "description": "Diagnostics (DNS, TCP, TLS, response headers, traceroute) at the first failure: 0 instance default, 1 on, 2 off"},
 		"grace_sec":           prop("integer", "Push monitors: extra seconds before a missing heartbeat is down"),
 		"slow_ms":             prop("integer", "Response time in ms above which a location is slow (median of its last 3 successful checks). Slow locations can make the monitor degraded, never down. 0 = off, -1 = automatic from each location's usual response time (3x, at least +100 ms, after 24h of history). A fixed value must be below timeout_ms"),
+		"ping_count":          prop("integer", "Ping monitors: echo requests per check, 1 to 20 (default 3). The timeout must cover them (300 ms apart). Agents older than this setting send 3"),
 		"locations":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Where to check from: ids from list_agents (\"local\" is the hub itself). Default local."},
 		"group_id":            prop("integer", "Group id from list_groups, 0 for none"),
 		"tag_ids":             intList("Tag ids from list_tags"),
