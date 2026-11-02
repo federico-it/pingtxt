@@ -316,13 +316,30 @@ Each notification channel has a **scope** and **events**:
 - **scope**: *all monitors* (also the ones added later), or the monitors of some **groups** and **tags**, or none
   (only the monitors linked one by one).
 - **events**: `down` (with its reminders), `up` (recovery, only to channels that got the alert), `degraded` (some
-  locations fail, and when that ends; off by default), `cert_expiry` and `domain_expiry`.
+  locations fail, and when that ends; off by default), `cert_expiry`, `domain_expiry` and `agent_offline` (see
+  [agent offline alerts](#agent-offline-alerts); about agents, so it ignores the scope and monitor links).
 
 A monitor can also be linked to a channel **one by one**, from the channel (its monitor list) or from the monitor
 form (*notifications*): the link has events of its own and wins over the scope, so it adds a monitor, changes what
 it sends, or leaves the monitor out of an *all monitors* channel. Channels created before this existed cover all
 monitors with every event except `degraded`, so nothing changes until you edit them. Webhooks carry `kind`
-(`""`, `degraded`, `cert_expiry`, `domain_expiry`) and `status`.
+(`""`, `degraded`, `cert_expiry`, `domain_expiry`, `agent`) and `status`.
+
+## Agent offline alerts
+
+When an agent stays disconnected longer than the **grace period** (5 minutes by default, set on the agents page,
+1 to 1440), channels with the `agent_offline` event get an *offline* alert, and an *online* one when the agent
+connects again. Short drops send nothing. The alert is not sent while the agent updates itself (at least 10 minutes
+of grace), after an admin rotated its token, when the agent's own *alert when offline* switch is off, or while
+every monitor it checks is in maintenance (it goes out when the window ends). Webhooks carry `kind: "agent"`,
+`status` (`offline` or `online`), `agent_id`, `agent`, `target` (its host name) and `down_since`.
+
+A monitor that runs only on agents offline past the grace period gets no checks: it turns **pending** (no incident,
+no downtime) instead of keeping its last status, until an agent reconnects. The dashboard shows a banner with the
+agents that are offline.
+
+New channels get the event by default; on upgrade it is added to channels that cover all monitors with `down`.
+Agents that were already offline before the upgrade stay quiet until they connect again.
 
 ## Escalation and reminders
 

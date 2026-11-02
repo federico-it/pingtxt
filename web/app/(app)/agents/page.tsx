@@ -17,9 +17,14 @@ import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { api, useApi, useIsAdmin, type Agent } from "@/lib/api"
+import { segment } from "@/components/ui/control"
+import { useMinute } from "@/hooks/use-now"
 import { ago, datetime } from "@/lib/format"
+import { cn } from "@/lib/utils"
 
-type AgentsResp = { agents: Agent[]; hub_url: string; hub_version: string; auto_update: boolean }
+type AgentsResp = { agents: Agent[]; hub_url: string; hub_version: string; auto_update: boolean; offline_grace_min: number }
+
+const maxGraceMin = 1440
 
 // Agents already asked about (per browser), so the prompt shows once.
 const ASKED_KEY = "pingtxt.agents.assignAsked"
@@ -43,7 +48,10 @@ function saveAsked(ids: number[]) {
 export default function AgentsPage() {
   const isAdmin = useIsAdmin()
   const t = useTranslations("agents")
-  const [edit, setEdit] = useState<{ id?: number; name: string; location: string } | null>(null)
+  const [edit, setEdit] = useState<{ id?: number; name: string; location: string; alert_offline: boolean } | null>(null)
+  const [onlyOffline, setOnlyOffline] = useState(false)
+  const [grace, setGrace] = useState<string | null>(null)
+  const now = useMinute()
   const [install, setInstall] = useState<{ id: number; name: string; token: string; hub: string; isNew: boolean } | null>(null)
   const [assignId, setAssignId] = useState<number | null>(null)
   const { data, mutate } = useApi<AgentsResp>("/api/agents", {
@@ -102,6 +110,30 @@ export default function AgentsPage() {
     }
   }
 
+  async function saveGrace() {
+    if (grace === null || !data) return
+    const min = Math.round(Number(grace))
+    setGrace(null)
+    if (!Number.isFinite(min) || min === data.offline_grace_min) return
+    if (min < 1 || min > maxGraceMin) {
+      toast.error(t("graceRange", { max: maxGraceMin }))
+      return
+    }
+    try {
+      await api("/api/settings/agent-updates", { method: "PUT", body: { offline_grace_min: min } })
+      toast.success(t("graceSaved", { min }))
+      mutate()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("error"))
+    }
+  }
+
+  const graceMs = (data?.offline_grace_min ?? 5) * 60_000
+  // Offline longer than the grace period: alerted (unless muted), checks not running.
+  const lost = (a: Agent) => !a.online && a.offline_since > 0 && now - a.offline_since >= graceMs
+  const offlineCount = data?.agents.filter((a) => !a.online).length ?? 0
+  const shown = (data?.agents ?? []).filter((a) => !onlyOffline || !a.online)
+
   async function updateNow(a: Agent) {
     try {
       await api(`/api/agents/${a.id}/update`, { method: "POST" })
@@ -122,7 +154,7 @@ export default function AgentsPage() {
     <>
       <PageHeader cmd="pingtxt agents ls" title={t("title")}>
         {isAdmin && (
-          <Button onClick={() => setEdit({ name: "", location: "" })}>
+          <Button onClick={() => setEdit({ name: "", location: "", alert_offline: true })}>
             <PlusIcon /> {t("add")}
           </Button>
         )}
@@ -137,11 +169,37 @@ export default function AgentsPage() {
             <Switch checked={data.auto_update} onCheckedChange={setAutoUpdate} disabled={!isAdmin} />
             <span>{t("autoUpdate")}</span>
           </label>
+          <label className="flex items-center gap-2" title={t("graceHint")}>
+            <span>{t("graceBefore")}</span>
+            <Input
+              type="number"
+              min={1}
+              max={maxGraceMin}
+              className="h-6 w-16 px-1.5 text-xs"
+              value={grace ?? String(data.offline_grace_min)}
+              disabled={!isAdmin}
+              onChange={(e) => setGrace(e.target.value)}
+              onBlur={saveGrace}
+              onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+            />
+            <span>{t("graceAfter")}</span>
+          </label>
           <span className="text-muted-foreground">
             {t.rich("hubVersion", { version: data.hub_version, hl: (c) => <span className="text-foreground">{c}</span> })}
             {" · "}
             {data.hub_version === "dev" ? t("devBuild") : t("updateHint")}
           </span>
+        </div>
+      )}
+
+      {offlineCount > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1 text-xs">
+          <button onClick={() => setOnlyOffline(false)} className={segment({ active: !onlyOffline })}>
+            {t("filterAll")}:{data?.agents.length ?? 0}
+          </button>
+          <button onClick={() => setOnlyOffline(true)} className={segment({ active: onlyOffline })}>
+            {t("offline")}:{offlineCount}
+          </button>
         </div>
       )}
 
@@ -161,11 +219,26 @@ export default function AgentsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(data?.agents ?? []).map((a) => (
+            {shown.map((a) => (
               <TableRow key={a.id}>
-                <TableCell>{a.online ? <span className="text-up">● {t("online")}</span> : <span className="text-muted-foreground">○ {t("offline")}</span>}</TableCell>
                 <TableCell>
-                  <div className="font-medium">{a.name}</div>
+                  {a.online ? (
+                    <span className="text-up">● {t("online")}</span>
+                  ) : lost(a) ? (
+                    <span className="text-down" title={t("lostHint")}>● {t("offline")}</span>
+                  ) : (
+                    <span className="text-muted-foreground">○ {t("offline")}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="font-medium">
+                    {a.name}
+                    {!a.alert_offline && (
+                      <span className="ml-2 text-[11px] font-normal text-muted-foreground" title={t("alertOffHint")}>
+                        {t("alertOff")}
+                      </span>
+                    )}
+                  </div>
                   <MonitorsLine agent={a} onAssign={isAdmin ? () => setAssignId(a.id) : undefined} />
                 </TableCell>
                 <TableCell>{a.location || <span className="text-muted-foreground">--</span>}</TableCell>
@@ -178,7 +251,7 @@ export default function AgentsPage() {
                 <TableCell className="hidden text-muted-foreground md:table-cell">
                   <VersionCell agent={a} hubVersion={data?.hub_version ?? ""} />
                 </TableCell>
-                <TableCell className="text-right text-muted-foreground" title={a.last_seen ? datetime(a.last_seen) : undefined}>{a.online ? t("now") : ago(a.last_seen)}</TableCell>
+                <TableCell className={cn("text-right text-muted-foreground", lost(a) && "text-down")} title={a.last_seen ? datetime(a.last_seen) : undefined}>{a.online ? t("now") : ago(a.offline_since || a.last_seen)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap">
                   {isAdmin && (
                     <>
@@ -187,7 +260,7 @@ export default function AgentsPage() {
                           {t("update")}
                         </Button>
                       )}
-                      <Button variant="ghost" size="xs" onClick={() => setEdit({ id: a.id, name: a.name, location: a.location })}>
+                      <Button variant="ghost" size="xs" onClick={() => setEdit({ id: a.id, name: a.name, location: a.location, alert_offline: a.alert_offline })}>
                         {t("edit")}
                       </Button>
                       <Confirm
@@ -235,6 +308,15 @@ export default function AgentsPage() {
               <Label htmlFor="agent-loc">{t("location")}</Label>
               <Input id="agent-loc" value={edit?.location ?? ""} onChange={(e) => setEdit((p) => p && { ...p, location: e.target.value })} placeholder="Frankfurt" />
             </div>
+            {edit?.id && (
+              <label className="flex cursor-pointer items-start gap-2">
+                <Switch className="mt-0.5" checked={edit.alert_offline} onCheckedChange={(v) => setEdit((p) => p && { ...p, alert_offline: v })} />
+                <span className="grid gap-0.5">
+                  <span>{t("alertOffline")}</span>
+                  <span className="text-xs text-muted-foreground">{t("alertOfflineHint", { min: data?.offline_grace_min ?? 5 })}</span>
+                </span>
+              </label>
+            )}
             <DialogFooter>
               <Button type="submit">{edit?.id ? t("save") : t("create")}</Button>
             </DialogFooter>

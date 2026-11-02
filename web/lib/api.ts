@@ -208,6 +208,10 @@ export interface Agent {
   last_seen: number
   created_at: number
   online: boolean
+  /** send the agent_offline event when it stays disconnected */
+  alert_offline: boolean
+  /** when it disconnected (unix ms), 0 while connected or never connected */
+  offline_since: number
   /** number of monitors that check from this agent */
   monitors: number
   /** version differs from the hub's */
@@ -250,6 +254,8 @@ export interface Location {
   kind: "local" | "agent"
   // IPv6 connectivity: 0 unknown (older agent), 1 available, 2 not available
   ipv6: 0 | 1 | 2
+  /** agents only: when it disconnected (unix ms), 0 while online */
+  offline_since?: number
 }
 
 export type MaintenanceKind = "once" | "daily" | "weekly" | "monthly"
@@ -313,13 +319,17 @@ export interface Tag {
 export type NotifierType =
   "webhook" | "discord" | "slack" | "telegram" | "ntfy" | "email" | "app"
 
-/** What a channel can be sent about a monitor. */
-export type NotifyEvent = "down" | "up" | "degraded" | "cert_expiry" | "domain_expiry"
+/** What a channel can be sent. agent_offline is about agents, not monitors:
+ * it ignores the channel's scope and monitor links cannot pick it. */
+export type NotifyEvent = "down" | "up" | "degraded" | "cert_expiry" | "domain_expiry" | "agent_offline"
 
-export const notifyEvents: NotifyEvent[] = ["down", "up", "degraded", "cert_expiry", "domain_expiry"]
+export const notifyEvents: NotifyEvent[] = ["down", "up", "degraded", "cert_expiry", "domain_expiry", "agent_offline"]
 
-/** Events of a new channel: everything but degraded, as before channels had events. */
-export const defaultNotifyEvents: NotifyEvent[] = ["down", "up", "cert_expiry", "domain_expiry"]
+/** The events about a monitor, which monitor links can pick. */
+export const monitorEvents: NotifyEvent[] = notifyEvents.filter((e) => e !== "agent_offline")
+
+/** Events of a new channel: everything but degraded. */
+export const defaultNotifyEvents: NotifyEvent[] = ["down", "up", "cert_expiry", "domain_expiry", "agent_offline"]
 
 /**
  * A channel linked to one monitor with its own events. It wins over the
@@ -357,6 +367,8 @@ export interface Overview {
   status: Partial<Record<Status, number>>
   agents: number
   agents_online: number
+  /** agents offline longer than the grace period */
+  agents_lost?: { id: number; name: string; offline_since: number }[]
   open_incidents: number
   version: string
 }

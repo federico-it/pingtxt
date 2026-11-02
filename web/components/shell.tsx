@@ -147,10 +147,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 />
                 <span aria-hidden>
                   {down > 0 && <span className="text-down">{down}↓ · </span>}
-                  {t("agents", {
-                    online: ov.data.agents_online,
-                    total: ov.data.agents,
-                  })}
+                  <span className={cn((ov.data.agents_lost?.length ?? 0) > 0 && "text-down")}>
+                    {t("agents", {
+                      online: ov.data.agents_online,
+                      total: ov.data.agents,
+                    })}
+                  </span>
                 </span>
                 <span className="sr-only">{statusText}</span>
               </span>

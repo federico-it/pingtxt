@@ -30,6 +30,8 @@ type agentConn struct {
 	once  sync.Once
 	done  chan struct{}
 	ipv6  atomic.Int32 // check.IPv6Yes/No as reported, IPv6Unknown before
+	// kicked is set when an admin closes the connection: no offline alert.
+	kicked atomic.Bool
 }
 
 func (a *agentConn) label() string {
@@ -141,10 +143,13 @@ func (h *Hub) ServeAgent(w http.ResponseWriter, r *http.Request) {
 	h.agents[ag.ID] = ac
 	h.mu.Unlock()
 	h.log.Info("agent connected", "agent", ag.Name, "addr", clientIP(r), "version", hl.Version)
+	h.agentConnectedAlert(ag)
 
 	defer func() {
+		gone := false
 		h.mu.Lock()
 		if h.agents[ag.ID] == ac {
+			gone = true
 			delete(h.agents, ag.ID)
 			// Forget this location's state so it does not affect status while offline.
 			loc := AgentLocation(ag.ID)
@@ -153,7 +158,15 @@ func (h *Hub) ServeAgent(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		h.mu.Unlock()
-		_ = h.store.AgentSeen(ag.ID)
+		if gone {
+			alerted := store.AgentAlertNone
+			if ac.kicked.Load() {
+				alerted = store.AgentAlertMuted
+			}
+			_ = h.store.SetAgentOffline(ag.ID, time.Now().UnixMilli(), alerted)
+		} else {
+			_ = h.store.AgentSeen(ag.ID)
+		}
 		ac.close()
 		h.log.Info("agent disconnected", "agent", ag.Name)
 	}()
@@ -228,6 +241,7 @@ func (h *Hub) DisconnectAgent(id int64) {
 	ac := h.agents[id]
 	h.mu.Unlock()
 	if ac != nil {
+		ac.kicked.Store(true)
 		ac.close()
 	}
 }

@@ -62,6 +62,8 @@ func (e Event) notifyEvent() string {
 		return store.EventDomainExpiry
 	case KindDegraded:
 		return store.EventDegraded
+	case KindAgent:
+		return store.EventAgentOffline
 	}
 	if e.Status == StatusDown {
 		return store.EventDown
@@ -154,7 +156,7 @@ func (h *Hub) validateScope(n *store.Notifier) error {
 		if slices.ContainsFunc(out, func(o store.ChannelLink) bool { return o.MonitorID == l.MonitorID }) {
 			continue
 		}
-		out = append(out, store.ChannelLink{MonitorID: l.MonitorID, Events: store.CleanEvents(l.Events)})
+		out = append(out, store.ChannelLink{MonitorID: l.MonitorID, Events: store.CleanLinkEvents(l.Events)})
 	}
 	n.Monitors = out
 	return nil
@@ -177,7 +179,7 @@ func (h *Hub) validateMonitorLinks(m *store.Monitor) error {
 		if slices.ContainsFunc(out, func(o store.ChannelLink) bool { return o.NotifierID == l.NotifierID }) {
 			continue
 		}
-		out = append(out, store.ChannelLink{NotifierID: l.NotifierID, Events: store.CleanEvents(l.Events)})
+		out = append(out, store.ChannelLink{NotifierID: l.NotifierID, Events: store.CleanLinkEvents(l.Events)})
 	}
 	m.Notifiers = out
 	return nil

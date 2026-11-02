@@ -216,6 +216,26 @@ func appMessage(e Event) pushMessage {
 		}
 		m.Title = first
 		body = append(body, strings.TrimPrefix(rest, "> "))
+	case KindAgent:
+		m.Data["type"] = "agent"
+		m.Data["agent_id"] = strconv.FormatInt(e.AgentID, 10)
+		id := "agent-" + strconv.FormatInt(e.AgentID, 10)
+		m.ThreadID, m.CollapseID = id, id
+		if e.Status == AgentOffline {
+			m.Priority = "high"
+			m.Title = "Agent " + e.Agent + " is offline"
+			if e.Target != "" {
+				body = append(body, e.Target)
+			}
+			if e.Cause != "" {
+				body = append(body, e.Cause)
+			}
+		} else {
+			m.Title = "Agent " + e.Agent + " is back online"
+			if d := e.downFor(); d != "" {
+				body = append(body, "After "+d+" offline")
+			}
+		}
 	case KindDegraded:
 		m.Title = e.Monitor + " is degraded"
 		if e.Status != StatusDegraded {

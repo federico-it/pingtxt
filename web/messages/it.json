@@ -203,7 +203,8 @@
     "deleteHint": "viene eliminato dopo qualche secondo: puoi annullare",
     "zoomHint": "trascina sul grafico per ingrandire",
     "zoomed": "{from} → {to}",
-    "zoomReset": "torna a {range}"
+    "zoomReset": "torna a {range}",
+    "noLocationOnline": "Nessuna località di questo monitor è online: i controlli non sono in esecuzione, quindi lo stato resta pending finché un agent non si ricollega."
   },
   "browserNotify": {
     "title": "notifiche desktop in questo browser",
@@ -706,7 +707,23 @@
     "waiting": "in attesa che {name} si colleghi… ti verrà chiesto quali monitor devono usarlo.",
     "noMonitors": "in nessun monitor",
     "monitors": "{count, plural, one {# monitor} other {# monitor}}",
-    "assign": "aggiungi ai monitor"
+    "assign": "aggiungi ai monitor",
+    "graceBefore": "avvisa quando un agent è offline da",
+    "graceAfter": "min",
+    "graceHint": "I canali con l'evento \"agent offline\" vengono avvisati quando un agent resta disconnesso così a lungo, e di nuovo quando torna. Gli agent a cui è appena stato inviato un aggiornamento hanno almeno 10 minuti.",
+    "graceRange": "Inserisci un valore tra 1 e {max} minuti.",
+    "graceSaved": "avviso offline dopo {min} min",
+    "filterAll": "tutti",
+    "lostHint": "Offline da più della soglia di avviso: i suoi controlli non sono in esecuzione.",
+    "alertOff": "nessun avviso offline",
+    "alertOffHint": "Questo agent non invia l'avviso \"agent offline\".",
+    "alertOffline": "avvisa quando questo agent va offline",
+    "alertOfflineHint": "I canali con l'evento \"agent offline\" vengono avvisati dopo {min} min senza connessione, e di nuovo quando torna."
+  },
+  "agentsOffline": {
+    "title": "{count, plural, one {# agent offline} other {# agent offline}}:",
+    "text": "{count, plural, one {i suoi controlli non sono in esecuzione.} other {i loro controlli non sono in esecuzione.}}",
+    "open": "agent"
   },
   "agentInstall": {
     "hint": "L'agent si collega solo in uscita verso l'hub via HTTPS/WebSocket: nessuna porta da aprire. Il token è mostrato solo ora; rigeneralo per averne uno nuovo."
@@ -1443,20 +1460,22 @@
   },
   "channelLinks": {
     "events": "eventi",
-    "eventsHint": "Cosa riceve questo canale per i monitor che copre. I ripristini vanno solo ai canali che hanno ricevuto l'avviso di down.",
+    "eventsHint": "Cosa riceve questo canale per i monitor che copre. I ripristini vanno solo ai canali che hanno ricevuto l'avviso di down. Agent offline riguarda gli agent, non i monitor: viene inviato qualunque monitor copra il canale.",
     "event": {
       "down": "down",
       "up": "di nuovo up",
       "degraded": "degradato",
       "cert_expiry": "scadenza certificato",
-      "domain_expiry": "scadenza dominio"
+      "domain_expiry": "scadenza dominio",
+      "agent_offline": "agent offline"
     },
     "short": {
       "down": "down",
       "up": "up",
       "degraded": "degradato",
       "cert_expiry": "cert",
-      "domain_expiry": "dominio"
+      "domain_expiry": "dominio",
+      "agent_offline": "agent"
     },
     "monitors": "monitor",
     "allMonitors": "tutti i monitor",

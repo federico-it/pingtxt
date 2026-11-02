@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"cmp"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -869,7 +870,7 @@ func (h *Hub) overview(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	}
 	writeJSON(w, 200, map[string]any{
 		"monitors": len(ms), "status": counts,
-		"agents": len(agents), "agents_online": online,
+		"agents": len(agents), "agents_online": online, "agents_lost": h.lostAgents(agents, time.Now()),
 		"open_incidents": active, "version": h.cfg.Version,
 	})
 }
@@ -1273,7 +1274,12 @@ func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.Use
 		return
 	}
 	for _, a := range agents {
-		out = append(out, map[string]any{"id": AgentLocation(a.ID), "name": agentLabel(a), "online": h.AgentOnline(a.ID), "kind": "agent", "ipv6": h.locationIPv6(AgentLocation(a.ID))})
+		online := h.AgentOnline(a.ID)
+		since := int64(0)
+		if !online {
+			since = cmp.Or(a.OfflineSince, a.LastSeen)
+		}
+		out = append(out, map[string]any{"id": AgentLocation(a.ID), "name": agentLabel(a), "online": online, "kind": "agent", "ipv6": h.locationIPv6(AgentLocation(a.ID)), "offline_since": since})
 	}
 	writeJSON(w, 200, out)
 }
@@ -1327,12 +1333,15 @@ func (h *Hub) listAgents(w http.ResponseWriter, r *http.Request, _ *store.User) 
 	writeJSON(w, 200, map[string]any{
 		"agents": out, "hub_url": h.hubURL(r),
 		"hub_version": h.cfg.Version, "auto_update": h.agentUpdateSettings().AutoUpdate,
+		"offline_grace_min": int(h.agentUpdateSettings().offlineGrace() / time.Minute),
 	})
 }
 
 type agentInput struct {
 	Name     string `json:"name"`
 	Location string `json:"location"`
+	// AlertOffline turns the offline alert on or off (nil = unchanged).
+	AlertOffline *bool `json:"alert_offline"`
 }
 
 func (h *Hub) createAgent(w http.ResponseWriter, r *http.Request, _ *store.User) {
@@ -1364,6 +1373,12 @@ func (h *Hub) updateAgent(w http.ResponseWriter, r *http.Request, _ *store.User)
 	if err := h.store.UpdateAgent(id, strings.TrimSpace(in.Name), strings.TrimSpace(in.Location)); err != nil {
 		h.internalErr(w, err)
 		return
+	}
+	if in.AlertOffline != nil {
+		if err := h.store.SetAgentAlertOffline(id, *in.AlertOffline); err != nil {
+			h.internalErr(w, err)
+			return
+		}
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }

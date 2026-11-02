@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
 
+import { AgentsOffline } from "@/components/agents-offline"
 import { ExpiryBadges } from "@/components/expiry"
 import { TagList, TagToggle, useLabels } from "@/components/labels"
 import { Empty, PageHeader } from "@/components/page-header"
@@ -322,6 +323,8 @@ function Monitors() {
           </Button>
         )}
       </PageHeader>
+
+      <AgentsOffline />
 
       <div className="mb-4 flex flex-wrap gap-1 text-xs">
         {filters.map((f) => (

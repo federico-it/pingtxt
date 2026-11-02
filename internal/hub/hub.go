@@ -90,6 +90,9 @@ type Hub struct {
 	// warmUntil is when the monitors were loaded: older results are added to
 	// the dashboard stats from the database by warmStats.
 	warmUntil int64
+	// started is when Run started (unix ms): agents offline before count
+	// from then, see agentOfflineSince.
+	started int64
 
 	localQueue chan check.Job
 	tests      testChecks                   // test checks waiting for an agent, see monitortest.go
@@ -167,6 +170,7 @@ func parseAgentLocation(loc string) (int64, bool) {
 
 // Run starts the scheduler and maintenance loops until ctx is done.
 func (h *Hub) Run(ctx context.Context) error {
+	h.started = time.Now().UnixMilli()
 	if err := h.reloadAll(); err != nil {
 		return err
 	}
@@ -190,6 +194,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.telemetryLoop(ctx)
 	go h.agentUpdateLoop(ctx)
 	go h.escalationLoop(ctx)
+	go h.agentOfflineLoop(ctx)
 	go h.liveActivityLoop(ctx)
 	go h.localIPv6.Run(ctx, 10*time.Minute)
 	t := time.NewTicker(time.Second)

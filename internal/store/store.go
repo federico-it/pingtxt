@@ -562,6 +562,29 @@ var laterMigrations = []migration{
 		FOREIGN KEY (notifier_id) REFERENCES notifiers(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 27: "agent offline" alerts. offline_since is when the agent
+	// disconnected (0 while connected), offline_alerted whether the alert of
+	// that disconnection went out (1) or is not to be sent (2). Agents that
+	// exist now start muted, so agents dead long before the upgrade do not
+	// all alert at once; connected ones reset it when they reconnect. Channels
+	// that get everything (every monitor, down events) get the new event too.
+	{
+		sqlite: `ALTER TABLE agents ADD COLUMN alert_offline INTEGER NOT NULL DEFAULT 1;
+	ALTER TABLE agents ADD COLUMN offline_since INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE agents ADD COLUMN offline_alerted INTEGER NOT NULL DEFAULT 0;
+	UPDATE agents SET offline_alerted = 2;
+	UPDATE notifiers SET events = REPLACE(events, ']', ',"agent_offline"]') WHERE all_monitors = 1 AND events LIKE '%"down"%';`,
+		postgres: `ALTER TABLE agents ADD COLUMN alert_offline INTEGER NOT NULL DEFAULT 1;
+	ALTER TABLE agents ADD COLUMN offline_since BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE agents ADD COLUMN offline_alerted INTEGER NOT NULL DEFAULT 0;
+	UPDATE agents SET offline_alerted = 2;
+	UPDATE notifiers SET events = REPLACE(events, ']', ',"agent_offline"]') WHERE all_monitors = 1 AND events LIKE '%"down"%';`,
+		mysql: `ALTER TABLE agents ADD COLUMN alert_offline INT NOT NULL DEFAULT 1;
+	ALTER TABLE agents ADD COLUMN offline_since BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE agents ADD COLUMN offline_alerted INT NOT NULL DEFAULT 0;
+	UPDATE agents SET offline_alerted = 2;
+	UPDATE notifiers SET events = REPLACE(events, ']', ',"agent_offline"]') WHERE all_monitors = 1 AND events LIKE '%"down"%';`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

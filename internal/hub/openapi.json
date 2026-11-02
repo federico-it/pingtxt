@@ -122,6 +122,10 @@
                     },
                     "auto_update": {
                       "type": "boolean"
+                    },
+                    "offline_grace_min": {
+                      "type": "integer",
+                      "description": "Minutes an agent can be disconnected before it is reported offline (agent_offline event)."
                     }
                   }
                 }
@@ -250,6 +254,10 @@
                   },
                   "location": {
                     "type": "string"
+                  },
+                  "alert_offline": {
+                    "type": "boolean",
+                    "description": "Turn the offline alert of this agent on or off (left out = unchanged)."
                   }
                 },
                 "required": [
@@ -4374,6 +4382,26 @@
                     "agents_online": {
                       "type": "integer"
                     },
+                    "agents_lost": {
+                      "type": "array",
+                      "description": "Agents offline longer than the grace period (offline_grace_min).",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "offline_since": {
+                            "type": "integer",
+                            "format": "int64"
+                          }
+                        }
+                      }
+                    },
                     "open_incidents": {
                       "type": "integer"
                     },
@@ -4391,6 +4419,7 @@
                   },
                   "agents": 2,
                   "agents_online": 2,
+                  "agents_lost": [],
                   "open_incidents": 1,
                   "version": "v0.1.0"
                 }
@@ -5061,14 +5090,18 @@
                 "properties": {
                   "auto_update": {
                     "type": "boolean"
+                  },
+                  "offline_grace_min": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1440,
+                    "description": "Minutes an agent can be disconnected before channels with the agent_offline event are alerted (0 = default, 5). Agents that were just sent an update get at least 10 minutes."
                   }
-                },
-                "required": [
-                  "auto_update"
-                ]
+                }
               },
               "example": {
-                "auto_update": true
+                "auto_update": true,
+                "offline_grace_min": 5
               }
             }
           }
@@ -5083,6 +5116,9 @@
                   "properties": {
                     "auto_update": {
                       "type": "boolean"
+                    },
+                    "offline_grace_min": {
+                      "type": "integer"
                     }
                   }
                 }
@@ -9641,6 +9677,15 @@
             ],
             "description": "IPv6 connectivity as last probed: 0 unknown (agents before this field), 1 available, 2 not available. IPv6-only monitors cannot use a location with 2, and monitors with ip_family 0 check over IPv4 there."
           },
+          "alert_offline": {
+            "type": "boolean",
+            "description": "Send the agent_offline event when the agent stays disconnected longer than the grace period (default true)."
+          },
+          "offline_since": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When the agent disconnected, unix time in milliseconds (0 = connected, or never connected)."
+          },
           "location_id": {
             "type": "string",
             "description": "Value to use in monitor locations.",
@@ -9704,6 +9749,11 @@
               2
             ],
             "description": "IPv6 connectivity as last probed: 0 unknown (agents before this field), 1 available, 2 not available. IPv6-only monitors cannot use a location with 2, and monitors with ip_family 0 check over IPv4 there."
+          },
+          "offline_since": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Agents only: when the agent disconnected, unix time in milliseconds (0 = online or never connected)."
           }
         }
       },
@@ -9808,10 +9858,11 @@
                 "up",
                 "degraded",
                 "cert_expiry",
-                "domain_expiry"
+                "domain_expiry",
+                "agent_offline"
               ]
             },
-            "description": "What the channel gets for the monitors it covers. Default on create: down, up, cert_expiry, domain_expiry. down = the monitor went down (and the reminders of repeat_min), up = it is back up (only to channels that got the down alert), degraded = some locations fail and when that ends, cert_expiry / domain_expiry = the TLS certificate or the domain registration expires soon, expired or was renewed."
+            "description": "What the channel gets for the monitors it covers. Default on create: down, up, cert_expiry, domain_expiry, agent_offline. down = the monitor went down (and the reminders of repeat_min), up = it is back up (only to channels that got the down alert), degraded = some locations fail and when that ends, cert_expiry / domain_expiry = the TLS certificate or the domain registration expires soon, expired or was renewed. agent_offline = an agent stayed disconnected longer than the grace period, and when it is back online (whatever monitors the channel covers; not available on monitor links)."
           },
           "monitors": {
             "type": "array",

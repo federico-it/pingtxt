@@ -128,13 +128,28 @@ type Agent struct {
 	// IPv6 is the agent's IPv6 connectivity as last reported: 0 unknown
 	// (never reported, older agent), 1 yes, 2 no.
 	IPv6 int `json:"ipv6"`
+	// AlertOffline sends the "agent offline" event when the agent stays
+	// disconnected longer than the grace period.
+	AlertOffline bool `json:"alert_offline"`
+	// OfflineSince is when the agent disconnected (unix ms), 0 while it is
+	// connected or before it ever connected.
+	OfflineSince int64 `json:"offline_since"`
+	// OfflineAlerted is AgentAlertNone, AgentAlertSent or AgentAlertMuted.
+	OfflineAlerted int `json:"-"`
 }
 
-const agentCols = `id, name, location, token_hash, version, hostname, platform, remote_addr, last_seen, created_at, ipv6`
+// Agent.OfflineAlerted values.
+const (
+	AgentAlertNone  = 0 // no "offline" event sent for this disconnection (yet)
+	AgentAlertSent  = 1 // "offline" sent: "online" follows when it reconnects
+	AgentAlertMuted = 2 // nothing to send until it reconnects (admin kicked it, or offline before alerts existed)
+)
+
+const agentCols = `id, name, location, token_hash, version, hostname, platform, remote_addr, last_seen, created_at, ipv6, alert_offline, offline_since, offline_alerted`
 
 func scanAgent(sc interface{ Scan(...any) error }) (*Agent, error) {
 	a := &Agent{}
-	err := sc.Scan(&a.ID, &a.Name, &a.Location, &a.TokenHash, &a.Version, &a.Hostname, &a.Platform, &a.RemoteAddr, &a.LastSeen, &a.CreatedAt, &a.IPv6)
+	err := sc.Scan(&a.ID, &a.Name, &a.Location, &a.TokenHash, &a.Version, &a.Hostname, &a.Platform, &a.RemoteAddr, &a.LastSeen, &a.CreatedAt, &a.IPv6, &a.AlertOffline, &a.OfflineSince, &a.OfflineAlerted)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -167,7 +182,7 @@ func (s *Store) AgentByToken(hash string) (*Agent, error) {
 }
 
 func (s *Store) CreateAgent(name, location, tokenHash string) (*Agent, error) {
-	a := &Agent{Name: name, Location: location, TokenHash: tokenHash, CreatedAt: now()}
+	a := &Agent{Name: name, Location: location, TokenHash: tokenHash, CreatedAt: now(), AlertOffline: true}
 	id, err := s.db.insert(s.db, `INSERT INTO agents (name, location, token_hash, created_at) VALUES (?, ?, ?, ?)`, a.Name, a.Location, a.TokenHash, a.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -199,6 +214,31 @@ func (s *Store) SetAgentIPv6(id int64, v int) error {
 
 func (s *Store) AgentSeen(id int64) error {
 	_, err := s.db.Exec(`UPDATE agents SET last_seen = ? WHERE id = ?`, now(), id)
+	return err
+}
+
+// SetAgentAlertOffline turns the offline alert of an agent on or off.
+func (s *Store) SetAgentAlertOffline(id int64, on bool) error {
+	_, err := s.db.Exec(`UPDATE agents SET alert_offline = ? WHERE id = ?`, b2i(on), id)
+	return err
+}
+
+// SetAgentOffline records that an agent disconnected at since (unix ms),
+// with the alert state of this disconnection.
+func (s *Store) SetAgentOffline(id, since int64, alerted int) error {
+	_, err := s.db.Exec(`UPDATE agents SET offline_since = ?, offline_alerted = ?, last_seen = ? WHERE id = ?`, since, alerted, now(), id)
+	return err
+}
+
+// SetAgentOnline clears the offline state of an agent that connected.
+func (s *Store) SetAgentOnline(id int64) error {
+	_, err := s.db.Exec(`UPDATE agents SET offline_since = 0, offline_alerted = 0 WHERE id = ?`, id)
+	return err
+}
+
+// SetAgentAlerted records the alert state of an agent's disconnection.
+func (s *Store) SetAgentAlerted(id int64, alerted int) error {
+	_, err := s.db.Exec(`UPDATE agents SET offline_alerted = ? WHERE id = ?`, alerted, id)
 	return err
 }
 
