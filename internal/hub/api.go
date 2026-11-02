@@ -70,6 +70,7 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("POST /api/auth/2fa/enable", session(h.enableTwoFactor))
 	mux.HandleFunc("POST /api/auth/2fa/disable", session(h.disableTwoFactor))
 	mux.HandleFunc("POST /api/auth/2fa/recovery-codes", session(h.regenerateRecoveryCodes))
+	mux.HandleFunc("GET /api/account/activity", auth(h.accountActivity))
 	mux.HandleFunc("GET /api/tokens", session(h.listTokens))
 	mux.HandleFunc("POST /api/tokens", session(h.createToken))
 	mux.HandleFunc("DELETE /api/tokens/{id}", session(h.deleteToken))
@@ -104,7 +105,10 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/mobile/live-activity/start-token", personal(h.deleteLAStartToken))
 	mux.HandleFunc("PUT /api/mobile/live-activity/token", personal(h.putLAToken))
 	mux.HandleFunc("DELETE /api/mobile/live-activity/token", personal(h.deleteLAToken))
-	mux.HandleFunc("GET /api/config/export", auth(h.exportConfig)) // secrets only with a session
+	mux.HandleFunc("GET /api/config/export", auth(h.exportConfig))   // secrets only with a session
+	mux.HandleFunc("GET /api/audit", h.requireAdminAny(h.listAudit)) // audit log, see audit.go
+	mux.HandleFunc("GET /api/audit/users", h.requireAdminAny(h.auditUsers))
+	mux.HandleFunc("GET /api/audit/export", h.requireAdminAny(h.exportAudit))
 	mux.HandleFunc("POST /api/config/import", admin(h.importConfig))
 	mux.HandleFunc("POST /api/import/uptime-kuma", admin(h.importKuma))
 
@@ -404,6 +408,7 @@ func (h *Hub) postSetup(w http.ResponseWriter, r *http.Request) {
 		h.internalErr(w, err)
 		return
 	}
+	h.auditEvent(r, u, nil, "account.setup", store.AuditOK, map[string]any{"_role": u.Role})
 	writeJSON(w, 201, u)
 }
 
@@ -424,6 +429,11 @@ func (h *Hub) login(w http.ResponseWriter, r *http.Request) {
 	u, err := h.store.UserByEmail(email)
 	if err != nil || u.PasswordHash == "" || bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(c.Password)) != nil {
 		h.passwordFailed(r, email)
+		var known *store.User
+		if err == nil {
+			known = u
+		}
+		h.auditLogin(r, known, email, "password", store.AuditFailed)
 		time.Sleep(400 * time.Millisecond)
 		writeErr(w, 401, "invalid email or password")
 		return
@@ -437,10 +447,14 @@ func (h *Hub) login(w http.ResponseWriter, r *http.Request) {
 		h.internalErr(w, err)
 		return
 	}
+	h.auditLogin(r, u, email, "password", store.AuditOK)
 	writeJSON(w, 200, u)
 }
 
 func (h *Hub) logout(w http.ResponseWriter, r *http.Request) {
+	if u := h.currentUser(r); u != nil {
+		h.auditEvent(r, u, nil, "account.logout", store.AuditOK, nil)
+	}
 	if c, err := r.Cookie(sessionCookie); err == nil {
 		_ = h.store.DeleteSession(HashToken(c.Value))
 	}

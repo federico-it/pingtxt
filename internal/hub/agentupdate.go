@@ -259,6 +259,7 @@ func (h *Hub) agentConnected(ac *agentConn) {
 	if st := u.state[ac.agent.ID]; st != nil && st.target == ac.hello.Version {
 		delete(u.state, ac.agent.ID)
 		h.log.Info("agent updated", "agent", ac.agent.Name, "version", ac.hello.Version)
+		defer h.AuditSystem(store.AuditSystem, "agent.updated", "agent", ac.agent.ID, agentLabel(ac.agent), map[string]any{"version": ac.hello.Version})
 	}
 	u.mu.Unlock()
 	if h.autoUpdateReady() {

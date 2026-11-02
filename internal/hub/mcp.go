@@ -78,6 +78,8 @@ type mcpCaller struct {
 	auth   string // Authorization header, forwarded to the API
 	host   string
 	remote string
+	ip     string // client address for the audit log
+	agent  string // User-Agent
 }
 
 // canWrite reports whether the caller may use the tools that change data.
@@ -119,7 +121,7 @@ func (h *Hub) serveMCP(api http.Handler) http.HandlerFunc {
 			h.mcpUnauthorized(w, r, err.Error(), true)
 			return
 		}
-		c := &mcpCaller{user: u, token: tok, auth: r.Header.Get("Authorization"), host: r.Host, remote: r.RemoteAddr}
+		c := &mcpCaller{user: u, token: tok, auth: r.Header.Get("Authorization"), host: r.Host, remote: r.RemoteAddr, ip: requestIP(r), agent: r.UserAgent()}
 
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, mcpMaxBody))
 		if err != nil {
@@ -232,8 +234,10 @@ func (h *Hub) mcpDispatch(ctx context.Context, api http.Handler, c *mcpCaller, m
 			if !c.user.IsAdmin() {
 				msg = errReadOnlyUser
 			}
+			h.auditMCPDenied(c, p.Name)
 			return toolError(msg), nil
 		}
+		ctx = withMCPOrigin(ctx, mcpOrigin{tool: p.Name, ip: c.ip, remote: c.remote, userAgent: c.agent})
 		out, err := t.run(&mcpCall{ctx: ctx, api: api, caller: c, args: p.Arguments})
 		if err != nil {
 			return toolError(err.Error()), nil

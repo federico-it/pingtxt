@@ -80,6 +80,10 @@
     {
       "name": "OAuth",
       "description": "OAuth 2.1 authorization server for native apps and MCP clients. Form bodies, OAuth error format."
+    },
+    {
+      "name": "Audit log",
+      "description": "Who changed what, when and from where. Admins only."
     }
   ],
   "paths": {
@@ -8621,6 +8625,411 @@
           }
         }
       }
+    },
+    "/api/audit": {
+      "get": {
+        "tags": [
+          "Audit log"
+        ],
+        "summary": "List the audit log",
+        "operationId": "listAudit",
+        "description": "Newest first, 50 per page (limit up to 200). Pass next_before as before for the next page. Admins only.\n\n**Access:** An admin's browser session or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Cursor: entries with a smaller id."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "1 to 200."
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Unix ms, entries at or after."
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Unix ms, entries before."
+          },
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "User id; -1 = entries without a user."
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma separated: web, api, mcp, app, system, cli."
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Action prefix, e.g. monitor."
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact action."
+          },
+          {
+            "name": "target_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "e.g. monitor."
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "With target_type."
+          },
+          {
+            "name": "problems",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "1 = only denied and failed."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search in email, target name, token/app name and IP."
+          },
+          {
+            "name": "request_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Entries of one request."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of entries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuditEntry"
+                      }
+                    },
+                    "next_before": {
+                      "type": "integer",
+                      "description": "0 = no more entries."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/audit/users": {
+      "get": {
+        "tags": [
+          "Audit log"
+        ],
+        "summary": "Users found in the audit log",
+        "operationId": "listAuditUsers",
+        "description": "For the user filter. Admins only.\n\n**Access:** An admin's browser session or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "email": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/audit/export": {
+      "get": {
+        "tags": [
+          "Audit log"
+        ],
+        "summary": "Export the audit log",
+        "operationId": "exportAudit",
+        "description": "The filtered entries (up to 100,000) as CSV or JSON Lines. The export is itself logged. Admins only.\n\n**Access:** An admin's browser session or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "csv (default) or jsonl."
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Unix ms, entries at or after."
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Unix ms, entries before."
+          },
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "User id; -1 = entries without a user."
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma separated: web, api, mcp, app, system, cli."
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Action prefix, e.g. monitor."
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact action."
+          },
+          {
+            "name": "target_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "e.g. monitor."
+          },
+          {
+            "name": "target_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "With target_type."
+          },
+          {
+            "name": "problems",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "1 = only denied and failed."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search in email, target name, token/app name and IP."
+          },
+          {
+            "name": "request_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Entries of one request."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File download.",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "application/x-ndjson": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/account/activity": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Your recent account activity",
+        "operationId": "accountActivity",
+        "description": "Logins, two-factor changes, API tokens and app sign-ins of the current user in the last 30 days (up to 100), newest first.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEntry"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10185,6 +10594,10 @@
                 "description": "Stop asking GitHub for new releases. PINGTXT_DISABLE_UPDATE_CHECK=true sets it on first start."
               }
             }
+          },
+          "audit_retention_days": {
+            "type": "integer",
+            "description": "Days the audit log keeps its entries, 30 to 3650 (default 365)."
           }
         }
       },
@@ -11237,6 +11650,87 @@
         "required": [
           "events"
         ]
+      },
+      "AuditEntry": {
+        "type": "object",
+        "description": "One line of the audit log. Secret values are never stored: a changed secret shows as \"********\".",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "at": {
+            "type": "integer",
+            "description": "Unix milliseconds."
+          },
+          "user_id": {
+            "type": "integer",
+            "description": "0 for the hub itself, the command line and failed logins with an unknown email."
+          },
+          "user_email": {
+            "type": "string",
+            "description": "Copy of the email at the time (or the email typed in a failed login)."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "web",
+              "api",
+              "mcp",
+              "app",
+              "system",
+              "cli"
+            ]
+          },
+          "credential": {
+            "type": "string",
+            "description": "Name of the API token (with its last characters) or of the OAuth app."
+          },
+          "via": {
+            "type": "string",
+            "description": "MCP tool that made the change."
+          },
+          "ip": {
+            "type": "string",
+            "description": "First public address in the proxy headers, else the connection address."
+          },
+          "remote_addr": {
+            "type": "string",
+            "description": "Address of the connection, as seen by the hub."
+          },
+          "user_agent": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "description": "<object>.<verb>, e.g. monitor.update, account.login."
+          },
+          "target_type": {
+            "type": "string"
+          },
+          "target_id": {
+            "type": "integer"
+          },
+          "target_name": {
+            "type": "string",
+            "description": "Copy of the name at the time."
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "denied",
+              "failed"
+            ]
+          },
+          "changes": {
+            "type": "object",
+            "description": "Changed fields as {\"field\": [before, after]}; keys starting with _ are details (login method, import result...)."
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Same for every entry of one request (bulk changes, imports)."
+          }
+        }
       }
     }
   }

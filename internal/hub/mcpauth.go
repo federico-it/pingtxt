@@ -526,6 +526,7 @@ func (h *Hub) tokenEndpoint(w http.ResponseWriter, r *http.Request) {
 			h.internalErr(w, err)
 			return
 		}
+		h.auditGrant(r, g, "app.authorize")
 		writeTokens(w, access, refresh, g.Scope)
 	case "refresh_token":
 		hash := HashToken(f.Get("refresh_token"))
@@ -579,6 +580,7 @@ func (h *Hub) revokeEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil && g.ClientID == r.PostForm.Get("client_id") {
 		_ = h.store.DeleteOAuthGrantByID(g.ID)
+		h.auditGrant(r, g, "app.revoke")
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -601,7 +603,7 @@ func (h *Hub) oauthAccessToken(t string) (*store.User, *store.APIToken, error) {
 	if now-g.LastUsedAt > time.Minute.Milliseconds() {
 		_ = h.store.TouchOAuthGrant(g.ID, now)
 	}
-	return u, &store.APIToken{UserID: u.ID, Name: g.ClientName, Scope: g.Scope, GrantID: g.ID}, nil
+	return u, &store.APIToken{UserID: u.ID, Name: g.ClientName, Scope: g.Scope, GrantID: g.ID, Native: isNativeApp(g.ClientID)}, nil
 }
 
 // cleanOAuth drops expired grants and clients nobody authorized.

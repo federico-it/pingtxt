@@ -156,6 +156,8 @@ type APIToken struct {
 	ExpiresAt  int64  `json:"expires_at"`
 	// GrantID is set for OAuth access tokens (MCP clients, the mobile app).
 	GrantID int64 `json:"-"`
+	// Native is true for the grants of the hub's own apps (the iOS app).
+	Native bool `json:"-"`
 }
 
 const tokenCols = `id, user_id, name, token_hash, hint, scope, created_at, last_used_at, expires_at`
