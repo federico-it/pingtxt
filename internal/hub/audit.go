@@ -190,6 +190,7 @@ var auditRoutes = map[string]auditSpec{
 	"POST /api/monitors/{id}/test":       skipAudit,
 	"POST /api/monitors/{id}/push-token": {action: "monitor.push_token_rotate", typ: "monitor", load: loadMonitor},
 	"POST /api/monitors/{id}/expiry":     skipAudit, // runs a check, changes nothing
+	"POST /api/monitors/{id}/check":      skipAudit, // runs the checks now, changes nothing
 	"POST /api/maintenances":             {action: "maintenance.create", typ: "maintenance", load: loadMaintenance},
 	"PUT /api/maintenances/{id}":         {action: "maintenance.update", typ: "maintenance", load: loadMaintenance},
 	"DELETE /api/maintenances/{id}":      {action: "maintenance.delete", typ: "maintenance", load: loadMaintenance},
