@@ -63,6 +63,10 @@ export interface Monitor {
   degraded_pct: number
   /** response time (ms) above which a location is slow; 0 = off, -1 = automatic */
   slow_ms: number
+  /** ping: echo requests per check (1-20, default 3); 0 on other types */
+  ping_count: number
+  /** ping: down when at least this % of packets is lost; 0 = only when all are */
+  ping_loss_pct: number
   /** 4 = IPv4 only, 6 = IPv6 only, 0 = either */
   /** 0 instance default, 1 IPv4 or IPv6, 4, 6, 46 IPv4 and IPv6 */
   ip_family: IPFamily

@@ -36,6 +36,7 @@ type kumaMonitor struct {
 	Port                kumaNumber `json:"port"`
 	Interval            kumaNumber `json:"interval"`
 	Timeout             kumaNumber `json:"timeout"`
+	PingCount           kumaNumber `json:"ping_count"` // Kuma 2
 	MaxRetries          kumaNumber `json:"maxretries"`
 	Active              kumaBool   `json:"active"`
 	Keyword             string     `json:"keyword"`
@@ -255,6 +256,9 @@ func kumaToMonitor(km *kumaMonitor) (m *store.Monitor, note, reason string) {
 		m.Type, m.Target = check.TypeTCP, hostPort()
 	case "ping":
 		m.Type, m.Target = check.TypePing, km.Hostname
+		if n := min(int(km.PingCount), check.MaxPingCount); n > 0 && (m.TimeoutMs == 0 || int64(m.TimeoutMs) >= check.MinPingTimeout(n).Milliseconds()) {
+			m.PingCount = n
+		}
 	case "dns":
 		rt := strings.ToUpper(km.DNSResolveType)
 		if rt == "" {

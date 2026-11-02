@@ -352,6 +352,8 @@ func jobFor(m *store.Monitor) check.Job {
 		Headers:        m.Headers,
 		Body:           m.Body,
 		Assertions:     m.Assertions,
+		PingCount:      m.PingCount,
+		PingLossPct:    m.PingLossPct,
 	}
 }
 
@@ -560,6 +562,10 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		(r.IPFamily != fam || (fam == check.IPBoth && !r.Both)) {
 		r.OK = false
 		r.Message = "this agent cannot limit checks to IPv4 or IPv6: update it"
+	}
+	if r.OK && oldPingAgent(m, loc, r) {
+		r.OK = false
+		r.Message = errOldPingAgent
 	}
 	pct := m.DegradedPct
 	if pct == 0 {

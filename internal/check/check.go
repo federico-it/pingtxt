@@ -63,6 +63,12 @@ type Job struct {
 	// Diagnose asks for diagnostics (DNS, TCP, TLS, HTTP headers,
 	// traceroute) if the check fails. Older agents ignore it.
 	Diagnose bool `json:"diagnose,omitempty"`
+	// PingCount is how many echo requests a ping check sends; 0 means
+	// DefaultPingCount. Older agents ignore it and send DefaultPingCount.
+	PingCount int `json:"ping_count,omitempty"`
+	// PingLossPct fails a ping check when at least this share (percent) of
+	// the packets is lost; 0 = only when all are lost.
+	PingLossPct int `json:"ping_loss_pct,omitempty"`
 }
 
 // Result is the outcome of a Job.
@@ -92,6 +98,9 @@ type Result struct {
 	Diag *Diag `json:"diag,omitempty"`
 
 	http *DiagHTTP // response of a failed HTTP check, for Diagnose
+	// PingSent is how many echo requests a ping check sent. Agents older
+	// than the packet loss threshold never set it.
+	PingSent int `json:"ping_sent,omitempty"`
 }
 
 // Timing is the time spent in each phase of an HTTP request, in ms. With
