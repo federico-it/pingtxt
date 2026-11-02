@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -56,6 +57,34 @@ type locState struct {
 	fails   int
 	down    bool
 	lastMsg string
+	// lat holds the response times of the last slowWindow successful
+	// checks, oldest first, to tell whether the location is slow.
+	lat  []float64
+	slow bool
+}
+
+// slowWindow is how many successful checks the slow test looks at: the
+// location is slow when their median is above the monitor's threshold, so
+// one spike alone changes nothing.
+const slowWindow = 3
+
+// addLatency records the response time of a successful check.
+func (ls *locState) addLatency(ms float64) {
+	if len(ls.lat) == slowWindow {
+		ls.lat = ls.lat[1:]
+	}
+	ls.lat = append(ls.lat, ms)
+}
+
+// median gives the median of the recorded response times, or -1 until the
+// window is full.
+func (ls *locState) median() float64 {
+	if len(ls.lat) < slowWindow {
+		return -1
+	}
+	v := slices.Clone(ls.lat)
+	slices.Sort(v)
+	return v[len(v)/2]
 }
 
 type monState struct {
@@ -521,14 +550,17 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	if r.OK {
 		ls.fails = 0
 		ls.down = false
+		ls.addLatency(r.LatencyMs)
 	} else {
 		ls.fails++
 		if ls.fails >= max(m.Retries, 1) {
 			ls.down = true
 		}
 	}
-	// Evaluate over locations that are currently reachable.
-	n, down := 0, 0
+	ls.slow = m.SlowMs > 0 && ls.median() > float64(m.SlowMs)
+	// Evaluate over locations that are currently reachable. A failing
+	// location is not also counted as slow.
+	n, down, slow := 0, 0, 0
 	var causes []string
 	for l, s := range st.locs {
 		if l != LocalLocation {
@@ -537,12 +569,17 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 			}
 		}
 		n++
-		if s.down {
+		switch {
+		case s.down:
 			down++
 			causes = append(causes, h.locationNameLocked(l)+": "+s.lastMsg)
+		case s.slow && m.SlowMs > 0:
+			slow++
+			causes = append(causes, h.locationNameLocked(l)+": "+slowCause(s.median(), m.SlowMs))
 		}
 	}
-	status := classify(n, down, pct)
+	slices.Sort(causes)
+	status := classify(n, down, slow, pct)
 	st.real = status
 	if status == StatusDown && st.alerts != nil {
 		st.alerts.cause = strings.Join(causes, "; ") // reminders carry the latest cause
@@ -560,7 +597,7 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		}
 		pending++
 	}
-	state := resultState(classify(n+pending, down, pct))
+	state := resultState(classify(n+pending, down, slow, pct))
 	inMaint := st.inMaint
 	display := status
 	if inMaint {
@@ -650,18 +687,25 @@ const (
 )
 
 // classify gives a monitor's status from how many of its n reachable
-// locations are failing: down when more than half fail, degraded when at
-// least pct percent fail, up otherwise.
-func classify(n, down, pct int) string {
+// locations are failing (down) or answering too slowly (slow): down when
+// more than half fail, degraded when at least pct percent fail or are
+// slow, up otherwise. Slow locations never make the monitor down.
+func classify(n, down, slow, pct int) string {
+	bad := down + slow
 	switch {
-	case down == 0:
+	case bad == 0:
 		return StatusUp
 	case down*2 > n:
 		return StatusDown
-	case down*100 >= pct*n:
+	case bad*100 >= pct*n:
 		return StatusDegraded
 	}
 	return StatusUp
+}
+
+// slowCause describes a slow location for the degraded notifications.
+func slowCause(median float64, limit int) string {
+	return fmt.Sprintf("slow, %.0f ms (threshold %d ms)", median, limit)
 }
 
 // alertLocked decides whether an incident must be opened ("down") or

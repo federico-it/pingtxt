@@ -656,6 +656,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	if m.DegradedPct < 0 || m.DegradedPct > maxDegradedPct {
 		return fmt.Errorf("degraded threshold must be between 1%% and %d%% (0 = instance default)", maxDegradedPct)
 	}
+	if err := checkSlowMs(m); err != nil {
+		return err
+	}
 	if m.Headers == nil {
 		m.Headers = map[string]string{}
 	}
@@ -1768,4 +1771,22 @@ func serveFile(w http.ResponseWriter, r *http.Request, ui fs.FS, name string) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	http.ServeContent(w, r, name, st.ModTime(), rs)
+}
+
+// maxPushSlowMs bounds the slow threshold of push monitors, whose latency is
+// the duration the job reports.
+const maxPushSlowMs = 3600000
+
+// checkSlowMs validates the slow threshold: a check that takes longer than
+// the timeout fails, so the threshold must be below it.
+func checkSlowMs(m *store.Monitor) error {
+	switch {
+	case m.SlowMs < 0:
+		return errors.New("slow threshold must not be negative (0 = off)")
+	case m.Type == check.TypePush && m.SlowMs > maxPushSlowMs:
+		return fmt.Errorf("slow threshold must be at most %d ms", maxPushSlowMs)
+	case m.Type != check.TypePush && m.SlowMs >= m.TimeoutMs:
+		return fmt.Errorf("slow threshold must be below the timeout (%d ms)", m.TimeoutMs)
+	}
+	return nil
 }

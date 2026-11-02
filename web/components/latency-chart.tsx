@@ -23,10 +23,13 @@ const MIN_ZOOM = 5 * 60_000
 
 export function LatencyChart({
   series,
+  slowMs = 0,
   live = true,
   onZoom,
 }: {
   series: Series
+  /** the monitor's slow threshold in ms, drawn as a dashed line (0 = none) */
+  slowMs?: number
   /** the window ends now (false: a past window, labelled with its end time) */
   live?: boolean
   /** called with a window [start, end) picked by dragging across the chart */
@@ -62,8 +65,12 @@ export function LatencyChart({
       }
       if (b.ok < b.total) fails[i] += b.total - b.ok
     }
+    // The threshold line widens the scale only when the data comes close
+    // to it, so a far threshold does not flatten the lines.
+    if (slowMs > 0 && max >= slowMs / 2) max = Math.max(max, slowMs)
     return { slots: n, byLoc, yMax: niceMax(max * 1.1), failSlots: fails }
-  }, [series])
+  }, [series, slowMs])
+  const showSlow = slowMs > 0 && slowMs <= yMax
 
   const iw = w - PAD.l - PAD.r
   const ih = H - PAD.t - PAD.b
@@ -157,6 +164,22 @@ export function LatencyChart({
             </text>
           </g>
         ))}
+        {showSlow && (
+          <g>
+            <line
+              x1={PAD.l}
+              x2={w - PAD.r}
+              y1={y(slowMs)}
+              y2={y(slowMs)}
+              stroke="var(--warn)"
+              strokeWidth={1}
+              strokeDasharray="6 4"
+            />
+            <text x={w - PAD.r - 2} y={y(slowMs) - 4} textAnchor="end" fontSize={10} fill="var(--warn)">
+              {t("slow", { ms: ms(slowMs) })}
+            </text>
+          </g>
+        )}
         {failSlots.map((f, i) =>
           f > 0 ? <rect key={i} x={x(i) - 1.5} y={PAD.t + ih + 3} width={3} height={5} fill="var(--down)" /> : null
         )}
@@ -218,6 +241,11 @@ export function LatencyChart({
             <span style={{ color: COLORS[li % COLORS.length] }}>■</span> {l.name}
           </span>
         ))}
+        {slowMs > 0 && (
+          <span>
+            <span className="text-warn">- -</span> {t("slowLegend", { ms: ms(slowMs) })}
+          </span>
+        )}
       </div>
     </div>
   )

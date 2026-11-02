@@ -203,6 +203,7 @@ function View() {
                   ? t("degradedAt", { pct: d.degraded_pct })
                   : t("degradedAtDefault")
               }`}
+            {d.slow_ms > 0 && ` · ${t("slowAt", { ms: d.slow_ms })}`}
             {d.ip_family === 4 || d.ip_family === 6 || d.ip_family === 46
               ? ` · ${t(d.ip_family === 4 ? "ipv4Only" : d.ip_family === 6 ? "ipv6Only" : "ipBoth")}`
               : ""}
@@ -322,6 +323,7 @@ function View() {
         ) : series.data ? (
           <LatencyChart
             series={series.data}
+            slowMs={d.slow_ms}
             live={!zoom}
             onZoom={(start, end) => setQuery({ start: String(start), end: String(end) })}
           />
@@ -434,6 +436,7 @@ function View() {
         slot={slot}
         onClearWindow={() => setSlot(null)}
         waitingText={t("waitingFirst")}
+        slowMs={d.slow_ms}
       />
     </>
   )

@@ -8,6 +8,7 @@ import { phaseTitle } from "@/components/phase-chart"
 import { OkText } from "@/components/status"
 import { Button } from "@/components/ui/button"
 import { api, useApi, type ResultRow } from "@/lib/api"
+import { cn } from "@/lib/utils"
 import { datetime, ms } from "@/lib/format"
 import { segment } from "@/components/ui/control"
 
@@ -29,8 +30,11 @@ export function ResultsLog({
   slot,
   onClearWindow,
   waitingText,
+  slowMs = 0,
 }: {
   monitorId: number
+  /** latencies above it are marked (0 = no threshold) */
+  slowMs?: number
   slot: TimeWindow | null
   onClearWindow: () => void
   waitingText: string
@@ -123,7 +127,13 @@ export function ResultsLog({
             <span className="w-8 shrink-0">
               <OkText ok={r.ok} />
             </span>
-            <span className="w-16 shrink-0 text-right" title={phaseTitle(r.timing, r.latency_ms, tp)}>
+            <span
+              className={cn(
+                "w-16 shrink-0 text-right",
+                r.ok && slowMs > 0 && r.latency_ms > slowMs && "text-warn"
+              )}
+              title={phaseTitle(r.timing, r.latency_ms, tp)}
+            >
               {ms(r.latency_ms)}
             </span>
             <span className="truncate text-muted-foreground" title={r.message}>

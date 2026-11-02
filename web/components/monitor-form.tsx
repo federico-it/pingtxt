@@ -200,6 +200,7 @@ export const emptyMonitor: MonitorInput = {
   assertions: [],
   grace_sec: 300,
   degraded_pct: 0,
+  slow_ms: 0,
   ip_family: 0,
   locations: ["local"],
   group_id: 0,
@@ -778,6 +779,22 @@ export function MonitorForm({
               </Field>
             </>
           )}
+          <Field
+            label={tr("slowMs")}
+            hint={isPush ? tr("slowMsHintPush") : tr("slowMsHint")}
+          >
+            <Input
+              type="number"
+              min={0}
+              max={isPush ? 3600000 : Math.max(m.timeout_ms - 1, 0)}
+              step={50}
+              placeholder={tr("slowMsPlaceholder")}
+              value={m.slow_ms || ""}
+              onChange={(e) =>
+                set("slow_ms", Math.max(Number(e.target.value) || 0, 0))
+              }
+            />
+          </Field>
         </div>
       </Section>
 

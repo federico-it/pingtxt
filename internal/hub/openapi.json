@@ -2830,6 +2830,7 @@
                   "grace_sec": 0,
                   "degraded_pct": 0,
                   "ip_family": 0,
+                  "slow_ms": 0,
                   "domain_expiry_alert": false,
                   "paused": false,
                   "status": "up",
@@ -3184,6 +3185,7 @@
                   "grace_sec": 0,
                   "degraded_pct": 0,
                   "ip_family": 0,
+                  "slow_ms": 0,
                   "domain_expiry_alert": false,
                   "paused": false,
                   "status": "up",
@@ -9025,6 +9027,10 @@
           "degraded_pct": {
             "type": "integer",
             "description": "Share of failing locations (percent) from which the monitor is degraded, 1 to 50. 0 = instance default."
+          },
+          "slow_ms": {
+            "type": "integer",
+            "description": "Response time in ms above which a location is slow: when the median of its last 3 successful checks is higher. Slow locations count with failing ones toward degraded_pct, never toward down. 0 = off. Below timeout_ms (push monitors: up to 3600000)."
           },
           "locations": {
             "type": "array",

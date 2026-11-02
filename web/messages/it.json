@@ -194,6 +194,7 @@
     "ipv6Only": "solo IPv6",
     "ipBoth": "IPv4 e IPv6",
     "degradedAtDefault": "degradato dalla soglia predefinita",
+    "slowAt": "lento sopra {ms} ms",
     "checkNow": "controlla ora",
     "checking": "controllo...",
     "duplicate": "duplica",
@@ -393,6 +394,10 @@
     "degradedPct": "degradato da (% di località)",
     "degradedPctHint": "vuoto = valore predefinito dell'istanza (impostazioni)",
     "degradedPctPlaceholder": "predefinito",
+    "slowMs": "lento sopra (ms)",
+    "slowMsHint": "degradato quando la mediana degli ultimi 3 check di una località la supera, conta come una località in errore. vuoto = spento",
+    "slowMsHintPush": "degradato quando la mediana delle ultime 3 durate inviate (ping=) la supera. vuoto = spento",
+    "slowMsPlaceholder": "spento",
     "ipFamily": {
       "label": "versione ip",
       "hint": "solo IPv4 o solo IPv6, per accorgersi se uno dei due non funziona su un host dual-stack",
@@ -499,6 +504,8 @@
   "latencyChart": {
     "noData": "ancora nessun dato",
     "now": "ora",
+    "slow": "lento {ms}",
+    "slowLegend": "lento sopra {ms}",
     "failed": "{count, plural, one {# controllo fallito} other {# controlli falliti}}"
   },
   "phaseChart": {
