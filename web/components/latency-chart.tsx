@@ -23,10 +23,13 @@ const MIN_ZOOM = 5 * 60_000
 
 export function LatencyChart({
   series,
+  slow = {},
   live = true,
   onZoom,
 }: {
   series: Series
+  /** slow threshold (ms) of each location, drawn as dashed lines */
+  slow?: Record<string, number>
   /** the window ends now (false: a past window, labelled with its end time) */
   live?: boolean
   /** called with a window [start, end) picked by dragging across the chart */
@@ -62,8 +65,22 @@ export function LatencyChart({
       }
       if (b.ok < b.total) fails[i] += b.total - b.ok
     }
+    // A threshold line widens the scale only when the data comes close to
+    // it, so a far threshold does not flatten the lines.
+    for (const l of series.locations) {
+      const v = slow[l.id] ?? 0
+      if (v > 0 && max >= v / 2) max = Math.max(max, v)
+    }
     return { slots: n, byLoc, yMax: niceMax(max * 1.1), failSlots: fails }
-  }, [series])
+  }, [series, slow])
+  // Thresholds of the charted locations. One value (fixed threshold, or a
+  // single location) is drawn in the warning color with a label; automatic
+  // ones that differ get a line each in the color of their location.
+  const limits = series.locations
+    .map((l, li) => ({ v: slow[l.id] ?? 0, color: COLORS[li % COLORS.length] }))
+    .filter((l) => l.v > 0)
+  const same = limits.length > 0 && limits.every((l) => l.v === limits[0].v)
+  const slowLines = same ? [{ v: limits[0].v, color: "var(--warn)" }] : limits
 
   const iw = w - PAD.l - PAD.r
   const ih = H - PAD.t - PAD.b
@@ -157,6 +174,26 @@ export function LatencyChart({
             </text>
           </g>
         ))}
+        {slowLines
+          .filter((l) => l.v <= yMax)
+          .map((l, i) => (
+            <g key={i}>
+              <line
+                x1={PAD.l}
+                x2={w - PAD.r}
+                y1={y(l.v)}
+                y2={y(l.v)}
+                stroke={l.color}
+                strokeWidth={1}
+                strokeDasharray="6 4"
+              />
+              {same && (
+                <text x={w - PAD.r - 2} y={y(l.v) - 4} textAnchor="end" fontSize={10} fill="var(--warn)">
+                  {t("slow", { ms: ms(l.v) })}
+                </text>
+              )}
+            </g>
+          ))}
         {failSlots.map((f, i) =>
           f > 0 ? <rect key={i} x={x(i) - 1.5} y={PAD.t + ih + 3} width={3} height={5} fill="var(--down)" /> : null
         )}
@@ -206,7 +243,12 @@ export function LatencyChart({
           {series.locations.map((l, li) => (
             <div key={l.id} className="flex justify-between gap-4">
               <span style={{ color: COLORS[li % COLORS.length] }}>■ {l.name}</span>
-              <span>{ms(byLoc[l.id][hover] ?? 0)}</span>
+              <span>
+                {ms(byLoc[l.id][hover] ?? 0)}
+                {!same && slow[l.id] > 0 && (
+                  <span className="text-muted-foreground"> / {ms(slow[l.id])}</span>
+                )}
+              </span>
             </div>
           ))}
           {failSlots[hover] > 0 && <div className="text-down">{t("failed", { count: failSlots[hover] })}</div>}
@@ -218,6 +260,12 @@ export function LatencyChart({
             <span style={{ color: COLORS[li % COLORS.length] }}>■</span> {l.name}
           </span>
         ))}
+        {limits.length > 0 && (
+          <span>
+            <span className={same ? "text-warn" : undefined}>- -</span>{" "}
+            {same ? t("slowLegend", { ms: ms(limits[0].v) }) : t("slowLegendPerLocation")}
+          </span>
+        )}
       </div>
     </div>
   )

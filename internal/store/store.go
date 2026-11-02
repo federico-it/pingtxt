@@ -585,6 +585,9 @@ var laterMigrations = []migration{
 	UPDATE agents SET offline_alerted = 2;
 	UPDATE notifiers SET events = REPLACE(events, ']', ',"agent_offline"]') WHERE all_monitors = 1 AND events LIKE '%"down"%';`,
 	},
+	// 28: response time (ms) above which a location of a monitor is slow,
+	// 0 = off.
+	{sqlite: `ALTER TABLE monitors ADD COLUMN slow_ms INTEGER NOT NULL DEFAULT 0`},
 }
 
 func sqliteOnly(list []string) []migration {

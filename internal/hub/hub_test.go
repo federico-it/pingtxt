@@ -146,27 +146,32 @@ func TestMajorityAcrossLocations(t *testing.T) {
 
 func TestClassify(t *testing.T) {
 	cases := []struct {
-		n, down, pct int
-		want         string
+		n, down, slow, pct int
+		want               string
 	}{
-		{1, 0, 35, StatusUp},
-		{1, 1, 35, StatusDown},
-		{2, 1, 35, StatusDegraded}, // 50% is not a majority
-		{3, 1, 35, StatusUp},       // 33%
-		{3, 2, 35, StatusDown},
-		{4, 1, 35, StatusUp},       // 25%
-		{4, 2, 35, StatusDegraded}, // 50%
-		{10, 3, 35, StatusUp},
-		{10, 4, 35, StatusDegraded},
-		{10, 6, 35, StatusDown},
-		{20, 7, 35, StatusDegraded}, // exactly 35%
-		{3, 1, 30, StatusDegraded},
-		{4, 1, 25, StatusDegraded},
-		{0, 0, 35, StatusUp},
+		{1, 0, 0, 35, StatusUp},
+		{1, 1, 0, 35, StatusDown},
+		{2, 1, 0, 35, StatusDegraded}, // 50% is not a majority
+		{3, 1, 0, 35, StatusUp},       // 33%
+		{3, 2, 0, 35, StatusDown},
+		{4, 1, 0, 35, StatusUp},       // 25%
+		{4, 2, 0, 35, StatusDegraded}, // 50%
+		{10, 3, 0, 35, StatusUp},
+		{10, 4, 0, 35, StatusDegraded},
+		{10, 6, 0, 35, StatusDown},
+		{20, 7, 0, 35, StatusDegraded}, // exactly 35%
+		{3, 1, 0, 30, StatusDegraded},
+		{4, 1, 0, 25, StatusDegraded},
+		{0, 0, 0, 35, StatusUp},
+		{1, 0, 1, 35, StatusDegraded}, // slow is never down
+		{3, 0, 3, 35, StatusDegraded},
+		{3, 0, 1, 35, StatusUp},       // one far slow agent of three
+		{3, 1, 1, 35, StatusDegraded}, // failing and slow add up
+		{3, 2, 1, 35, StatusDown},
 	}
 	for _, c := range cases {
-		if got := classify(c.n, c.down, c.pct); got != c.want {
-			t.Errorf("classify(%d, %d, %d) = %s, want %s", c.n, c.down, c.pct, got, c.want)
+		if got := classify(c.n, c.down, c.slow, c.pct); got != c.want {
+			t.Errorf("classify(%d, %d, %d, %d) = %s, want %s", c.n, c.down, c.slow, c.pct, got, c.want)
 		}
 	}
 }
@@ -438,5 +443,152 @@ func TestValidateIPFamilies(t *testing.T) {
 	g.normalize()
 	if g.IPFamily != ipEither {
 		t.Errorf("default family %d", g.IPFamily)
+	}
+}
+
+func TestSlowThreshold(t *testing.T) {
+	h, st := newTestHub(t)
+	m := &store.Monitor{Name: "m", Type: "http", Target: "http://x", IntervalSec: 60, Retries: 1, SlowMs: 500, Locations: []string{LocalLocation}}
+	if err := st.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	h.MonitorChanged(m.ID)
+	send := func(ok bool, ms float64) {
+		r := result(m.ID, ok)
+		r.LatencyMs = ms
+		h.HandleResult(LocalLocation, r)
+	}
+	steps := []struct {
+		ok   bool
+		ms   float64
+		want string
+	}{
+		{true, 100, StatusUp},
+		{true, 900, StatusUp},       // window not full yet
+		{true, 900, StatusDegraded}, // median 900
+		{true, 100, StatusDegraded}, // one fast check is not enough
+		{true, 100, StatusUp},       // median 100
+		{true, 2000, StatusUp},      // one spike changes nothing
+		{false, 0, StatusDown},      // failing still wins
+		{true, 2000, StatusDegraded},
+	}
+	for i, s := range steps {
+		send(s.ok, s.ms)
+		if got := status(t, st, m.ID); got != s.want {
+			t.Fatalf("step %d: want %s, got %s", i, s.want, got)
+		}
+	}
+	// Degraded counts as up for uptime.
+	now := time.Now().UnixMilli()
+	b, err := st.Buckets(m.ID, now-3600000, now+3600000, 7200000, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, ok, deg := 0, 0, 0
+	for _, x := range b {
+		total, ok, deg = total+x.Total, ok+x.OK, deg+x.Degraded
+	}
+	if total != 8 || ok != 7 || deg != 3 {
+		t.Fatalf("want 8 checks, 7 counted as up, 3 degraded; got %d, %d, %d", total, ok, deg)
+	}
+	// Turning the threshold off makes the monitor up again.
+	m.SlowMs = 0
+	if err := st.UpdateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	h.MonitorChanged(m.ID)
+	send(true, 2000)
+	if got := status(t, st, m.ID); got != StatusUp {
+		t.Fatalf("threshold off: want up, got %s", got)
+	}
+}
+
+func TestCheckSlowMs(t *testing.T) {
+	cases := []struct {
+		typ     string
+		slow    int
+		wantErr bool
+	}{
+		{"http", 0, false},
+		{"http", 800, false},
+		{"http", store.SlowAuto, false},
+		{"http", -2, true},
+		{"http", 10000, true}, // not below the timeout
+		{check.TypePush, 60000, false},
+		{check.TypePush, maxPushSlowMs + 1, true},
+	}
+	for _, c := range cases {
+		m := &store.Monitor{Type: c.typ, TimeoutMs: 10000, SlowMs: c.slow}
+		if err := checkSlowMs(m); (err != nil) != c.wantErr {
+			t.Errorf("%s %d: err = %v", c.typ, c.slow, err)
+		}
+	}
+}
+
+func TestAutoSlowLimit(t *testing.T) {
+	flat := func(n int, v float64) []float64 {
+		out := make([]float64, n)
+		for i := range out {
+			out[i] = v
+		}
+		return out
+	}
+	if got := autoSlowLimit(flat(23, 100)); got != 0 {
+		t.Errorf("under 24 hours: want 0, got %v", got)
+	}
+	if got := autoSlowLimit(flat(24, 100)); got != 300 {
+		t.Errorf("100 ms: want 3x = 300, got %v", got)
+	}
+	if got := autoSlowLimit(flat(24, 20)); got != 120 {
+		t.Errorf("20 ms: want +100 = 120, got %v", got)
+	}
+	// A few slow hours do not move the median.
+	v := append(flat(30, 100), flat(10, 900)...)
+	if got := autoSlowLimit(v); got != 300 {
+		t.Errorf("with slow hours: want 300, got %v", got)
+	}
+}
+
+func TestSlowAuto(t *testing.T) {
+	h, st := newTestHub(t)
+	m := &store.Monitor{Name: "m", Type: "http", Target: "http://x", IntervalSec: 60, Retries: 1, SlowMs: store.SlowAuto, Locations: []string{LocalLocation}}
+	if err := st.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	h.MonitorChanged(m.ID)
+	// 30 hours of history at 100 ms, one check per hour.
+	now := time.Now()
+	hour := int64(3600000)
+	start := now.UnixMilli() - now.UnixMilli()%hour - 30*hour
+	var rows []*store.ResultRow
+	for i := range int64(30) {
+		rows = append(rows, &store.ResultRow{MonitorID: m.ID, Location: LocalLocation, TS: start + i*hour, OK: true, LatencyMs: 100})
+	}
+	if err := st.InsertResults(rows); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.RollupResults(now, nil); err != nil {
+		t.Fatal(err)
+	}
+	h.updateSlowLimits(now)
+	if got := h.SlowLimits(m.ID)[LocalLocation]; got != 300 {
+		t.Fatalf("want automatic threshold 300 ms, got %v", got)
+	}
+	send := func(ms float64) {
+		r := result(m.ID, true)
+		r.LatencyMs = ms
+		h.HandleResult(LocalLocation, r)
+	}
+	for range 3 {
+		send(250)
+	}
+	if got := status(t, st, m.ID); got != StatusUp {
+		t.Fatalf("250 ms: want up, got %s", got)
+	}
+	for range 2 {
+		send(400)
+	}
+	if got := status(t, st, m.ID); got != StatusDegraded {
+		t.Fatalf("400 ms: want degraded, got %s", got)
 	}
 }

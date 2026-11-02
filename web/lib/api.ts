@@ -61,6 +61,8 @@ export interface Monitor {
   grace_sec: number
   /** percent of failing locations that marks the monitor degraded; 0 = instance default */
   degraded_pct: number
+  /** response time (ms) above which a location is slow; 0 = off, -1 = automatic */
+  slow_ms: number
   /** 4 = IPv4 only, 6 = IPv6 only, 0 = either */
   /** 0 instance default, 1 IPv4 or IPv6, 4, 6, 46 IPv4 and IPv6 */
   ip_family: IPFamily
@@ -143,6 +145,8 @@ export interface LocationStatus {
   name: string
   online: boolean
   last: ResultRow | null
+  /** slow threshold in use at the location (ms), 0 = none */
+  slow_ms: number
 }
 
 export interface MonitorDetail extends MonitorSummary {

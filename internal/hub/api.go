@@ -656,6 +656,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	if m.DegradedPct < 0 || m.DegradedPct > maxDegradedPct {
 		return fmt.Errorf("degraded threshold must be between 1%% and %d%% (0 = instance default)", maxDegradedPct)
 	}
+	if err := checkSlowMs(m); err != nil {
+		return err
+	}
 	if m.Headers == nil {
 		m.Headers = map[string]string{}
 	}
@@ -924,6 +927,9 @@ type locationStatus struct {
 	Name   string           `json:"name"`
 	Online bool             `json:"online"`
 	Last   *store.ResultRow `json:"last"`
+	// SlowMs is the slow threshold in use at the location, 0 = none (or
+	// not enough history yet for the automatic one).
+	SlowMs float64 `json:"slow_ms"`
 }
 
 func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, u *store.User) {
@@ -960,8 +966,9 @@ func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, u *store.User) 
 		byLoc[r.Location] = r
 	}
 	names := h.locationNames()
+	slow := h.SlowLimits(id)
 	for _, l := range h.locationsOf(m) {
-		d.Locations = append(d.Locations, locationStatus{ID: l, Name: nameOr(names, l), Online: h.locationOnline(l), Last: byLoc[l]})
+		d.Locations = append(d.Locations, locationStatus{ID: l, Name: nameOr(names, l), Online: h.locationOnline(l), Last: byLoc[l], SlowMs: slow[l]})
 	}
 	writeJSON(w, 200, d)
 }
@@ -1768,4 +1775,22 @@ func serveFile(w http.ResponseWriter, r *http.Request, ui fs.FS, name string) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	http.ServeContent(w, r, name, st.ModTime(), rs)
+}
+
+// maxPushSlowMs bounds the slow threshold of push monitors, whose latency is
+// the duration the job reports.
+const maxPushSlowMs = 3600000
+
+// checkSlowMs validates the slow threshold: a check that takes longer than
+// the timeout fails, so the threshold must be below it.
+func checkSlowMs(m *store.Monitor) error {
+	switch {
+	case m.SlowMs < store.SlowAuto:
+		return errors.New("slow threshold must be -1 (automatic), 0 (off) or a time in ms")
+	case m.Type == check.TypePush && m.SlowMs > maxPushSlowMs:
+		return fmt.Errorf("slow threshold must be at most %d ms", maxPushSlowMs)
+	case m.Type != check.TypePush && m.SlowMs >= m.TimeoutMs:
+		return fmt.Errorf("slow threshold must be below the timeout (%d ms)", m.TimeoutMs)
+	}
+	return nil
 }

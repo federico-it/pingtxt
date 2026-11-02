@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -56,6 +57,35 @@ type locState struct {
 	fails   int
 	down    bool
 	lastMsg string
+	// lat holds the response times of the last slowWindow successful
+	// checks, oldest first, to tell whether the location is slow.
+	lat       []float64
+	slow      bool
+	slowLimit float64 // threshold the slow test used (ms)
+}
+
+// slowWindow is how many successful checks the slow test looks at: the
+// location is slow when their median is above the monitor's threshold, so
+// one spike alone changes nothing.
+const slowWindow = 3
+
+// addLatency records the response time of a successful check.
+func (ls *locState) addLatency(ms float64) {
+	if len(ls.lat) == slowWindow {
+		ls.lat = ls.lat[1:]
+	}
+	ls.lat = append(ls.lat, ms)
+}
+
+// median gives the median of the recorded response times, or -1 until the
+// window is full.
+func (ls *locState) median() float64 {
+	if len(ls.lat) < slowWindow {
+		return -1
+	}
+	v := slices.Clone(ls.lat)
+	slices.Sort(v)
+	return v[len(v)/2]
 }
 
 type monState struct {
@@ -70,6 +100,10 @@ type monState struct {
 	inMaint  bool        // a maintenance window currently covers the monitor
 	incident bool        // an incident is open (alerted as down)
 	alerts   *alertState // alerts sent for the open incident, see escalation.go
+
+	// autoSlow is the automatic slow threshold (ms) of each location with
+	// enough history, for monitors set to store.SlowAuto.
+	autoSlow map[string]float64
 
 	busy  bool      // a local check is queued or running
 	stats *monStats // last 24h of results, for the dashboard
@@ -250,6 +284,9 @@ func (h *Hub) MonitorChanged(id int64) {
 	if st, ok := h.monitors[id]; ok {
 		st.m = m
 		st.next = next
+		if m.SlowMs == store.SlowAuto && st.autoSlow == nil {
+			go h.updateSlowLimits(time.Now()) // just switched to automatic
+		}
 		// Drop states of locations no longer assigned.
 		keep := map[string]bool{}
 		for _, l := range h.locationsOf(m) {
@@ -521,14 +558,18 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	if r.OK {
 		ls.fails = 0
 		ls.down = false
+		ls.addLatency(r.LatencyMs)
 	} else {
 		ls.fails++
 		if ls.fails >= max(m.Retries, 1) {
 			ls.down = true
 		}
 	}
-	// Evaluate over locations that are currently reachable.
-	n, down := 0, 0
+	ls.slowLimit = slowLimit(st, loc)
+	ls.slow = ls.slowLimit > 0 && ls.median() > ls.slowLimit
+	// Evaluate over locations that are currently reachable. A failing
+	// location is not also counted as slow.
+	n, down, slow := 0, 0, 0
 	var causes []string
 	for l, s := range st.locs {
 		if l != LocalLocation {
@@ -537,12 +578,17 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 			}
 		}
 		n++
-		if s.down {
+		switch {
+		case s.down:
 			down++
 			causes = append(causes, h.locationNameLocked(l)+": "+s.lastMsg)
+		case s.slow && m.SlowMs != 0:
+			slow++
+			causes = append(causes, h.locationNameLocked(l)+": "+slowCause(s.median(), s.slowLimit))
 		}
 	}
-	status := classify(n, down, pct)
+	slices.Sort(causes)
+	status := classify(n, down, slow, pct)
 	st.real = status
 	if status == StatusDown && st.alerts != nil {
 		st.alerts.cause = strings.Join(causes, "; ") // reminders carry the latest cause
@@ -560,7 +606,7 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		}
 		pending++
 	}
-	state := resultState(classify(n+pending, down, pct))
+	state := resultState(classify(n+pending, down, slow, pct))
 	inMaint := st.inMaint
 	display := status
 	if inMaint {
@@ -650,18 +696,113 @@ const (
 )
 
 // classify gives a monitor's status from how many of its n reachable
-// locations are failing: down when more than half fail, degraded when at
-// least pct percent fail, up otherwise.
-func classify(n, down, pct int) string {
+// locations are failing (down) or answering too slowly (slow): down when
+// more than half fail, degraded when at least pct percent fail or are
+// slow, up otherwise. Slow locations never make the monitor down.
+func classify(n, down, slow, pct int) string {
+	bad := down + slow
 	switch {
-	case down == 0:
+	case bad == 0:
 		return StatusUp
 	case down*2 > n:
 		return StatusDown
-	case down*100 >= pct*n:
+	case bad*100 >= pct*n:
 		return StatusDegraded
 	}
 	return StatusUp
+}
+
+// slowCause describes a slow location for the degraded notifications.
+func slowCause(median, limit float64) string {
+	return fmt.Sprintf("slow, %.0f ms (threshold %.0f ms)", median, limit)
+}
+
+// slowLimit gives the slow threshold (ms) of a location, 0 = none.
+func slowLimit(st *monState, loc string) float64 {
+	switch {
+	case st.m.SlowMs > 0:
+		return float64(st.m.SlowMs)
+	case st.m.SlowMs == store.SlowAuto:
+		return st.autoSlow[loc]
+	}
+	return 0
+}
+
+// Automatic slow threshold: a location is slow when its response time is
+// both slowAutoFactor times its usual one and slowAutoMinMs above it. The
+// usual time is the median of its hourly averages over the last
+// slowAutoDays, once there are at least slowAutoHours of them.
+const (
+	slowAutoFactor = 3
+	slowAutoMinMs  = 100
+	slowAutoDays   = 7
+	slowAutoHours  = 24
+)
+
+// autoSlowLimit gives the automatic threshold from hourly averages, 0 when
+// there are too few.
+func autoSlowLimit(hourly []float64) float64 {
+	if len(hourly) < slowAutoHours {
+		return 0
+	}
+	v := slices.Clone(hourly)
+	slices.Sort(v)
+	base := v[len(v)/2]
+	return max(base*slowAutoFactor, base+slowAutoMinMs)
+}
+
+// updateSlowLimits recomputes the automatic slow thresholds from the hourly
+// rollups. It runs with the maintenance loop, after the rollups.
+func (h *Hub) updateSlowLimits(now time.Time) {
+	h.mu.Lock()
+	var ids []int64
+	for id, st := range h.monitors {
+		if st.m.SlowMs == store.SlowAuto {
+			ids = append(ids, id)
+		}
+	}
+	h.mu.Unlock()
+	if len(ids) == 0 {
+		return
+	}
+	lat, err := h.store.HourlyLatencies(ids, now.Add(-slowAutoDays*24*time.Hour).UnixMilli())
+	if err != nil {
+		h.log.Error("slow thresholds", "err", err)
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, id := range ids {
+		st := h.monitors[id]
+		if st == nil {
+			continue
+		}
+		lim := map[string]float64{}
+		for loc, v := range lat[id] {
+			if l := autoSlowLimit(v); l > 0 {
+				lim[loc] = l
+			}
+		}
+		st.autoSlow = lim
+	}
+}
+
+// SlowLimits gives the slow threshold (ms) in use at each location of a
+// monitor, leaving out locations without one.
+func (h *Hub) SlowLimits(id int64) map[string]float64 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := map[string]float64{}
+	st := h.monitors[id]
+	if st == nil {
+		return out
+	}
+	for _, l := range h.locationsOf(st.m) {
+		if v := slowLimit(st, l); v > 0 {
+			out[l] = v
+		}
+	}
+	return out
 }
 
 // alertLocked decides whether an incident must be opened ("down") or
@@ -746,6 +887,7 @@ func (h *Hub) compactResults(ctx context.Context, now time.Time) {
 	} else if n > 1 {
 		h.log.Info("rolled up results", "hours", n, "took", time.Since(t0).Round(time.Millisecond))
 	}
+	h.updateSlowLimits(now)
 	day := 24 * time.Hour
 	if n, err := h.store.PruneResults(now.Add(-time.Duration(g.RawRetentionDays) * day).UnixMilli()); err != nil {
 		h.log.Error("prune results", "err", err)
