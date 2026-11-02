@@ -39,11 +39,11 @@ const (
 
 // Event is a status change sent to notification channels.
 type Event struct {
-	Kind      string `json:"kind,omitempty"` // "", "cert_expiry", "domain_expiry" or "degraded"
+	Kind      string `json:"kind,omitempty"` // "", "cert_expiry", "domain_expiry", "degraded" or "agent"
 	MonitorID int64  `json:"monitor_id"`
 	Monitor   string `json:"monitor"`
 	Target    string `json:"target"`
-	Status    string `json:"status"` // "down"/"up", or "expiring"/"expired"/"renewed" for expiry events
+	Status    string `json:"status"` // "down"/"up", "expiring"/"expired"/"renewed" for expiry events, "offline"/"online" for agent events
 	Cause     string `json:"cause,omitempty"`
 	At        int64  `json:"at"`
 	Test      bool   `json:"test,omitempty"`
@@ -55,11 +55,15 @@ type Event struct {
 	Subject   string `json:"subject,omitempty"`    // host name or domain
 	ExpiresAt int64  `json:"expires_at,omitempty"` // unix ms
 	DaysLeft  *int   `json:"days_left,omitempty"`
+	// Agent events only: the agent and its label (name · location). Target
+	// is its host name, DownSince when it disconnected.
+	AgentID int64  `json:"agent_id,omitempty"`
+	Agent   string `json:"agent,omitempty"`
 }
 
 // Alert reports whether the event is bad news (sent with high priority).
 func (e Event) Alert() bool {
-	return e.Status == StatusDown || e.Status == ExpiryExpiring || e.Status == ExpiryExpired
+	return e.Status == StatusDown || e.Status == ExpiryExpiring || e.Status == ExpiryExpired || e.Status == AgentOffline
 }
 
 // Title is a one-line summary, used as subject or title by channels that have one.
@@ -71,6 +75,8 @@ func (e Event) Title() string {
 			what = "domain"
 		}
 		return fmt.Sprintf("pingtxt: %s %s %s", e.Subject, what, e.Status)
+	case KindAgent:
+		return "pingtxt: agent " + e.Agent + " " + e.statusWord()
 	}
 	return "pingtxt: " + e.Monitor + " " + e.statusWord()
 }
@@ -123,6 +129,9 @@ func (e Event) Text() string {
 	}
 	if e.Kind == KindCert || e.Kind == KindDomain {
 		return prefix + e.expiryText()
+	}
+	if e.Kind == KindAgent {
+		return e.agentText(prefix)
 	}
 	if e.Kind == KindDegraded {
 		if e.Status == StatusDegraded {
@@ -234,7 +243,7 @@ func (n *Notifier) Deliver(ctx context.Context, nt *store.Notifier, e Event) err
 	case "ntfy":
 		hdr := map[string]string{"Title": e.Title()}
 		switch {
-		case e.Status == StatusDown || e.Status == ExpiryExpired:
+		case e.Status == StatusDown || e.Status == ExpiryExpired || e.Status == AgentOffline:
 			hdr["Priority"] = "high"
 			hdr["Tags"] = "red_circle"
 		case e.Alert():

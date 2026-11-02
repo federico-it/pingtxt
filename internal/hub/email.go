@@ -125,6 +125,9 @@ func emailSubject(e Event) string {
 		// e.g. "[pingtxt] example.com certificate expiring"
 		return prefix + "[pingtxt] " + strings.TrimPrefix(e.Title(), "pingtxt: ")
 	}
+	if e.Kind == KindAgent {
+		return fmt.Sprintf("%s[pingtxt] agent %s is %s", prefix, e.Agent, e.Status)
+	}
 	return fmt.Sprintf("%s[pingtxt] %s is %s", prefix, e.Monitor, e.statusWord())
 }
 
@@ -151,14 +154,21 @@ func eventMailView(e Event, base string) mailView {
 	if i := strings.IndexByte(v.Preheader, '\n'); i > 0 {
 		v.Preheader = v.Preheader[:i]
 	}
-	if e.Kind == KindCert || e.Kind == KindDomain {
+	switch e.Kind {
+	case KindCert, KindDomain:
 		expiryMailView(&v, e)
-	} else {
+	case KindAgent:
+		agentMailView(&v, e)
+	default:
 		statusMailView(&v, e)
 	}
 	if e.Test {
 		v.Command = "pingtxt notify --test"
 		v.Footer = append(v.Footer, "This is a test notification: nothing is down.")
+	} else if e.Kind == KindAgent {
+		if base != "" {
+			v.Action = &mailLink{Label: "open agents", Href: base + "/agents/"}
+		}
 	} else if u := monitorURL(base, e.MonitorID); u != "" {
 		v.Action = &mailLink{Label: "open monitor", Href: u}
 	}
@@ -205,6 +215,30 @@ func statusMailView(v *mailView, e Event) {
 	v.Rows = append(v.Rows, mailRow{Key: "up since", Value: mailTime(e.At)})
 	if d := e.downFor(); d != "" {
 		v.Rows = append(v.Rows, mailRow{Key: "was down", Value: d})
+	}
+}
+
+func agentMailView(v *mailView, e Event) {
+	v.Command = "pingtxt agent " + e.Agent
+	v.Title = e.Agent
+	v.Rows = append(v.Rows, mailRow{Key: "agent", Value: e.Agent})
+	if e.Target != "" {
+		v.Rows = append(v.Rows, mailRow{Key: "host", Value: e.Target})
+	}
+	if e.Status == AgentOffline {
+		v.Tone, v.Badge = toneDown, "AGENT OFFLINE"
+		v.Lead = "The agent lost its connection to the hub. Its checks are not running."
+		v.Note = e.Cause
+		if e.DownSince > 0 {
+			v.Rows = append(v.Rows, mailRow{Key: "offline since", Value: mailTime(e.DownSince)})
+		}
+		return
+	}
+	v.Tone, v.Badge = toneUp, "AGENT ONLINE"
+	v.Lead = "The agent is connected again and runs its checks."
+	v.Rows = append(v.Rows, mailRow{Key: "online since", Value: mailTime(e.At)})
+	if d := e.downFor(); d != "" {
+		v.Rows = append(v.Rows, mailRow{Key: "was offline", Value: d})
 	}
 }
 

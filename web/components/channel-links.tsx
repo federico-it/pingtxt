@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useTranslations } from "use-intl"
 
 import { Checkbox } from "@/components/ui/checkbox"
-import { defaultNotifyEvents, notifyEvents, type Monitor, type Notifier, type NotifyEvent } from "@/lib/api"
+import { defaultNotifyEvents, monitorEvents, notifyEvents, type Monitor, type Notifier, type NotifyEvent } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 // Which channels get which events about which monitors. A channel has a scope
@@ -28,6 +28,9 @@ const sameEvents = (a: NotifyEvent[], b: NotifyEvent[]) => a.length === b.length
 /** Keeps known events, once each, in display order. */
 export const cleanEvents = (list: NotifyEvent[]) => notifyEvents.filter((e) => list.includes(e))
 
+/** The events of list about a monitor, for monitor links. */
+const linkEvents = (list: NotifyEvent[]) => monitorEvents.filter((e) => list.includes(e))
+
 export type LinkState = {
   on: boolean
   events: NotifyEvent[]
@@ -37,17 +40,18 @@ export type LinkState = {
 
 /** What a channel sends about a monitor, from its scope and the monitor's link. */
 export function linkState(covered: boolean, defaults: NotifyEvent[], link?: NotifyEvent[]): LinkState {
-  if (link) return { on: link.length > 0, events: link, custom: true }
-  return { on: covered, events: covered ? defaults : [], custom: false }
+  if (link) return { on: link.length > 0, events: linkEvents(link), custom: true }
+  return { on: covered, events: covered ? linkEvents(defaults) : [], custom: false }
 }
 
 /**
  * The link to store for a choice: undefined when the scope already gives
  * the same result (no link needed), else the events ([] = left out).
  */
-export function nextLink(covered: boolean, defaults: NotifyEvent[], on: boolean, events: NotifyEvent[]): NotifyEvent[] | undefined {
+export function nextLink(covered: boolean, channelDefaults: NotifyEvent[], on: boolean, events: NotifyEvent[]): NotifyEvent[] | undefined {
   if (!on) return covered ? [] : undefined
-  const ev = cleanEvents(events.length > 0 ? events : defaults.length > 0 ? defaults : defaultNotifyEvents)
+  const defaults = linkEvents(channelDefaults)
+  const ev = linkEvents(events.length > 0 ? events : defaults.length > 0 ? defaults : defaultNotifyEvents)
   if (covered && sameEvents(ev, defaults)) return undefined
   return ev
 }
@@ -56,18 +60,21 @@ export function nextLink(covered: boolean, defaults: NotifyEvent[], on: boolean,
 export function EventChips({
   value,
   onChange,
+  events = notifyEvents,
   disabled,
   className,
 }: {
   value: NotifyEvent[]
   onChange: (v: NotifyEvent[]) => void
+  /** The events to offer (default: all). */
+  events?: NotifyEvent[]
   disabled?: boolean
   className?: string
 }) {
   const t = useTranslations("channelLinks")
   return (
     <div className={cn("flex flex-wrap gap-1", className)}>
-      {notifyEvents.map((e) => {
+      {events.map((e) => {
         const on = value.includes(e)
         return (
           <button
@@ -96,6 +103,7 @@ const eventTone: Record<NotifyEvent, string> = {
   degraded: "border-warn/50 bg-warn/10 text-warn",
   cert_expiry: "border-info/50 bg-info/10 text-foreground",
   domain_expiry: "border-info/50 bg-info/10 text-foreground",
+  agent_offline: "border-warn/50 bg-warn/10 text-warn",
 }
 
 /** Short list of events, e.g. "down, up". */
@@ -130,7 +138,7 @@ export function LinkRow({
   const t = useTranslations("channelLinks")
   const list = useEventList()
   const [open, setOpen] = useState(false)
-  const differs = state.custom && (state.on !== covered || (state.on && !sameEvents(state.events, defaults)))
+  const differs = state.custom && (state.on !== covered || (state.on && !sameEvents(state.events, linkEvents(defaults))))
   return (
     <div className="border-b border-dashed px-2 py-1.5 last:border-b-0">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -165,7 +173,7 @@ export function LinkRow({
       </div>
       {open && state.on && (
         <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-6">
-          <EventChips value={state.events} onChange={(ev) => onChange(nextLink(covered, defaults, ev.length > 0, ev))} disabled={disabled} />
+          <EventChips value={state.events} events={monitorEvents} onChange={(ev) => onChange(nextLink(covered, defaults, ev.length > 0, ev))} disabled={disabled} />
           {differs && covered && (
             <button
               type="button"

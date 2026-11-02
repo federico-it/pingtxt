@@ -12,14 +12,17 @@ const (
 	EventDegraded     = "degraded"      // some locations fail, and when that ends
 	EventCertExpiry   = "cert_expiry"   // TLS certificate expiring, expired or renewed
 	EventDomainExpiry = "domain_expiry" // domain registration expiring, expired or renewed
+	// EventAgentOffline is about an agent, not a monitor: a channel gets it
+	// whatever its scope, and monitor links cannot pick it.
+	EventAgentOffline = "agent_offline" // agent disconnected past the grace period, and back online
 )
 
 // NotifyEvents lists every event, in display order.
-var NotifyEvents = []string{EventDown, EventUp, EventDegraded, EventCertExpiry, EventDomainExpiry}
+var NotifyEvents = []string{EventDown, EventUp, EventDegraded, EventCertExpiry, EventDomainExpiry, EventAgentOffline}
 
 // DefaultNotifyEvents are the events a channel gets unless told otherwise:
 // everything that was sent before channels could be picked per monitor.
-var DefaultNotifyEvents = []string{EventDown, EventUp, EventCertExpiry, EventDomainExpiry}
+var DefaultNotifyEvents = []string{EventDown, EventUp, EventCertExpiry, EventDomainExpiry, EventAgentOffline}
 
 // ChannelLink ties a notification channel to a monitor with the events the
 // channel gets for it. It overrides the channel's own scope: a link with no
@@ -40,6 +43,12 @@ func CleanEvents(list []string) []string {
 		}
 	}
 	return out
+}
+
+// CleanLinkEvents is CleanEvents for a monitor link: the events about a
+// monitor only.
+func CleanLinkEvents(list []string) []string {
+	return slices.DeleteFunc(CleanEvents(list), func(e string) bool { return e == EventAgentOffline })
 }
 
 // Covers reports whether the channel's scope includes the monitor: every
@@ -78,7 +87,7 @@ func (s *Store) channelLinks(q string, args ...any) ([]ChannelLink, error) {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(ev), &l.Events)
-		l.Events = CleanEvents(l.Events)
+		l.Events = CleanLinkEvents(l.Events)
 		out = append(out, l)
 	}
 	return out, rows.Err()
@@ -110,7 +119,7 @@ func setMonitorLinks(tx *tx, monitorID int64, links []ChannelLink) error {
 		return err
 	}
 	for _, l := range links {
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO monitor_notifiers (monitor_id, notifier_id, events) VALUES (?, ?, ?)`, monitorID, l.NotifierID, jsonIDs(CleanEvents(l.Events))); err != nil {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO monitor_notifiers (monitor_id, notifier_id, events) VALUES (?, ?, ?)`, monitorID, l.NotifierID, jsonIDs(CleanLinkEvents(l.Events))); err != nil {
 			return err
 		}
 	}
@@ -128,7 +137,7 @@ func (s *Store) SetChannelMonitors(notifierID int64, links []ChannelLink) error 
 		return err
 	}
 	for _, l := range links {
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO monitor_notifiers (monitor_id, notifier_id, events) VALUES (?, ?, ?)`, l.MonitorID, notifierID, jsonIDs(CleanEvents(l.Events))); err != nil {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO monitor_notifiers (monitor_id, notifier_id, events) VALUES (?, ?, ?)`, l.MonitorID, notifierID, jsonIDs(CleanLinkEvents(l.Events))); err != nil {
 			return err
 		}
 	}

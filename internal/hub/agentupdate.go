@@ -28,10 +28,14 @@ import (
 
 const keyAgentUpdates = "agent_updates"
 
-// AgentUpdateSettings control automatic agent updates.
+// AgentUpdateSettings are the agent settings: automatic updates and the
+// offline alert.
 type AgentUpdateSettings struct {
 	// AutoUpdate updates agents to the hub version as soon as they connect.
 	AutoUpdate bool `json:"auto_update"`
+	// OfflineGraceMin is how many minutes an agent can be disconnected
+	// before it is reported offline (0 = defaultOfflineGraceMin).
+	OfflineGraceMin int `json:"offline_grace_min"`
 }
 
 // Retry delays for automatic updates. A manual update ignores them.
@@ -400,9 +404,13 @@ func (h *Hub) agentUpdateView(a *store.Agent) updateView {
 // ---------- API ----------
 
 func (h *Hub) putAgentUpdateSettings(w http.ResponseWriter, r *http.Request, _ *store.User) {
-	var in AgentUpdateSettings
+	in := h.agentUpdateSettings()
 	if readJSON(r, &in) != nil {
 		writeErr(w, 400, "invalid body")
+		return
+	}
+	if in.OfflineGraceMin < 0 || in.OfflineGraceMin > maxOfflineGraceMin {
+		writeErr(w, 400, fmt.Sprintf("offline_grace_min must be between 1 and %d", maxOfflineGraceMin))
 		return
 	}
 	if err := h.setAgentUpdateSettings(in); err != nil {

@@ -70,6 +70,8 @@ type cfgAgent struct {
 	// TokenHash lets the agents keep their tokens when the configuration
 	// moves to another hub. Only in exports with secrets.
 	TokenHash string `json:"token_hash,omitempty"`
+	// AlertOffline is the agent's offline alert (nil in older exports: on).
+	AlertOffline *bool `json:"alert_offline,omitempty"`
 }
 
 // The cfg* types reuse the API objects and drop state that is not
@@ -173,7 +175,7 @@ func (h *Hub) ExportConfig(secrets bool) (*ConfigDoc, error) {
 		return nil, err
 	}
 	for _, ag := range agents {
-		c := cfgAgent{ID: ag.ID, Name: ag.Name, Location: ag.Location}
+		c := cfgAgent{ID: ag.ID, Name: ag.Name, Location: ag.Location, AlertOffline: &ag.AlertOffline}
 		if secrets {
 			c.TokenHash = ag.TokenHash
 		}
@@ -434,6 +436,7 @@ func (im *importer) settings() error {
 		}
 	}
 	if u := s.AgentUpdates; u != nil {
+		u.OfflineGraceMin = min(max(u.OfflineGraceMin, 0), maxOfflineGraceMin)
 		if err := h.setAgentUpdateSettings(*u); err != nil {
 			return err
 		}
@@ -479,6 +482,12 @@ func (im *importer) importAgents() error {
 				}
 				im.res.Updated["agents"]++
 			}
+			if a.AlertOffline != nil && *a.AlertOffline != match.AlertOffline {
+				if err := st.SetAgentAlertOffline(match.ID, *a.AlertOffline); err != nil {
+					return err
+				}
+				im.res.Updated["agents"]++
+			}
 			continue
 		}
 		hash := a.TokenHash
@@ -489,6 +498,11 @@ func (im *importer) importAgents() error {
 		created, err := st.CreateAgent(name, strings.TrimSpace(a.Location), hash)
 		if err != nil {
 			return err
+		}
+		if a.AlertOffline != nil && !*a.AlertOffline {
+			if err := st.SetAgentAlertOffline(created.ID, false); err != nil {
+				return err
+			}
 		}
 		cur = append(cur, created)
 		im.agents[a.ID] = created.ID

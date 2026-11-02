@@ -153,7 +153,7 @@ func TestChannelLinksAPI(t *testing.T) {
 	if c := do("POST", "/api/notifiers", `{"name":"hook","type":"webhook","enabled":true,"config":{"url":"https://example.com"}}`, &n); c != 201 {
 		t.Fatalf("create: %d", c)
 	}
-	if !n.AllMonitors || strings.Join(n.Events, ",") != "down,up,cert_expiry,domain_expiry" || n.Monitors == nil {
+	if !n.AllMonitors || strings.Join(n.Events, ",") != "down,up,cert_expiry,domain_expiry,agent_offline" || n.Monitors == nil {
 		t.Fatalf("defaults: %+v", n)
 	}
 
@@ -247,7 +247,7 @@ func TestChannelLinksExportImport(t *testing.T) {
 	}
 	ns, _ = st2.ListNotifiers()
 	for _, n := range ns {
-		if n.Name == "old" && (!n.AllMonitors || strings.Join(n.Events, ",") != "down,up,cert_expiry,domain_expiry") {
+		if n.Name == "old" && (!n.AllMonitors || strings.Join(n.Events, ",") != "down,up,cert_expiry,domain_expiry,agent_offline") {
 			t.Fatalf("old file: %+v", n)
 		}
 	}

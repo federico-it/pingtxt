@@ -203,7 +203,8 @@
     "deleteHint": "deleted after a few seconds: you can undo it",
     "zoomHint": "drag across the chart to zoom in",
     "zoomed": "{from} → {to}",
-    "zoomReset": "back to {range}"
+    "zoomReset": "back to {range}",
+    "noLocationOnline": "No location of this monitor is online: its checks are not running, so the status is pending until an agent reconnects."
   },
   "browserNotify": {
     "title": "desktop notifications in this browser",
@@ -706,7 +707,23 @@
     "waiting": "waiting for {name} to connect… you will be asked which monitors should use it.",
     "noMonitors": "in no monitor",
     "monitors": "{count, plural, one {# monitor} other {# monitors}}",
-    "assign": "add to monitors"
+    "assign": "add to monitors",
+    "graceBefore": "alert when an agent is offline for",
+    "graceAfter": "min",
+    "graceHint": "Channels with the \"agent offline\" event are alerted when an agent stays disconnected this long, and again when it is back. Agents that were just sent an update get at least 10 minutes.",
+    "graceRange": "Enter a value between 1 and {max} minutes.",
+    "graceSaved": "offline alert after {min} min",
+    "filterAll": "all",
+    "lostHint": "Offline longer than the alert threshold: its checks are not running.",
+    "alertOff": "no offline alert",
+    "alertOffHint": "This agent sends no \"agent offline\" alert.",
+    "alertOffline": "alert when this agent goes offline",
+    "alertOfflineHint": "Channels with the \"agent offline\" event are alerted after {min} min without a connection, and again when it is back."
+  },
+  "agentsOffline": {
+    "title": "{count, plural, one {# agent offline} other {# agents offline}}:",
+    "text": "{count, plural, one {its checks are not running.} other {their checks are not running.}}",
+    "open": "agents"
   },
   "agentInstall": {
     "hint": "The agent only dials out to the hub over HTTPS/WebSocket: no ports to open. The token is shown only now; rotate it to get a new one."
@@ -1443,20 +1460,22 @@
   },
   "channelLinks": {
     "events": "events",
-    "eventsHint": "What this channel gets for the monitors it covers. Recoveries go only to channels that got the down alert.",
+    "eventsHint": "What this channel gets for the monitors it covers. Recoveries go only to channels that got the down alert. Agent offline is about agents, not monitors: it is sent whatever monitors the channel covers.",
     "event": {
       "down": "down",
       "up": "back up",
       "degraded": "degraded",
       "cert_expiry": "certificate expiry",
-      "domain_expiry": "domain expiry"
+      "domain_expiry": "domain expiry",
+      "agent_offline": "agent offline"
     },
     "short": {
       "down": "down",
       "up": "up",
       "degraded": "degraded",
       "cert_expiry": "cert",
-      "domain_expiry": "domain"
+      "domain_expiry": "domain",
+      "agent_offline": "agent"
     },
     "monitors": "monitors",
     "allMonitors": "all monitors",

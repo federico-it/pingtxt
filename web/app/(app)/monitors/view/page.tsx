@@ -351,6 +351,9 @@ function View() {
       </Section>
 
       <Section title={d.type === "push" ? t("lastHeartbeat") : t("locations")}>
+        {d.type !== "push" && d.location_status.length > 0 && d.location_status.every((l) => !l.online) && (
+          <p className="mb-2 text-xs text-warn">{t("noLocationOnline")}</p>
+        )}
         <Table>
           <TableHeader>
             <TableRow>
