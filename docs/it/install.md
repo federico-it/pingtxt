@@ -108,6 +108,22 @@ status.example.com {
 Caddy inoltra i WebSocket senza impostazioni in più. Le status page su un
 [dominio personalizzato](status-pages.md#dominio-personalizzato) passano dallo stesso hub.
 
+## Coolify
+
+Il repository ha due file compose pronti per [Coolify](https://coolify.io):
+[docker-compose.coolify.yml](../../docker-compose.coolify.yml) (SQLite) e
+[docker-compose.coolify.postgres.yml](../../docker-compose.coolify.postgres.yml) (PostgreSQL). In Coolify crea una
+nuova risorsa di tipo **Docker Compose Empty**, incolla uno dei due file e fai il deploy.
+
+Coolify riempie da solo le variabili: `SERVICE_URL_PINGTXT_8090` crea il dominio e lo inoltra alla porta 8090
+con TLS, e utente e password di PostgreSQL arrivano da `SERVICE_USER_POSTGRES` e `SERVICE_PASSWORD_POSTGRES`.
+Non c'è niente da scrivere a mano. Per usare un tuo dominio cambialo nelle impostazioni del servizio prima del
+primo deploy: l'URL pubblico viene preso da lì solo al primo avvio, poi si cambia in **impostazioni → generali**.
+
+I dati restano nel volume `pingtxt-data` (e `pingtxt-postgres` per il database). La rete Docker di Coolify non ha
+IPv6 di default, quindi i controlli verso destinazioni solo IPv6 falliscono dall'hub; falli partire da un
+[agent](locations.md) con IPv6.
+
 ## IPv6
 
 L'hub ascolta su IPv4 e IPv6, e ogni tipo di controllo funziona su IPv6 (vedi [IPv6 nei monitor](monitors.md#ipv6)).

@@ -1,0 +1,25 @@
+# pingtxt hub on Coolify, with SQLite (default).
+# In Coolify: new resource > Docker Compose Empty, paste this file and deploy.
+# Coolify creates the domain from SERVICE_URL_PINGTXT_8090 and routes it to port 8090
+# (change the domain in the service settings if you want your own).
+# Docs: https://pingtxt.com/docs/install/#coolify
+services:
+  pingtxt:
+    image: ghcr.io/federico-it/pingtxt:latest
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_PINGTXT_8090
+      # Seeds the public URL on the first start only; afterwards change it in settings > general.
+      - PINGTXT_PUBLIC_URL=${SERVICE_URL_PINGTXT}
+    volumes:
+      - pingtxt-data:/data
+      # Only for "docker container" monitors on the hub location:
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8090/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pingtxt-data:
