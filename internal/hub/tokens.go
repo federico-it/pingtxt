@@ -79,15 +79,17 @@ func (h *Hub) requireAuth(fn func(http.ResponseWriter, *http.Request, *store.Use
 		}
 		if !readOnlyMethod(r.Method) {
 			if tok != nil && tok.Scope != ScopeWrite {
+				h.auditDenied(r, u, tok)
 				writeErr(w, http.StatusForbidden, "this token is read-only")
 				return
 			}
 			if !u.IsAdmin() {
+				h.auditDenied(r, u, tok)
 				writeErr(w, http.StatusForbidden, errReadOnlyUser)
 				return
 			}
 		}
-		fn(w, r, u)
+		h.audited(w, r, u, tok, func(w http.ResponseWriter, r *http.Request) { fn(w, r, u) })
 	}
 }
 
@@ -104,6 +106,25 @@ func (h *Hub) requireSession(fn func(http.ResponseWriter, *http.Request, *store.
 			return
 		}
 		if tok != nil {
+			h.auditDenied(r, u, tok)
+			writeErr(w, http.StatusForbidden, "API tokens cannot manage accounts or settings, log in from the browser")
+			return
+		}
+		h.audited(w, r, u, tok, func(w http.ResponseWriter, r *http.Request) { fn(w, r, u) })
+	}
+}
+
+// requireSessionRaw is requireSession without the audit log, for wrappers
+// that record the request themselves.
+func (h *Hub) requireSessionRaw(fn func(http.ResponseWriter, *http.Request, *store.User)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		u, tok, err := h.authenticate(r)
+		if err != nil {
+			writeErr(w, http.StatusUnauthorized, err.Error())
+			return
+		}
+		if tok != nil {
+			h.auditDenied(r, u, tok)
 			writeErr(w, http.StatusForbidden, "API tokens cannot manage accounts or settings, log in from the browser")
 			return
 		}
@@ -113,12 +134,13 @@ func (h *Hub) requireSession(fn func(http.ResponseWriter, *http.Request, *store.
 
 // requireAdmin accepts only a browser session of an admin: instance settings and users.
 func (h *Hub) requireAdmin(fn func(http.ResponseWriter, *http.Request, *store.User)) http.HandlerFunc {
-	return h.requireSession(func(w http.ResponseWriter, r *http.Request, u *store.User) {
+	return h.requireSessionRaw(func(w http.ResponseWriter, r *http.Request, u *store.User) {
 		if !u.IsAdmin() {
+			h.auditDenied(r, u, nil)
 			writeErr(w, http.StatusForbidden, "only admins can do this")
 			return
 		}
-		fn(w, r, u)
+		h.audited(w, r, u, nil, func(w http.ResponseWriter, r *http.Request) { fn(w, r, u) })
 	})
 }
 

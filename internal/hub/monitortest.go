@@ -257,8 +257,10 @@ func (h *Hub) bulkMonitors(w http.ResponseWriter, r *http.Request, _ *store.User
 		monitors = append(monitors, m)
 	}
 	now := time.Now().UnixMilli()
+	rec := auditFrom(r)
 	for _, m := range monitors {
 		var err error
+		oldGroup := m.GroupID
 		switch in.Action {
 		case "pause", "resume":
 			paused := in.Action == "pause"
@@ -283,6 +285,14 @@ func (h *Hub) bulkMonitors(w http.ResponseWriter, r *http.Request, _ *store.User
 			return
 		}
 		h.MonitorChanged(m.ID)
+		var changes map[string]any
+		switch in.Action {
+		case "pause", "resume":
+			changes = map[string]any{"paused": []any{in.Action == "resume", in.Action == "pause"}}
+		case "group":
+			changes = map[string]any{"group_id": []any{oldGroup, m.GroupID}}
+		}
+		rec.Item("monitor."+in.Action, "monitor", m.ID, m.Name, changes)
 	}
 	if in.Action == "group" {
 		h.labelsChanged()

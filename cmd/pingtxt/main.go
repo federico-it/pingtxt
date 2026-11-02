@@ -125,6 +125,7 @@ func main() {
 		log.Info("pingtxt hub starting", "addr", cfg.Addr, "version", version)
 	}
 
+	restoredFrom := "" // previous database, when a staged restore was applied
 	if dbURL == "" {
 		if boot != nil && fileExists(hub.PendingRestorePath(dbPath)) {
 			boot.SetPhase(hub.PhaseRestore)
@@ -134,6 +135,7 @@ func main() {
 			log.Error("restore staged backup failed, starting with the current database", "err", err)
 		} else if kept != "" {
 			log.Info("restored staged backup", "previous_database", kept)
+			restoredFrom = kept
 		}
 	}
 
@@ -158,6 +160,7 @@ func main() {
 			log.Error("enable password login", "err", err)
 			os.Exit(1)
 		}
+		h.AuditSystem(store.AuditCLI, "settings.password_login_enable", "settings", 0, "auth", nil)
 		fmt.Println("password login enabled. Restart the hub if it is running.")
 		return
 	}
@@ -168,6 +171,7 @@ func main() {
 			log.Error("reset two-factor", "err", err)
 			os.Exit(1)
 		}
+		h.AuditSystem(store.AuditCLI, "user.2fa_reset", "user", 0, *resetTwoFactor, nil)
 		fmt.Println("two-factor authentication turned off for " + *resetTwoFactor + ".")
 		return
 	}
@@ -178,6 +182,7 @@ func main() {
 			log.Error("make admin", "err", err)
 			os.Exit(1)
 		}
+		h.AuditSystem(store.AuditCLI, "user.make_admin", "user", 0, *makeAdmin, nil)
 		fmt.Println(*makeAdmin + " is now an admin.")
 		return
 	}
@@ -188,6 +193,9 @@ func main() {
 		if err != nil {
 			log.Error("export config", "err", err)
 			os.Exit(1)
+		}
+		if *exportSecrets {
+			h.AuditSystem(store.AuditCLI, "config.export", "config", 0, "", map[string]any{"secrets": true})
 		}
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		b = append(b, '\n')
@@ -225,6 +233,7 @@ func main() {
 			log.Error("import config", "err", err)
 			os.Exit(1)
 		}
+		h.AuditSystem(store.AuditCLI, "config.import", "config", 0, filepath.Base(*importFrom), map[string]any{"mode": *importMode, "result": res})
 		fmt.Println("configuration imported. Restart the hub if it is running.")
 		return
 	}
@@ -234,6 +243,9 @@ func main() {
 
 	boot.SetPhase(hub.PhaseStarting)
 	h := hub.New(cfg, st, log)
+	if restoredFrom != "" {
+		h.AuditSystem(store.AuditSystem, "backup.restore_applied", "backup", 0, "", map[string]any{"previous_database": filepath.Base(restoredFrom)})
+	}
 	go func() {
 		if err := h.Run(ctx); err != nil {
 			log.Error("scheduler", "err", err)

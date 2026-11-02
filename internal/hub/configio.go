@@ -969,6 +969,9 @@ func (h *Hub) exportConfig(w http.ResponseWriter, r *http.Request, u *store.User
 		return
 	}
 	secrets := r.URL.Query().Get("secrets") == "1" || r.URL.Query().Get("secrets") == "true"
+	if !secrets {
+		auditFrom(r).Skip() // the audit log keeps only exports with secrets
+	}
 	if secrets {
 		if _, tok, _ := h.authenticate(r); tok != nil {
 			writeErr(w, http.StatusForbidden, "API tokens cannot export secrets, log in from the browser")

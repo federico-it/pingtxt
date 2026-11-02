@@ -223,6 +223,7 @@ func (h *Hub) scheduledBackup(now time.Time) {
 			h.log.Error("scheduled backup", "err", err)
 			return
 		}
+		h.AuditSystem(store.AuditSystem, "backup.create", "backup", 0, b.Name, nil)
 		h.log.Info("scheduled backup", "file", b.Name, "bytes", b.Size, "took", time.Since(t0).Round(time.Millisecond))
 		auto = append([]*BackupFile{b}, auto...)
 	}

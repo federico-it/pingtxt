@@ -253,6 +253,7 @@ func (h *Hub) oauthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := h.resolveExternalUser(id, ext)
 	if err != nil {
+		h.auditLogin(r, nil, ext.Email, "sso:"+id, store.AuditFailed)
 		h.loginRedirect(w, r, err.Error())
 		return
 	}
@@ -261,6 +262,7 @@ func (h *Hub) oauthCallback(w http.ResponseWriter, r *http.Request) {
 		h.loginRedirect(w, r, "internal error")
 		return
 	}
+	h.auditLogin(r, u, u.Email, "sso:"+id, store.AuditOK)
 	dest := "/"
 	if safeNext(p.next) {
 		dest = p.next
@@ -322,6 +324,7 @@ func (h *Hub) linkAccount(w http.ResponseWriter, r *http.Request, provider strin
 		h.settingsRedirect(w, r, "internal error")
 		return
 	}
+	h.auditEvent(r, cur, nil, "account.sso_link", store.AuditOK, map[string]any{"_provider": provider, "_email": ext.Email})
 	http.Redirect(w, r, "/settings/account/?linked="+url.QueryEscape(provider), http.StatusFound)
 }
 

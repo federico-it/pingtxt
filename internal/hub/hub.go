@@ -899,4 +899,9 @@ func (h *Hub) compactResults(ctx context.Context, now time.Time) {
 	} else if n > 0 {
 		h.log.Info("pruned hourly rollups", "rows", n)
 	}
+	if n, err := h.store.PruneAudit(now.Add(-time.Duration(g.AuditRetentionDays) * day).UnixMilli()); err != nil {
+		h.log.Error("prune audit log", "err", err)
+	} else if n > 0 {
+		h.log.Info("pruned audit log", "rows", n)
+	}
 }

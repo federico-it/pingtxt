@@ -41,7 +41,15 @@ type GeneralSettings struct {
 	IPFamily int `json:"ip_family"`
 	// UpdateCheck looks for new pingtxt releases on GitHub.
 	UpdateCheck UpdateCheckSettings `json:"update_check"`
+	// AuditRetentionDays is how long the audit log keeps its entries.
+	AuditRetentionDays int `json:"audit_retention_days"`
 }
+
+const (
+	defaultAuditRetention = 365
+	minAuditRetention     = 30
+	maxAuditRetention     = 3650
+)
 
 // ExpirySettings set when certificate and domain expiry alerts are sent:
 // one alert when the days left cross each threshold. An empty list turns
@@ -136,6 +144,10 @@ func (g *GeneralSettings) normalize() {
 		g.RawRetentionDays = 3
 	}
 	g.RawRetentionDays = min(max(g.RawRetentionDays, 2), max(g.RetentionDays, 2))
+	if g.AuditRetentionDays <= 0 {
+		g.AuditRetentionDays = defaultAuditRetention
+	}
+	g.AuditRetentionDays = min(max(g.AuditRetentionDays, minAuditRetention), maxAuditRetention)
 	d := &g.MonitorDefaults
 	if d.IntervalSec == 0 {
 		d.IntervalSec = 60

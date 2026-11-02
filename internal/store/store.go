@@ -588,6 +588,76 @@ var laterMigrations = []migration{
 	// 28: response time (ms) above which a location of a monitor is slow,
 	// 0 = off.
 	{sqlite: `ALTER TABLE monitors ADD COLUMN slow_ms INTEGER NOT NULL DEFAULT 0`},
+	// 29: audit log, who changed what and when. No foreign keys: entries
+	// outlive the users and objects they name (email and name are copies).
+	{
+		sqlite: `CREATE TABLE audit_log (
+		id INTEGER PRIMARY KEY,
+		at INTEGER NOT NULL,
+		user_id INTEGER NOT NULL DEFAULT 0,
+		user_email TEXT NOT NULL DEFAULT '',
+		source TEXT NOT NULL,
+		credential TEXT NOT NULL DEFAULT '',
+		via TEXT NOT NULL DEFAULT '',
+		ip TEXT NOT NULL DEFAULT '',
+		remote_addr TEXT NOT NULL DEFAULT '',
+		user_agent TEXT NOT NULL DEFAULT '',
+		action TEXT NOT NULL,
+		target_type TEXT NOT NULL DEFAULT '',
+		target_id INTEGER NOT NULL DEFAULT 0,
+		target_name TEXT NOT NULL DEFAULT '',
+		result TEXT NOT NULL,
+		changes TEXT NOT NULL DEFAULT '',
+		request_id TEXT NOT NULL DEFAULT ''
+	);
+	CREATE INDEX audit_log_at ON audit_log(at);
+	CREATE INDEX audit_log_target ON audit_log(target_type, target_id, id);
+	CREATE INDEX audit_log_user ON audit_log(user_id, id);`,
+		postgres: `CREATE TABLE audit_log (
+		id BIGSERIAL PRIMARY KEY,
+		at BIGINT NOT NULL,
+		user_id BIGINT NOT NULL DEFAULT 0,
+		user_email TEXT NOT NULL DEFAULT '',
+		source TEXT NOT NULL,
+		credential TEXT NOT NULL DEFAULT '',
+		via TEXT NOT NULL DEFAULT '',
+		ip TEXT NOT NULL DEFAULT '',
+		remote_addr TEXT NOT NULL DEFAULT '',
+		user_agent TEXT NOT NULL DEFAULT '',
+		action TEXT NOT NULL,
+		target_type TEXT NOT NULL DEFAULT '',
+		target_id BIGINT NOT NULL DEFAULT 0,
+		target_name TEXT NOT NULL DEFAULT '',
+		result TEXT NOT NULL,
+		changes TEXT NOT NULL DEFAULT '',
+		request_id TEXT NOT NULL DEFAULT ''
+	);
+	CREATE INDEX audit_log_at ON audit_log(at);
+	CREATE INDEX audit_log_target ON audit_log(target_type, target_id, id);
+	CREATE INDEX audit_log_user ON audit_log(user_id, id);`,
+		mysql: `CREATE TABLE audit_log (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		at BIGINT NOT NULL,
+		user_id BIGINT NOT NULL DEFAULT 0,
+		user_email VARCHAR(320) NOT NULL DEFAULT '',
+		source VARCHAR(16) NOT NULL,
+		credential VARCHAR(255) NOT NULL DEFAULT '',
+		via VARCHAR(100) NOT NULL DEFAULT '',
+		ip VARCHAR(64) NOT NULL DEFAULT '',
+		remote_addr VARCHAR(255) NOT NULL DEFAULT '',
+		user_agent VARCHAR(512) NOT NULL DEFAULT '',
+		action VARCHAR(64) NOT NULL,
+		target_type VARCHAR(32) NOT NULL DEFAULT '',
+		target_id BIGINT NOT NULL DEFAULT 0,
+		target_name VARCHAR(255) NOT NULL DEFAULT '',
+		result VARCHAR(16) NOT NULL,
+		changes MEDIUMTEXT NOT NULL,
+		request_id VARCHAR(32) NOT NULL DEFAULT '',
+		INDEX audit_log_at (at),
+		INDEX audit_log_target (target_type, target_id, id),
+		INDEX audit_log_user (user_id, id)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

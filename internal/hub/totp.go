@@ -207,9 +207,16 @@ func (h *Hub) loginSecondFactor(w http.ResponseWriter, r *http.Request) {
 	if h.codeBlocked(w, uid) {
 		return
 	}
+	method := "password+2fa"
+	if !isDigits(normalizeCode(in.Code)) {
+		method = "password+recovery_code"
+	}
 	if err := h.verifySecondFactor(uid, in.Code, true); err != nil {
 		if errors.Is(err, errBadCode) {
 			h.codeFailed(uid)
+			if u, err := h.store.UserByID(uid); err == nil {
+				h.auditLogin(r, u, u.Email, method, store.AuditFailed)
+			}
 		}
 		time.Sleep(400 * time.Millisecond)
 		writeErr(w, 401, err.Error())
@@ -225,6 +232,7 @@ func (h *Hub) loginSecondFactor(w http.ResponseWriter, r *http.Request) {
 		h.internalErr(w, err)
 		return
 	}
+	h.auditLogin(r, u, u.Email, method, store.AuditOK)
 	writeJSON(w, 200, u)
 }
 

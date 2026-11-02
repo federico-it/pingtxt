@@ -130,6 +130,20 @@ to log in through single sign-on with the same email) and change roles there.
 - Instance settings and users are for admins only. Admins cannot change their own role, so one admin always remains.
 - Users that existed before roles were added are admins. Locked out? `pingtxt -make-admin you@example.com`.
 
+### Audit log
+
+**settings → audit log** shows who changed what, when and from where: every change made from the web UI, an API
+token, an MCP client or the mobile app, plus logins (failed ones too), 2FA changes, tokens and app sign-ins, backups,
+imports and the command line recovery flags. Each entry keeps the fields that changed (before → after); secrets are
+never stored, a changed password or token shows as `********`. Changes refused to read-only users and read tokens are
+logged as *denied*.
+
+- Only admins see it, filter it and export it (CSV or JSON Lines), from the browser or with an API token
+  (`GET /api/audit`, `/api/audit/export`). Every user sees their own logins in **settings → account**.
+- The client address is the first public IP in the proxy headers (`CF-Connecting-IP`, `X-Forwarded-For`...); the
+  address of the connection is kept too, since headers can be forged.
+- Entries are kept 365 days (**settings → general**, 30 to 3650) and are part of database backups.
+
 ### API tokens
 
 Create personal tokens in **settings → api tokens** and send them as a bearer token:
