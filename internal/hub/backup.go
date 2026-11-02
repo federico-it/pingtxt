@@ -289,7 +289,7 @@ func (h *Hub) createBackup(w http.ResponseWriter, r *http.Request, _ *store.User
 
 func (h *Hub) putBackupSettings(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	var s BackupSettings
-	if readJSON(r, &s) != nil {
+	if readJSONOver(r, h.backupSettings(), &s) != nil {
 		writeErr(w, 400, "invalid body")
 		return
 	}

@@ -782,7 +782,7 @@ func (h *Hub) getReports(w http.ResponseWriter, r *http.Request, _ *store.User) 
 
 func (h *Hub) putReports(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	var s ReportSettings
-	if readJSON(r, &s) != nil {
+	if readJSONOver(r, h.reportSettings(), &s) != nil {
 		writeErr(w, 400, "invalid body")
 		return
 	}

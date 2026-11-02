@@ -326,6 +326,71 @@ func readJSON(r *http.Request, v any) error {
 	return dec.Decode(v)
 }
 
+// readJSONOver reads a PUT body that replaces cur, keeping the fields the
+// body leaves out: each top-level key of the body replaces that field of cur
+// as a whole, every other field keeps its stored value. Clients that do not
+// know a newer field (an older iOS app, a script) so do not reset it.
+func readJSONOver(r *http.Request, cur, v any) error {
+	var body map[string]json.RawMessage
+	if err := readJSON(r, &body); err != nil {
+		return err
+	}
+	if body == nil {
+		return errors.New("body must be a JSON object")
+	}
+	return mergeJSON(cur, body, v)
+}
+
+// readSave reads the body of a handler that creates (POST) or updates (PUT
+// /…/{id}) a record. On PUT it loads the stored record with load and keeps
+// the fields the body leaves out. It writes the error response itself and
+// returns the id (0 on POST) and whether the handler can go on.
+func readSave[T any](h *Hub, w http.ResponseWriter, r *http.Request, load func(int64) (*T, error), v *T, what string) (int64, bool) {
+	if r.Method == http.MethodPost {
+		if readJSON(r, v) != nil {
+			writeErr(w, 400, "invalid body")
+			return 0, false
+		}
+		return 0, true
+	}
+	id, ok := pathID(r)
+	if !ok {
+		writeErr(w, 400, "invalid id")
+		return 0, false
+	}
+	cur, err := load(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, what+" not found")
+		return 0, false
+	} else if err != nil {
+		h.internalErr(w, err)
+		return 0, false
+	}
+	if readJSONOver(r, cur, v) != nil {
+		writeErr(w, 400, "invalid body")
+		return 0, false
+	}
+	return id, true
+}
+
+func mergeJSON(cur any, body map[string]json.RawMessage, v any) error {
+	b, err := json.Marshal(cur)
+	if err != nil {
+		return err
+	}
+	merged := map[string]json.RawMessage{}
+	if err := json.Unmarshal(b, &merged); err != nil {
+		return err
+	}
+	for k, raw := range body {
+		merged[k] = raw
+	}
+	if b, err = json.Marshal(merged); err != nil {
+		return err
+	}
+	return json.Unmarshal(b, v)
+}
+
 func pathID(r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	return id, err == nil && id > 0
@@ -1040,7 +1105,7 @@ func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 		return
 	}
 	var m store.Monitor
-	if readJSON(r, &m) != nil {
+	if readJSONOver(r, prev, &m) != nil {
 		writeErr(w, 400, "invalid body")
 		return
 	}

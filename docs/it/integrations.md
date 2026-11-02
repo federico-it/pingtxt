@@ -28,6 +28,11 @@ serve anche:
 - una Swagger UI interattiva su `/api/docs` (con un link da **impostazioni → token**), dove le richieste usano la tua
   sessione del browser o un token impostato in *Authorize*.
 
+`PUT` su un monitor, una finestra di manutenzione, un gruppo, un tag o una status page, e sulle impostazioni generali,
+dei backup e dei report, cambia solo i campi presenti nel body: gli altri tengono il loro valore. Manda un campo per
+cambiarlo, anche per svuotarlo (`[]`, `""`, `0`). Così uno script o un'app più vecchia che non conosce un campo nuovo
+non lo azzera mai.
+
 ## Server MCP
 
 L'hub è anche un server [MCP](https://modelcontextprotocol.io) su `/mcp` (Streamable HTTP), così un assistente AI come
