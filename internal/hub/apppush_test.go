@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -196,7 +197,7 @@ func TestAppPush(t *testing.T) {
 	if res := admin.do("POST", "/api/notifiers/"+itoa(all.ID)+"/test", nil); res.StatusCode != 200 {
 		t.Fatalf("test channel: %d", res.StatusCode)
 	}
-	if len(relay.pushes) != 1 || len(relay.pushes[0].Devices) != 2 || !strings.HasPrefix(relay.pushes[0].Title, "[test] ") || relay.pushes[0].Priority != "high" {
+	if len(relay.pushes) != 1 || len(relay.pushes[0].Devices) != 2 || relay.pushes[0].Data["hub_id"] != "hub1" || !strings.HasPrefix(relay.pushes[0].Title, "[test] ") || relay.pushes[0].Priority != "high" {
 		t.Fatalf("pushes: %+v", relay.pushes)
 	}
 	if list := decode[[]store.PushDevice](t, bearerDo(t, srv.URL, "pma_viewer", "GET", "/api/mobile/devices", nil)); len(list) != 0 {
@@ -268,8 +269,58 @@ func TestAppMessage(t *testing.T) {
 		cert.ThreadID != "monitor-42" || cert.Body != "monitor api (https://api)" || cert.Data["type"] != KindCert {
 		t.Fatalf("cert: %+v", cert)
 	}
+	if down.Category != CategoryMonitorDown || up.Category != CategoryMonitorUp || cert.Category != CategoryExpiry {
+		t.Fatalf("categories %q %q %q", down.Category, up.Category, cert.Category)
+	}
+	deg := appMessage(Event{Kind: KindDegraded, MonitorID: 42, Monitor: "api", Status: StatusDegraded})
+	if deg.Category != CategoryMonitorDegraded {
+		t.Fatalf("degraded: %+v", deg)
+	}
+	if test := appMessage(Event{MonitorID: 42, Monitor: "api", Status: StatusDown, Test: true}); test.Category != "" {
+		t.Fatalf("test notification has buttons: %q", test.Category)
+	}
 	long := appMessage(Event{Monitor: strings.Repeat("é", 300), Status: StatusDown})
 	if len(long.Title) > maxPushTitle || !strings.HasSuffix(long.Title, "é") {
 		t.Fatalf("title: %d bytes", len(long.Title))
+	}
+}
+
+func TestCheckMonitorNow(t *testing.T) {
+	h, st := newTestHub(t)
+	m := &store.Monitor{Name: "m", Type: "http", Target: "http://x", IntervalSec: 3600, Locations: []string{LocalLocation}}
+	push := &store.Monitor{Name: "p", Type: "push", IntervalSec: 60, Locations: []string{LocalLocation}}
+	for _, x := range []*store.Monitor{m, push} {
+		if err := st.CreateMonitor(x); err != nil {
+			t.Fatal(err)
+		}
+		h.MonitorChanged(x.ID)
+	}
+	later := time.Now().Add(time.Hour)
+	h.mu.Lock()
+	h.monitors[m.ID].next = later
+	h.mu.Unlock()
+
+	c := newAPIClient(t, h, st)
+	path := "/api/monitors/" + strconv.FormatInt(m.ID, 10) + "/check"
+	if code := c.json("POST", path, "", nil); code != 202 {
+		t.Fatalf("check now: %d", code)
+	}
+	h.mu.Lock()
+	next := h.monitors[m.ID].next
+	h.mu.Unlock()
+	if !next.Before(later) || time.Until(next) > 0 {
+		t.Fatalf("next check at %v, want now", next)
+	}
+	if code := c.json("POST", "/api/monitors/"+strconv.FormatInt(push.ID, 10)+"/check", "", nil); code != 400 {
+		t.Fatalf("heartbeat: %d", code)
+	}
+	if code := c.json("POST", "/api/monitors/999999/check", "", nil); code != 404 {
+		t.Fatalf("missing: %d", code)
+	}
+	if code := c.json("POST", "/api/monitors/"+strconv.FormatInt(m.ID, 10)+"/pause", `{"paused":true}`, nil); code != 200 {
+		t.Fatalf("pause: %d", code)
+	}
+	if code := c.json("POST", path, "", nil); code != 409 {
+		t.Fatalf("paused: %d", code)
 	}
 }

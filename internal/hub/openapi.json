@@ -3483,6 +3483,79 @@
         }
       }
     },
+    "/api/monitors/{id}/check": {
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Check now",
+        "operationId": "checkMonitorNow",
+        "description": "Runs the scheduled check right away at every location of the monitor. Unlike `/test`, the results are recorded: they update the status and can open or resolve an incident. Answers at once; read the outcome from `GET /api/monitors/{id}` a few seconds later.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Check scheduled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "monitor_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "scheduled_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix ms."
+                    }
+                  }
+                },
+                "example": {
+                  "monitor_id": 42,
+                  "scheduled_at": 1793635200000
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
     "/api/monitors/{id}/push-token": {
       "post": {
         "tags": [

@@ -268,6 +268,16 @@ func (h *Hub) reloadAll() error {
 }
 
 // MonitorChanged reloads one monitor after an API change (or removes it).
+// CheckNow moves the next check of a monitor to now. The scheduler picks it
+// up on its next tick.
+func (h *Hub) CheckNow(id int64) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if st, ok := h.monitors[id]; ok && !st.m.Paused {
+		st.next = time.Now()
+	}
+}
+
 func (h *Hub) MonitorChanged(id int64) {
 	h.LiveActivitiesChanged() // paused, renamed or deleted: the incidents shown change
 	m, err := h.store.Monitor(id)
