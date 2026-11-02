@@ -205,6 +205,7 @@ export const emptyMonitor: MonitorInput = {
   degraded_pct: 0,
   slow_ms: 0,
   ping_count: 3,
+  ping_loss_pct: 0,
   ip_family: 0,
   diagnostics: 0,
   locations: ["local"],
@@ -647,25 +648,44 @@ export function MonitorForm({
             </>
           )}
           {m.type === "ping" && (
-            <Field
-              label={tr("pingCount")}
-              hint={tr("pingCountHint", {
-                ms: pingTimeout(m.ping_count || 3),
-              })}
-            >
-              <Input
-                type="number"
-                min={1}
-                max={20}
-                value={m.ping_count || 3}
-                onChange={(e) =>
-                  set(
-                    "ping_count",
-                    Math.min(Math.max(Number(e.target.value) || 1, 1), 20)
-                  )
-                }
-              />
-            </Field>
+            <>
+              <Field
+                label={tr("pingCount")}
+                hint={tr("pingCountHint", {
+                  ms: pingTimeout(m.ping_count || 3),
+                })}
+              >
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={m.ping_count || 3}
+                  onChange={(e) =>
+                    set(
+                      "ping_count",
+                      Math.min(Math.max(Number(e.target.value) || 1, 1), 20)
+                    )
+                  }
+                />
+              </Field>
+              <Field label={tr("pingLoss")} hint={tr("pingLossHint")}>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={m.ping_loss_pct ?? 0}
+                  onChange={(e) =>
+                    set(
+                      "ping_loss_pct",
+                      Math.min(
+                        Math.max(Math.round(Number(e.target.value) || 0), 0),
+                        100
+                      )
+                    )
+                  }
+                />
+              </Field>
+            </>
           )}
           {m.type === "dns" && (
             <>

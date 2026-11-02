@@ -698,8 +698,10 @@ var laterMigrations = []migration{
 		FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
-	// 31: echo requests per ping check (0 = default, 3).
+	// 31: echo requests per ping check (0 = default, 3) and the packet
+	// loss (percent) that fails it (0 = only when every packet is lost).
 	{sqlite: `ALTER TABLE monitors ADD COLUMN ping_count INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE monitors ADD COLUMN ping_loss_pct INTEGER NOT NULL DEFAULT 0;
 	UPDATE monitors SET ping_count = 3 WHERE type = 'ping';`},
 }
 

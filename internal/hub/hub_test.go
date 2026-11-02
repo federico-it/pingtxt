@@ -543,6 +543,11 @@ func TestCheckPingCount(t *testing.T) {
 		{check.TypePing, -1, 10000, 0, true},
 		{"http", 5, 10000, 0, false}, // dropped on other types
 	}
+	for _, loss := range []int{-1, 101} {
+		if err := checkPingCount(&store.Monitor{Type: check.TypePing, TimeoutMs: 10000, PingLossPct: loss}); err == nil {
+			t.Errorf("ping_loss_pct %d accepted", loss)
+		}
+	}
 	for _, c := range cases {
 		m := &store.Monitor{Type: c.typ, TimeoutMs: c.timeout, PingCount: c.count}
 		err := checkPingCount(m)
@@ -552,6 +557,20 @@ func TestCheckPingCount(t *testing.T) {
 		if err == nil && m.PingCount != c.wantCount {
 			t.Errorf("%s %d: count %d, want %d", c.typ, c.count, m.PingCount, c.wantCount)
 		}
+	}
+}
+
+func TestOldPingAgent(t *testing.T) {
+	m := &store.Monitor{Type: check.TypePing, PingLossPct: 20}
+	if !oldPingAgent(m, "agent:1", check.Result{OK: true}) {
+		t.Error("old agent result accepted")
+	}
+	if oldPingAgent(m, "agent:1", check.Result{OK: true, PingSent: 3}) || oldPingAgent(m, LocalLocation, check.Result{OK: true}) {
+		t.Error("new agent or hub result refused")
+	}
+	m.PingLossPct = 0
+	if oldPingAgent(m, "agent:1", check.Result{OK: true}) {
+		t.Error("old agent refused without a threshold")
 	}
 }
 

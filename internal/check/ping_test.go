@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
+
+	probing "github.com/prometheus-community/pro-bing"
 )
 
 func TestConfiguredPingMode(t *testing.T) {
@@ -39,5 +42,31 @@ func TestPingCount(t *testing.T) {
 	}
 	if got := MinPingTimeout(3); got != 1100*time.Millisecond {
 		t.Errorf("MinPingTimeout(3) = %v", got)
+	}
+}
+
+func TestPingLossLimit(t *testing.T) {
+	stats := func(sent, recv int) *probing.Statistics {
+		return &probing.Statistics{PacketsSent: sent, PacketsRecv: recv, PacketLoss: float64(sent-recv) / float64(sent) * 100}
+	}
+	cases := []struct {
+		limit, sent, recv int
+		ok                bool
+	}{
+		{0, 10, 1, true},  // no limit: one reply is enough
+		{0, 10, 0, false}, // all lost
+		{50, 10, 6, true}, // 40% < 50%
+		{50, 10, 5, false},
+		{1, 3, 2, false}, // any loss
+		{1, 3, 3, true},
+	}
+	for _, c := range cases {
+		r := pingResult(Job{PingLossPct: c.limit}, stats(c.sent, c.recv), nil)
+		if r.OK != c.ok || r.PingSent != c.sent {
+			t.Errorf("limit %d, %d/%d: ok %v sent %d (%s)", c.limit, c.recv, c.sent, r.OK, r.PingSent, r.Message)
+		}
+		if !c.ok && c.recv > 0 && !strings.Contains(r.Message, "limit") {
+			t.Errorf("limit %d, %d/%d: message %q", c.limit, c.recv, c.sent, r.Message)
+		}
 	}
 }

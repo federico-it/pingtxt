@@ -206,8 +206,19 @@ func checkAgentSupport(m *store.Monitor, loc string, fam int, r check.Result) ch
 	} else if fam != check.IPAny && (r.IPFamily != fam || (fam == check.IPBoth && !r.Both)) {
 		r.OK = false
 		r.Message = "this agent cannot limit checks to IPv4 or IPv6: update it"
+	} else if oldPingAgent(m, loc, r) {
+		r.OK = false
+		r.Message = errOldPingAgent
 	}
 	return r
+}
+
+const errOldPingAgent = "this agent cannot check the packet loss threshold: update it"
+
+// oldPingAgent reports whether an up result for a ping monitor with a packet
+// loss threshold comes from an agent too old to apply it.
+func oldPingAgent(m *store.Monitor, loc string, r check.Result) bool {
+	return m.Type == check.TypePing && m.PingLossPct > 0 && loc != LocalLocation && r.PingSent == 0
 }
 
 // ---------- bulk changes ----------

@@ -48,6 +48,10 @@ Ping monitors send **3 echo requests** per check by default, 300 ms apart; set *
 `9/10 packets, 10% loss`. The timeout covers the whole run, so it must be at least (packets - 1) x 300 + 500 ms.
 Agents older than this setting send 3 packets: update them.
 
+To be stricter, set the **packet loss limit** (API `ping_loss_pct`): the check fails when at least that share of the
+packets is lost, e.g. 50 fails `5/10 packets, 50% loss`. 0 (default) fails only when every packet is lost. Agents
+older than this setting fail the check with "update it" instead of ignoring the limit.
+
 ## Response checks (JSON)
 
 HTTP and keyword monitors can check the JSON body of the response, for example a health endpoint that returns

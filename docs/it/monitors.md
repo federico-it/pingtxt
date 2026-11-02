@@ -49,6 +49,11 @@ I monitor ping inviano di default **3 richieste echo** per controllo, a 300 ms l
 risultato dice quante, ad esempio `9/10 packets, 10% loss`. Il timeout copre tutto l'invio, quindi deve essere almeno
 (pacchetti - 1) x 300 + 500 ms. Gli agent più vecchi di questa impostazione inviano 3 pacchetti: aggiornali.
 
+Per essere più severi imposta il **limite perdita pacchetti** (API `ping_loss_pct`): il controllo fallisce se si perde
+almeno quella quota di pacchetti, ad esempio con 50 fallisce `5/10 packets, 50% loss`. 0 (default) fallisce solo se
+si perdono tutti. Gli agent più vecchi di questa impostazione falliscono il controllo con "update it" invece di
+ignorare il limite.
+
 ## Controlli sulla risposta (JSON)
 
 I monitor HTTP e con parola chiave possono controllare il body JSON della risposta, per esempio un endpoint di health

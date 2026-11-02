@@ -1845,8 +1845,11 @@ const maxPushSlowMs = 3600000
 // (count 0) keeps working with the default whatever its timeout.
 func checkPingCount(m *store.Monitor) error {
 	if m.Type != check.TypePing {
-		m.PingCount = 0
+		m.PingCount, m.PingLossPct = 0, 0
 		return nil
+	}
+	if m.PingLossPct < 0 || m.PingLossPct > 100 {
+		return errors.New("ping_loss_pct must be between 0 (only when every packet is lost) and 100")
 	}
 	explicit := m.PingCount != 0
 	if !explicit {

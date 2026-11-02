@@ -50,7 +50,7 @@ func runPing(ctx context.Context, j Job, timeout time.Duration) Result {
 			if err == nil {
 				pingMode.CompareAndSwap(pingAuto, pingRaw)
 			}
-			return pingResult(r, err)
+			return pingResult(j, r, err)
 		}
 		r, err = ping(ctx, j, timeout, false)
 		if err == nil {
@@ -58,9 +58,10 @@ func runPing(ctx context.Context, j Job, timeout time.Duration) Result {
 		} else if permissionError(err) {
 			return Result{Message: "ping not allowed: needs CAP_NET_RAW or net.ipv4.ping_group_range (" + cleanErr(err) + ")"}
 		}
-		return pingResult(r, err)
+		return pingResult(j, r, err)
 	}
-	return pingResult(ping(ctx, j, timeout, mode == pingRaw))
+	r, err := ping(ctx, j, timeout, mode == pingRaw)
+	return pingResult(j, r, err)
 }
 
 func ping(ctx context.Context, j Job, timeout time.Duration, privileged bool) (*probing.Statistics, error) {
@@ -100,18 +101,24 @@ func MinPingTimeout(count int) time.Duration {
 	return time.Duration(max(count-1, 0))*PingInterval + 500*time.Millisecond
 }
 
-func pingResult(s *probing.Statistics, err error) Result {
+func pingResult(j Job, s *probing.Statistics, err error) Result {
 	if err != nil {
 		return Result{Message: cleanErr(err)}
 	}
 	if s.PacketsRecv == 0 {
-		return Result{Message: fmt.Sprintf("100%% packet loss (%s)", s.IPAddr)}
+		return Result{Message: fmt.Sprintf("100%% packet loss (%s)", s.IPAddr), PingSent: s.PacketsSent}
 	}
-	return Result{
+	r := Result{
 		OK:        true,
 		LatencyMs: ms(s.AvgRtt),
 		Message:   fmt.Sprintf("%d/%d packets, %.0f%% loss", s.PacketsRecv, s.PacketsSent, s.PacketLoss),
+		PingSent:  s.PacketsSent,
 	}
+	if j.PingLossPct > 0 && s.PacketLoss >= float64(j.PingLossPct) {
+		r.OK = false
+		r.Message += fmt.Sprintf(" (limit %d%%)", j.PingLossPct)
+	}
+	return r
 }
 
 // permissionError reports whether opening the ICMP socket was refused.

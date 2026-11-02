@@ -9640,6 +9640,12 @@
             "maximum": 20,
             "description": "ping: echo requests per check, 1 to 20, sent 300 ms apart; 0 or missing = 3. The timeout must be at least (ping_count - 1) x 300 + 500 ms. Agents older than this setting send 3. Always 0 on other types."
           },
+          "ping_loss_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "ping: the check fails when at least this share (percent) of the packets is lost. 0 = only when every packet is lost. Agents older than this setting fail the check with \"update it\". Always 0 on other types."
+          },
           "locations": {
             "type": "array",
             "items": {
