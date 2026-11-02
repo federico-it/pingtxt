@@ -1049,7 +1049,8 @@
       "monitors": "monitor",
       "access": "accesso",
       "integrations": "integrazioni",
-      "data": "dati"
+      "data": "dati",
+      "audit": "registro attività"
     },
     "catHints": {
       "profile": "aspetto, lingua",
@@ -1059,13 +1060,15 @@
       "monitors": "default, degradato, ip, avvisi di scadenza",
       "access": "login, single sign-on, utenti",
       "integrations": "app mobile, metriche prometheus",
-      "data": "esportazione, importazione, backup"
+      "data": "esportazione, importazione, backup",
+      "audit": "chi ha cambiato cosa"
     },
     "adminOnly": "solo gli admin possono modificare queste impostazioni.",
     "unsaved": "modifiche non salvate",
     "discard": "scarta",
     "save": "salva",
-    "unsavedLeave": "Hai modifiche non salvate nelle impostazioni. Uscire senza salvare?"
+    "unsavedLeave": "Hai modifiche non salvate nelle impostazioni. Uscire senza salvare?",
+    "activity": "attività recente"
   },
   "generalSettings": {
     "saved": "impostazioni salvate",
@@ -1107,7 +1110,9 @@
     "degradedPct": "degradato da (% di località)",
     "degradedPctHint": "degradato quando fallisce almeno questa quota delle località online di un monitor, down quando ne fallisce più della metà. ogni monitor può cambiarla",
     "ipFamily": "versione ip",
-    "ipFamilyHint": "come i monitor controllano gli host dual-stack, se non impostano la propria. le località senza IPv6 controllano via IPv4"
+    "ipFamilyHint": "come i monitor controllano gli host dual-stack, se non impostano la propria. le località senza IPv6 controllano via IPv4",
+    "auditRetention": "conserva il registro attività (giorni)",
+    "auditRetentionHint": "Giorni per cui il registro attività conserva le voci, da 30 a 3650."
   },
   "authSettings": {
     "title": "autenticazione",
@@ -1509,5 +1514,60 @@
     "channelOff": "disattivato",
     "viaAll": "tutti i monitor",
     "viaLabels": "gruppo o tag"
+  },
+  "audit": {
+    "intro": "Chi ha cambiato cosa, quando e da dove: interfaccia web, token API, client MCP, app mobile, l'hub stesso e la riga di comando. I segreti non vengono mai salvati: una password o un token cambiati appaiono come ********. Solo gli admin vedono questa pagina.",
+    "error": "errore",
+    "filters": "filtri",
+    "entries": "voci",
+    "period": "periodo",
+    "periods": {
+      "24h": "ultime 24 ore",
+      "7d": "ultimi 7 giorni",
+      "30d": "ultimi 30 giorni",
+      "90d": "ultimi 90 giorni",
+      "all": "tutto"
+    },
+    "user": "utente",
+    "allUsers": "tutti gli utenti",
+    "noUser": "nessun utente (hub, cli, email sconosciuta)",
+    "source": "origine",
+    "allSources": "tutte le origini",
+    "sources": {
+      "web": "web",
+      "api": "token api",
+      "mcp": "mcp",
+      "app": "app mobile",
+      "system": "hub",
+      "cli": "riga di comando"
+    },
+    "action": "azione",
+    "allActions": "tutte le azioni",
+    "search": "cerca email, nome, token, ip",
+    "problemsOnly": "solo negati e falliti",
+    "sameRequest": "stessa richiesta",
+    "clear": "rimuovi",
+    "results": {
+      "ok": "ok",
+      "denied": "negato",
+      "failed": "fallito"
+    },
+    "empty": "nessuna voce con questi filtri.",
+    "more": "carica altre",
+    "exportCsv": "esporta csv",
+    "exportJsonl": "esporta jsonl",
+    "ip": "ip",
+    "connection": "connessione",
+    "credential": "token / app",
+    "tool": "tool mcp",
+    "userAgent": "user agent",
+    "target": "oggetto",
+    "ipFromHeader": "l'ip viene da un header del proxy: è mostrato anche l'indirizzo della connessione, nel caso l'header fosse falsificato.",
+    "showRequest": "mostra tutte le voci di questa richiesta",
+    "changes": "modifiche",
+    "fullLog": "registro completo",
+    "noChanges": "ancora nessuna modifica registrata.",
+    "activityIntro": "I tuoi accessi, le modifiche alla verifica in due passaggi, i token api e gli accessi delle app degli ultimi 30 giorni. Qualcosa che non riconosci? Cambia la password e revoca i token e le app che non usi.",
+    "noActivity": "niente negli ultimi 30 giorni."
   }
 }

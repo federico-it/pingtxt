@@ -170,6 +170,22 @@ export function InstanceForm({ settings, onSaved }: FormProps) {
               }
             />
           </Field>
+          <Field
+            label={t("auditRetention")}
+            htmlFor="audit_retention"
+            hint={t("auditRetentionHint")}
+          >
+            <Input
+              id="audit_retention"
+              type="number"
+              min={30}
+              max={3650}
+              value={g.audit_retention_days}
+              onChange={(e) =>
+                set("audit_retention_days", Number(e.target.value))
+              }
+            />
+          </Field>
         </div>
       </Section>
       <Section title={t("updates")}>

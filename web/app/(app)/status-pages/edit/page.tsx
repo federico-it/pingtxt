@@ -6,6 +6,7 @@ import { useTranslations } from "use-intl"
 
 import { AdminOnly } from "@/components/admin-only"
 import { PageHeader } from "@/components/page-header"
+import { AuditTrail } from "@/components/settings/audit-log"
 import { StatusPageForm } from "@/components/status-page-form"
 import { useApi, type StatusPage } from "@/lib/api"
 
@@ -28,6 +29,7 @@ function Edit() {
     <>
       <PageHeader cmd={`pingtxt status-pages edit ${id}`} title={t("editTitle", { name: data.title })} />
       <StatusPageForm initial={data} key={data.id} />
+      <AuditTrail type="page" id={id} />
     </>
   )
 }

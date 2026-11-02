@@ -767,7 +767,7 @@ var auditSecretKeyRe = regexp.MustCompile(`(?i)(^|_)(password|passwd|secret|toke
 var auditVolatile = map[string]bool{
 	"status": true, "status_since": true, "last_seen": true, "last_seen_at": true, "last_used_at": true,
 	"updated_at": true, "created_at": true, "version": true, "hostname": true, "platform": true,
-	"remote_addr": true, "ipv6": true, "online": true, "connected": true,
+	"remote_addr": true, "ipv6": true, "online": true, "connected": true, "id": true,
 }
 
 // auditTree turns a value into JSON-like maps with secrets replaced by marks.

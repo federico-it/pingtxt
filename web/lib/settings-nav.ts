@@ -13,6 +13,7 @@ export const settingsCategories = [
   { slug: "access", admin: true },
   { slug: "integrations", admin: true },
   { slug: "data", admin: true },
+  { slug: "audit", admin: true },
 ] as const
 
 export type SettingsCategory = (typeof settingsCategories)[number]["slug"]

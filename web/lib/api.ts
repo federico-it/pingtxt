@@ -498,6 +498,37 @@ export interface GeneralSettings {
   degraded_pct: number
   ip_family: Exclude<IPFamily, 0>
   update_check: { disabled: boolean }
+  /** days the audit log keeps its entries (30-3650) */
+  audit_retention_days: number
+}
+
+export type AuditSource = "web" | "api" | "mcp" | "app" | "system" | "cli"
+export const auditSources: AuditSource[] = ["web", "api", "mcp", "app", "system", "cli"]
+
+/** One line of the audit log (admins only, see /api/audit). */
+export interface AuditEntry {
+  id: number
+  at: number
+  /** 0 = the hub, the command line or an unknown email */
+  user_id: number
+  user_email: string
+  source: AuditSource
+  /** API token (with its last characters) or OAuth app */
+  credential: string
+  /** MCP tool */
+  via: string
+  ip: string
+  remote_addr: string
+  user_agent: string
+  /** <object>.<verb>, e.g. monitor.update */
+  action: string
+  target_type: string
+  target_id: number
+  target_name: string
+  result: "ok" | "denied" | "failed"
+  /** {"field": [before, after]}; keys starting with _ are details */
+  changes?: Record<string, unknown>
+  request_id: string
 }
 
 /** Anonymous usage stats (admins only), see /api/telemetry. */

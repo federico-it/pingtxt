@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
 import { MonitorBadges } from "@/components/badge-info"
+import { AuditTrail } from "@/components/settings/audit-log"
 import { ExpiryTable } from "@/components/expiry"
 import { PushInfo } from "@/components/push-info"
 import { LatencyChart } from "@/components/latency-chart"
@@ -435,6 +436,8 @@ function View() {
       </Section>
 
       <MonitorBadges monitorId={id} groupId={d.group_id} />
+
+      <AuditTrail type="monitor" id={id} />
 
       <ResultsLog
         monitorId={id}
