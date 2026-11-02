@@ -37,11 +37,12 @@ func mailSamples(t *testing.T) map[string]fakeMail {
 			{Name: "website", Uptime: 1, PrevUptime: 0.9992, AvgMs: 318, Incidents: 0},
 		}, IncidentList: []ReportIncident{
 			{Monitor: "api", StartedAt: from.Add(34 * time.Hour).UnixMilli(), ResolvedAt: 1, DurationMs: 7 * 3600_000, Cause: "timeout after 10s"},
-			{Monitor: "api", StartedAt: from.Add(130 * time.Hour).UnixMilli(), Cause: "http 502: Bad Gateway"},
+			{Monitor: "api", StartedAt: from.Add(130 * time.Hour).UnixMilli(), Cause: "Get \"https://api.example.com/v2/health\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)"},
 		}},
 		{Name: "No group", Uptime: 0.9995, PrevUptime: 1, Incidents: 1, DowntimeMs: 30 * 60_000, Monitors: []ReportMonitor{
 			{Name: "gateway ping", Uptime: 0.9995, PrevUptime: 1, AvgMs: 0.3, Incidents: 1, DowntimeMs: 30 * 60_000},
 			{Name: "dns cloudflare", Uptime: 1, PrevUptime: 1, AvgMs: 6.4},
+			{Name: "https://status-endpoint.internal.example.com/v2/health", Uptime: 1, PrevUptime: 1, AvgMs: 1240},
 		}, IncidentList: []ReportIncident{
 			{Monitor: "gateway ping", StartedAt: from.Add(80 * time.Hour).UnixMilli(), ResolvedAt: 1, DurationMs: 30 * 60_000, Cause: "100% packet loss"},
 		}},

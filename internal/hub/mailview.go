@@ -122,8 +122,6 @@ a{color:inherit}
 }
 @media (max-width:600px){
 .pt-pad{padding-left:16px!important;padding-right:16px!important}
-.pt-hide{display:none!important}
-.pt-key{width:96px!important}
 }
 </style>
 </head>
@@ -141,15 +139,15 @@ a{color:inherit}
 <tr><td class="pt-pad" style="padding:28px 24px 8px">
 {{if .Command}}<div class="pt-mu" style="color:#6a6966;font-size:12px">$ {{.Command}}</div>{{end}}
 <h1 class="pt-fg" style="margin:4px 0 0;font-size:18px;line-height:1.4;font-weight:700;color:#171613;word-break:break-word">{{if .Badge}}<span class="pt-{{.Tone}}" style="color:{{tone .Tone}}">[{{.Badge}}]</span> {{end}}{{.Title}}</h1>
-{{if .Lead}}<p style="margin:12px 0 0">{{.Lead}}</p>{{end}}
-{{if .Note}}<div class="pt-box pt-bl-{{.Tone}}" style="margin:18px 0 0;padding:10px 14px;background:#efeeec;border-left:2px solid {{tone .Tone}};white-space:pre-wrap;word-break:break-word">{{.Note}}</div>{{end}}
+{{if .Lead}}<p style="margin:12px 0 0;word-break:break-word;overflow-wrap:anywhere">{{.Lead}}</p>{{end}}
+{{if .Note}}<div class="pt-box pt-bl-{{.Tone}}" style="margin:18px 0 0;padding:10px 14px;background:#efeeec;border-left:2px solid {{tone .Tone}};white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere">{{.Note}}</div>{{end}}
 {{if .Rows}}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0">
-{{range .Rows}}<tr><td class="pt-mu pt-bd pt-key" valign="top" style="width:128px;padding:7px 12px 7px 0;color:#6a6966;border-top:1px dashed #d8d7d4;white-space:nowrap">{{.Key}}</td><td class="pt-bd{{if .Tone}} pt-{{.Tone}}{{end}}" valign="top" style="padding:7px 0;border-top:1px dashed #d8d7d4;word-break:break-word{{if .Tone}};color:{{tone .Tone}};font-weight:700{{end}}">{{if .Href}}<a href="{{.Href}}" class="pt-fg" style="color:#171613;text-decoration:underline">{{.Value}}</a>{{else}}{{.Value}}{{end}}</td></tr>
+{{range .Rows}}<tr><td class="pt-mu pt-bd" valign="top" width="1%" style="width:1%;padding:7px 12px 7px 0;color:#6a6966;border-top:1px dashed #d8d7d4;white-space:nowrap">{{.Key}}</td><td class="pt-bd{{if .Tone}} pt-{{.Tone}}{{end}}" valign="top" style="padding:7px 0;border-top:1px dashed #d8d7d4;word-break:break-word;overflow-wrap:anywhere{{if .Tone}};color:{{tone .Tone}};font-weight:700{{end}}">{{if .Href}}<a href="{{.Href}}" class="pt-fg" style="color:#171613;text-decoration:underline">{{.Value}}</a>{{else}}{{.Value}}{{end}}</td></tr>
 {{end}}<tr><td class="pt-bd" colspan="2" style="border-top:1px dashed #d8d7d4;font-size:0;line-height:0">&nbsp;</td></tr>
 </table>{{end}}
 {{range .Sections}}<div class="pt-mu" style="margin:22px 0 0;color:#6a6966;font-size:12px"># {{.Title}}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 0">
-{{range .Rows}}<tr><td class="pt-mu pt-bd pt-key" valign="top" style="width:128px;padding:5px 12px 5px 0;color:#6a6966;border-top:1px dashed #d8d7d4;white-space:nowrap;font-size:12px">{{.Key}}</td><td class="pt-bd{{if .Tone}} pt-{{.Tone}}{{end}}" valign="top" style="padding:5px 0;border-top:1px dashed #d8d7d4;word-break:break-all;font-size:12px{{if .Tone}};color:{{tone .Tone}};font-weight:700{{end}}">{{.Value}}</td></tr>
+{{range .Rows}}<tr><td class="pt-mu pt-bd" valign="top" width="1%" style="width:1%;padding:5px 12px 5px 0;color:#6a6966;border-top:1px dashed #d8d7d4;white-space:nowrap;font-size:12px">{{.Key}}</td><td class="pt-bd{{if .Tone}} pt-{{.Tone}}{{end}}" valign="top" style="padding:5px 0;border-top:1px dashed #d8d7d4;word-break:break-all;font-size:12px{{if .Tone}};color:{{tone .Tone}};font-weight:700{{end}}">{{.Value}}</td></tr>
 {{end}}<tr><td class="pt-bd" colspan="2" style="border-top:1px dashed #d8d7d4;font-size:0;line-height:0">&nbsp;</td></tr>
 </table>{{end}}
 {{block "extra" .Data}}{{end}}

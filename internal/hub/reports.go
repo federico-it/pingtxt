@@ -614,35 +614,24 @@ var reportMailHTML = template.Must(template.Must(mailLayout.Clone()).Funcs(templ
 	"cap": func(l []ReportIncident) []ReportIncident { return l[:min(len(l), maxReportIncidents)] },
 }).Parse(`{{define "extra"}}{{$loc := .Loc}}{{range .R.Groups}}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:32px 0 0">
-<tr><td class="pt-fg" style="font-weight:700;font-size:14px;color:#171613;word-break:break-word">## {{.Name}}</td>
+<tr><td class="pt-fg" style="font-weight:700;font-size:14px;color:#171613;word-break:break-word;overflow-wrap:anywhere">## {{.Name}}</td>
 <td align="right" class="pt-{{utone .Uptime}}" style="font-weight:700;font-size:14px;white-space:nowrap;color:{{tone (utone .Uptime)}}">{{pct .Uptime}}</td></tr>
-<tr><td colspan="2" class="pt-mu" style="color:#6a6966;font-size:12px;padding:2px 0 8px">prev {{pct .PrevUptime}} &middot; {{plural .Incidents "incident"}} &middot; {{duration .DowntimeMs}} down</td></tr>
+<tr><td colspan="2" class="pt-mu" style="color:#6a6966;font-size:12px;padding:2px 0 8px"><span style="white-space:nowrap">prev {{pct .PrevUptime}}</span> &middot; <span style="white-space:nowrap">{{plural .Incidents "incident"}}</span> &middot; <span style="white-space:nowrap">{{duration .DowntimeMs}} down</span></td></tr>
 </table>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr class="pt-mu" style="color:#6a6966;font-size:11px;letter-spacing:0.04em">
-<td class="pt-bd" width="100%" style="padding:6px 8px 6px 0;border-top:1px dashed #d8d7d4">NAME</td>
-<td class="pt-bd" align="right" style="padding:6px 8px;border-top:1px dashed #d8d7d4">UPTIME</td>
-<td class="pt-bd pt-hide" align="right" style="padding:6px 8px;border-top:1px dashed #d8d7d4">PREV</td>
-<td class="pt-bd pt-hide" align="right" style="padding:6px 8px;border-top:1px dashed #d8d7d4">AVG</td>
-<td class="pt-bd" align="right" style="padding:6px 8px;border-top:1px dashed #d8d7d4">INC</td>
-<td class="pt-bd" align="right" style="padding:6px 0 6px 8px;border-top:1px dashed #d8d7d4">DOWN</td></tr>
-{{range .Monitors}}<tr>
-<td class="pt-bd" style="padding:7px 8px 7px 0;border-top:1px dashed #d8d7d4;word-break:break-word"><span class="pt-{{utone .Uptime}}" style="color:{{tone (utone .Uptime)}}">&#9679;</span> {{clip .Name 48}}</td>
-<td class="pt-bd pt-{{utone .Uptime}}" align="right" style="padding:7px 8px;border-top:1px dashed #d8d7d4;white-space:nowrap;color:{{tone (utone .Uptime)}}">{{pct .Uptime}}</td>
-<td class="pt-bd pt-mu pt-hide" align="right" style="padding:7px 8px;border-top:1px dashed #d8d7d4;white-space:nowrap;color:#6a6966">{{pct .PrevUptime}}</td>
-<td class="pt-bd pt-hide" align="right" style="padding:7px 8px;border-top:1px dashed #d8d7d4;white-space:nowrap">{{avg .AvgMs}}{{if gt .AvgMs 0.0}}<span class="pt-mu" style="color:#6a6966">ms</span>{{end}}</td>
-<td class="pt-bd" align="right" style="padding:7px 8px;border-top:1px dashed #d8d7d4">{{.Incidents}}</td>
-<td class="pt-bd" align="right" style="padding:7px 0 7px 8px;border-top:1px dashed #d8d7d4;white-space:nowrap">{{duration .DowntimeMs}}</td></tr>
-{{end}}<tr><td class="pt-bd" colspan="6" style="border-top:1px dashed #d8d7d4;font-size:0;line-height:0">&nbsp;</td></tr>
+{{range .Monitors}}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr><td class="pt-bd" valign="top" style="padding:8px 8px 0 0;border-top:1px dashed #d8d7d4;word-break:break-word;overflow-wrap:anywhere"><span class="pt-{{utone .Uptime}}" style="color:{{tone (utone .Uptime)}}">&#9679;</span> {{clip .Name 48}}</td>
+<td class="pt-bd pt-{{utone .Uptime}}" valign="top" align="right" style="padding:8px 0 0 8px;border-top:1px dashed #d8d7d4;white-space:nowrap;font-weight:700;color:{{tone (utone .Uptime)}}">{{pct .Uptime}}</td></tr>
+<tr><td colspan="2" class="pt-mu" style="padding:2px 0 8px 18px;color:#6a6966;font-size:12px"><span style="white-space:nowrap">prev {{pct .PrevUptime}}</span> &middot; <span style="white-space:nowrap">avg {{avg .AvgMs}}{{if gt .AvgMs 0.0}}ms{{end}}</span>{{if .Incidents}} &middot; <span style="white-space:nowrap">{{plural .Incidents "incident"}}</span> &middot; <span style="white-space:nowrap">{{duration .DowntimeMs}} down</span>{{end}}</td></tr>
 </table>
+{{end}}<div class="pt-bd" style="border-top:1px dashed #d8d7d4;font-size:0;line-height:0">&nbsp;</div>
 {{if .IncidentList}}<div class="pt-mu" style="color:#6a6966;font-size:11px;letter-spacing:0.04em;margin:16px 0 0;padding-bottom:6px">INCIDENTS</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-{{range cap .IncidentList}}<tr>
-<td class="pt-bd pt-mu" valign="top" style="padding:7px 12px 7px 0;border-top:1px dashed #d8d7d4;white-space:nowrap;color:#6a6966">{{when . $loc}}</td>
-<td class="pt-bd" valign="top" width="100%" style="padding:7px 8px;border-top:1px dashed #d8d7d4;word-break:break-word">{{clip .Monitor 48}}{{if .Cause}}<div class="pt-mu" style="color:#6a6966;font-size:12px">&gt; {{clip .Cause 120}}</div>{{end}}</td>
-<td class="pt-bd{{if not .ResolvedAt}} pt-down{{end}}" valign="top" align="right" style="padding:7px 0 7px 8px;border-top:1px dashed #d8d7d4;white-space:nowrap{{if not .ResolvedAt}};color:#d72828{{end}}">{{length .}}</td></tr>
-{{end}}<tr><td class="pt-bd" colspan="3" style="border-top:1px dashed #d8d7d4;font-size:0;line-height:0">&nbsp;</td></tr>
-</table>{{if gt (more .IncidentList) 0}}<div class="pt-mu" style="color:#6a6966;padding-top:6px">... and {{more .IncidentList}} more</div>{{end}}{{end}}
+{{range cap .IncidentList}}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr><td class="pt-bd" valign="top" style="padding:8px 8px 0 0;border-top:1px dashed #d8d7d4;word-break:break-word;overflow-wrap:anywhere">{{clip .Monitor 48}}</td>
+<td class="pt-bd{{if not .ResolvedAt}} pt-down{{end}}" valign="top" align="right" style="padding:8px 0 0 8px;border-top:1px dashed #d8d7d4;white-space:nowrap{{if not .ResolvedAt}};color:#d72828{{end}}">{{length .}}</td></tr>
+<tr><td colspan="2" class="pt-mu" style="padding:2px 0 8px;color:#6a6966;font-size:12px;word-break:break-word;overflow-wrap:anywhere">{{when . $loc}}{{if .Cause}}<br>&gt; {{clip .Cause 120}}{{end}}</td></tr>
+</table>
+{{end}}<div class="pt-bd" style="border-top:1px dashed #d8d7d4;font-size:0;line-height:0">&nbsp;</div>
+{{if gt (more .IncidentList) 0}}<div class="pt-mu" style="color:#6a6966;padding-top:6px">... and {{more .IncidentList}} more</div>{{end}}{{end}}
 {{end}}{{end}}`))
 
 // reportMailView lays out a report email.
