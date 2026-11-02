@@ -7,7 +7,7 @@ import { useTranslations } from "use-intl"
 import { Button } from "@/components/ui/button"
 import { api, useApi, type TelemetryStatus } from "@/lib/api"
 
-export const TELEMETRY_DOCS = "https://pingtxt.com/docs/#usage-stats"
+export const TELEMETRY_DOCS = "https://pingtxt.com/docs/administration/#usage-stats"
 
 /** Usage stats status for admins (null for read-only users). */
 export function useTelemetry(isAdmin: boolean) {

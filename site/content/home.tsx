@@ -5,6 +5,7 @@ import { CopyBlock } from "@/components/copy-block"
 import { Shot } from "@/components/shot"
 import { Prompt, REPO, SectionTitle } from "@/components/site-shell"
 import { UsageStats } from "@/components/usage-stats"
+import { docHref } from "@/lib/docs"
 import { localePath, tx, type Lang } from "@/lib/i18n"
 import { jsonLd, NAME, pageMeta, softwareJsonLd } from "@/lib/seo"
 
@@ -273,7 +274,7 @@ export function HomePage({ lang }: { lang: Lang }) {
         </div>
       </section>
 
-      <UsageStats />
+      <UsageStats docsHref={docHref(lang, "administration", "usage-stats")} />
 
       <section id="install" className="space-y-6">
         <SectionTitle>{t("install", "installazione")}</SectionTitle>

@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 
 import { Prompt, REPO, SectionTitle } from "@/components/site-shell"
 import { localePath, tx, type Lang } from "@/lib/i18n"
+import { docHref } from "@/lib/docs"
 import { pageMeta } from "@/lib/seo"
 
 // Every text is t(english, italiano). When you change one, change the other,
@@ -471,12 +472,12 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
               <>
                 The self-hosted hub can send anonymous usage stats (a random id, its version and how many monitors and agents
                 are live) once an hour, only if an admin turns it on. It is not part of the app. See{" "}
-                <A href={localePath(lang, "/docs/#usage-stats")}>usage stats</A> in the docs.
+                <A href={docHref(lang, "administration", "usage-stats")}>usage stats</A> in the docs.
               </>,
               <>
                 L&apos;hub self-hosted può inviare statistiche d&apos;uso anonime (un id casuale, la sua versione e quanti
                 monitor e agent sono attivi) una volta all&apos;ora, solo se un admin lo attiva. Non fa parte dell&apos;app.
-                Vedi <A href={localePath(lang, "/docs/#usage-stats")}>statistiche d&apos;uso</A> nella documentazione.
+                Vedi <A href={docHref(lang, "administration", "usage-stats")}>statistiche d&apos;uso</A> nella documentazione.
               </>,
             )}
           </p>

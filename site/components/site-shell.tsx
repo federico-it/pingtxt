@@ -33,9 +33,9 @@ export function SiteShell({ lang, notFound, children }: { lang: Lang; notFound?:
             github.com/federico-it/pingtxt
           </a>{" "}
           ·{" "}
-          <Link href={p("/docs/#contributing")} className={footLink}>
+          <a href={`${REPO}/blob/main/CONTRIBUTING.md`} className={footLink}>
             {t("contributing", "contribuire")}
-          </Link>{" "}
+          </a>{" "}
           ·{" "}
           <a href={`${REPO}/blob/main/SECURITY.md`} className={footLink}>
             {t("security", "sicurezza")}

@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react"
 
-import { useLang, useT } from "@/components/lang"
+import { useT } from "@/components/lang"
 import { SectionTitle } from "@/components/site-shell"
-import { localePath } from "@/lib/i18n"
 
 // Totals from the opt-in usage stats of self-hosted hubs, served by
 // pingtxt-telemetry (public JSON, cross-origin reads allowed).
@@ -32,10 +31,10 @@ function useLive(): Live | null {
 
 
 // UsageStats shows live hubs, monitors and agents. Hidden until the service
-// answers with at least one hub.
-export function UsageStats() {
+// answers with at least one hub. docsHref is the usage stats section of the
+// docs, worked out on the server (lib/docs reads files).
+export function UsageStats({ docsHref }: { docsHref: string }) {
   const live = useLive()
-  const lang = useLang()
   const t = useT()
   if (!live || live.instances < 1) return null
   const items: [number, string][] = [
@@ -59,7 +58,7 @@ export function UsageStats() {
           "Live numbers from hubs whose admins chose to share anonymous usage stats.",
           "Numeri in tempo reale dagli hub i cui admin hanno scelto di condividere statistiche d'uso anonime.",
         )}{" "}
-        <a href={localePath(lang, "/docs/#usage-stats")} className="underline underline-offset-4 hover:text-foreground">
+        <a href={docsHref} className="underline underline-offset-4 hover:text-foreground">
           {t("what is sent", "cosa viene inviato")}
         </a>{" "}
         ·{" "}
