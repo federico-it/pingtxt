@@ -703,6 +703,10 @@ var laterMigrations = []migration{
 	{sqlite: `ALTER TABLE monitors ADD COLUMN ping_count INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE monitors ADD COLUMN ping_loss_pct INTEGER NOT NULL DEFAULT 0;
 	UPDATE monitors SET ping_count = 3 WHERE type = 'ping';`},
+	// 32: look of a status page (colors, font, shape, header and footer
+	// texts, custom CSS) as JSON, "" = the default look.
+	{sqlite: `ALTER TABLE status_pages ADD COLUMN theme TEXT NOT NULL DEFAULT ''`,
+		mysql: `ALTER TABLE status_pages ADD COLUMN theme MEDIUMTEXT NOT NULL DEFAULT ('')`},
 }
 
 func sqliteOnly(list []string) []migration {

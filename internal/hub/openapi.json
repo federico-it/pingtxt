@@ -10549,6 +10549,9 @@
             "type": "boolean",
             "description": "Show only the logo in the page header, without the page name (it stays the browser tab title). Ignored when the page has no logo."
           },
+          "theme": {
+            "$ref": "#/components/schemas/PageTheme"
+          },
           "logo": {
             "$ref": "#/components/schemas/PageLogo",
             "readOnly": true,
@@ -10624,6 +10627,10 @@
           "hide_title": {
             "type": "boolean",
             "description": "Show only the logo in the header."
+          },
+          "theme": {
+            "$ref": "#/components/schemas/PageTheme",
+            "description": "Present when the page does not use the default look."
           },
           "published": {
             "type": "boolean"
@@ -12176,6 +12183,212 @@
           },
           "data": {
             "$ref": "#/components/schemas/Diag"
+          }
+        }
+      },
+      "PageColors": {
+        "type": "object",
+        "description": "Colors of one theme as #rrggbb. Empty or left out = the default color.",
+        "properties": {
+          "background": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$",
+            "description": "Page background."
+          },
+          "surface": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$",
+            "description": "Cards, group headers and fields."
+          },
+          "text": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$",
+            "description": "Main text."
+          },
+          "muted": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$",
+            "description": "Secondary text."
+          },
+          "border": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$",
+            "description": "Lines and borders."
+          },
+          "accent": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$",
+            "description": "Primary color: buttons, links, the colored header. Text on it turns black or white by itself."
+          },
+          "up": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$",
+            "description": "Operational."
+          },
+          "degraded": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$",
+            "description": "Degraded."
+          },
+          "down": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$",
+            "description": "Down and outages."
+          }
+        }
+      },
+      "PageLink": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "url": {
+            "type": "string",
+            "description": "http://, https:// or mailto: address."
+          }
+        },
+        "required": [
+          "label",
+          "url"
+        ]
+      },
+      "PageTheme": {
+        "type": "object",
+        "description": "Look of a status page. Every field is optional: left out = the default look of pingtxt.",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "",
+              "light",
+              "dark"
+            ],
+            "description": "Force a theme. Empty = the visitor's choice."
+          },
+          "light": {
+            "$ref": "#/components/schemas/PageColors"
+          },
+          "dark": {
+            "$ref": "#/components/schemas/PageColors"
+          },
+          "font": {
+            "type": "string",
+            "enum": [
+              "",
+              "plex",
+              "figtree",
+              "atkinson",
+              "serif",
+              "system"
+            ],
+            "description": "Empty = JetBrains Mono, plex = IBM Plex Sans, atkinson = Atkinson Hyperlegible Next, serif = Source Serif 4, system = the visitor's system font. Fonts are served by the hub, no third party."
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "",
+              "s",
+              "l"
+            ],
+            "description": "Text size, empty = medium."
+          },
+          "radius": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 24,
+            "description": "Corner radius in px. Left out = 2."
+          },
+          "style": {
+            "type": "string",
+            "enum": [
+              "",
+              "solid",
+              "cards"
+            ],
+            "description": "Empty = dashed lines."
+          },
+          "density": {
+            "type": "string",
+            "enum": [
+              "",
+              "compact",
+              "airy"
+            ]
+          },
+          "width": {
+            "type": "string",
+            "enum": [
+              "",
+              "wide"
+            ]
+          },
+          "bars": {
+            "type": "string",
+            "enum": [
+              "",
+              "round",
+              "thin"
+            ],
+            "description": "Shape of the uptime bars, empty = blocks."
+          },
+          "header_style": {
+            "type": "string",
+            "enum": [
+              "",
+              "band"
+            ],
+            "description": "band = header painted with the accent color."
+          },
+          "header_align": {
+            "type": "string",
+            "enum": [
+              "",
+              "center"
+            ]
+          },
+          "tagline": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Line under the page name."
+          },
+          "header_links": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "$ref": "#/components/schemas/PageLink"
+            }
+          },
+          "notice": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Highlighted message above the status. Light Markdown: **bold**, *italic*, [text](url)."
+          },
+          "footer_text": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Free text in the footer, light Markdown like notice."
+          },
+          "footer_links": {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+              "$ref": "#/components/schemas/PageLink"
+            }
+          },
+          "hide_powered_by": {
+            "type": "boolean",
+            "description": "Remove \"powered by pingtxt\" from the footer."
+          },
+          "logo_favicon": {
+            "type": "boolean",
+            "description": "Use the page logo as the browser tab icon."
+          },
+          "css": {
+            "type": "string",
+            "maxLength": 32768,
+            "description": "Custom CSS added to the page as is. Stable class names: pt-page, pt-header, pt-notice, pt-banner, pt-section, pt-monitor, pt-group, pt-footer."
           }
         }
       }

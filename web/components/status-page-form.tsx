@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { LogoImage, StatusPageView } from "@/components/status-page-view"
+import { PageThemeFields } from "@/components/status-page-theme"
 import { api, apiRaw, useApi, type Monitor, type Notifier, type PageLogo, type PublicStatusPage, type StatusPage } from "@/lib/api"
 import { useUnsavedGuard } from "@/hooks/use-unsaved-guard"
 import { useMounted, useNow } from "@/hooks/use-now"
@@ -37,6 +38,7 @@ const empty: Draft = {
   group_ids: [],
   subscribe_notifier_id: 0,
   protected: false,
+  theme: { light: {}, dark: {} },
 }
 
 function slugify(s: string) {
@@ -53,7 +55,13 @@ function slugify(s: string) {
 function toDraft(p: StatusPage): Draft {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { id, created_at, logo, ...rest } = p
-  return { ...rest, group_ids: p.group_ids ?? [], header_url: p.header_url ?? "", hide_title: !!p.hide_title }
+  return {
+    ...rest,
+    group_ids: p.group_ids ?? [],
+    header_url: p.header_url ?? "",
+    hide_title: !!p.hide_title,
+    theme: { ...p.theme, light: p.theme?.light ?? {}, dark: p.theme?.dark ?? {} },
+  }
 }
 
 export function StatusPageForm({ initial }: { initial?: StatusPage }) {
@@ -216,6 +224,8 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
           )}
         </div>
       </Section>
+
+      <PageThemeFields value={d.theme ?? empty.theme!} onChange={(v) => set("theme", v)} hasLogo={!!logo} />
 
       <Section title={t("subscribeTitle")}>
         <div className="grid gap-4 sm:grid-cols-2">

@@ -33,6 +33,40 @@ visitatori. Agli utenti con accesso non serve mai.
   ridimensionate e servite come AVIF e WebP; i file SVG restano vettoriali, senza script.
 - **mostra solo il logo**: per i loghi che contengono già il nome. Il nome resta il titolo della scheda del browser.
 
+## Aspetto
+
+La sezione **aspetto** cambia come appare la pagina; l'anteprima mostra ogni modifica prima di salvare.
+
+- **preset**: un aspetto pronto (pingtxt, pulito, aziendale, morbido, editoriale, alto contrasto). Imposta colori,
+  font e forma e tiene testi e link. Poi puoi cambiare qualsiasi cosa.
+- **tema**: scelto dal visitatore (con il pulsante chiaro/scuro) oppure sempre chiaro o sempre scuro.
+- **colori**: sfondo, superfici, testo, testo secondario, bordi, colore primario e i tre colori di stato, per il
+  tema chiaro e quello scuro. I colori vuoti restano quelli predefiniti. Il testo sul colore primario diventa nero
+  o bianco da solo, e l'editor mostra il contrasto WCAG dei colori del testo. **colori di stato per daltonici**
+  sostituisce verde e rosso con blu e arancio.
+- **font**: JetBrains Mono, IBM Plex Sans, Figtree, Atkinson Hyperlegible, Source Serif 4 o il font di sistema del
+  visitatore, in tre dimensioni. I font sono serviti dall'hub, mai da terzi.
+- **angoli, linee, densità, larghezza, barre uptime**: angoli netti o arrotondati (0-24 px), linee tratteggiate o
+  continue oppure schede, spaziatura compatta o ariosa, pagina stretta o larga, barre a blocchi, arrotondate o
+  sottili.
+- **intestazione**: semplice o una fascia del colore primario, a sinistra o centrata, un sottotitolo e fino a 6
+  link.
+- **avviso**: un messaggio in evidenza sopra lo stato, per esempio un intervento programmato.
+- **footer**: testo libero e fino a 12 link, per esempio dati dell'azienda, contatti e privacy policy. **nascondi
+  "powered by pingtxt"** toglie la riga del credito.
+- **usa il logo come icona della scheda**.
+
+Avviso e testo del footer accettano Markdown semplice: `**grassetto**`, `*corsivo*`, `[testo](https://…)` e una
+riga vuota per un nuovo paragrafo. I link devono essere indirizzi `http://`, `https://` o `mailto:`.
+
+Il **CSS personalizzato** viene aggiunto così com'è alla pagina pubblica, per tutto ciò che le opzioni non coprono.
+Queste classi sono stabili: `.pt-page`, `.pt-header`, `.pt-brand`, `.pt-tagline`, `.pt-notice`, `.pt-banner`,
+`.pt-section`, `.pt-list`, `.pt-monitor`, `.pt-group`, `.pt-bars`, `.pt-report`, `.pt-subscribe`, `.pt-footer`. I
+colori sono variabili CSS (`--background`, `--foreground`, `--primary`, `--muted`, `--border`, `--up`, `--warn`,
+`--down`). Immagini o font che il CSS carica da altri siti vengono scaricati da ogni visitatore, che così mostra il
+proprio indirizzo a quei siti. Il modulo della password di una pagina protetta usa gli stessi colori, font e CSS,
+senza testi e link.
+
 ## Incidenti e iscritti via email
 
 Apri gli **incidenti** di una pagina (pulsante nell'elenco delle status page) per spiegare ai visitatori cosa

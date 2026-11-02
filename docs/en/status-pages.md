@@ -32,6 +32,37 @@ hashed, wrong attempts are rate limited, and changing it logs every visitor out.
   served as AVIF and WebP; SVG files are kept as vectors, without scripts.
 - **show only the logo**: for logos that already contain the name. The name stays the title of the browser tab.
 
+## Look
+
+The **look** section changes how the page looks; the preview shows every change before saving.
+
+- **preset**: a ready-made look (pingtxt, clean, corporate, soft, editorial, high contrast). It sets colors, font
+  and shape and keeps your texts and links. Change anything afterwards.
+- **theme**: the visitor's choice (with the light/dark button) or always light or always dark.
+- **colors**: background, surfaces, text, secondary text, borders, primary color and the three status colors, for
+  the light and the dark theme. Empty colors keep the default. Text on the primary color turns black or white by
+  itself, and the editor shows the WCAG contrast of the text colors. **color-blind safe status colors** swaps green
+  and red for blue and orange.
+- **font**: JetBrains Mono, IBM Plex Sans, Figtree, Atkinson Hyperlegible, Source Serif 4 or the visitor's system
+  font, in three sizes. Fonts are served by the hub, never by a third party.
+- **corners, lines, density, width, uptime bars**: sharp or rounded corners (0-24 px), dashed or solid lines or
+  cards, compact or airy spacing, narrow or wide page, block, rounded or thin bars.
+- **header**: plain or a band in the primary color, left or centered, a subtitle and up to 6 links.
+- **notice**: a highlighted message above the status, for example planned work.
+- **footer**: free text and up to 12 links, for example company details, contacts and privacy policy. **hide
+  "powered by pingtxt"** removes the credit line.
+- **use the logo as the browser tab icon**.
+
+Notice and footer text accept light Markdown: `**bold**`, `*italic*`, `[text](https://…)` and an empty line for a
+new paragraph. Links must be `http://`, `https://` or `mailto:` addresses.
+
+**custom CSS** is added to the public page as is, for anything the options do not cover. These classes are stable:
+`.pt-page`, `.pt-header`, `.pt-brand`, `.pt-tagline`, `.pt-notice`, `.pt-banner`, `.pt-section`, `.pt-list`,
+`.pt-monitor`, `.pt-group`, `.pt-bars`, `.pt-report`, `.pt-subscribe`, `.pt-footer`. Colors are CSS variables
+(`--background`, `--foreground`, `--primary`, `--muted`, `--border`, `--up`, `--warn`, `--down`). Images or fonts
+the CSS loads from other sites are fetched by every visitor, so they see the visitor's address. The password form
+of a protected page uses the same colors, font and CSS, without texts and links.
+
 ## Incidents and email subscribers
 
 Open **incidents** on a page (button in the status page list) to tell visitors what is going on: a title, an impact

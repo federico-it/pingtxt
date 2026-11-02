@@ -6,11 +6,12 @@ import { useTranslations } from "use-intl"
 
 import { Section } from "@/components/page-header"
 import { LanguagePicker } from "@/components/language-picker"
-import { StatusPageView } from "@/components/status-page-view"
+import { StatusPageView, useForcedMode } from "@/components/status-page-view"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { api, ApiError, type PublicStatusPage } from "@/lib/api"
+import { api, ApiError, type PageTheme, type PublicStatusPage } from "@/lib/api"
+import { customCSS, themeCSS } from "@/lib/page-theme"
 import { useNow } from "@/hooks/use-now"
 import { cn } from "@/lib/utils"
 
@@ -36,6 +37,7 @@ export default function PublicStatusPage() {
   })
   const locked = error instanceof ApiError && error.status === 403 && (error.data as { password_required?: boolean } | undefined)?.password_required
   const lockedTitle = locked ? ((error.data as { title?: string }).title ?? "") : ""
+  const lockedTheme = locked ? (error.data as { theme?: PageTheme }).theme : undefined
 
   useEffect(() => {
     if (data) document.title = data.title
@@ -43,7 +45,7 @@ export default function PublicStatusPage() {
   }, [data, lockedTitle])
 
   if (locked && path) {
-    return <PasswordForm endpoint={`${path}/unlock`} title={lockedTitle} onUnlocked={() => mutate()} />
+    return <PasswordForm endpoint={`${path}/unlock`} title={lockedTitle} theme={lockedTheme} onUnlocked={() => mutate()} />
   }
   if (error) {
     return (
@@ -77,8 +79,11 @@ export default function PublicStatusPage() {
 }
 
 /** Shown instead of a password protected page until the visitor unlocks it. */
-function PasswordForm({ endpoint, title, onUnlocked }: { endpoint: string; title: string; onUnlocked: () => void }) {
+function PasswordForm({ endpoint, title, theme, onUnlocked }: { endpoint: string; title: string; theme?: PageTheme; onUnlocked: () => void }) {
   const t = useTranslations("statusPublic.locked")
+  useForcedMode(theme?.mode ?? "")
+  const css = themeCSS(theme, ":root")
+  const custom = customCSS(theme, false)
   const [password, setPassword] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
@@ -98,14 +103,16 @@ function PasswordForm({ endpoint, title, onUnlocked }: { endpoint: string; title
   }
 
   return (
-    <div className="mx-auto flex min-h-svh w-full max-w-3xl flex-col px-4 sm:px-6">
+    <div className="pt-page pt-locked mx-auto flex min-h-svh w-full max-w-3xl flex-col px-4 sm:px-6" data-pt-style={theme?.style || undefined}>
+      {css && <style>{css}</style>}
+      {custom && <style>{custom}</style>}
       <header className="flex items-center gap-4 border-b border-dashed py-3">
         <h1 className="min-w-0 truncate font-semibold tracking-tight">
           <span className="text-primary">&gt;</span> {title}
         </h1>
         <div className="ml-auto flex items-center gap-1">
           <LanguagePicker />
-          <ThemeToggle />
+          {!theme?.mode && <ThemeToggle />}
         </div>
       </header>
       <main className="flex flex-1 items-center justify-center py-8">
@@ -156,7 +163,7 @@ function SubscribeForm({ endpoint }: { endpoint: string }) {
   }
 
   return (
-    <Section title={t("title")}>
+    <Section title={t("title")} className="pt-section pt-subscribe">
       {state === "sent" ? (
         <p className="text-up">{t("sent", { email })}</p>
       ) : (
@@ -205,5 +212,5 @@ function SubscriptionNotice() {
   }, [t])
 
   if (!notice) return null
-  return <div className={cn("mt-4 border border-dashed px-4 py-2 text-sm", notice.ok ? "text-up" : "text-down")}>{notice.ok ? "✓" : "!"} {notice.text}</div>
+  return <div className={cn("pt-box mt-4 border border-dashed px-4 py-2 text-sm", notice.ok ? "text-up" : "text-down")}>{notice.ok ? "✓" : "!"} {notice.text}</div>
 }

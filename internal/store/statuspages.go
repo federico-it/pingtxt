@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 )
@@ -33,15 +34,94 @@ type StatusPage struct {
 	Password string `json:"password,omitempty"`
 	// PasswordHash is the bcrypt hash of the visitors' password, "" = none.
 	PasswordHash string `json:"-"`
-	CreatedAt    int64  `json:"created_at"`
+	// Theme is the look of the page, the zero value is the default look.
+	Theme     PageTheme `json:"theme"`
+	CreatedAt int64     `json:"created_at"`
 }
 
-const statusPageCols = `id, slug, title, description, domain, header_url, hide_title, published, show_incidents, subscribe_notifier_id, password_hash, created_at`
+// PageTheme is how a status page looks. Empty fields keep the default.
+// The hub validates every field (validatePageTheme) before it is stored.
+type PageTheme struct {
+	// Mode forces a theme: "light" or "dark"; "" follows the visitor.
+	Mode  string     `json:"mode,omitempty"`
+	Light PageColors `json:"light"`
+	Dark  PageColors `json:"dark"`
+	// Font is one of the bundled fonts, "" = JetBrains Mono.
+	Font string `json:"font,omitempty"`
+	// Size of the text: "s", "l", "" = medium.
+	Size string `json:"size,omitempty"`
+	// Radius of corners in px, nil = default (2).
+	Radius *int `json:"radius,omitempty"`
+	// Style of the lists: "solid", "cards", "" = dashed lines.
+	Style string `json:"style,omitempty"`
+	// Density: "compact", "airy", "" = normal.
+	Density string `json:"density,omitempty"`
+	// Width: "wide", "" = narrow.
+	Width string `json:"width,omitempty"`
+	// Bars is the shape of the uptime bars: "round", "thin", "" = blocks.
+	Bars string `json:"bars,omitempty"`
+	// HeaderStyle "band" paints the header with the accent color.
+	HeaderStyle string `json:"header_style,omitempty"`
+	// HeaderAlign "center" centers logo, name and links.
+	HeaderAlign string     `json:"header_align,omitempty"`
+	Tagline     string     `json:"tagline,omitempty"`
+	HeaderLinks []PageLink `json:"header_links,omitempty"`
+	// Notice is a highlighted message above the status (light Markdown).
+	Notice string `json:"notice,omitempty"`
+	// FooterText is free text in the footer (light Markdown).
+	FooterText  string     `json:"footer_text,omitempty"`
+	FooterLinks []PageLink `json:"footer_links,omitempty"`
+	// HidePoweredBy removes "powered by pingtxt" from the footer.
+	HidePoweredBy bool `json:"hide_powered_by,omitempty"`
+	// LogoFavicon uses the page logo as the browser tab icon.
+	LogoFavicon bool `json:"logo_favicon,omitempty"`
+	// CSS is added to the page as is (admins only).
+	CSS string `json:"css,omitempty"`
+}
+
+// PageColors are #rrggbb colors of one theme, "" = default.
+type PageColors struct {
+	Background string `json:"background,omitempty"`
+	Surface    string `json:"surface,omitempty"`
+	Text       string `json:"text,omitempty"`
+	Muted      string `json:"muted,omitempty"`
+	Border     string `json:"border,omitempty"`
+	Accent     string `json:"accent,omitempty"`
+	Up         string `json:"up,omitempty"`
+	Degraded   string `json:"degraded,omitempty"`
+	Down       string `json:"down,omitempty"`
+}
+
+// PageLink is a link in the header or footer of a status page.
+type PageLink struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
+}
+
+// IsZero reports whether the theme is the default look.
+func (t PageTheme) IsZero() bool {
+	b, _ := json.Marshal(t)
+	return string(b) == `{"light":{},"dark":{}}`
+}
+
+func encodeTheme(t PageTheme) string {
+	if t.IsZero() {
+		return ""
+	}
+	b, _ := json.Marshal(t)
+	return string(b)
+}
+
+const statusPageCols = `id, slug, title, description, domain, header_url, hide_title, published, show_incidents, subscribe_notifier_id, password_hash, theme, created_at`
 
 func (s *Store) scanStatusPage(sc interface{ Scan(...any) error }) (*StatusPage, error) {
 	p := &StatusPage{}
-	err := sc.Scan(&p.ID, &p.Slug, &p.Title, &p.Description, &p.Domain, &p.HeaderURL, &p.HideTitle, &p.Published, &p.ShowIncidents, &p.SubscribeNotifierID, &p.PasswordHash, &p.CreatedAt)
+	var theme string
+	err := sc.Scan(&p.ID, &p.Slug, &p.Title, &p.Description, &p.Domain, &p.HeaderURL, &p.HideTitle, &p.Published, &p.ShowIncidents, &p.SubscribeNotifierID, &p.PasswordHash, &theme, &p.CreatedAt)
 	p.Protected = p.PasswordHash != ""
+	if theme != "" {
+		_ = json.Unmarshal([]byte(theme), &p.Theme) // a broken theme shows the default look
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -166,8 +246,8 @@ func (s *Store) CreateStatusPage(p *StatusPage) error {
 		return err
 	}
 	defer tx.Rollback()
-	id, err := s.db.insert(tx, `INSERT INTO status_pages (slug, title, description, domain, header_url, hide_title, published, show_incidents, subscribe_notifier_id, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.Slug, p.Title, p.Description, p.Domain, p.HeaderURL, b2i(p.HideTitle), b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.PasswordHash, p.CreatedAt)
+	id, err := s.db.insert(tx, `INSERT INTO status_pages (slug, title, description, domain, header_url, hide_title, published, show_incidents, subscribe_notifier_id, password_hash, theme, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		p.Slug, p.Title, p.Description, p.Domain, p.HeaderURL, b2i(p.HideTitle), b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.PasswordHash, encodeTheme(p.Theme), p.CreatedAt)
 	if err != nil {
 		return uniqueErr(err)
 	}
@@ -184,8 +264,8 @@ func (s *Store) UpdateStatusPage(p *StatusPage) error {
 		return err
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec(`UPDATE status_pages SET slug = ?, title = ?, description = ?, domain = ?, header_url = ?, hide_title = ?, published = ?, show_incidents = ?, subscribe_notifier_id = ?, password_hash = ? WHERE id = ?`,
-		p.Slug, p.Title, p.Description, p.Domain, p.HeaderURL, b2i(p.HideTitle), b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.PasswordHash, p.ID)
+	res, err := tx.Exec(`UPDATE status_pages SET slug = ?, title = ?, description = ?, domain = ?, header_url = ?, hide_title = ?, published = ?, show_incidents = ?, subscribe_notifier_id = ?, password_hash = ?, theme = ? WHERE id = ?`,
+		p.Slug, p.Title, p.Description, p.Domain, p.HeaderURL, b2i(p.HideTitle), b2i(p.Published), b2i(p.ShowIncidents), p.SubscribeNotifierID, p.PasswordHash, encodeTheme(p.Theme), p.ID)
 	if err != nil {
 		return uniqueErr(err)
 	}
