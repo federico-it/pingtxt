@@ -1,0 +1,46 @@
+# pingtxt hub + PostgreSQL on Coolify.
+# In Coolify: new resource > Docker Compose Empty, paste this file and deploy.
+# Coolify creates the domain from SERVICE_URL_PINGTXT_8090 and generates the database
+# user and password (SERVICE_USER_POSTGRES, SERVICE_PASSWORD_POSTGRES): nothing to fill in.
+# Docs: https://pingtxt.com/docs/install/#coolify
+services:
+  pingtxt:
+    image: ghcr.io/federico-it/pingtxt:latest
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_PINGTXT_8090
+      # Seeds the public URL on the first start only; afterwards change it in settings > general.
+      - PINGTXT_PUBLIC_URL=${SERVICE_URL_PINGTXT}
+      - PINGTXT_DB_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/pingtxt?sslmode=disable
+    volumes:
+      # Backups and staged restores; the monitors and history are in PostgreSQL.
+      - pingtxt-data:/data
+      # Only for "docker container" monitors on the hub location:
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8090/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=pingtxt
+    volumes:
+      - pingtxt-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d pingtxt"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  pingtxt-data:
+  pingtxt-postgres:
