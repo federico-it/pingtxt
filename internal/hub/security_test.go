@@ -66,7 +66,10 @@ func TestTwoFactorLogin(t *testing.T) {
 	if res := c.do("POST", "/api/auth/2fa/enable", map[string]string{"code": "000000"}); res.StatusCode != 400 {
 		t.Fatalf("wrong code accepted: %d", res.StatusCode)
 	}
-	res := c.do("POST", "/api/auth/2fa/enable", map[string]string{"code": currentCode(t, setup["secret"], -1)})
+	// Keep the code: computing it again later can give the next step's code
+	// when a 30 s boundary passes in between.
+	used := currentCode(t, setup["secret"], -1)
+	res := c.do("POST", "/api/auth/2fa/enable", map[string]string{"code": used})
 	if res.StatusCode != 200 {
 		t.Fatalf("enable: %d", res.StatusCode)
 	}
@@ -86,7 +89,7 @@ func TestTwoFactorLogin(t *testing.T) {
 		t.Fatalf("session started before second factor: %d", res.StatusCode)
 	}
 	// A code already used (the one from enable) is refused: no replay.
-	if res := v.do("POST", "/api/auth/login/2fa", map[string]string{"challenge": ch, "code": currentCode(t, setup["secret"], -1)}); res.StatusCode != 401 {
+	if res := v.do("POST", "/api/auth/login/2fa", map[string]string{"challenge": ch, "code": used}); res.StatusCode != 401 {
 		t.Fatalf("replayed code accepted: %d", res.StatusCode)
 	}
 	if res := v.do("POST", "/api/auth/login/2fa", map[string]string{"challenge": ch, "code": codes[0]}); res.StatusCode != 200 {
