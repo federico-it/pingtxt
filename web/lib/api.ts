@@ -679,7 +679,52 @@ export interface StatusPage {
   protected: boolean
   /** new visitors' password, write-only */
   password?: string
+  /** look of the page, empty fields = default */
+  theme?: PageTheme
   created_at: number
+}
+
+/** #rrggbb colors of one theme, missing or "" = default */
+export interface PageColors {
+  background?: string
+  surface?: string
+  text?: string
+  muted?: string
+  border?: string
+  accent?: string
+  up?: string
+  degraded?: string
+  down?: string
+}
+
+export interface PageLink {
+  label: string
+  url: string
+}
+
+/** Look of a status page; every field is optional. */
+export interface PageTheme {
+  mode?: "" | "light" | "dark"
+  light?: PageColors
+  dark?: PageColors
+  font?: "" | "plex" | "figtree" | "atkinson" | "serif" | "system"
+  size?: "" | "s" | "l"
+  /** corner radius in px, undefined = 2 */
+  radius?: number
+  style?: "" | "solid" | "cards"
+  density?: "" | "compact" | "airy"
+  width?: "" | "wide"
+  bars?: "" | "round" | "thin"
+  header_style?: "" | "band"
+  header_align?: "" | "center"
+  tagline?: string
+  header_links?: PageLink[]
+  notice?: string
+  footer_text?: string
+  footer_links?: PageLink[]
+  hide_powered_by?: boolean
+  logo_favicon?: boolean
+  css?: string
 }
 
 export type ReportStatus = "investigating" | "identified" | "monitoring" | "resolved"
@@ -754,6 +799,8 @@ export interface PublicStatusPage {
   header_url: string
   logo?: PageLogo
   hide_title: boolean
+  /** set when the page does not use the default look */
+  theme?: PageTheme
   published: boolean
   status: PageStatus
   days: number

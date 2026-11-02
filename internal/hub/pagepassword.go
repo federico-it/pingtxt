@@ -68,10 +68,17 @@ func (h *Hub) pageOpen(r *http.Request, page *publicPage, byDomain bool) bool {
 
 // passwordRequired answers a request for a protected page without access.
 // 403, not 401: the UI sends 401 answers to the hub's login page.
+// The look of the page comes along, without its texts and links.
 func passwordRequired(w http.ResponseWriter, page *publicPage) {
-	writeJSON(w, http.StatusForbidden, map[string]any{
+	body := map[string]any{
 		"error": "this status page needs a password", "password_required": true, "title": page.Title,
-	})
+	}
+	if page.Theme != nil {
+		t := *page.Theme
+		t.Tagline, t.Notice, t.FooterText, t.HeaderLinks, t.FooterLinks = "", "", "", nil, nil
+		body["theme"] = t
+	}
+	writeJSON(w, http.StatusForbidden, body)
 }
 
 // hashPagePassword checks and hashes a new page password.

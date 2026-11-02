@@ -127,6 +127,9 @@ func (h *Hub) validateStatusPage(r *http.Request, p *store.StatusPage) error {
 	if p.Title == "" {
 		return errors.New("title is required")
 	}
+	if err := validatePageTheme(&p.Theme); err != nil {
+		return err
+	}
 	if len(p.Title) > 100 || len(p.Description) > 1000 {
 		return errors.New("title or description is too long")
 	}
@@ -306,6 +309,10 @@ func (h *Hub) previewStatusPage(w http.ResponseWriter, r *http.Request, _ *store
 	}
 	p.Title = strings.TrimSpace(p.Title)
 	p.Description = strings.TrimSpace(p.Description)
+	if err := validatePageTheme(&p.Theme); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
 	if p.ID != 0 { // incidents written on the page come from the saved page
 		if _, err := h.store.StatusPage(p.ID); err != nil {
 			p.ID = 0
@@ -353,8 +360,10 @@ type publicPage struct {
 	// HeaderURL is where the page name links to, "" = no link.
 	HeaderURL string `json:"header_url"`
 	// Logo is set when the page has one, see pagelogo.go.
-	Logo          *publicLogo      `json:"logo,omitempty"`
-	HideTitle     bool             `json:"hide_title"`
+	Logo      *publicLogo `json:"logo,omitempty"`
+	HideTitle bool        `json:"hide_title"`
+	// Theme is the look of the page, omitted for the default look.
+	Theme         *store.PageTheme `json:"theme,omitempty"`
 	Published     bool             `json:"published"`
 	Status        string           `json:"status"`
 	Days          int              `json:"days"`
@@ -465,6 +474,10 @@ func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
 		Days: days, ShowIncidents: sp.ShowIncidents, Monitors: []publicMonitor{}, Incidents: []publicIncident{},
 		Subscribe: h.subscribeChannel(sp) != nil, UpdatedAt: now.UnixMilli(),
 		id: sp.ID, passHash: sp.PasswordHash,
+	}
+	if !sp.Theme.IsZero() {
+		t := sp.Theme
+		p.Theme = &t
 	}
 	if sp.ID != 0 {
 		if l, err := h.store.PageLogoInfo(sp.ID); err == nil {

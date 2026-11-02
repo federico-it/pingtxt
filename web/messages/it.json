@@ -968,6 +968,108 @@
     "hideTitle": "mostra solo il logo",
     "hideTitleHint": "per i logo che contengono già il nome. Il nome resta il titolo della scheda del browser."
   },
+  "statusPageTheme": {
+    "title": "aspetto",
+    "preset": "preset",
+    "presetHint": "un aspetto pronto: imposta colori, font e forma, tiene testi e link.",
+    "presets": {
+      "pingtxt": "pingtxt",
+      "clean": "pulito",
+      "corporate": "aziendale",
+      "soft": "morbido",
+      "editorial": "editoriale",
+      "contrast": "alto contrasto"
+    },
+    "mode": "tema",
+    "modes": {
+      "auto": "scelto dal visitatore",
+      "light": "chiaro",
+      "dark": "scuro"
+    },
+    "colors": "colori",
+    "colorsHint": "i colori vuoti restano quelli predefiniti. Il testo sul colore primario diventa nero o bianco da solo.",
+    "color": "colore",
+    "default": "predefinito",
+    "colorReset": "usa il colore predefinito",
+    "colorNames": {
+      "background": "sfondo",
+      "surface": "superfici",
+      "text": "testo",
+      "muted": "testo secondario",
+      "border": "bordi",
+      "accent": "primario",
+      "up": "operativo",
+      "degraded": "degradato",
+      "down": "down"
+    },
+    "colorBlind": "colori di stato per daltonici",
+    "colorsReset": "ripristina colori",
+    "contrast": "contrasto",
+    "contrastLarge": "solo testo grande",
+    "contrastLow": "troppo basso",
+    "lowContrast": "sotto WCAG AA (4,5:1) per il testo normale",
+    "font": "font",
+    "fontSystem": "font di sistema",
+    "size": "dimensione testo",
+    "sizes": {
+      "s": "piccolo",
+      "m": "medio",
+      "l": "grande"
+    },
+    "radius": "angoli",
+    "style": "linee",
+    "styles": {
+      "dashed": "tratteggio",
+      "solid": "continue",
+      "cards": "schede"
+    },
+    "density": "densità",
+    "densities": {
+      "compact": "compatta",
+      "normal": "normale",
+      "airy": "ariosa"
+    },
+    "width": "larghezza",
+    "widths": {
+      "narrow": "stretta",
+      "wide": "larga"
+    },
+    "bars": "barre uptime",
+    "barStyles": {
+      "blocks": "blocchi",
+      "round": "arrotondate",
+      "thin": "sottili"
+    },
+    "headerStyle": "intestazione",
+    "headerStyles": {
+      "plain": "semplice",
+      "band": "fascia colorata"
+    },
+    "headerAlign": "allineamento intestazione",
+    "aligns": {
+      "left": "a sinistra",
+      "center": "centrato"
+    },
+    "tagline": "sottotitolo",
+    "taglineHint": "una riga breve sotto il nome della pagina.",
+    "headerLinks": "link nell'intestazione",
+    "footerLinks": "link nel footer",
+    "linksHint": "indirizzi http://, https:// o mailto:.",
+    "linkLabel": "testo",
+    "linkUrl": "indirizzo",
+    "linkAdd": "aggiungi link",
+    "linkRemove": "rimuovi link",
+    "notice": "avviso",
+    "noticePlaceholder": "es. Manutenzione del database sabato, 02:00-03:00",
+    "footerText": "testo del footer",
+    "footerPlaceholder": "es. **Acme S.r.l.** · supporto: [help@acme.it](mailto:help@acme.it)",
+    "markdownHint": "**grassetto**, *corsivo*, [testo](https://…), riga vuota = nuovo paragrafo.",
+    "hidePoweredBy": "nascondi \"powered by pingtxt\"",
+    "logoFavicon": "usa il logo come icona della scheda",
+    "logoFaviconNoLogo": "carica prima un logo.",
+    "css": "CSS personalizzato",
+    "cssHint": "aggiunto così com'è alla pagina pubblica. Classi stabili: .pt-page, .pt-header, .pt-notice, .pt-banner, .pt-section, .pt-monitor, .pt-group, .pt-footer. Immagini o font presi da altri siti vengono scaricati da ogni visitatore."
+  },
   "statusPublic": {
     "banner": {
       "operational": "tutti i sistemi funzionano",

@@ -968,6 +968,108 @@
     "hideTitle": "show only the logo",
     "hideTitleHint": "for logos that already contain the name. The name stays the browser tab title."
   },
+  "statusPageTheme": {
+    "title": "look",
+    "preset": "preset",
+    "presetHint": "a ready-made look: sets colors, font and shape, keeps texts and links.",
+    "presets": {
+      "pingtxt": "pingtxt",
+      "clean": "clean",
+      "corporate": "corporate",
+      "soft": "soft",
+      "editorial": "editorial",
+      "contrast": "high contrast"
+    },
+    "mode": "theme",
+    "modes": {
+      "auto": "visitor's choice",
+      "light": "light",
+      "dark": "dark"
+    },
+    "colors": "colors",
+    "colorsHint": "empty colors keep the default. Text on the primary color turns black or white by itself.",
+    "color": "color",
+    "default": "default",
+    "colorReset": "use the default color",
+    "colorNames": {
+      "background": "background",
+      "surface": "surface",
+      "text": "text",
+      "muted": "secondary text",
+      "border": "borders",
+      "accent": "primary",
+      "up": "operational",
+      "degraded": "degraded",
+      "down": "down"
+    },
+    "colorBlind": "color-blind safe status colors",
+    "colorsReset": "reset colors",
+    "contrast": "contrast",
+    "contrastLarge": "large text only",
+    "contrastLow": "too low",
+    "lowContrast": "below WCAG AA (4.5:1) for normal text",
+    "font": "font",
+    "fontSystem": "system font",
+    "size": "text size",
+    "sizes": {
+      "s": "small",
+      "m": "medium",
+      "l": "large"
+    },
+    "radius": "corners",
+    "style": "lines",
+    "styles": {
+      "dashed": "dashed",
+      "solid": "solid",
+      "cards": "cards"
+    },
+    "density": "density",
+    "densities": {
+      "compact": "compact",
+      "normal": "normal",
+      "airy": "airy"
+    },
+    "width": "width",
+    "widths": {
+      "narrow": "narrow",
+      "wide": "wide"
+    },
+    "bars": "uptime bars",
+    "barStyles": {
+      "blocks": "blocks",
+      "round": "rounded",
+      "thin": "thin"
+    },
+    "headerStyle": "header",
+    "headerStyles": {
+      "plain": "plain",
+      "band": "colored band"
+    },
+    "headerAlign": "header alignment",
+    "aligns": {
+      "left": "left",
+      "center": "centered"
+    },
+    "tagline": "subtitle",
+    "taglineHint": "a short line under the page name.",
+    "headerLinks": "header links",
+    "footerLinks": "footer links",
+    "linksHint": "http://, https:// or mailto: addresses.",
+    "linkLabel": "text",
+    "linkUrl": "address",
+    "linkAdd": "add link",
+    "linkRemove": "remove link",
+    "notice": "notice",
+    "noticePlaceholder": "e.g. Planned database maintenance on Saturday, 02:00-03:00 UTC",
+    "footerText": "footer text",
+    "footerPlaceholder": "e.g. **Acme Inc.** · support: [help@acme.com](mailto:help@acme.com)",
+    "markdownHint": "**bold**, *italic*, [text](https://…), empty line = new paragraph.",
+    "hidePoweredBy": "hide \"powered by pingtxt\"",
+    "logoFavicon": "use the logo as the browser tab icon",
+    "logoFaviconNoLogo": "upload a logo first.",
+    "css": "custom CSS",
+    "cssHint": "added to the public page as is. Stable classes: .pt-page, .pt-header, .pt-notice, .pt-banner, .pt-section, .pt-monitor, .pt-group, .pt-footer. Images or fonts loaded from other sites are fetched by every visitor."
+  },
   "statusPublic": {
     "banner": {
       "operational": "all systems operational",
