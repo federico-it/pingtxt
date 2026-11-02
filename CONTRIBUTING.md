@@ -65,15 +65,50 @@ The public website (pingtxt.com) lives in [`site/`](site/) and is a separate Nex
 
 ### Project layout
 
+```
+            ┌──────────────── hub container ────────────────┐
+ browser ──▶│  Go http server ─ /api/*  ─ SQLite/PG/MariaDB │
+            │        │          /        ─ Next.js export   │
+            │   scheduler ──▶ local probe ("hub" location)  │
+            │        │                                       │
+            └────────┼───────────────────────────────────────┘
+                     │ jobs / results over WebSocket (agent dials out)
+          ┌──────────┴──────────┐
+     agent (Frankfurt)     agent (home lab) ...
+```
+
 - `cmd/pingtxt`, `cmd/pingtxt-agent` – hub and agent binaries.
 - `internal/check` – probes, shared by hub and agents. A new check type goes here, with tests.
+- `internal/expiry` – certificate and domain (RDAP / WHOIS) expiry lookups, run by the hub.
 - `internal/hub` – scheduler, status, incidents, notifications, HTTP API, agent WebSocket.
-- `internal/store` – SQLite, PostgreSQL and MariaDB/MySQL. Migrations are an ordered list in `internal/store/store.go`: **always append**
-  a new migration at the end, never edit one that already shipped.
-- `internal/expiry` – certificate and domain expiry lookups.
-- `web/` – the hub UI (Next.js static export, shadcn/ui, Tailwind 4).
+- `internal/store` – SQLite (pure Go driver `modernc.org/sqlite`, no CGO), PostgreSQL (`lib/pq`) and
+  MariaDB/MySQL (`go-sql-driver/mysql`). Queries are written once for SQLite and rewritten for the other two.
+  Migrations are an ordered list in `internal/store/store.go`: **always append** a new migration at the end
+  (with a `postgres` / `mysql` variant when the SQLite text does not work there), never edit one that already
+  shipped.
+- `web/` – the hub UI (Next.js 16 static export, shadcn/ui on Base UI, Tailwind 4).
 - `site/` – the public website; it renders the docs from `docs/`.
 - `docs/` – the user docs in Markdown, English and Italian.
+
+**Why Go for the backend:** the agent must be a tiny static binary that runs anywhere (amd64/arm64/arm,
+Linux/macOS). The same language lets the hub and the agents share the probe code and the wire protocol, Go's
+concurrency fits thousands of periodic checks, and the hub compiles to one binary with the UI embedded, so the
+container needs no Node runtime.
+
+### Tests on PostgreSQL and MariaDB
+
+The store and hub tests run on SQLite by default. To run them on a database server (each test creates and drops
+its own scratch database, so the user needs `CREATE DATABASE`):
+
+```sh
+docker run -d --name pg -p 5432:5432 -e POSTGRES_PASSWORD=pingtxt postgres:17-alpine
+PINGTXT_TEST_DB_URL="postgres://postgres:pingtxt@127.0.0.1:5432/postgres?sslmode=disable" go test ./internal/store/... ./internal/hub/...
+
+docker run -d --name maria -p 3306:3306 -e MARIADB_ROOT_PASSWORD=pingtxt mariadb:11
+PINGTXT_TEST_DB_URL="mariadb://root:pingtxt@127.0.0.1:3306/mysql" go test ./internal/store/... ./internal/hub/...
+```
+
+CI runs the tests on SQLite, PostgreSQL, MariaDB and MySQL.
 
 ## Build from source
 
