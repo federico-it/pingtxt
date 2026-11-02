@@ -1583,7 +1583,9 @@
     "fullLog": "full log",
     "noChanges": "no changes recorded yet.",
     "activityIntro": "Your logins, two-factor changes, api tokens and app sign-ins of the last 30 days. Something you don't recognize? Change your password and revoke the tokens and apps you don't use.",
-    "noActivity": "nothing in the last 30 days."
+    "noActivity": "nothing in the last 30 days.",
+    "created": "created",
+    "deleted": "deleted"
   },
   "diagnostics": {
     "loading": "loading diagnostics…",
