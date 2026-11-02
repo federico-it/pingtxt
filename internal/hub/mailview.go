@@ -47,6 +47,11 @@ type mailLink struct {
 	Label, Href string
 }
 
+type mailSection struct {
+	Title string
+	Rows  []mailRow
+}
+
 // mailView is the content of one email.
 type mailView struct {
 	Preheader string // inbox preview text, hidden in the message
@@ -57,6 +62,9 @@ type mailView struct {
 	Lead      string // a paragraph under the title
 	Note      string // quoted text (a cause, an update message), kept as written
 	Rows      []mailRow
+	// Sections are titled groups of rows after Rows (the diagnostics of
+	// each location).
+	Sections  []mailSection
 	Action    *mailLink // the main button
 	Footer    []string
 	FootLinks []mailLink
@@ -139,6 +147,11 @@ a{color:inherit}
 {{range .Rows}}<tr><td class="pt-mu pt-bd pt-key" valign="top" style="width:128px;padding:7px 12px 7px 0;color:#6a6966;border-top:1px dashed #d8d7d4;white-space:nowrap">{{.Key}}</td><td class="pt-bd{{if .Tone}} pt-{{.Tone}}{{end}}" valign="top" style="padding:7px 0;border-top:1px dashed #d8d7d4;word-break:break-word{{if .Tone}};color:{{tone .Tone}};font-weight:700{{end}}">{{if .Href}}<a href="{{.Href}}" class="pt-fg" style="color:#171613;text-decoration:underline">{{.Value}}</a>{{else}}{{.Value}}{{end}}</td></tr>
 {{end}}<tr><td class="pt-bd" colspan="2" style="border-top:1px dashed #d8d7d4;font-size:0;line-height:0">&nbsp;</td></tr>
 </table>{{end}}
+{{range .Sections}}<div class="pt-mu" style="margin:22px 0 0;color:#6a6966;font-size:12px"># {{.Title}}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 0">
+{{range .Rows}}<tr><td class="pt-mu pt-bd pt-key" valign="top" style="width:128px;padding:5px 12px 5px 0;color:#6a6966;border-top:1px dashed #d8d7d4;white-space:nowrap;font-size:12px">{{.Key}}</td><td class="pt-bd{{if .Tone}} pt-{{.Tone}}{{end}}" valign="top" style="padding:5px 0;border-top:1px dashed #d8d7d4;word-break:break-all;font-size:12px{{if .Tone}};color:{{tone .Tone}};font-weight:700{{end}}">{{.Value}}</td></tr>
+{{end}}<tr><td class="pt-bd" colspan="2" style="border-top:1px dashed #d8d7d4;font-size:0;line-height:0">&nbsp;</td></tr>
+</table>{{end}}
 {{block "extra" .Data}}{{end}}
 {{if .Action}}<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0"><tr><td class="pt-btn" bgcolor="#171613" style="background:#171613;border:1px solid #171613">
 <a href="{{.Action.Href}}" class="pt-btn" style="display:inline-block;padding:8px 16px;color:#fafaf9;background:#171613;text-decoration:none;font-weight:700">{{.Action.Label}} &rarr;</a>
@@ -193,6 +206,16 @@ func (v mailView) renderText(extra string) string {
 		}
 		b.WriteString("\n")
 		for _, r := range v.Rows {
+			b.WriteString(padRight(r.Key, w) + "  " + r.Value + "\n")
+		}
+	}
+	for _, sec := range v.Sections {
+		b.WriteString("\n# " + sec.Title + "\n")
+		w := 0
+		for _, r := range sec.Rows {
+			w = max(w, len([]rune(r.Key)))
+		}
+		for _, r := range sec.Rows {
 			b.WriteString(padRight(r.Key, w) + "  " + r.Value + "\n")
 		}
 	}

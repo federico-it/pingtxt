@@ -133,6 +133,8 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("/api/push/{token}", h.push)
 	mux.HandleFunc("POST /api/monitors/{id}/expiry", auth(h.checkMonitorExpiry))
 	mux.HandleFunc("GET /api/incidents", auth(h.listIncidents))
+	mux.HandleFunc("GET /api/incidents/{id}/diagnostics", auth(h.incidentDiagnostics))
+	mux.HandleFunc("GET /api/monitors/{id}/diagnostics", auth(h.monitorDiagnostics))
 	mux.HandleFunc("GET /api/maintenances", auth(h.listMaintenances))
 	mux.HandleFunc("POST /api/maintenances", auth(h.createMaintenance))
 	mux.HandleFunc("PUT /api/maintenances/{id}", auth(h.updateMaintenance))
@@ -572,6 +574,12 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 		m.IPFamily = ipDefault // no network check of their own
 	case !validFamily(m.IPFamily) && m.IPFamily != ipDefault:
 		return errors.New("ip_family must be 0 (instance default), 1 (IPv4 or IPv6), 4, 6 or 46 (IPv4 and IPv6)")
+	}
+	if m.Diagnostics < diagDefault || m.Diagnostics > diagOff {
+		return errors.New("diagnostics must be 0 (instance default), 1 (on) or 2 (off)")
+	}
+	if m.Type == check.TypePush {
+		m.Diagnostics = diagDefault // nothing to probe
 	}
 	if m.Assertions == nil {
 		m.Assertions = []check.Assertion{}
@@ -1301,6 +1309,7 @@ func (h *Hub) listIncidents(w http.ResponseWriter, r *http.Request, _ *store.Use
 		h.internalErr(w, err)
 		return
 	}
+	h.markDiagnosed(list)
 	writeJSON(w, 200, list)
 }
 

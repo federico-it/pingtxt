@@ -60,6 +60,9 @@ type Job struct {
 	// IPFamily limits the check to IPv4 (4) or IPv6 (6), or runs it over
 	// both (46); 0 uses either.
 	IPFamily int `json:"ip_family,omitempty"`
+	// Diagnose asks for diagnostics (DNS, TCP, TLS, HTTP headers,
+	// traceroute) if the check fails. Older agents ignore it.
+	Diagnose bool `json:"diagnose,omitempty"`
 }
 
 // Result is the outcome of a Job.
@@ -84,6 +87,11 @@ type Result struct {
 	// older than it echo IPBoth but check over either family.
 	Both bool  `json:"both,omitempty"`
 	At   int64 `json:"at"` // unix milliseconds
+	// Diag holds the diagnostics of a failed check, when the job asked for
+	// them.
+	Diag *Diag `json:"diag,omitempty"`
+
+	http *DiagHTTP // response of a failed HTTP check, for Diagnose
 }
 
 // Timing is the time spent in each phase of an HTTP request, in ms. With
@@ -100,8 +108,17 @@ type Timing struct {
 
 // Run executes the job and always returns a Result.
 func Run(ctx context.Context, j Job) Result {
+	r := runJob(ctx, j)
+	if j.Diagnose && !r.OK && j.Type != TypePush {
+		r.Diag = Diagnose(ctx, j, r)
+	}
+	r.http = nil
+	return r
+}
+
+func runJob(ctx context.Context, j Job) Result {
 	if j.IPFamily == IPBoth {
-		r := runBoth(ctx, j, Run)
+		r := runBoth(ctx, j, runJob)
 		r.IPFamily = IPBoth
 		r.Message = truncate(r.Message, 300)
 		return r
@@ -175,10 +192,30 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 		DialContext:         j.dialContext,
 	}
 	defer tr.CloseIdleConnections()
-	client := &http.Client{Transport: tr, Timeout: timeout, CheckRedirect: dropHeadersOnRedirect(j.Headers)}
+	var redirects []string
+	follow := dropHeadersOnRedirect(j.Headers)
+	client := &http.Client{Transport: tr, Timeout: timeout, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if j.Diagnose {
+			redirects = append(redirects, redirectURL(req.URL))
+		}
+		return follow(req, via)
+	}}
 
 	pt := &phaseTracer{}
-	req = req.WithContext(httptrace.WithClientTrace(ctx, pt.trace()))
+	ct := pt.trace()
+	var remote string
+	if j.Diagnose {
+		got := ct.GotConn
+		ct.GotConn = func(info httptrace.GotConnInfo) {
+			got(info)
+			if info.Conn != nil {
+				pt.mu.Lock()
+				remote = info.Conn.RemoteAddr().String()
+				pt.mu.Unlock()
+			}
+		}
+	}
+	req = req.WithContext(httptrace.WithClientTrace(ctx, ct))
 	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
@@ -187,6 +224,11 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 	defer resp.Body.Close()
 
 	r := Result{StatusCode: resp.StatusCode, Timing: pt.timing()}
+	if j.Diagnose {
+		pt.mu.Lock()
+		r.http = diagHTTP(resp, remote, redirects)
+		pt.mu.Unlock()
+	}
 	if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
 		r.CertExpiry = resp.TLS.PeerCertificates[0].NotAfter.Unix()
 	}
@@ -358,61 +400,15 @@ func runTCP(ctx context.Context, j Job) Result {
 }
 
 func runDNS(ctx context.Context, j Job) Result {
-	res := net.DefaultResolver
-	if j.DNSServer != "" {
-		server := j.DNSServer
-		if _, _, err := net.SplitHostPort(server); err != nil {
-			server = net.JoinHostPort(StripBrackets(server), "53")
-		}
-		res = &net.Resolver{
-			PreferGo: true,
-			Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
-				return j.dialContext(ctx, network, server)
-			},
-		}
-	} else if j.IPFamily != IPAny {
-		// The system resolver, reached over the chosen family only.
-		res = &net.Resolver{PreferGo: true, Dial: j.dialContext}
-	}
 	host := StripBrackets(j.Target)
 	if u, err := url.Parse(host); err == nil && u.Host != "" {
 		host = u.Hostname()
 	}
-	start := time.Now()
-	var answers []string
-	var err error
-	switch strings.ToUpper(j.DNSRecord) {
-	case "", "A", "AAAA":
-		var ips []net.IP
-		network := "ip4"
-		if strings.ToUpper(j.DNSRecord) == "AAAA" {
-			network = "ip6"
-		}
-		ips, err = res.LookupIP(ctx, network, host)
-		for _, ip := range ips {
-			answers = append(answers, ip.String())
-		}
-	case "CNAME":
-		var c string
-		c, err = res.LookupCNAME(ctx, host)
-		answers = []string{c}
-	case "MX":
-		var mx []*net.MX
-		mx, err = res.LookupMX(ctx, host)
-		for _, m := range mx {
-			answers = append(answers, m.Host)
-		}
-	case "TXT":
-		answers, err = res.LookupTXT(ctx, host)
-	case "NS":
-		var ns []*net.NS
-		ns, err = res.LookupNS(ctx, host)
-		for _, n := range ns {
-			answers = append(answers, n.Host)
-		}
-	default:
+	if !knownRecord(j.DNSRecord) {
 		return Result{Message: "unsupported record type " + j.DNSRecord}
 	}
+	start := time.Now()
+	answers, err := lookupRecord(ctx, j.resolver(), j.DNSRecord, host)
 	lat := ms(time.Since(start))
 	if err != nil {
 		return Result{LatencyMs: lat, Message: cleanErr(err)}
@@ -434,6 +430,76 @@ func runDNS(ctx context.Context, j Job) Result {
 		}
 	}
 	return Result{OK: true, LatencyMs: lat, Message: msg}
+}
+
+// resolver is the monitor's DNS server, or the system resolver (reached
+// over the job's IP family).
+func (j Job) resolver() *net.Resolver {
+	if j.DNSServer != "" {
+		server := j.DNSServer
+		if _, _, err := net.SplitHostPort(server); err != nil {
+			server = net.JoinHostPort(StripBrackets(server), "53")
+		}
+		return &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+				return j.dialContext(ctx, network, server)
+			},
+		}
+	}
+	if j.IPFamily != IPAny {
+		return &net.Resolver{PreferGo: true, Dial: j.dialContext}
+	}
+	return net.DefaultResolver
+}
+
+func knownRecord(rec string) bool {
+	switch strings.ToUpper(rec) {
+	case "", "A", "AAAA", "CNAME", "MX", "TXT", "NS":
+		return true
+	}
+	return false
+}
+
+// lookupRecord queries one record type ("" is A).
+func lookupRecord(ctx context.Context, res *net.Resolver, rec, host string) ([]string, error) {
+	var answers []string
+	var err error
+	switch strings.ToUpper(rec) {
+	case "", "A", "AAAA":
+		var ips []net.IP
+		network := "ip4"
+		if strings.ToUpper(rec) == "AAAA" {
+			network = "ip6"
+		}
+		ips, err = res.LookupIP(ctx, network, host)
+		for _, ip := range ips {
+			answers = append(answers, ip.String())
+		}
+	case "CNAME":
+		var c string
+		c, err = res.LookupCNAME(ctx, host)
+		if c != "" {
+			answers = []string{c}
+		}
+	case "MX":
+		var mx []*net.MX
+		mx, err = res.LookupMX(ctx, host)
+		for _, m := range mx {
+			answers = append(answers, m.Host)
+		}
+	case "TXT":
+		answers, err = res.LookupTXT(ctx, host)
+	case "NS":
+		var ns []*net.NS
+		ns, err = res.LookupNS(ctx, host)
+		for _, n := range ns {
+			answers = append(answers, n.Host)
+		}
+	default:
+		err = errors.New("unsupported record type " + rec)
+	}
+	return answers, err
 }
 
 // RedactTarget hides the password of URL targets (database connection

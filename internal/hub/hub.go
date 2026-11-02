@@ -62,6 +62,10 @@ type locState struct {
 	lat       []float64
 	slow      bool
 	slowLimit float64 // threshold the slow test used (ms)
+
+	diagAt time.Time   // when the location last sent diagnostics
+	diag   *check.Diag // diagnostics of the current failure, if any
+	diagID int64       // their stored id
 }
 
 // slowWindow is how many successful checks the slow test looks at: the
@@ -359,7 +363,8 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 	}
 	var work []dispatch
 	var missed []check.Result
-	defFamily := h.generalSettings().IPFamily
+	gs := h.generalSettings()
+	defFamily := gs.IPFamily
 	h.mu.Lock()
 	for _, st := range h.monitors {
 		if st.m.Paused || now.Before(st.next) {
@@ -379,6 +384,7 @@ func (h *Hub) tick(ctx context.Context, now time.Time) {
 		job := jobFor(st.m)
 		for _, loc := range h.locationsOf(st.m) {
 			job.IPFamily = h.familyAtLocked(st.m, loc, defFamily)
+			job.Diagnose = h.wantDiagLocked(st, loc, gs, now)
 			if loc == LocalLocation {
 				if st.busy {
 					// The previous local check has not finished yet: skip
@@ -565,10 +571,14 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		st.locs[loc] = ls
 	}
 	ls.lastMsg = r.Message
+	if r.Diag != nil {
+		ls.diag, ls.diagID, ls.diagAt = r.Diag, 0, time.Now()
+	}
 	if r.OK {
 		ls.fails = 0
 		ls.down = false
 		ls.addLatency(r.LatencyMs)
+		ls.diag, ls.diagID = nil, 0
 	} else {
 		ls.fails++
 		if ls.fails >= max(m.Retries, 1) {
@@ -653,6 +663,9 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	if changed {
 		_ = h.store.SetMonitorStatus(m.ID, display, since)
 		h.log.Info("status change", "monitor", name, "from", prev, "to", display)
+	}
+	if r.Diag != nil && !r.OK {
+		h.storeDiag(m, loc, r)
 	}
 	h.raise(m, alert, strings.Join(causes, "; "), r.At)
 	if degraded != "" {
@@ -842,7 +855,17 @@ func (h *Hub) raise(m *store.Monitor, alert, cause string, at int64) {
 		if err != nil {
 			h.log.Error("open incident", "err", err)
 		}
-		h.openAlerts(m, id, at, cause)
+		var diags []EventDiag
+		var ids []int64
+		h.mu.Lock()
+		if st := h.monitors[m.ID]; st != nil {
+			diags, ids = h.incidentDiagsLocked(st)
+		}
+		h.mu.Unlock()
+		if err := h.store.LinkDiagnostics(id, ids); err != nil {
+			h.log.Error("link diagnostics", "err", err)
+		}
+		h.openAlerts(m, id, at, cause, diags)
 	case StatusUp:
 		_ = h.store.ResolveIncident(m.ID, at)
 		h.closeAlerts(m, at)
@@ -913,5 +936,11 @@ func (h *Hub) compactResults(ctx context.Context, now time.Time) {
 		h.log.Error("prune audit log", "err", err)
 	} else if n > 0 {
 		h.log.Info("pruned audit log", "rows", n)
+	}
+	// Diagnostics of failures that never became an incident go after a day.
+	if n, err := h.store.PruneDiagnostics(now.Add(-day).UnixMilli(), now.Add(-time.Duration(g.DiagRetentionDays)*day).UnixMilli()); err != nil {
+		h.log.Error("prune diagnostics", "err", err)
+	} else if n > 0 {
+		h.log.Info("pruned diagnostics", "rows", n)
 	}
 }

@@ -206,7 +206,8 @@
     "zoomHint": "trascina sul grafico per ingrandire",
     "zoomed": "{from} → {to}",
     "zoomReset": "torna a {range}",
-    "noLocationOnline": "Nessuna località di questo monitor è online: i controlli non sono in esecuzione, quindi lo stato resta pending finché un agent non si ricollega."
+    "noLocationOnline": "Nessuna località di questo monitor è online: i controlli non sono in esecuzione, quindi lo stato resta pending finché un agent non si ricollega.",
+    "diagnostics": "diagnostica"
   },
   "browserNotify": {
     "title": "notifiche desktop in questo browser",
@@ -442,7 +443,14 @@
     "unsaved": "modifiche non salvate",
     "unsavedChanges": "Hai modifiche non salvate. Uscire comunque da questa pagina?",
     "copyTitle": "copia di {name}",
-    "copyName": "{name} (copia)"
+    "copyName": "{name} (copia)",
+    "diagnostics": {
+      "label": "diagnostica sul down",
+      "hint": "al primo errore la località salva DNS, TCP, TLS, header della risposta e un traceroute, e li allega all'alert",
+      "default": "default dell'istanza",
+      "on": "attiva",
+      "off": "spenta"
+    }
   },
   "testCheck": {
     "title": "controllo di prova",
@@ -556,7 +564,9 @@
     "allMonitors": "tutti i monitor",
     "noMatch": "nessun incidente corrisponde",
     "count": "{count, plural, one {# incidente} other {# incidenti}}",
-    "showChecks": "mostra i controlli intorno a questo incidente"
+    "showChecks": "mostra i controlli intorno a questo incidente",
+    "diagnostics": "diagnostica",
+    "diagnosticsHint": "cosa hanno visto le località in errore: DNS, TCP, TLS, header della risposta, traceroute"
   },
   "maintenance": {
     "title": "manutenzione",
@@ -1112,7 +1122,12 @@
     "ipFamily": "versione ip",
     "ipFamilyHint": "come i monitor controllano gli host dual-stack, se non impostano la propria. le località senza IPv6 controllano via IPv4",
     "auditRetention": "conserva il registro attività (giorni)",
-    "auditRetentionHint": "Giorni per cui il registro attività conserva le voci, da 30 a 3650."
+    "auditRetentionHint": "Giorni per cui il registro attività conserva le voci, da 30 a 3650.",
+    "diagnostics": "diagnostica",
+    "diagnosticsOn": "diagnostica automatica",
+    "diagnosticsHint": "al primo errore di un controllo la località salva DNS, TCP, TLS, header della risposta (mai il body) e un traceroute, e li allega all'alert. Mai nelle status page.",
+    "diagRetention": "conserva la diagnostica (giorni)",
+    "diagRetentionHint": "per gli incidenti; quella degli errori rientrati da soli si cancella dopo un giorno"
   },
   "authSettings": {
     "title": "autenticazione",
@@ -1569,5 +1584,21 @@
     "noChanges": "ancora nessuna modifica registrata.",
     "activityIntro": "I tuoi accessi, le modifiche alla verifica in due passaggi, i token api e gli accessi delle app degli ultimi 30 giorni. Qualcosa che non riconosci? Cambia la password e revoca i token e le app che non usi.",
     "noActivity": "niente negli ultimi 30 giorni."
+  },
+  "diagnostics": {
+    "loading": "carico la diagnostica…",
+    "loadError": "impossibile caricare la diagnostica",
+    "none": "nessuna diagnostica per questo incidente",
+    "took": "raccolta in {ms} ms",
+    "copy": "copia come testo",
+    "noRecords": "nessun record",
+    "open": "aperta",
+    "issuer": "emittente",
+    "until": "fino al",
+    "note": "nota",
+    "headers": "header della risposta",
+    "redacted": "nascosto",
+    "reached": "destinazione raggiunta",
+    "notReached": "destinazione non raggiunta"
   }
 }

@@ -39,6 +39,11 @@ type GeneralSettings struct {
 	// IPFamily is the default IP family of monitors (1 IPv4 or IPv6, 4, 6,
 	// 46 IPv4 and IPv6). Monitors can override it.
 	IPFamily int `json:"ip_family"`
+	// Diagnostics collects DNS, TCP, TLS, response headers and a traceroute
+	// at the first failure of a check. Monitors can override it.
+	Diagnostics *bool `json:"diagnostics,omitempty"`
+	// DiagRetentionDays is how long the diagnostics of incidents are kept.
+	DiagRetentionDays int `json:"diag_retention_days"`
 	// UpdateCheck looks for new pingtxt releases on GitHub.
 	UpdateCheck UpdateCheckSettings `json:"update_check"`
 	// AuditRetentionDays is how long the audit log keeps its entries.
@@ -165,6 +170,14 @@ func (g *GeneralSettings) normalize() {
 	if !validFamily(g.IPFamily) {
 		g.IPFamily = ipEither
 	}
+	if g.Diagnostics == nil {
+		on := true
+		g.Diagnostics = &on
+	}
+	if g.DiagRetentionDays <= 0 {
+		g.DiagRetentionDays = 30
+	}
+	g.DiagRetentionDays = min(g.DiagRetentionDays, 365)
 	g.Expiry.CertDays = normalizeDays(g.Expiry.CertDays, defaultCertDays)
 	g.Expiry.DomainDays = normalizeDays(g.Expiry.DomainDays, defaultDomainDays)
 }

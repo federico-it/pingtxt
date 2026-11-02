@@ -66,6 +66,8 @@ export interface Monitor {
   /** 4 = IPv4 only, 6 = IPv6 only, 0 = either */
   /** 0 instance default, 1 IPv4 or IPv6, 4, 6, 46 IPv4 and IPv6 */
   ip_family: IPFamily
+  /** diagnostics at the first failure: 0 instance default, 1 on, 2 off */
+  diagnostics: 0 | 1 | 2
   locations: string[]
   /** 0 = no group */
   group_id: number
@@ -196,6 +198,39 @@ export interface Incident {
   started_at: number
   resolved_at: number
   cause: string
+  /** locations sent diagnostics for it */
+  diagnostics: boolean
+}
+
+/** What a location found out about a failing check (see GET /api/incidents/{id}/diagnostics). */
+export interface Diag {
+  at: number
+  host?: string
+  port?: string
+  dns?: { resolver: string; query: string; answers?: string[]; cname?: string; ms: number; error?: string }[]
+  tcp?: { addr: string; ok: boolean; ms: number; error?: string }[]
+  tls?: { addr: string; version?: string; subject?: string; issuer?: string; sans?: string[]; not_after?: number; error?: string }
+  http?: { status: number; proto?: string; remote_addr?: string; redirects?: string[]; headers?: { name: string; value: string }[] }
+  trace?: {
+    proto: "tcp" | "udp"
+    dest: string
+    port: number
+    reached: boolean
+    error?: string
+    hops?: { ttl: number; addr?: string; name?: string; rtt_ms?: number }[]
+  }
+  note?: string
+  ms: number
+}
+
+export interface Diagnostic {
+  id: number
+  monitor_id: number
+  incident_id: number
+  location: string
+  location_name: string
+  at: number
+  data: Diag
 }
 
 export interface Agent {
@@ -497,6 +532,10 @@ export interface GeneralSettings {
   /** default percent of failing locations that marks a monitor degraded */
   degraded_pct: number
   ip_family: Exclude<IPFamily, 0>
+  /** collect diagnostics at the first failure of a check */
+  diagnostics: boolean
+  /** days the diagnostics of incidents are kept */
+  diag_retention_days: number
   update_check: { disabled: boolean }
   /** days the audit log keeps its entries (30-3650) */
   audit_retention_days: number

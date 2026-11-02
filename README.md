@@ -369,6 +369,32 @@ Each notification channel has two optional settings, in minutes:
 Times count from when the incident opened. Nothing is sent during a maintenance window: due alerts go out when it ends.
 What each channel received is stored with the incident, so a restart does not repeat or skip alerts.
 
+## Diagnostics on failure
+
+At the first failure of a check, the location that ran it (the hub or an agent) collects diagnostics
+right away and sends them with the failed result, so they are ready when the alert goes out:
+
+- **DNS**: the A/AAAA answers (and CNAME) of the system resolver; for DNS monitors also the answer of
+  their server and the NS records of the name
+- **TCP**: a connection to each resolved address (up to 4) on the monitor's port
+- **TLS**: version, certificate subject, issuer, names, expiry and the verification error
+- **HTTP**: status, redirects (without query strings) and response headers. Cookies, `Authorization`
+  and any header whose name contains token, key, secret, session, csrf or auth are redacted. The body
+  and the request headers are never kept
+- **traceroute**: up to 20 hops with reverse names, as TCP SYNs to the monitor's port (UDP for ping
+  and DNS). It needs no root: on Linux it reads the ICMP errors with `IP_RECVERR`, like `tracepath`,
+  so it works in the non-root containers. Other systems skip it for now
+
+It takes at most 8 seconds and 16 KB, and runs at most once every 10 minutes per monitor and location.
+Agents older than this version ignore the request. The first alert of an incident lists one line per
+failing location and a link to the full diagnostics on the incidents page (`/incidents/?diag=<id>`);
+webhooks get `diagnostics` and `diagnostics_url`, reminders only the link. Diagnostics are never shown
+on status pages. They are also in the API (`GET /api/incidents/{id}/diagnostics`) and the MCP tool
+`get_incident_diagnostics`.
+
+Turn them off in Settings → monitors, or per monitor (instance default / on / off). Diagnostics of
+incidents are kept 30 days (configurable); those of failures that never became an incident, one day.
+
 ## Heartbeat monitors (cron jobs)
 
 For jobs that run on a schedule (backups, cron, queues) create a monitor of type **heartbeat (push)**. It gets a secret URL; the job calls it at the end of every run, with any HTTP method:

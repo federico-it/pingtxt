@@ -278,6 +278,13 @@ func appMessage(e Event) pushMessage {
 			if d := e.downFor(); d != "" {
 				body = append(body, "Down for "+d)
 			}
+			// Only the first location fits a push; the app opens the rest.
+			if len(e.Diagnostics) > 0 {
+				body = append(body, e.Diagnostics[0].Location+": "+e.Diagnostics[0].Summary)
+			}
+			if e.DiagnosticsURL != "" {
+				m.Data["diagnostics_url"] = e.DiagnosticsURL
+			}
 		} else {
 			m.Title = e.Monitor + " is back up"
 			m.Category = CategoryMonitorUp

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Suspense, useState } from "react"
+import { Fragment, Suspense, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
@@ -19,6 +19,7 @@ import { KV, PageHeader, Section } from "@/components/page-header"
 import { OkText, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
 import { ResultsLog, type TimeWindow } from "@/components/results-log"
+import { IncidentDiagnostics } from "@/components/diagnostics"
 import { TestResults, type TestResult } from "@/components/test-results"
 import { Button } from "@/components/ui/button"
 import {
@@ -91,6 +92,7 @@ function View() {
     id ? `/api/incidents?monitor=${id}` : null,
     { refreshInterval: 30_000 }
   )
+  const [openDiag, setOpenDiag] = useState(0)
 
   if (m.error) return <div className="text-down">! {m.error.message}</div>
   if (!m.data)
@@ -410,7 +412,8 @@ function View() {
         {incidents.data?.length ? (
           <div className="grid gap-1">
             {incidents.data.slice(0, 10).map((i) => (
-              <div key={i.id} className="flex flex-wrap gap-x-3 text-xs">
+              <Fragment key={i.id}>
+              <div className="flex flex-wrap items-center gap-x-3 text-xs">
                 <span
                   className={
                     i.resolved_at ? "text-muted-foreground" : "text-down"
@@ -425,7 +428,22 @@ function View() {
                 <span className="min-w-0 flex-1 truncate text-muted-foreground">
                   {i.cause}
                 </span>
+                {i.diagnostics && (
+                  <button
+                    onClick={() => setOpenDiag(openDiag === i.id ? 0 : i.id)}
+                    className={segment({ active: openDiag === i.id, size: "xs" })}
+                    aria-expanded={openDiag === i.id}
+                  >
+                    {t("diagnostics")}
+                  </button>
+                )}
               </div>
+              {openDiag === i.id && (
+                <div className="my-2 border border-dashed p-3">
+                  <IncidentDiagnostics incident={i.id} />
+                </div>
+              )}
+              </Fragment>
             ))}
           </div>
         ) : (
