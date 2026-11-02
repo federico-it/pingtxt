@@ -59,6 +59,10 @@ type Event struct {
 	// is its host name, DownSince when it disconnected.
 	AgentID int64  `json:"agent_id,omitempty"`
 	Agent   string `json:"agent,omitempty"`
+	// First alert of an incident: what the failing locations found out
+	// (DNS, TCP, TLS, HTTP, traceroute). Reminders carry only the link.
+	Diagnostics    []EventDiag `json:"diagnostics,omitempty"`
+	DiagnosticsURL string      `json:"diagnostics_url,omitempty"`
 }
 
 // Alert reports whether the event is bad news (sent with high priority).
@@ -154,7 +158,7 @@ func (e Event) Text() string {
 		if e.Cause != "" {
 			s += "\n> " + e.Cause
 		}
-		return s
+		return s + e.diagText()
 	}
 	s := fmt.Sprintf("%s[UP] %s (%s) is back up at %s", prefix, e.Monitor, e.Target, ts)
 	if d := e.downFor(); d != "" {

@@ -304,6 +304,35 @@ export function MonitorDefaultsForm({ settings, onSaved }: FormProps) {
           </Field>
         </div>
       </Section>
+      <Section title={t("diagnostics")}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t("diagnosticsOn")} hint={t("diagnosticsHint")}>
+            <label className="flex h-8 items-center gap-2 text-xs">
+              <Switch
+                checked={g.diagnostics !== false}
+                onCheckedChange={(v) => set("diagnostics", v)}
+              />
+              {g.diagnostics !== false ? t("enabled") : t("disabled")}
+            </label>
+          </Field>
+          <Field
+            label={t("diagRetention")}
+            htmlFor="diag_retention"
+            hint={t("diagRetentionHint")}
+          >
+            <Input
+              id="diag_retention"
+              type="number"
+              min={1}
+              max={365}
+              value={g.diag_retention_days || 30}
+              onChange={(e) =>
+                set("diag_retention_days", Number(e.target.value))
+              }
+            />
+          </Field>
+        </div>
+      </Section>
       <Section title={t("expiry")}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field

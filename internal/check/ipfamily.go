@@ -36,6 +36,7 @@ func runBoth(ctx context.Context, j Job, run func(context.Context, Job) Result) 
 	case !r6.OK:
 		r.Message = "IPv6: " + r6.Message
 		r.StatusCode = r6.StatusCode
+		r.http = r6.http
 	case !r4.OK:
 		r.Message = "IPv4: " + r4.Message
 	}

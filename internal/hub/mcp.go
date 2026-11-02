@@ -504,6 +504,7 @@ func monitorFields() map[string]any {
 		"dns_expected":        prop("string", "Expected DNS answer"),
 		"ignore_tls":          prop("boolean", "Ignore TLS certificate errors"),
 		"ip_family":           map[string]any{"type": "integer", "enum": []int{0, 1, 4, 6, 46}, "description": "0 instance default, 1 IPv4 or IPv6 (first to connect), 4 IPv4 only, 6 IPv6 only, 46 IPv4 and IPv6 (both must work). 6 and 46 are refused on locations without IPv6"},
+		"diagnostics":         map[string]any{"type": "integer", "enum": []int{0, 1, 2}, "description": "Diagnostics (DNS, TCP, TLS, response headers, traceroute) at the first failure: 0 instance default, 1 on, 2 off"},
 		"grace_sec":           prop("integer", "Push monitors: extra seconds before a missing heartbeat is down"),
 		"slow_ms":             prop("integer", "Response time in ms above which a location is slow (median of its last 3 successful checks). Slow locations can make the monitor degraded, never down. 0 = off, -1 = automatic from each location's usual response time (3x, at least +100 ms, after 24h of history). A fixed value must be below timeout_ms"),
 		"locations":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Where to check from: ids from list_agents (\"local\" is the hub itself). Default local."},
@@ -652,6 +653,20 @@ var mcpTools = []mcpTool{
 				return out, nil
 			}
 			return res, nil
+		},
+	},
+	{
+		name: "get_incident_diagnostics", title: "Get incident diagnostics",
+		description: "What the failing locations found at the start of an incident: DNS answers, TCP connections, TLS certificate, HTTP status and response headers (secrets redacted, no body) and a traceroute (hops with address, reverse name and RTT; reached=false means the path stops at the last hop that answered). list_incidents marks incidents that have some with diagnostics=true.",
+		schema: object(map[string]any{
+			"incident_id": prop("integer", "Incident id from list_incidents"),
+		}, "incident_id"),
+		run: func(c *mcpCall) (any, error) {
+			id, err := c.id("incident_id")
+			if err != nil {
+				return nil, err
+			}
+			return c.do("GET", fmt.Sprintf("/api/incidents/%d/diagnostics", id), nil)
 		},
 	},
 	{

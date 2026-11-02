@@ -164,6 +164,8 @@ function withValue(list: { value: string; label: string }[], sec: number) {
 
 const methods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 const records = ["A", "AAAA", "CNAME", "MX", "TXT", "NS"]
+const diagModes = [0, 1, 2] as const
+const diagModeKey = { 0: "default", 1: "on", 2: "off" } as const
 const ipFamilies = [0, 1, 4, 6, 46] as const
 const slowModes = ["off", "auto", "fixed"] as const
 const ipFamilyKey = {
@@ -203,6 +205,7 @@ export const emptyMonitor: MonitorInput = {
   degraded_pct: 0,
   slow_ms: 0,
   ip_family: 0,
+  diagnostics: 0,
   locations: ["local"],
   group_id: 0,
   tag_ids: [],
@@ -892,6 +895,31 @@ export function MonitorForm({
                         }
                       >
                         {tr(`ipFamily.${ipFamilyKey[f]}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+            {m.type !== "push" && (
+              <Field label={tr("diagnostics.label")} hint={tr("diagnostics.hint")}>
+                <Select
+                  items={diagModes.map((v) => ({
+                    value: String(v),
+                    label: tr(`diagnostics.${diagModeKey[v]}`),
+                  }))}
+                  value={String(m.diagnostics ?? 0)}
+                  onValueChange={(v) =>
+                    v && set("diagnostics", Number(v) as Monitor["diagnostics"])
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {diagModes.map((v) => (
+                      <SelectItem key={v} value={String(v)}>
+                        {tr(`diagnostics.${diagModeKey[v]}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>

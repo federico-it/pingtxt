@@ -169,6 +169,8 @@ func eventMailView(e Event, base string) mailView {
 		if base != "" {
 			v.Action = &mailLink{Label: "open agents", Href: base + "/agents/"}
 		}
+	} else if e.DiagnosticsURL != "" {
+		v.Action = &mailLink{Label: "full diagnostics", Href: e.DiagnosticsURL}
 	} else if u := monitorURL(base, e.MonitorID); u != "" {
 		v.Action = &mailLink{Label: "open monitor", Href: u}
 	}
@@ -208,6 +210,11 @@ func statusMailView(v *mailView, e Event) {
 		}
 		if e.Reminder > 0 {
 			v.Rows = append(v.Rows, mailRow{Key: "reminder", Value: fmt.Sprintf("#%d", e.Reminder)})
+		}
+		for _, d := range e.Diagnostics {
+			if rows := diagMailRows(d.Diag); len(rows) > 0 {
+				v.Sections = append(v.Sections, mailSection{Title: "diagnostics · " + d.Location, Rows: rows})
+			}
 		}
 		return
 	}

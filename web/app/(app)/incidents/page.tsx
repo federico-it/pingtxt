@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Suspense } from "react"
+import { Fragment, Suspense, useEffect, useState } from "react"
+import { ActivityIcon } from "lucide-react"
 import { useTranslations } from "use-intl"
 
 import { Empty, PageHeader } from "@/components/page-header"
@@ -12,6 +13,7 @@ import { useApi, type Incident, type MonitorSummary } from "@/lib/api"
 import { useMinute, useNow } from "@/hooks/use-now"
 import { datetime, duration } from "@/lib/format"
 import { segment } from "@/components/ui/control"
+import { IncidentDiagnostics } from "@/components/diagnostics"
 
 const states = ["all", "open", "resolved"] as const
 const periods = ["24h", "7d", "30d", "all"] as const
@@ -42,6 +44,9 @@ function Incidents() {
   const minute = useMinute()
   const now = useNow()
   const t = useTranslations("incidents")
+  // ?diag=<id> (the link of an alert) opens the diagnostics of an incident.
+  const diagParam = Number(params.get("diag")) || 0
+  const [open, setOpen] = useState<number>(diagParam)
 
   const q = new URLSearchParams({ limit: "200" })
   if (state !== "all") q.set("state", state)
@@ -50,6 +55,11 @@ function Incidents() {
   if (periodMs[period] && minute) q.set("since", String(minute - periodMs[period]))
   const { data } = useApi<Incident[]>(`/api/incidents?${q}`)
   const monitors = useApi<MonitorSummary[]>("/api/monitors", { refreshInterval: 60_000 })
+  const loaded = !!data
+  useEffect(() => {
+    if (diagParam && loaded) document.getElementById(`incident-${diagParam}`)?.scrollIntoView({ block: "start" })
+  }, [diagParam, loaded])
+
   const monitorItems = [
     { value: "0", label: t("allMonitors") },
     ...[...(monitors.data ?? [])]
@@ -127,6 +137,7 @@ function Incidents() {
               <TableHead>{t("started")}</TableHead>
               <TableHead>{t("duration")}</TableHead>
               <TableHead className="hidden md:table-cell">{t("cause")}</TableHead>
+              <TableHead className="hidden w-0 md:table-cell" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -134,7 +145,8 @@ function Incidents() {
               // The monitor's check log around the incident.
               const to = (i.resolved_at || now) + 60_000
               return (
-                <TableRow key={i.id}>
+                <Fragment key={i.id}>
+                <TableRow id={`incident-${i.id}`} className="scroll-mt-20">
                   <TableCell>
                     {i.resolved_at ? (
                       <span className="text-up">{t("resolved")}</span>
@@ -146,6 +158,16 @@ function Incidents() {
                     <Link href={`/monitors/view/?id=${i.monitor_id}`} className="underline-offset-4 hover:underline">
                       {i.monitor_name}
                     </Link>
+                    {i.diagnostics && (
+                      <button
+                        onClick={() => setOpen(open === i.id ? 0 : i.id)}
+                        className={segment({ active: open === i.id, size: "xs", className: "ml-2 md:hidden" })}
+                        aria-expanded={open === i.id}
+                        aria-label={t("diagnostics")}
+                      >
+                        <ActivityIcon className="size-3" />
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     <Link
@@ -162,7 +184,31 @@ function Incidents() {
                   <TableCell className="hidden max-w-md truncate text-muted-foreground md:table-cell" title={i.cause}>
                     {i.cause}
                   </TableCell>
+                  <TableCell className="hidden text-right md:table-cell">
+                    {i.diagnostics && (
+                      <button
+                        onClick={() => setOpen(open === i.id ? 0 : i.id)}
+                        className={segment({ active: open === i.id, size: "xs" })}
+                        aria-expanded={open === i.id}
+                        title={t("diagnosticsHint")}
+                      >
+                        <ActivityIcon className="mr-1 size-3" />
+                        {t("diagnostics")}
+                      </button>
+                    )}
+                  </TableCell>
                 </TableRow>
+                {open === i.id && i.diagnostics && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={6} className="bg-muted/30 p-3 whitespace-normal sm:p-4">
+                      {/* Pinned to the viewport while the table scrolls sideways on phones. */}
+                      <div className="sticky left-3 max-w-[calc(100vw-3.5rem)] md:static md:max-w-none">
+                        <IncidentDiagnostics incident={i.id} />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                </Fragment>
               )
             })}
           </TableBody>

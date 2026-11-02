@@ -206,7 +206,8 @@
     "zoomHint": "drag across the chart to zoom in",
     "zoomed": "{from} → {to}",
     "zoomReset": "back to {range}",
-    "noLocationOnline": "No location of this monitor is online: its checks are not running, so the status is pending until an agent reconnects."
+    "noLocationOnline": "No location of this monitor is online: its checks are not running, so the status is pending until an agent reconnects.",
+    "diagnostics": "diagnostics"
   },
   "browserNotify": {
     "title": "desktop notifications in this browser",
@@ -442,7 +443,14 @@
     "unsaved": "unsaved changes",
     "unsavedChanges": "You have unsaved changes. Leave this page anyway?",
     "copyTitle": "copy of {name}",
-    "copyName": "{name} (copy)"
+    "copyName": "{name} (copy)",
+    "diagnostics": {
+      "label": "diagnostics on failure",
+      "hint": "at the first failure the location saves DNS, TCP, TLS, response headers and a traceroute, and attaches them to the alert",
+      "default": "instance default",
+      "on": "on",
+      "off": "off"
+    }
   },
   "testCheck": {
     "title": "test check",
@@ -556,7 +564,9 @@
     "allMonitors": "all monitors",
     "noMatch": "no incidents match",
     "count": "{count, plural, one {# incident} other {# incidents}}",
-    "showChecks": "show the checks around this incident"
+    "showChecks": "show the checks around this incident",
+    "diagnostics": "diagnostics",
+    "diagnosticsHint": "what the failing locations saw: DNS, TCP, TLS, response headers, traceroute"
   },
   "maintenance": {
     "title": "maintenance",
@@ -1112,7 +1122,12 @@
     "ipFamily": "ip version",
     "ipFamilyHint": "how monitors check dual-stack hosts, unless they set their own. locations without IPv6 check over IPv4",
     "auditRetention": "keep audit log (days)",
-    "auditRetentionHint": "Days the audit log keeps its entries, 30 to 3650."
+    "auditRetentionHint": "Days the audit log keeps its entries, 30 to 3650.",
+    "diagnostics": "diagnostics",
+    "diagnosticsOn": "automatic diagnostics",
+    "diagnosticsHint": "at the first failure of a check the location saves DNS, TCP, TLS, response headers (never the body) and a traceroute, and attaches them to the alert. Never shown on status pages.",
+    "diagRetention": "keep diagnostics (days)",
+    "diagRetentionHint": "for incidents; diagnostics of failures that recovered by themselves are deleted after a day"
   },
   "authSettings": {
     "title": "authentication",
@@ -1569,5 +1584,21 @@
     "noChanges": "no changes recorded yet.",
     "activityIntro": "Your logins, two-factor changes, api tokens and app sign-ins of the last 30 days. Something you don't recognize? Change your password and revoke the tokens and apps you don't use.",
     "noActivity": "nothing in the last 30 days."
+  },
+  "diagnostics": {
+    "loading": "loading diagnostics…",
+    "loadError": "could not load the diagnostics",
+    "none": "no diagnostics for this incident",
+    "took": "collected in {ms} ms",
+    "copy": "copy as text",
+    "noRecords": "no records",
+    "open": "open",
+    "issuer": "issuer",
+    "until": "until",
+    "note": "note",
+    "headers": "response headers",
+    "redacted": "redacted",
+    "reached": "destination reached",
+    "notReached": "destination not reached"
   }
 }

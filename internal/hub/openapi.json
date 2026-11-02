@@ -2388,6 +2388,55 @@
         }
       }
     },
+    "/api/incidents/{id}/diagnostics": {
+      "get": {
+        "tags": [
+          "Incidents"
+        ],
+        "summary": "Incident diagnostics",
+        "operationId": "getIncidentDiagnostics",
+        "description": "Diagnostics the failing locations collected at the start of the incident (one per location), oldest first. Never shown on status pages.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the incident."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diagnostics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Diagnostic"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/api/locations": {
       "get": {
         "tags": [
@@ -3719,6 +3768,77 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/monitors/{id}/diagnostics": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Latest diagnostics",
+        "operationId": "monitorDiagnostics",
+        "description": "Latest diagnostics of a monitor, newest first, including failures that did not become an incident (kept one day).\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Only diagnostics taken at or after this time (unix ms)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "Maximum number of diagnostics."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diagnostics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Diagnostic"
+                  }
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -9557,6 +9677,15 @@
           "paused": {
             "type": "boolean",
             "description": "Create the monitor paused. Ignored on update: use POST /api/monitors/{id}/pause."
+          },
+          "diagnostics": {
+            "type": "integer",
+            "enum": [
+              0,
+              1,
+              2
+            ],
+            "description": "Diagnostics at the first failure of a check (DNS, TCP, TLS, response headers, traceroute), collected by the failing location: 0 = instance default (GeneralSettings.diagnostics), 1 = on, 2 = off. Ignored for push."
           }
         },
         "required": [
@@ -9916,6 +10045,10 @@
           },
           "cause": {
             "type": "string"
+          },
+          "diagnostics": {
+            "type": "boolean",
+            "description": "Locations sent diagnostics for this incident (see getIncidentDiagnostics)."
           }
         }
       },
@@ -10671,6 +10804,16 @@
           "audit_retention_days": {
             "type": "integer",
             "description": "Days the audit log keeps its entries, 30 to 3650 (default 365)."
+          },
+          "diagnostics": {
+            "type": "boolean",
+            "description": "Collect diagnostics at the first failure of a check, for monitors with diagnostics 0. Default true."
+          },
+          "diag_retention_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "description": "Days the diagnostics of incidents are kept (default 30). Diagnostics of failures that never became an incident are deleted after a day."
           }
         }
       },
@@ -11802,6 +11945,225 @@
           "request_id": {
             "type": "string",
             "description": "Same for every entry of one request (bulk changes, imports)."
+          }
+        }
+      },
+      "Diag": {
+        "type": "object",
+        "description": "What a location found out about a failing check. Request headers and the response body are never kept; secret response headers are redacted.",
+        "properties": {
+          "at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds."
+          },
+          "host": {
+            "type": "string"
+          },
+          "port": {
+            "type": "string"
+          },
+          "dns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "resolver": {
+                  "type": "string",
+                  "description": "system, or the DNS server of a dns monitor."
+                },
+                "query": {
+                  "type": "string",
+                  "description": "e.g. A/AAAA example.com"
+                },
+                "answers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cname": {
+                  "type": "string"
+                },
+                "ms": {
+                  "type": "number"
+                },
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "tcp": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "addr": {
+                  "type": "string"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "ms": {
+                  "type": "number"
+                },
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "tls": {
+            "type": "object",
+            "properties": {
+              "addr": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "issuer": {
+                "type": "string"
+              },
+              "sans": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "not_after": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix seconds."
+              },
+              "error": {
+                "type": "string",
+                "description": "Handshake or verification error."
+              }
+            }
+          },
+          "http": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer"
+              },
+              "proto": {
+                "type": "string"
+              },
+              "remote_addr": {
+                "type": "string"
+              },
+              "redirects": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Redirect hops, without query strings."
+              },
+              "headers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "trace": {
+            "type": "object",
+            "properties": {
+              "proto": {
+                "type": "string",
+                "enum": [
+                  "tcp",
+                  "udp"
+                ]
+              },
+              "dest": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              },
+              "reached": {
+                "type": "boolean"
+              },
+              "error": {
+                "type": "string"
+              },
+              "hops": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "ttl": {
+                      "type": "integer"
+                    },
+                    "addr": {
+                      "type": "string",
+                      "description": "Empty when the hop did not answer."
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "rtt_ms": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "note": {
+            "type": "string"
+          },
+          "ms": {
+            "type": "number",
+            "description": "Time spent collecting."
+          }
+        }
+      },
+      "Diagnostic": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monitor_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "incident_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "0 when the failure did not become an incident (yet)."
+          },
+          "location": {
+            "type": "string"
+          },
+          "location_name": {
+            "type": "string"
+          },
+          "at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds."
+          },
+          "data": {
+            "$ref": "#/components/schemas/Diag"
           }
         }
       }

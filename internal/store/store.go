@@ -658,6 +658,46 @@ var laterMigrations = []migration{
 		INDEX audit_log_user (user_id, id)
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 30: diagnostics collected by the location of a failing check (DNS,
+	// TCP, TLS, response headers, traceroute), linked to the incident they
+	// explain (0 = none yet), and the per-monitor switch (0 follows the
+	// instance setting, 1 on, 2 off).
+	{
+		sqlite: `ALTER TABLE monitors ADD COLUMN diagnostics INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE diagnostics (
+		id INTEGER PRIMARY KEY,
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		incident_id INTEGER NOT NULL DEFAULT 0,
+		location TEXT NOT NULL,
+		at INTEGER NOT NULL,
+		data TEXT NOT NULL
+	);
+	CREATE INDEX diagnostics_monitor ON diagnostics(monitor_id, at);
+	CREATE INDEX diagnostics_incident ON diagnostics(incident_id);`,
+		postgres: `ALTER TABLE monitors ADD COLUMN diagnostics INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE diagnostics (
+		id BIGSERIAL PRIMARY KEY,
+		monitor_id BIGINT NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		incident_id BIGINT NOT NULL DEFAULT 0,
+		location TEXT NOT NULL,
+		at BIGINT NOT NULL,
+		data TEXT NOT NULL
+	);
+	CREATE INDEX diagnostics_monitor ON diagnostics(monitor_id, at);
+	CREATE INDEX diagnostics_incident ON diagnostics(incident_id);`,
+		mysql: `ALTER TABLE monitors ADD COLUMN diagnostics INT NOT NULL DEFAULT 0;
+	CREATE TABLE diagnostics (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		monitor_id BIGINT NOT NULL,
+		incident_id BIGINT NOT NULL DEFAULT 0,
+		location VARCHAR(255) NOT NULL,
+		at BIGINT NOT NULL,
+		data MEDIUMTEXT NOT NULL,
+		INDEX diagnostics_monitor (monitor_id, at),
+		INDEX diagnostics_incident (incident_id),
+		FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

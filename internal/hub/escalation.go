@@ -26,6 +26,8 @@ type alertState struct {
 	started  int64 // unix ms
 	cause    string
 	sent     map[int64]store.AlertSent // by notifier id
+	diags    []EventDiag               // for the first alert
+	diagURL  string
 }
 
 func newAlertState(a *store.IncidentAlerts) *alertState {
@@ -70,8 +72,12 @@ func (h *Hub) dueAlertsLocked(st *monState, list []*store.Notifier, rt routing, 
 			ev: Event{
 				MonitorID: st.m.ID, Monitor: st.m.Name, Target: eventTarget(st.m), Status: StatusDown,
 				Cause: a.cause, At: now, DownSince: a.started, Reminder: prev.Count,
+				DiagnosticsURL: a.diagURL,
 			},
 		})
+		if prev.Count == 0 {
+			out[len(out)-1].ev.Diagnostics = a.diags
+		}
 	}
 	return out
 }
@@ -90,15 +96,19 @@ func (h *Hub) sendAlerts(list []pendingAlert) {
 
 // openAlerts starts following a new incident and sends the alerts due right
 // away (channels without a delay).
-func (h *Hub) openAlerts(m *store.Monitor, incident, at int64, cause string) {
+func (h *Hub) openAlerts(m *store.Monitor, incident, at int64, cause string, diags []EventDiag) {
 	list, rt, err := h.loadRouting()
 	if err != nil {
 		h.log.Error("list notifiers", "err", err)
 	}
+	url := ""
+	if len(diags) > 0 {
+		url = diagURL(publicBase(h.generalSettings().PublicURL), incident)
+	}
 	h.mu.Lock()
 	var due []pendingAlert
 	if st := h.monitors[m.ID]; st != nil {
-		st.alerts = &alertState{incident: incident, started: at, cause: cause, sent: map[int64]store.AlertSent{}}
+		st.alerts = &alertState{incident: incident, started: at, cause: cause, sent: map[int64]store.AlertSent{}, diags: diags, diagURL: url}
 		due = h.dueAlertsLocked(st, list, rt, at)
 	}
 	h.mu.Unlock()
