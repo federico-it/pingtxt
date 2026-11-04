@@ -29,12 +29,17 @@ start. What the app itself sends is described in the [privacy policy](https://pi
 
 ## Choose what each phone gets
 
-Every phone has its own notification preferences, set in the app on that phone:
+Each user chooses in the app what their phones get:
 
 - **events**: down, back up, degraded, certificate and domain expiry, agent offline.
 - **monitors**: all of them, or only the monitors of some groups (with their subgroups) and tags, plus monitors picked
   one by one. Agent offline is about agents and follows the events only.
-- **mute**: the whole phone, or one monitor on it, for a while or until you turn it back on.
+- **mute**: everything, or one monitor, for a while or until you turn it back on.
+- **receive on**: every phone, or only one of them (for example the iPhone and not the iPad), to avoid getting each
+  alert twice. If that phone signs out, the others get the alerts again.
+
+These account preferences apply to all your phones. A phone can instead have events and monitors of its own, and can
+be muted by itself: an alert reaches a phone only when neither the account nor the phone is muted.
 
 The preferences are personal, so read-only users set them too. They change nothing for other people, channels or
 status pages, and they only leave notifications out: a phone never gets something its channels do not send. Test
@@ -90,8 +95,9 @@ registration.
   `hub_id`, so an app signed in to several hubs knows which one to call. Phones whose sign-in cannot change data get
   `MONITOR_DOWN_READONLY`, `MONITOR_DEGRADED_READONLY` and `EXPIRY_READONLY` instead of the categories with write
   actions. `POST /api/monitors/{id}/check` runs a check now.
-- Preferences of a phone: `GET` and `PUT /api/mobile/devices/{id}` (`current` = the phone of the calling sign-in),
-  `POST /api/mobile/devices/{id}/mute` with `monitor_id` and `minutes`, `DELETE /api/mobile/devices/{id}/mute`.
+- Preferences: `GET` and `PUT /api/mobile/preferences` for the account (with `primary_device_id`), and
+  `/api/mobile/devices/{id}` for one phone (`current` = the phone of the calling sign-in, `follow_account`). Mute with
+  `POST .../mute` (`monitor_id`, `minutes`) on either, unmute with `DELETE .../mute`.
 - Live Activity: the app sends its ActivityKit tokens to `PUT /api/mobile/live-activity/start-token` and `/token`.
 
 Every endpoint is in the [API reference](https://pingtxt.com/docs/api/).

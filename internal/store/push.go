@@ -1,7 +1,9 @@
 package store
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
 )
 
@@ -25,8 +27,26 @@ type PushDevice struct {
 	LAToken      string `json:"-"`
 	LAStartedAt  int64  `json:"-"`
 
-	// What the phone wants to hear about, set by its owner.
+	// What the phone wants to hear about, set by its owner. With
+	// FollowAccount (the default) the events and monitors are the owner's
+	// account preferences; the phone's own mutes apply either way.
+	FollowAccount bool `json:"follow_account"`
 	PushPrefs
+}
+
+// AccountPushPrefs are a user's preferences for all their phones. A mute
+// here mutes every phone. PrimaryDeviceID, when it names one of the user's
+// phones, is the only phone that gets notifications (no double alerts on a
+// phone and a tablet); 0 = every phone.
+type AccountPushPrefs struct {
+	PushPrefs
+	PrimaryDeviceID int64 `json:"primary_device_id"`
+}
+
+// devicePrefs is how a phone's preferences are stored.
+type devicePrefs struct {
+	PushPrefs
+	FollowAccount *bool `json:"follow_account"`
 }
 
 // Mute durations: MuteForever mutes until the owner turns it back on.
@@ -129,7 +149,11 @@ func scanPushDevices(rows interface {
 			&d.LAStartToken, &d.LAHubURL, &d.LAToken, &d.LAStartedAt, &prefs); err != nil {
 			return nil, err
 		}
-		d.PushPrefs = decodePushPrefs(prefs)
+		d.PushPrefs, d.FollowAccount = decodePushPrefs(prefs), true
+		var dp devicePrefs
+		if prefs != "" && json.Unmarshal([]byte(prefs), &dp) == nil && dp.FollowAccount != nil {
+			d.FollowAccount = *dp.FollowAccount
+		}
 		out = append(out, d)
 	}
 	return out, rows.Err()
@@ -198,7 +222,7 @@ func (s *Store) UserPushDevice(userID, id int64) (*PushDevice, error) {
 
 // UpdatePushDevice saves the name and preferences of a device of a user.
 func (s *Store) UpdatePushDevice(userID int64, d *PushDevice) error {
-	b, err := json.Marshal(d.PushPrefs)
+	b, err := json.Marshal(devicePrefs{PushPrefs: d.PushPrefs, FollowAccount: &d.FollowAccount})
 	if err != nil {
 		return err
 	}
@@ -210,6 +234,37 @@ func (s *Store) UpdatePushDevice(userID int64, d *PushDevice) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// UserPushPrefs returns the account preferences of a user for their phones.
+func (s *Store) UserPushPrefs(userID int64) (AccountPushPrefs, error) {
+	var raw string
+	err := s.db.QueryRow(`SELECT push_prefs FROM users WHERE id = ?`, userID).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return AccountPushPrefs{}, ErrNotFound
+	}
+	if err != nil {
+		return AccountPushPrefs{}, err
+	}
+	p := AccountPushPrefs{PushPrefs: decodePushPrefs(raw)}
+	if raw != "" {
+		var x struct {
+			PrimaryDeviceID int64 `json:"primary_device_id"`
+		}
+		_ = json.Unmarshal([]byte(raw), &x)
+		p.PrimaryDeviceID = x.PrimaryDeviceID
+	}
+	return p, nil
+}
+
+// SetUserPushPrefs saves the account preferences of a user for their phones.
+func (s *Store) SetUserPushPrefs(userID int64, p AccountPushPrefs) error {
+	b, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`UPDATE users SET push_prefs = ? WHERE id = ?`, string(b), userID)
+	return err
 }
 
 // CountPushDevices counts every registered device.

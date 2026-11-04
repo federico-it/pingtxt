@@ -9564,6 +9564,206 @@
           }
         }
       }
+    },
+    "/api/mobile/preferences": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Get my notification preferences",
+        "operationId": "getMobilePreferences",
+        "description": "Preferences for all the phones of the current user.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: the preferences are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPushPrefs"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Choose what my phones get",
+        "operationId": "updateMobilePreferences",
+        "description": "Changes the preferences for all the user's phones. Fields left out keep their value.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: the preferences are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPushPrefs"
+              },
+              "example": {
+                "events": [
+                  "down",
+                  "up"
+                ],
+                "primary_device_id": 3
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The account preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPushPrefs"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/mobile/preferences/mute": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mute all my phones",
+        "operationId": "muteMobilePreferences",
+        "description": "Mutes every phone of the user, or one monitor on all of them, for some minutes. Nothing changes for other people.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: the preferences are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "monitor_id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Monitor to mute; 0 or left out = the whole phone."
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 527040,
+                    "description": "How long; 0 or left out = until turned back on."
+                  }
+                }
+              },
+              "example": {
+                "monitor_id": 14,
+                "minutes": 60
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The account preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPushPrefs"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Unmute all my phones",
+        "operationId": "unmuteMobilePreferences",
+        "description": "Ends the account mute, or with monitor_id the mute of one monitor.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: the preferences are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "monitor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Monitor to unmute; left out = the mute of everything."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account preferences.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountPushPrefs"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -12816,7 +13016,7 @@
       },
       "PushPrefs": {
         "type": "object",
-        "description": "What a phone gets. The preferences only narrow down what the app notification channels send to the phone: they never add events a channel does not send. Test notifications ignore them.",
+        "description": "What a phone gets. The preferences only narrow down what the app notification channels send to the phone: they never add events a channel does not send. A phone is muted when its own mute or its account's mute says so. Test notifications ignore them.",
         "properties": {
           "name": {
             "type": "string",
@@ -12874,6 +13074,73 @@
               "$ref": "#/components/schemas/MonitorMute"
             },
             "description": "Monitors muted on this phone only. Ended mutes are left out."
+          },
+          "follow_account": {
+            "type": "boolean",
+            "description": "true (default): the phone gets the events and monitors of the account preferences (GET /api/mobile/preferences). Sending events or monitors without follow_account sets it to false. The phone's own mutes apply either way."
+          }
+        }
+      },
+      "AccountPushPrefs": {
+        "type": "object",
+        "description": "A user's notification preferences for all their phones. Phones follow the events and monitors unless they have their own (follow_account false).",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "down",
+                "up",
+                "degraded",
+                "cert_expiry",
+                "domain_expiry",
+                "agent_offline"
+              ]
+            },
+            "description": "Events the phone gets. Default: every event."
+          },
+          "all_monitors": {
+            "type": "boolean",
+            "description": "true (default): events of every monitor. false: only the monitors of group_ids (with their subgroups), tag_ids and monitor_ids. Agent events are about no monitor and follow events only."
+          },
+          "group_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "monitor_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "muted_until": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Mutes every phone of the user until this time (unix ms). 0 = not muted, -1 = until turned back on."
+          },
+          "muted_monitors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonitorMute"
+            },
+            "description": "Monitors muted on every phone of the user."
+          },
+          "primary_device_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The only phone that gets notifications (one of the user's phones, to avoid double alerts on a phone and a tablet). 0 = every phone. A phone that is no longer signed in counts as 0."
           }
         }
       }

@@ -30,12 +30,17 @@ successivo avvio. Cosa invia l'app è descritto nella [privacy policy](https://p
 
 ## Scegliere cosa riceve ogni telefono
 
-Ogni telefono ha le sue preferenze di notifica, che si impostano nell'app su quel telefono:
+Ogni utente sceglie nell'app cosa ricevono i suoi telefoni:
 
 - **eventi**: down, di nuovo up, degradato, scadenza di certificato e dominio, agent offline.
 - **monitor**: tutti, oppure solo i monitor di alcuni gruppi (con i sottogruppi) e tag, più monitor scelti uno per
   uno. Agent offline riguarda gli agent e segue solo gli eventi.
-- **silenzia**: tutto il telefono, o un monitor su di esso, per un po' o finché non lo riattivi.
+- **silenzia**: tutto, o un monitor, per un po' o finché non lo riattivi.
+- **ricevi su**: tutti i telefoni, o solo uno (per esempio l'iPhone e non l'iPad), per non ricevere ogni avviso due
+  volte. Se quel telefono si scollega, gli altri tornano a ricevere gli avvisi.
+
+Queste preferenze di account valgono per tutti i tuoi telefoni. Un telefono può invece avere eventi e monitor suoi, e
+si può silenziare da solo: un avviso arriva a un telefono solo se né l'account né il telefono sono silenziati.
 
 Le preferenze sono personali, quindi le impostano anche gli utenti in sola lettura. Non cambiano nulla per le altre
 persone, i canali o le status page, e tolgono solo notifiche: un telefono non riceve mai qualcosa che i suoi canali
@@ -93,8 +98,9 @@ registrazione.
   `hub_id`, così un'app collegata a più hub sa quale chiamare. I telefoni il cui accesso non può cambiare i dati
   ricevono `MONITOR_DOWN_READONLY`, `MONITOR_DEGRADED_READONLY` e `EXPIRY_READONLY` al posto delle categorie con azioni
   di scrittura. `POST /api/monitors/{id}/check` esegue subito un controllo.
-- Preferenze di un telefono: `GET` e `PUT /api/mobile/devices/{id}` (`current` = il telefono dell'accesso che chiama),
-  `POST /api/mobile/devices/{id}/mute` con `monitor_id` e `minutes`, `DELETE /api/mobile/devices/{id}/mute`.
+- Preferenze: `GET` e `PUT /api/mobile/preferences` per l'account (con `primary_device_id`), e
+  `/api/mobile/devices/{id}` per un telefono (`current` = il telefono dell'accesso che chiama, `follow_account`).
+  Silenzia con `POST .../mute` (`monitor_id`, `minutes`) su entrambi, riattiva con `DELETE .../mute`.
 - Live Activity: l'app invia i suoi token ActivityKit a `PUT /api/mobile/live-activity/start-token` e `/token`.
 
 Tutti gli endpoint sono nel [riferimento API](https://pingtxt.com/docs/api/).

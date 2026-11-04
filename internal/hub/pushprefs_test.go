@@ -176,4 +176,66 @@ func TestPushPrefs(t *testing.T) {
 	if got := devices(send(Event{Kind: KindAgent, AgentID: 1, Agent: "x", Status: AgentOffline})); !slices.Equal(got, []string{"prd_admin", "prd_viewer"}) {
 		t.Fatalf("agent: %v", got)
 	}
+
+	// Account preferences: the phone follows them again.
+	d = decode[mobileDevice](t, bearerDo(t, srv.URL, "pma_viewer", "PUT", "/api/mobile/devices/current", map[string]any{"follow_account": true}))
+	if !d.FollowAccount {
+		t.Fatalf("follow: %+v", d)
+	}
+	acc := decode[store.AccountPushPrefs](t, bearerDo(t, srv.URL, "pma_viewer", "GET", "/api/mobile/preferences", nil))
+	if !acc.AllMonitors || len(acc.Events) != len(store.NotifyEvents) || acc.PrimaryDeviceID != 0 {
+		t.Fatalf("account defaults: %+v", acc)
+	}
+	if got := devices(send(down2)); !slices.Equal(got, []string{"prd_admin", "prd_viewer"}) {
+		t.Fatalf("account defaults: %v", got)
+	}
+	acc = decode[store.AccountPushPrefs](t, bearerDo(t, srv.URL, "pma_viewer", "PUT", "/api/mobile/preferences", map[string]any{"events": []string{"up"}}))
+	if !slices.Equal(acc.Events, []string{"up"}) || !acc.AllMonitors {
+		t.Fatalf("account put: %+v", acc)
+	}
+	if got := devices(send(down2)); !slices.Equal(got, []string{"prd_admin"}) {
+		t.Fatalf("account events: %v", got)
+	}
+	bearerDo(t, srv.URL, "pma_viewer", "PUT", "/api/mobile/preferences", map[string]any{"events": store.NotifyEvents})
+
+	// A second phone; an account mute silences both, even one with its own events.
+	signInApp(t, st, "v@b.co", "pma_viewer2")
+	decode[map[string]int64](t, bearerDo(t, srv.URL, "pma_viewer2", "POST", "/api/mobile/devices", map[string]string{"device": "prd_ipad"}))
+	bearerDo(t, srv.URL, "pma_viewer2", "PUT", "/api/mobile/devices/current", map[string]any{"events": []string{"down"}})
+	if got := devices(send(down2)); !slices.Equal(got, []string{"prd_admin", "prd_ipad", "prd_viewer"}) {
+		t.Fatalf("two phones: %v", got)
+	}
+	acc = decode[store.AccountPushPrefs](t, bearerDo(t, srv.URL, "pma_viewer", "POST", "/api/mobile/preferences/mute", map[string]any{"monitor_id": m2.ID, "minutes": 30}))
+	if len(acc.MutedMonitors) != 1 {
+		t.Fatalf("account mute: %+v", acc)
+	}
+	if got := devices(send(down2)); !slices.Equal(got, []string{"prd_admin"}) {
+		t.Fatalf("account monitor mute: %v", got)
+	}
+	bearerDo(t, srv.URL, "pma_viewer", "DELETE", "/api/mobile/preferences/mute?monitor_id="+itoa(m2.ID), nil)
+
+	// Only the phone, not the tablet.
+	if res := bearerDo(t, srv.URL, "pma_viewer", "PUT", "/api/mobile/preferences", map[string]any{"primary_device_id": adminDev}); res.StatusCode != 400 {
+		t.Fatalf("someone else's phone as primary: %d", res.StatusCode)
+	}
+	bearerDo(t, srv.URL, "pma_viewer", "PUT", "/api/mobile/preferences", map[string]any{"primary_device_id": viewerDev})
+	if got := devices(send(down2)); !slices.Equal(got, []string{"prd_admin", "prd_viewer"}) {
+		t.Fatalf("primary: %v", got)
+	}
+	// The primary phone signs out: every phone gets them again.
+	if err := st.DeletePushDevice(userID(t, st, "v@b.co"), viewerDev); err != nil {
+		t.Fatal(err)
+	}
+	if got := devices(send(down2)); !slices.Equal(got, []string{"prd_admin", "prd_ipad"}) {
+		t.Fatalf("primary gone: %v", got)
+	}
+}
+
+func userID(t *testing.T, st *store.Store, email string) int64 {
+	t.Helper()
+	u, err := st.UserByEmail(email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u.ID
 }
