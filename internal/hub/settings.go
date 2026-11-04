@@ -25,8 +25,11 @@ type MonitorDefaults struct {
 
 // GeneralSettings are instance settings editable from the web UI.
 type GeneralSettings struct {
-	PublicURL        string          `json:"public_url"`
-	LocalName        string          `json:"local_name"`
+	PublicURL string `json:"public_url"`
+	LocalName string `json:"local_name"`
+	// LocalCountry is the country of the hub's own location (ISO 3166-1
+	// alpha-2, "" = not set).
+	LocalCountry     string          `json:"local_country"`
 	LocalEnabled     bool            `json:"local_enabled"`
 	RetentionDays    int             `json:"retention_days"`     // hourly history
 	RawRetentionDays int             `json:"raw_retention_days"` // every single check
@@ -139,6 +142,11 @@ func (g *GeneralSettings) normalize() {
 	g.LocalName = strings.TrimSpace(g.LocalName)
 	if g.LocalName == "" {
 		g.LocalName = "hub"
+	}
+	if c, ok := normalizeCountry(g.LocalCountry); ok {
+		g.LocalCountry = c
+	} else {
+		g.LocalCountry = ""
 	}
 	if g.RetentionDays <= 0 {
 		g.RetentionDays = 30

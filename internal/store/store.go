@@ -707,6 +707,10 @@ var laterMigrations = []migration{
 	// texts, custom CSS) as JSON, "" = the default look.
 	{sqlite: `ALTER TABLE status_pages ADD COLUMN theme TEXT NOT NULL DEFAULT ''`,
 		mysql: `ALTER TABLE status_pages ADD COLUMN theme MEDIUMTEXT NOT NULL DEFAULT ('')`},
+	// 33: country of an agent's location (ISO 3166-1 alpha-2, "" = not
+	// set), shown as a flag next to the location.
+	{sqlite: `ALTER TABLE agents ADD COLUMN country TEXT NOT NULL DEFAULT ''`,
+		mysql: `ALTER TABLE agents ADD COLUMN country VARCHAR(2) NOT NULL DEFAULT ''`},
 }
 
 func sqliteOnly(list []string) []migration {

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
+import { CountryFlag } from "@/components/country"
 import { covers, LinkRow, linkState } from "@/components/channel-links"
 import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
@@ -1016,7 +1017,10 @@ export function MonitorForm({
                     disabled={blocked && !checked}
                     onCheckedChange={(v) => toggleLoc(l.id, v)}
                   />
-                  <span className="flex-1 truncate">{l.name}</span>
+                  <span className="flex-1 truncate">
+                    <CountryFlag code={l.country} />
+                    {l.name}
+                  </span>
                   {l.ipv6 === 2 && m.type !== "docker" && (
                     <span
                       className={cn(

@@ -9,6 +9,7 @@ import { AgentAssign } from "@/components/agent-assign"
 import { AgentInstall } from "@/components/agent-install"
 import { Confirm } from "@/components/confirm"
 import { Empty, PageHeader } from "@/components/page-header"
+import { CountryFlag, CountrySelect } from "@/components/country"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -48,7 +49,7 @@ function saveAsked(ids: number[]) {
 export default function AgentsPage() {
   const isAdmin = useIsAdmin()
   const t = useTranslations("agents")
-  const [edit, setEdit] = useState<{ id?: number; name: string; location: string; alert_offline: boolean } | null>(null)
+  const [edit, setEdit] = useState<{ id?: number; name: string; location: string; country: string; alert_offline: boolean } | null>(null)
   const [onlyOffline, setOnlyOffline] = useState(false)
   const [grace, setGrace] = useState<string | null>(null)
   const now = useMinute()
@@ -154,7 +155,7 @@ export default function AgentsPage() {
     <>
       <PageHeader cmd="pingtxt agents ls" title={t("title")}>
         {isAdmin && (
-          <Button onClick={() => setEdit({ name: "", location: "", alert_offline: true })}>
+          <Button onClick={() => setEdit({ name: "", location: "", country: "", alert_offline: true })}>
             <PlusIcon /> {t("add")}
           </Button>
         )}
@@ -241,7 +242,10 @@ export default function AgentsPage() {
                   </div>
                   <MonitorsLine agent={a} onAssign={isAdmin ? () => setAssignId(a.id) : undefined} />
                 </TableCell>
-                <TableCell>{a.location || <span className="text-muted-foreground">--</span>}</TableCell>
+                <TableCell>
+                  <CountryFlag code={a.country} />
+                  {a.location || (a.country ? null : <span className="text-muted-foreground">--</span>)}
+                </TableCell>
                 <TableCell className="hidden text-muted-foreground md:table-cell">
                   {a.hostname ? `${a.hostname} · ${a.platform} · ${a.remote_addr}` : t("neverConnected")}
                   {a.ipv6 > 0 && (
@@ -260,7 +264,7 @@ export default function AgentsPage() {
                           {t("update")}
                         </Button>
                       )}
-                      <Button variant="ghost" size="xs" onClick={() => setEdit({ id: a.id, name: a.name, location: a.location, alert_offline: a.alert_offline })}>
+                      <Button variant="ghost" size="xs" onClick={() => setEdit({ id: a.id, name: a.name, location: a.location, country: a.country ?? "", alert_offline: a.alert_offline })}>
                         {t("edit")}
                       </Button>
                       <Confirm
@@ -307,6 +311,11 @@ export default function AgentsPage() {
             <div className="grid gap-1.5">
               <Label htmlFor="agent-loc">{t("location")}</Label>
               <Input id="agent-loc" value={edit?.location ?? ""} onChange={(e) => setEdit((p) => p && { ...p, location: e.target.value })} placeholder="Frankfurt" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="agent-country">{t("country")}</Label>
+              <CountrySelect id="agent-country" value={edit?.country ?? ""} onChange={(v) => setEdit((p) => p && { ...p, country: v })} />
+              <span className="text-xs text-muted-foreground">{t("countryHint")}</span>
             </div>
             {edit?.id && (
               <label className="flex cursor-pointer items-start gap-2">

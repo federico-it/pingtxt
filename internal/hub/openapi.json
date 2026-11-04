@@ -169,6 +169,10 @@
                   },
                   "location": {
                     "type": "string"
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "Country of the location as an ISO 3166-1 alpha-2 code, \"\" for none. Optional: left out keeps the stored value on PUT and means none on POST. Other values are refused with 400."
                   }
                 },
                 "required": [
@@ -262,6 +266,10 @@
                   "alert_offline": {
                     "type": "boolean",
                     "description": "Turn the offline alert of this agent on or off (left out = unchanged)."
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "Country of the location as an ISO 3166-1 alpha-2 code, \"\" for none. Optional: left out keeps the stored value on PUT and means none on POST. Other values are refused with 400."
                   }
                 },
                 "required": [
@@ -9979,6 +9987,10 @@
                     "slow_ms": {
                       "type": "number",
                       "description": "Slow threshold in use at this location (fixed or automatic), 0 = none."
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "Country of the location (ISO 3166-1 alpha-2), \"\" when not set."
                     }
                   }
                 }
@@ -10356,6 +10368,10 @@
           },
           "update_error": {
             "type": "string"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country of the location as an ISO 3166-1 alpha-2 code (for example IT or DE), \"\" when not set. The web UI shows its flag next to the location."
           }
         }
       },
@@ -10391,6 +10407,10 @@
             "type": "integer",
             "format": "int64",
             "description": "Agents only: when the agent disconnected, unix time in milliseconds (0 = online or never connected)."
+          },
+          "country": {
+            "type": "string",
+            "description": "Country of the location as an ISO 3166-1 alpha-2 code (for example IT or DE), \"\" when not set. The web UI shows its flag next to the location."
           }
         }
       },
@@ -10833,6 +10853,10 @@
             "minimum": 1,
             "maximum": 365,
             "description": "Days the diagnostics of incidents are kept (default 30). Diagnostics of failures that never became an incident are deleted after a day."
+          },
+          "local_country": {
+            "type": "string",
+            "description": "Country of the hub's own location (ISO 3166-1 alpha-2), \"\" when not set. Anything else is stored as \"\"."
           }
         }
       },

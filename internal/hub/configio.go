@@ -72,6 +72,8 @@ type cfgAgent struct {
 	TokenHash string `json:"token_hash,omitempty"`
 	// AlertOffline is the agent's offline alert (nil in older exports: on).
 	AlertOffline *bool `json:"alert_offline,omitempty"`
+	// Country of the agent's location ("" in older exports: not set).
+	Country string `json:"country,omitempty"`
 }
 
 // The cfg* types reuse the API objects and drop state that is not
@@ -175,7 +177,7 @@ func (h *Hub) ExportConfig(secrets bool) (*ConfigDoc, error) {
 		return nil, err
 	}
 	for _, ag := range agents {
-		c := cfgAgent{ID: ag.ID, Name: ag.Name, Location: ag.Location, AlertOffline: &ag.AlertOffline}
+		c := cfgAgent{ID: ag.ID, Name: ag.Name, Location: ag.Location, AlertOffline: &ag.AlertOffline, Country: ag.Country}
 		if secrets {
 			c.TokenHash = ag.TokenHash
 		}
@@ -482,6 +484,12 @@ func (im *importer) importAgents() error {
 				}
 				im.res.Updated["agents"]++
 			}
+			if c, ok := normalizeCountry(a.Country); ok && c != "" && c != match.Country {
+				if err := st.SetAgentCountry(match.ID, c); err != nil {
+					return err
+				}
+				im.res.Updated["agents"]++
+			}
 			if a.AlertOffline != nil && *a.AlertOffline != match.AlertOffline {
 				if err := st.SetAgentAlertOffline(match.ID, *a.AlertOffline); err != nil {
 					return err
@@ -498,6 +506,12 @@ func (im *importer) importAgents() error {
 		created, err := st.CreateAgent(name, strings.TrimSpace(a.Location), hash)
 		if err != nil {
 			return err
+		}
+		if c, ok := normalizeCountry(a.Country); ok && c != "" {
+			if err := st.SetAgentCountry(created.ID, c); err != nil {
+				return err
+			}
+			created.Country = c
 		}
 		if a.AlertOffline != nil && !*a.AlertOffline {
 			if err := st.SetAgentAlertOffline(created.ID, false); err != nil {

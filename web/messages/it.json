@@ -749,7 +749,9 @@
     "alertOff": "nessun avviso offline",
     "alertOffHint": "Questo agent non invia l'avviso \"agent offline\".",
     "alertOffline": "avvisa quando questo agent va offline",
-    "alertOfflineHint": "I canali con l'evento \"agent offline\" vengono avvisati dopo {min} min senza connessione, e di nuovo quando torna."
+    "alertOfflineHint": "I canali con l'evento \"agent offline\" vengono avvisati dopo {min} min senza connessione, e di nuovo quando torna.",
+    "country": "paese",
+    "countryHint": "Compare come bandiera accanto alla località."
   },
   "agentsOffline": {
     "title": "{count, plural, one {# agent offline} other {# agent offline}}:",
@@ -1235,7 +1237,9 @@
     "diagnosticsOn": "diagnostica automatica",
     "diagnosticsHint": "al primo errore di un controllo la località salva DNS, TCP, TLS, header della risposta (mai il body) e un traceroute, e li allega all'alert. Mai nelle status page.",
     "diagRetention": "conserva la diagnostica (giorni)",
-    "diagRetentionHint": "per gli incidenti; quella degli errori rientrati da soli si cancella dopo un giorno"
+    "diagRetentionHint": "per gli incidenti; quella degli errori rientrati da soli si cancella dopo un giorno",
+    "localCountry": "paese della località integrata",
+    "localCountryHint": "Compare come bandiera accanto alla località integrata."
   },
   "authSettings": {
     "title": "autenticazione",
@@ -1710,5 +1714,8 @@
     "redacted": "nascosto",
     "reached": "destinazione raggiunta",
     "notReached": "destinazione non raggiunta"
+  },
+  "country": {
+    "none": "nessuno"
   }
 }

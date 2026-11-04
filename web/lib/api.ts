@@ -153,6 +153,8 @@ export interface LocationStatus {
   last: ResultRow | null
   /** slow threshold in use at the location (ms), 0 = none */
   slow_ms: number
+  /** ISO 3166-1 alpha-2 country of the location, "" = not set */
+  country?: string
 }
 
 export interface MonitorDetail extends MonitorSummary {
@@ -255,6 +257,8 @@ export interface Agent {
   alert_offline: boolean
   /** when it disconnected (unix ms), 0 while connected or never connected */
   offline_since: number
+  /** ISO 3166-1 alpha-2 country of the location, "" = not set */
+  country?: string
   /** number of monitors that check from this agent */
   monitors: number
   /** version differs from the hub's */
@@ -299,6 +303,8 @@ export interface Location {
   ipv6: 0 | 1 | 2
   /** agents only: when it disconnected (unix ms), 0 while online */
   offline_since?: number
+  /** ISO 3166-1 alpha-2 country of the location, "" = not set */
+  country?: string
 }
 
 export type MaintenanceKind = "once" | "daily" | "weekly" | "monthly"
@@ -527,6 +533,8 @@ export interface MonitorDefaults {
 export interface GeneralSettings {
   public_url: string
   local_name: string
+  /** ISO 3166-1 alpha-2 country of the hub's own location, "" = not set */
+  local_country?: string
   local_enabled: boolean
   retention_days: number
   raw_retention_days: number
