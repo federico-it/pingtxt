@@ -339,6 +339,8 @@ export interface Group {
   id: number
   name: string
   description: string
+  /** group this one is a subgroup of, 0 = top level */
+  parent_id?: number
   monitors: number
   created_at: number
 }

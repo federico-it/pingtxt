@@ -229,7 +229,7 @@ function View() {
         <div className="-mt-4 mb-6 flex flex-wrap items-center gap-2 text-xs">
           {groupById.has(d.group_id) && (
             <Link href="/groups/" className="text-muted-foreground hover:text-foreground">
-              [{groupById.get(d.group_id)!.name}]
+              [{groupById.get(d.group_id)!.path}]
             </Link>
           )}
           <TagList ids={d.tag_ids} tagById={tagById} />

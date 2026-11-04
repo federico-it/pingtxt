@@ -342,10 +342,13 @@ func (h *Hub) buildReport(kind string, from, to time.Time, s ReportSettings) (*R
 	if err != nil {
 		return nil, err
 	}
+	tree := store.NewGroupTree(groups)
 	names := map[int64]string{}
 	for _, g := range groups {
-		names[g.ID] = g.Name
+		names[g.ID] = tree.Path(g.ID, " › ")
 	}
+	// Picking a group reports on its subgroups too.
+	pickedGroups := tree.Expand(s.GroupIDs)
 	byMonitor := map[int64][]*store.Incident{}
 	for _, i := range incidents {
 		byMonitor[i.MonitorID] = append(byMonitor[i.MonitorID], i)
@@ -359,7 +362,7 @@ func (h *Hub) buildReport(kind string, from, to time.Time, s ReportSettings) (*R
 		if _, ok := names[gid]; !ok {
 			gid = 0
 		}
-		if len(s.GroupIDs) > 0 && !slices.Contains(s.GroupIDs, gid) {
+		if len(s.GroupIDs) > 0 && !slices.Contains(pickedGroups, gid) {
 			continue
 		}
 		up, avg, err := h.store.UptimeBetween(m.ID, f, t)

@@ -911,6 +911,11 @@ func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, u *store.User
 		writeErr(w, 400, err.Error())
 		return
 	}
+	if f.group > 0 && r.URL.Query().Get("include_subgroups") == "true" {
+		if t, err := h.groupTree(); err == nil {
+			f.subgroups = t.Descendants(f.group)
+		}
+	}
 	ms, err := h.store.ListMonitors()
 	if err != nil {
 		h.internalErr(w, err)

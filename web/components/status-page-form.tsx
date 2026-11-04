@@ -71,7 +71,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
   const notifiers = useApi<Notifier[]>("/api/notifiers", { refreshInterval: 0 })
   const [d, setD] = useState<Draft>(initial ? toDraft(initial) : empty)
   const [logo, setLogo] = useState<PageLogo | null>(initial?.logo ?? null)
-  const { groups, groupById } = useLabels()
+  const { groups, groupById, tree } = useLabels()
   const [slugTouched, setSlugTouched] = useState(!!initial)
   const [busy, setBusy] = useState(false)
   // A password is stored: the field can stay empty to keep it.
@@ -297,7 +297,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
                   <div key={id} className="flex items-center gap-2 border-b border-dashed px-2 py-1.5">
                     <span className="w-5 text-right text-xs text-muted-foreground">{i + 1}</span>
                     <span className="min-w-0 flex-1 truncate">
-                      [{g?.name ?? `#${id}`}] <span className="text-xs text-muted-foreground">{t("monitorCount", { count: g?.monitors ?? 0 })}</span>
+                      [{g?.path ?? `#${id}`}] <span className="text-xs text-muted-foreground">{t("monitorCount", { count: g?.monitors ?? 0 })}</span>
                     </span>
                     <Button type="button" variant="ghost" size="icon-xs" aria-label={t("moveUp")} disabled={i === 0} onClick={() => move("group_ids", i, -1)}>
                       <ArrowUpIcon />
@@ -321,7 +321,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
             </div>
           )}
           <div className="flex flex-wrap gap-1.5">
-            {(groups.data ?? [])
+            {tree.ordered
               .filter((g) => !d.group_ids.includes(g.id))
               .map((g) => (
                 <GroupToggle key={g.id} group={g} on={false} onChange={() => set("group_ids", [...d.group_ids, g.id])} />
@@ -345,7 +345,7 @@ export function StatusPageForm({ initial }: { initial?: StatusPage }) {
                   {m && <StatusGlyph status={m.status} />}
                   <span className="min-w-0 flex-1 truncate">
                     {m?.name ?? `#${id}`}
-                    {m && groupById.get(m.group_id) && <span className="ml-2 text-xs text-muted-foreground">[{groupById.get(m.group_id)!.name}]</span>}
+                    {m && groupById.get(m.group_id) && <span className="ml-2 text-xs text-muted-foreground">[{groupById.get(m.group_id)!.path}]</span>}
                   </span>
                   <Button type="button" variant="ghost" size="icon-xs" aria-label={t("moveUp")} disabled={i === 0} onClick={() => move("monitor_ids", i, -1)}>
                     <ArrowUpIcon />

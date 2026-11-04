@@ -7,6 +7,7 @@ import { useTranslations } from "use-intl"
 
 import { api, useApi, type Group, type Tag, type TagColor } from "@/lib/api"
 import { chip } from "@/components/ui/control"
+import { groupTree } from "@/lib/groups"
 import { cn } from "@/lib/utils"
 
 // Full class names, so Tailwind keeps them.
@@ -87,19 +88,18 @@ export function TagToggle({
   )
 }
 
-/** Groups and tags with lookup maps, shared by every page that shows them. */
+/** Groups and tags with lookup maps, shared by every page that shows them.
+ * tree.ordered lists the groups parents first, with their path for labels. */
 export function useLabels() {
   const groups = useApi<Group[]>("/api/groups", { refreshInterval: 60_000 })
   const tags = useApi<Tag[]>("/api/tags", { refreshInterval: 60_000 })
-  const groupById = useMemo(
-    () => new Map((groups.data ?? []).map((g) => [g.id, g])),
-    [groups.data]
-  )
+  const tree = useMemo(() => groupTree(groups.data ?? []), [groups.data])
+  const groupById = tree.byId
   const tagById = useMemo(
     () => new Map((tags.data ?? []).map((t) => [t.id, t])),
     [tags.data]
   )
-  return { groups, tags, groupById, tagById }
+  return { groups, tags, groupById, tagById, tree }
 }
 
 export function TagList({
@@ -217,7 +217,7 @@ export function GroupToggle({
   on,
   onChange,
 }: {
-  group: Pick<Group, "name">
+  group: Pick<Group, "name"> & { path?: string }
   on: boolean
   onChange: (on: boolean) => void
 }) {
@@ -233,7 +233,7 @@ export function GroupToggle({
           : "text-muted-foreground hover:text-foreground"
       )}
     >
-      [{group.name}]
+      [{group.path ?? group.name}]
     </button>
   )
 }

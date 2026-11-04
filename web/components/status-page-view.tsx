@@ -335,10 +335,14 @@ export function LogoImage({ logo, base, alt, className }: { logo: PageLogo; base
   )
 }
 
-/** Section title of a group, with the state of its worst monitor. */
+/** Section title of a group, with the state of its worst monitor. A
+ * subgroup's title is its path ("project › api"); a group's state sums up
+ * its subgroups shown on the page too. */
 function GroupHeader({ page, name }: { page: PublicStatusPage; name: string }) {
   const t = useTranslations("statusPublic.group")
-  const ms = page.monitors.filter((m) => m.group === name && m.status !== "paused")
+  const ms = page.monitors.filter(
+    (m) => (m.group === name || m.group?.startsWith(name + " › ")) && m.status !== "paused"
+  )
   const down = ms.filter((m) => m.status === "down").length
   const degraded = ms.filter((m) => m.status === "degraded").length
   let text = ""

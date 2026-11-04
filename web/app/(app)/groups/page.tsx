@@ -16,13 +16,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { api, tagColors, useApi, useIsAdmin, type Group, type Monitor, type Tag, type TagColor } from "@/lib/api"
+import { MAX_GROUP_DEPTH } from "@/lib/groups"
 import { cn } from "@/lib/utils"
 
-type GroupDraft = { id?: number; name: string; description: string; monitor_ids: number[] }
+type GroupDraft = { id?: number; name: string; description: string; parent_id: number; monitor_ids: number[] }
 type TagDraft = { id?: number; name: string; color: TagColor }
 
 export default function GroupsPage() {
-  const { groups, tags } = useLabels()
+  const { groups, tags, tree } = useLabels()
   const isAdmin = useIsAdmin()
   const t = useTranslations("groups")
   const monitors = useApi<Monitor[]>("/api/monitors", { refreshInterval: 30_000 })
@@ -40,8 +41,8 @@ export default function GroupsPage() {
   function editGroup(g?: Group) {
     setGroup(
       g
-        ? { id: g.id, name: g.name, description: g.description, monitor_ids: all.filter((m) => m.group_id === g.id).map((m) => m.id) }
-        : { name: "", description: "", monitor_ids: [] }
+        ? { id: g.id, name: g.name, description: g.description, parent_id: g.parent_id ?? 0, monitor_ids: all.filter((m) => m.group_id === g.id).map((m) => m.id) }
+        : { name: "", description: "", parent_id: 0, monitor_ids: [] }
     )
   }
 
@@ -51,7 +52,7 @@ export default function GroupsPage() {
     try {
       const saved = await api<Group>(group.id ? `/api/groups/${group.id}` : "/api/groups", {
         method: group.id ? "PUT" : "POST",
-        body: { name: group.name, description: group.description },
+        body: { name: group.name, description: group.description, parent_id: group.parent_id },
       })
       await api(`/api/groups/${saved.id}/monitors`, { method: "PUT", body: { monitor_ids: group.monitor_ids } })
       toast.success(t("groupSaved"))
@@ -84,7 +85,16 @@ export default function GroupsPage() {
     refresh()
   }
 
-  const groupName = new Map((groups.data ?? []).map((g) => [g.id, g.name]))
+  const groupName = new Map(tree.ordered.map((g) => [g.id, g.path]))
+  // Groups the one being edited can move under: not itself or its
+  // subgroups, and within the nesting limit with its own subgroups.
+  const parentOptions = group
+    ? tree.ordered.filter((g) => {
+        if (!group.id) return g.depth + 1 < MAX_GROUP_DEPTH
+        if (g.id === group.id || g.ancestors.includes(group.id)) return false
+        return g.depth + 1 + tree.height(group.id) <= MAX_GROUP_DEPTH
+      })
+    : []
 
   return (
     <>
@@ -109,13 +119,23 @@ export default function GroupsPage() {
           <Empty>{t("noGroups")}</Empty>
         ) : (
           <div className="border-t border-dashed">
-            {(groups.data ?? []).map((g) => {
+            {tree.ordered.map((g) => {
               const members = all.filter((m) => m.group_id === g.id)
+              const subgroups = tree.descendants(g.id).length
               return (
-                <div key={g.id} className="flex flex-wrap items-center gap-3 border-b border-dashed px-2 py-2.5">
+                <div
+                  key={g.id}
+                  className="flex flex-wrap items-center gap-3 border-b border-dashed px-2 py-2.5"
+                  style={{ paddingLeft: `${0.5 + g.depth * 1.5}rem` }}
+                >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-3">
-                      <span className="font-medium">[{g.name}]</span>
+                      <span className="font-medium">
+                        {g.depth > 0 && <span className="mr-1 text-muted-foreground">└</span>}[{g.name}]
+                      </span>
+                      {subgroups > 0 && (
+                        <span className="text-xs text-muted-foreground">{t("subgroupCount", { count: subgroups })}</span>
+                      )}
                       <span className="text-xs text-muted-foreground">
                         {t("monitorCount", { count: g.monitors })}
                       </span>
@@ -201,6 +221,23 @@ export default function GroupsPage() {
               <div className="grid gap-1.5">
                 <Label htmlFor="g-name">{t("name")}</Label>
                 <Input id="g-name" required maxLength={64} value={group.name} onChange={(e) => setGroup({ ...group, name: e.target.value })} placeholder="web" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="g-parent">{t("parent")}</Label>
+                <select
+                  id="g-parent"
+                  value={String(group.parent_id)}
+                  onChange={(e) => setGroup({ ...group, parent_id: Number(e.target.value) })}
+                  className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2 py-1 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-[13px] dark:bg-input/30"
+                >
+                  <option value="0">{t("noParent")}</option>
+                  {parentOptions.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.path}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-muted-foreground">{t("parentHint", { max: MAX_GROUP_DEPTH })}</span>
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="g-desc">{t("description")}</Label>

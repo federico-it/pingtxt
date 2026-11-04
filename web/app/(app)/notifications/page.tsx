@@ -138,7 +138,7 @@ export default function NotificationsPage() {
   const eventList = useEventList()
   const [draft, setDraft] = useState<Draft | null>(null)
   const { data: monitors } = useApi<Monitor[]>("/api/monitors", { refreshInterval: 0 })
-  const { groups, tags } = useLabels()
+  const { groups, tags, tree } = useLabels()
   // App channels need push on in Settings (admins only can read it).
   const { data: push } = useApi<PushSettings>(isAdmin ? "/api/settings/push" : null, { refreshInterval: 0 })
   const pushOff = !!push && !(push.enabled && push.registered)
@@ -364,7 +364,7 @@ export default function NotificationsPage() {
                   {!draft.all_monitors && (groups.data?.length ?? 0) > 0 && (
                     <div className="flex flex-wrap items-center gap-1">
                       <span className="mr-1 text-xs text-muted-foreground">{tl("groups")}</span>
-                      {(groups.data ?? []).map((g) => (
+                      {tree.ordered.map((g) => (
                         <GroupToggle key={g.id} group={g} on={draft.group_ids.includes(g.id)} onChange={(on) => toggleID("group_ids", g.id, on)} />
                       ))}
                     </div>

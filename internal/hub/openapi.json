@@ -2767,6 +2767,15 @@
             "description": "Group id, or `none` for monitors without a group."
           },
           {
+            "name": "include_subgroups",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "With `group`, also list the monitors of its subgroups (`true`). Left out: only the group's own monitors."
+          },
+          {
             "name": "tag",
             "in": "query",
             "required": false,
@@ -10099,6 +10108,11 @@
             "type": "integer",
             "format": "int64",
             "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "parent_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Group this one is a subgroup of, 0 = top level (the default). Groups nest at most 3 levels; a group cannot be inside itself or one of its subgroups (400). Picking a group for a maintenance window, status page, channel or report includes its subgroups. Deleting a group moves its subgroups up one level."
           }
         },
         "required": [

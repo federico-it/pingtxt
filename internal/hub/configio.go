@@ -531,10 +531,16 @@ func (im *importer) importGroups() error {
 	if err != nil {
 		return err
 	}
+	parents := map[int64]int64{} // old id → old parent id
 	for _, x := range im.doc.Groups {
 		g := x.Group
 		old := g.ID
 		g.ID = 0
+		if g.ParentID > 0 {
+			parents[old] = g.ParentID
+		}
+		// Parents are set below, once every group has its new id.
+		g.ParentID = 0
 		if err := validateGroup(&g); err != nil {
 			im.res.warn("group %q skipped: %v", x.Name, err)
 			im.res.Skipped["groups"]++
@@ -543,6 +549,7 @@ func (im *importer) importGroups() error {
 		for _, c := range cur {
 			if strings.EqualFold(c.Name, g.Name) {
 				g.ID = c.ID
+				g.ParentID = c.ParentID
 			}
 		}
 		if g.ID != 0 {
@@ -558,6 +565,27 @@ func (im *importer) importGroups() error {
 			im.res.Created["groups"]++
 		}
 		im.groups[old] = g.ID
+	}
+	for old, oldParent := range parents {
+		id, parent := im.groups[old], im.groups[oldParent]
+		if id == 0 || parent == 0 {
+			continue
+		}
+		cur, err := st.Group(id)
+		if err != nil {
+			return err
+		}
+		if cur.ParentID == parent {
+			continue
+		}
+		cur.ParentID = parent
+		if err := im.h.checkGroupParent(cur); err != nil {
+			im.res.warn("group %q kept at its level: %v", cur.Name, err)
+			continue
+		}
+		if err := st.SetGroupParent(id, parent); err != nil {
+			return err
+		}
 	}
 	return nil
 }

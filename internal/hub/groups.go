@@ -2,6 +2,7 @@ package hub
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -76,6 +77,56 @@ func validateGroup(g *store.Group) error {
 	return nil
 }
 
+// groupTree reads how groups nest.
+func (h *Hub) groupTree() (*store.GroupTree, error) {
+	groups, err := h.store.ListGroups()
+	if err != nil {
+		return nil, err
+	}
+	return store.NewGroupTree(groups), nil
+}
+
+// expandGroups adds every subgroup to a selection of groups: picking a
+// group picks its subgroups too. On error it returns the selection as is.
+func (h *Hub) expandGroups(ids []int64) []int64 {
+	if len(ids) == 0 {
+		return ids
+	}
+	t, err := h.groupTree()
+	if err != nil {
+		return ids
+	}
+	return t.Expand(ids)
+}
+
+// checkGroupParent checks the parent of a group: an existing group, not the
+// group itself or one of its subgroups, and at most store.MaxGroupDepth
+// levels with the group's own subgroups.
+func (h *Hub) checkGroupParent(g *store.Group) error {
+	if g.ParentID <= 0 {
+		g.ParentID = 0
+		return nil
+	}
+	t, err := h.groupTree()
+	if err != nil {
+		return err
+	}
+	if !t.Has(g.ParentID) {
+		return errors.New("parent group not found")
+	}
+	if g.ID != 0 && t.Within(g.ParentID, g.ID) {
+		return errors.New("a group cannot be inside itself or one of its subgroups")
+	}
+	height := 1
+	if g.ID != 0 {
+		height = t.Height(g.ID)
+	}
+	if t.Depth(g.ParentID)+height > store.MaxGroupDepth {
+		return fmt.Errorf("groups can nest at most %d levels", store.MaxGroupDepth)
+	}
+	return nil
+}
+
 func (h *Hub) listGroups(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	list, err := h.store.ListGroups()
 	if err != nil {
@@ -96,6 +147,10 @@ func (h *Hub) saveGroup(w http.ResponseWriter, r *http.Request, _ *store.User) {
 		g.ID = id
 	}
 	if err := validateGroup(&g); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	if err := h.checkGroupParent(&g); err != nil {
 		writeErr(w, 400, err.Error())
 		return
 	}
@@ -271,9 +326,11 @@ func (h *Hub) deleteTag(w http.ResponseWriter, r *http.Request, _ *store.User) {
 // monitorFilter reads the optional ?group= and ?tag= filters of the monitor
 // list. group=none selects monitors without a group.
 type monitorFilter struct {
-	group  int64 // -1 = no group, 0 = any
-	tag    int64 // 0 = any
-	active bool
+	group int64 // -1 = no group, 0 = any
+	// subgroups of group that match too (include_subgroups=true)
+	subgroups []int64
+	tag       int64 // 0 = any
+	active    bool
 }
 
 func parseMonitorFilter(r *http.Request) (monitorFilter, error) {
@@ -304,7 +361,7 @@ func (f monitorFilter) match(m *store.Monitor) bool {
 	switch {
 	case f.group == -1 && m.GroupID != 0:
 		return false
-	case f.group > 0 && m.GroupID != f.group:
+	case f.group > 0 && m.GroupID != f.group && !slices.Contains(f.subgroups, m.GroupID):
 		return false
 	case f.tag > 0 && !slices.Contains(m.TagIDs, f.tag):
 		return false

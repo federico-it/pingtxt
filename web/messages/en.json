@@ -641,7 +641,7 @@
     "error": "error",
     "groupSaved": "group saved",
     "tagSaved": "tag saved",
-    "intro": "A monitor belongs to at most one group and can have any number of tags. Groups are sections on the dashboard and on status pages; both can be used to pick monitors for maintenance windows and to filter the monitor list.",
+    "intro": "A monitor belongs to at most one group and can have any number of tags. Groups are sections on the dashboard and on status pages and can hold subgroups; both can be used to pick monitors for maintenance windows and to filter the monitor list.",
     "groupsTitle": "groups ({count})",
     "tagsTitle": "tags ({count})",
     "noGroups": "no groups yet.",
@@ -650,7 +650,7 @@
     "edit": "edit",
     "rm": "rm",
     "deleteGroup": "delete group {name}?",
-    "deleteGroupText": "Its monitors are kept, without a group. The group is removed from maintenance windows and status pages.",
+    "deleteGroupText": "Its monitors are kept, without a group, and its subgroups move up one level. The group is removed from maintenance windows and status pages.",
     "deleteTag": "delete tag {name}?",
     "deleteTagText": "The tag is removed from every monitor and maintenance window.",
     "editGroup": "edit group",
@@ -678,7 +678,11 @@
       "purple": "purple",
       "pink": "pink",
       "gray": "gray"
-    }
+    },
+    "subgroupCount": "{count, plural, one {# subgroup} other {# subgroups}}",
+    "parent": "inside group",
+    "noParent": "none (top level)",
+    "parentHint": "A subgroup shows nested under its group. Picking a group for a maintenance window, status page, channel or report includes its subgroups. Up to {max} levels."
   },
   "labels": {
     "error": "error",
