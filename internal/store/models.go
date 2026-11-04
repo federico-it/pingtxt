@@ -300,6 +300,10 @@ type Monitor struct {
 	Locations   []string `json:"locations"`
 	GroupID     int64    `json:"group_id"` // 0 = no group
 	TagIDs      []int64  `json:"tag_ids"`
+	// DependsOn are the monitors this one depends on, e.g. the ping of the
+	// server it runs on. While one of them is down this monitor sends no
+	// alerts of its own.
+	DependsOn []int64 `json:"depends_on"`
 	// Notifiers are the channels linked to this monitor one by one, with
 	// their events. Channels whose scope covers the monitor need no link.
 	// On save, nil keeps the stored links.
@@ -332,6 +336,7 @@ func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	}
 	m.GroupID = group.Int64
 	m.TagIDs = []int64{}
+	m.DependsOn = []int64{}
 	_ = json.Unmarshal([]byte(headers), &m.Headers)
 	_ = json.Unmarshal([]byte(locations), &m.Locations)
 	_ = json.Unmarshal([]byte(assertions), &m.Assertions)
@@ -378,9 +383,16 @@ func (s *Store) listMonitorsWhere(where string, args ...any) ([]*Monitor, error)
 	if err != nil {
 		return nil, err
 	}
+	deps, err := s.monitorDeps(0)
+	if err != nil {
+		return nil, err
+	}
 	for _, m := range out {
 		if t := tags[m.ID]; t != nil {
 			m.TagIDs = t
+		}
+		if d := deps[m.ID]; d != nil {
+			m.DependsOn = d
 		}
 		m.Notifiers = links[m.ID]
 		if m.Notifiers == nil {
@@ -418,6 +430,13 @@ func (s *Store) Monitor(id int64) (*Monitor, error) {
 	if m.Notifiers == nil {
 		m.Notifiers = []ChannelLink{}
 	}
+	deps, err := s.monitorDeps(id)
+	if err != nil {
+		return nil, err
+	}
+	if d := deps[id]; d != nil {
+		m.DependsOn = d
+	}
 	return m, nil
 }
 
@@ -442,6 +461,9 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 	if err := setMonitorTags(tx, m.ID, m.TagIDs); err != nil {
 		return err
 	}
+	if err := setMonitorDeps(tx, m.ID, m.DependsOn); err != nil {
+		return err
+	}
 	if m.Notifiers != nil {
 		if err := setMonitorLinks(tx, m.ID, m.Notifiers); err != nil {
 			return err
@@ -464,6 +486,9 @@ func (s *Store) UpdateMonitor(m *Monitor) error {
 		return err
 	}
 	if err := setMonitorTags(tx, m.ID, m.TagIDs); err != nil {
+		return err
+	}
+	if err := setMonitorDeps(tx, m.ID, m.DependsOn); err != nil {
 		return err
 	}
 	if m.Notifiers != nil {

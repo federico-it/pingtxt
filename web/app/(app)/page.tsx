@@ -490,6 +490,11 @@ function Monitors() {
                     <div className="min-w-0">
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate font-medium">{m.name}</span>
+                        {m.blocked_by && (
+                          <span className="shrink-0 text-xs text-muted-foreground" title={t("blockedBy", { name: m.blocked_by.name })}>
+                            ⛓ {m.blocked_by.name}
+                          </span>
+                        )}
                         <TagList
                           ids={m.tag_ids}
                           tagById={tagById}

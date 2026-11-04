@@ -21,6 +21,7 @@ var openAPISchemaFields = []struct {
 	skip   []string // fields of the Go type that the schema leaves out on purpose
 }{
 	{"Monitor", store.Monitor{}, nil},
+	{"MonitorSummary", monitorSummary{}, nil},
 	{"MonitorInput", store.Monitor{}, []string{"id", "push_token", "paused", "status", "status_since", "created_at"}},
 	{"Assertion", check.Assertion{}, nil},
 	{"ChannelLink", store.ChannelLink{}, nil},

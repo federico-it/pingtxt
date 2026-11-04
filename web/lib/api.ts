@@ -76,6 +76,8 @@ export interface Monitor {
   /** 0 = no group */
   group_id: number
   tag_ids: number[]
+  /** Monitors this one depends on: while one is down it sends no alerts. */
+  depends_on: number[]
   /** Channels linked one by one, with their events (see ChannelLink). */
   notifiers: ChannelLink[]
   cert_expiry_alert: boolean
@@ -144,6 +146,8 @@ export interface MonitorSummary extends Monitor {
   bars: Bar[]
   expiry: ExpiryCheck[]
   maintenance: { id: number; name: string; end_at: number } | null
+  /** Monitor it depends on that is down while this one fails too (no alerts of its own). */
+  blocked_by?: { id: number; name: string; since: number } | null
 }
 
 export interface LocationStatus {

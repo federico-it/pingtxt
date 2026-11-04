@@ -57,6 +57,25 @@ any time zone), for some or all monitors, or whole groups and tags.
 During a window the monitors show **maintenance**: checks keep running, but no incidents open, no alerts are sent
 and those checks do not count toward uptime. A monitor still down when the window ends gets its alert then.
 
+## Dependencies
+
+When many monitors run on the same server, tell each of them what it depends on: in the monitor form, under
+**dependencies**, add the monitor of the server (a ping, for example). If the server goes down you get one alert for
+the server, not one for each service on it.
+
+- While a monitor it depends on is down, a failing monitor is **blocked by** that monitor: it keeps checking and shows
+  its own status (down, so uptime and status pages stay accurate), but it opens no incident and sends no alerts. The
+  dashboard and the monitor page say which monitor blocks it. Dependencies chain: if the server blocks the site and
+  the site blocks the app, the app is blocked by the server.
+- When the server is back, each blocked monitor is checked again right away, and only those that still fail alert:
+  that is a different problem.
+- Checks of different monitors do not run at the same moment. When a service fails first, its alert waits for a fresh
+  check of the server (taken right away, and its retries, up to 10 minutes): if the server is down too, the service
+  stays quiet.
+
+A monitor can depend on up to 20 monitors, and the hub refuses loops. In the API this is `depends_on` (monitor ids),
+and `blocked_by` on the monitor lists while it is blocked.
+
 ## Expiry alerts
 
 pingtxt watches the TLS certificate of https monitors and the registration of their domain (RDAP, with WHOIS for

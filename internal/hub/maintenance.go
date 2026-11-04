@@ -81,7 +81,7 @@ func (h *Hub) maintTick(now time.Time) {
 				status = StatusPending
 			}
 		}
-		c := change{m: st.m, status: status, alert: h.alertLocked(st)}
+		c := change{m: st.m, status: status, alert: h.alertLocked(st, now, false)}
 		if c.alert == StatusDown {
 			c.cause = h.causesLocked(st)
 		}

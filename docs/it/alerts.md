@@ -59,6 +59,25 @@ Durante una finestra i monitor risultano in **manutenzione**: i controlli contin
 partono avvisi e quei controlli non contano per l'uptime. Un monitor ancora down quando la finestra finisce riceve
 l'avviso in quel momento.
 
+## Dipendenze
+
+Quando molti monitor girano sullo stesso server, di' a ognuno da cosa dipende: nel modulo del monitor, sotto
+**dipendenze**, aggiungi il monitor del server (un ping, per esempio). Se il server va giù ricevi un solo avviso per il
+server, non uno per ogni servizio che ci gira sopra.
+
+- Finché un monitor da cui dipende è giù, un monitor che fallisce è **bloccato da** quel monitor: continua i controlli
+  e mostra il suo stato (giù, così uptime e status page restano corretti), ma non apre incidenti e non manda avvisi. La
+  dashboard e la pagina del monitor dicono quale monitor lo blocca. Le dipendenze si concatenano: se il server blocca
+  il sito e il sito blocca l'app, l'app è bloccata dal server.
+- Quando il server torna su, ogni monitor bloccato viene ricontrollato subito, e mandano un avviso solo quelli che
+  continuano a fallire: quello è un problema diverso.
+- I controlli di monitor diversi non partono nello stesso istante. Quando un servizio fallisce per primo, il suo
+  avviso aspetta un nuovo controllo del server (fatto subito, più i suoi tentativi, fino a 10 minuti): se anche il
+  server è giù, il servizio resta in silenzio.
+
+Un monitor può dipendere da al massimo 20 monitor, e l'hub rifiuta i cicli. Nell'API il campo è `depends_on` (id dei
+monitor), e `blocked_by` nell'elenco dei monitor finché è bloccato.
+
 ## Avvisi di scadenza
 
 pingtxt tiene d'occhio il certificato TLS dei monitor https e la registrazione del loro dominio (RDAP, con WHOIS per i

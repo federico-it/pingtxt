@@ -250,6 +250,21 @@ function View() {
         </div>
       )}
 
+      {d.blocked_by && (
+        <div className="mb-4 border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          ⛓{" "}
+          {t.rich("blockedBy", {
+            name: d.blocked_by.name,
+            since: datetime(d.blocked_by.since),
+            hl: (c) => (
+              <Link href={`/monitors/view/?id=${d.blocked_by!.id}`} className="text-foreground underline underline-offset-4">
+                {c}
+              </Link>
+            ),
+          })}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 border-y border-dashed py-4 sm:grid-cols-3 lg:grid-cols-6">
         <KV k={t("kv.status")} v={<StatusText status={d.status} />} />
         <KV

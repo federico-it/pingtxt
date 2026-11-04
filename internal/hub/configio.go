@@ -749,10 +749,13 @@ func (im *importer) importMonitors(old []*store.Monitor) error {
 		}
 		return found
 	}
+	deps := map[int64][]int64{} // new monitor id -> dependencies in the file
 	for _, x := range im.doc.Monitors {
 		m := x.Monitor
 		oldID := m.ID
 		m.ID = 0
+		fileDeps := m.DependsOn
+		m.DependsOn = nil // set below, once every monitor has its new id
 		m.GroupID = im.groups[m.GroupID]
 		m.TagIDs = im.mapIDs(m.TagIDs, im.tags)
 		if m.Notifiers != nil { // nil in files from before channel links: keep them
@@ -829,6 +832,23 @@ func (im *importer) importMonitors(old []*store.Monitor) error {
 			}
 		}
 		im.monitors[oldID] = m.ID
+		if fileDeps != nil { // nil in files from before dependencies: keep them
+			deps[m.ID] = fileDeps
+		}
+	}
+	for id, list := range deps {
+		m, err := st.Monitor(id)
+		if err != nil {
+			return err
+		}
+		m.DependsOn = im.mapIDs(list, im.monitors)
+		if err := h.checkDependencies(m); err != nil {
+			im.res.warn("monitor %q: dependencies skipped: %v", m.Name, err)
+			continue
+		}
+		if err := st.SetMonitorDependencies(id, m.DependsOn); err != nil {
+			return err
+		}
 	}
 	return nil
 }
