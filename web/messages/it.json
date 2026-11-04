@@ -755,7 +755,15 @@
     "alertOffline": "avvisa quando questo agent va offline",
     "alertOfflineHint": "I canali con l'evento \"agent offline\" vengono avvisati dopo {min} min senza connessione, e di nuovo quando torna.",
     "country": "paese",
-    "countryHint": "Compare come bandiera accanto alla località."
+    "countryHint": "Compare come bandiera accanto alla località.",
+    "localOff": "spenta",
+    "builtIn": "integrata",
+    "builtInHint": "La località dell'hub: i controlli partono dall'hub stesso.",
+    "thisHub": "questo hub",
+    "editLocalTitle": "modifica località integrata",
+    "localDialogText": "Da qui controlla l'hub stesso. Il nome è quello che vedi nei grafici.",
+    "localEnabled": "esegui controlli dall'hub",
+    "localEnabledHint": "disattivato: i controlli partono solo dagli agent"
   },
   "agentsOffline": {
     "title": "{count, plural, one {# agent offline} other {# agent offline}}:",

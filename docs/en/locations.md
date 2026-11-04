@@ -30,7 +30,10 @@ over WebSocket: no open port, works behind NAT, reconnects with backoff and keep
 When a new agent connects, the hub offers to add it to every monitor it can run. Otherwise tick the location in
 the monitors you want (**select all** in the locations section ticks every location the monitor can use): the hub plans every check and sends it to the agents.
 
-Give each agent a **country** (in the agent's edit dialog; the hub's own location has it in **settings → general**):
+The hub's own location is listed first on the agents page as **built-in**: **edit** changes its name, its country and
+whether the hub runs checks itself (the same values as in **settings → general**).
+
+Give each agent a **country** (in the agent's edit dialog, and for the built-in location in the same way):
 its flag then shows next to the location on the agents page, in the monitor form and on the monitor page.
 
 The agents page shows each agent's version, address, whether it reaches IPv6 and when it was last seen.

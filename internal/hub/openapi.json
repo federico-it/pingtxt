@@ -130,6 +130,10 @@
                     "offline_grace_min": {
                       "type": "integer",
                       "description": "Minutes an agent can be disconnected before it is reported offline (agent_offline event)."
+                    },
+                    "local": {
+                      "$ref": "#/components/schemas/LocalAgent",
+                      "description": "The hub's own location. Older hubs leave it out."
                     }
                   }
                 }
@@ -205,6 +209,68 @@
                       "type": "string"
                     }
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/agents/local": {
+      "put": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Edit the hub's own location",
+        "operationId": "updateLocalAgent",
+        "description": "Name, country and switch of the hub's built-in location, the same values as `local_name`, `local_country` and `local_enabled` in general settings. Fields left out keep their value.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string",
+                    "description": "ISO 3166-1 alpha-2, \"\" for none. Other values are refused with 400."
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The location as saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalAgent"
                 }
               }
             }
@@ -12427,6 +12493,40 @@
             "type": "string",
             "maxLength": 32768,
             "description": "Custom CSS added to the page as is. Stable class names: pt-page, pt-header, pt-notice, pt-banner, pt-section, pt-monitor, pt-group, pt-footer."
+          }
+        }
+      },
+      "LocalAgent": {
+        "type": "object",
+        "description": "The hub's own (built-in) location, listed with the agents.",
+        "properties": {
+          "location_id": {
+            "type": "string",
+            "description": "Always `local`."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the location (general settings `local_name`)."
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 country, \"\" when not set (general settings `local_country`)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "The hub runs checks itself (general settings `local_enabled`)."
+          },
+          "ipv6": {
+            "type": "integer",
+            "description": "IPv6 connectivity: 0 unknown, 1 yes, 2 no."
+          },
+          "monitors": {
+            "type": "integer",
+            "description": "Monitors that check from the hub."
+          },
+          "version": {
+            "type": "string",
+            "description": "Hub version."
           }
         }
       }

@@ -25,6 +25,7 @@ var openAPISchemaFields = []struct {
 	{"Assertion", check.Assertion{}, nil},
 	{"ChannelLink", store.ChannelLink{}, nil},
 	{"Group", store.Group{}, nil},
+	{"LocalAgent", localAgent{}, nil},
 	{"Tag", store.Tag{}, nil},
 	{"Maintenance", store.Maintenance{}, nil},
 	{"Notifier", store.Notifier{}, nil},
