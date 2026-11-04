@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
 import { Section } from "@/components/page-header"
+import { CountrySelect } from "@/components/country"
 import { Field } from "@/components/settings/field"
 import { SaveBar } from "@/components/settings/save-bar"
 import { Button } from "@/components/ui/button"
@@ -129,6 +130,17 @@ export function InstanceForm({ settings, onSaved }: FormProps) {
               id="local_name"
               value={g.local_name}
               onChange={(e) => set("local_name", e.target.value)}
+            />
+          </Field>
+          <Field
+            label={t("localCountry")}
+            htmlFor="local_country"
+            hint={t("localCountryHint")}
+          >
+            <CountrySelect
+              id="local_country"
+              value={g.local_country ?? ""}
+              onChange={(v) => set("local_country", v)}
             />
           </Field>
           <Field label={t("localEnabled")} hint={t("localEnabledHint")}>

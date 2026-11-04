@@ -136,6 +136,9 @@ type Agent struct {
 	OfflineSince int64 `json:"offline_since"`
 	// OfflineAlerted is AgentAlertNone, AgentAlertSent or AgentAlertMuted.
 	OfflineAlerted int `json:"-"`
+	// Country is the country of the agent's location as an ISO 3166-1
+	// alpha-2 code ("IT", "DE"), "" when not set. The UI shows its flag.
+	Country string `json:"country"`
 }
 
 // Agent.OfflineAlerted values.
@@ -145,11 +148,11 @@ const (
 	AgentAlertMuted = 2 // nothing to send until it reconnects (admin kicked it, or offline before alerts existed)
 )
 
-const agentCols = `id, name, location, token_hash, version, hostname, platform, remote_addr, last_seen, created_at, ipv6, alert_offline, offline_since, offline_alerted`
+const agentCols = `id, name, location, token_hash, version, hostname, platform, remote_addr, last_seen, created_at, ipv6, alert_offline, offline_since, offline_alerted, country`
 
 func scanAgent(sc interface{ Scan(...any) error }) (*Agent, error) {
 	a := &Agent{}
-	err := sc.Scan(&a.ID, &a.Name, &a.Location, &a.TokenHash, &a.Version, &a.Hostname, &a.Platform, &a.RemoteAddr, &a.LastSeen, &a.CreatedAt, &a.IPv6, &a.AlertOffline, &a.OfflineSince, &a.OfflineAlerted)
+	err := sc.Scan(&a.ID, &a.Name, &a.Location, &a.TokenHash, &a.Version, &a.Hostname, &a.Platform, &a.RemoteAddr, &a.LastSeen, &a.CreatedAt, &a.IPv6, &a.AlertOffline, &a.OfflineSince, &a.OfflineAlerted, &a.Country)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -214,6 +217,12 @@ func (s *Store) SetAgentIPv6(id int64, v int) error {
 
 func (s *Store) AgentSeen(id int64) error {
 	_, err := s.db.Exec(`UPDATE agents SET last_seen = ? WHERE id = ?`, now(), id)
+	return err
+}
+
+// SetAgentCountry sets the country of an agent's location ("" = none).
+func (s *Store) SetAgentCountry(id int64, country string) error {
+	_, err := s.db.Exec(`UPDATE agents SET country = ? WHERE id = ?`, country, id)
 	return err
 }
 

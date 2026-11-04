@@ -749,7 +749,9 @@
     "alertOff": "no offline alert",
     "alertOffHint": "This agent sends no \"agent offline\" alert.",
     "alertOffline": "alert when this agent goes offline",
-    "alertOfflineHint": "Channels with the \"agent offline\" event are alerted after {min} min without a connection, and again when it is back."
+    "alertOfflineHint": "Channels with the \"agent offline\" event are alerted after {min} min without a connection, and again when it is back.",
+    "country": "country",
+    "countryHint": "Shown as a flag next to the location."
   },
   "agentsOffline": {
     "title": "{count, plural, one {# agent offline} other {# agents offline}}:",
@@ -1235,7 +1237,9 @@
     "diagnosticsOn": "automatic diagnostics",
     "diagnosticsHint": "at the first failure of a check the location saves DNS, TCP, TLS, response headers (never the body) and a traceroute, and attaches them to the alert. Never shown on status pages.",
     "diagRetention": "keep diagnostics (days)",
-    "diagRetentionHint": "for incidents; diagnostics of failures that recovered by themselves are deleted after a day"
+    "diagRetentionHint": "for incidents; diagnostics of failures that recovered by themselves are deleted after a day",
+    "localCountry": "built-in location country",
+    "localCountryHint": "Shown as a flag next to the built-in location."
   },
   "authSettings": {
     "title": "authentication",
@@ -1710,5 +1714,8 @@
     "redacted": "redacted",
     "reached": "destination reached",
     "notReached": "destination not reached"
+  },
+  "country": {
+    "none": "none"
   }
 }

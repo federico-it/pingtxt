@@ -6,6 +6,7 @@ import { Fragment, Suspense, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
+import { CountryFlag } from "@/components/country"
 import { MonitorBadges } from "@/components/badge-info"
 import { AuditTrail } from "@/components/settings/audit-log"
 import { ExpiryTable } from "@/components/expiry"
@@ -377,7 +378,10 @@ function View() {
           <TableBody>
             {d.location_status.map((l) => (
               <TableRow key={l.id}>
-                <TableCell>{l.name}</TableCell>
+                <TableCell>
+                  <CountryFlag code={l.country} />
+                  {l.name}
+                </TableCell>
                 <TableCell>
                   {!l.online ? (
                     <span className="text-muted-foreground">{t("offline")}</span>

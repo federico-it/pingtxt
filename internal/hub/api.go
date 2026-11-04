@@ -1021,6 +1021,8 @@ type locationStatus struct {
 	// SlowMs is the slow threshold in use at the location, 0 = none (or
 	// not enough history yet for the automatic one).
 	SlowMs float64 `json:"slow_ms"`
+	// Country of the location (ISO 3166-1 alpha-2), "" when not set.
+	Country string `json:"country"`
 }
 
 func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, u *store.User) {
@@ -1057,9 +1059,10 @@ func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, u *store.User) 
 		byLoc[r.Location] = r
 	}
 	names := h.locationNames()
+	countries := h.locationCountries()
 	slow := h.SlowLimits(id)
 	for _, l := range h.locationsOf(m) {
-		d.Locations = append(d.Locations, locationStatus{ID: l, Name: nameOr(names, l), Online: h.locationOnline(l), Last: byLoc[l], SlowMs: slow[l]})
+		d.Locations = append(d.Locations, locationStatus{ID: l, Name: nameOr(names, l), Online: h.locationOnline(l), Last: byLoc[l], SlowMs: slow[l], Country: countries[l]})
 	}
 	writeJSON(w, 200, d)
 }
@@ -1091,6 +1094,21 @@ func (h *Hub) locationNames() map[string]string {
 		names[AgentLocation(a.ID)] = agentLabel(a)
 	}
 	return names
+}
+
+// locationCountries maps the locations that have a country to it.
+func (h *Hub) locationCountries() map[string]string {
+	out := map[string]string{}
+	if c := h.generalSettings().LocalCountry; c != "" {
+		out[LocalLocation] = c
+	}
+	agents, _ := h.store.ListAgents()
+	for _, a := range agents {
+		if a.Country != "" {
+			out[AgentLocation(a.ID)] = a.Country
+		}
+	}
+	return out
 }
 
 func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.User) {
@@ -1395,7 +1413,7 @@ type agentView struct {
 func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	out := []map[string]any{}
 	if h.localEnabled() {
-		out = append(out, map[string]any{"id": LocalLocation, "name": h.localName(), "online": true, "kind": "local", "ipv6": h.localIPv6.State()})
+		out = append(out, map[string]any{"id": LocalLocation, "name": h.localName(), "online": true, "kind": "local", "ipv6": h.localIPv6.State(), "country": h.generalSettings().LocalCountry})
 	}
 	agents, err := h.store.ListAgents()
 	if err != nil {
@@ -1408,7 +1426,7 @@ func (h *Hub) listLocations(w http.ResponseWriter, r *http.Request, _ *store.Use
 		if !online {
 			since = cmp.Or(a.OfflineSince, a.LastSeen)
 		}
-		out = append(out, map[string]any{"id": AgentLocation(a.ID), "name": agentLabel(a), "online": online, "kind": "agent", "ipv6": h.locationIPv6(AgentLocation(a.ID)), "offline_since": since})
+		out = append(out, map[string]any{"id": AgentLocation(a.ID), "name": agentLabel(a), "online": online, "kind": "agent", "ipv6": h.locationIPv6(AgentLocation(a.ID)), "offline_since": since, "country": a.Country})
 	}
 	writeJSON(w, 200, out)
 }
@@ -1471,6 +1489,21 @@ type agentInput struct {
 	Location string `json:"location"`
 	// AlertOffline turns the offline alert on or off (nil = unchanged).
 	AlertOffline *bool `json:"alert_offline"`
+	// Country of the location, ISO 3166-1 alpha-2 ("" = none).
+	Country string `json:"country"`
+}
+
+// normalizeCountry checks an ISO 3166-1 alpha-2 country code and returns
+// it in upper case. "" is valid and means no country.
+func normalizeCountry(c string) (string, bool) {
+	c = strings.ToUpper(strings.TrimSpace(c))
+	if c == "" {
+		return "", true
+	}
+	if len(c) != 2 || c[0] < 'A' || c[0] > 'Z' || c[1] < 'A' || c[1] > 'Z' {
+		return "", false
+	}
+	return c, true
 }
 
 func (h *Hub) createAgent(w http.ResponseWriter, r *http.Request, _ *store.User) {
@@ -1479,11 +1512,23 @@ func (h *Hub) createAgent(w http.ResponseWriter, r *http.Request, _ *store.User)
 		writeErr(w, 400, "name is required")
 		return
 	}
+	country, ok := normalizeCountry(in.Country)
+	if !ok {
+		writeErr(w, 400, "country must be a two-letter ISO 3166-1 code")
+		return
+	}
 	token, hash := NewToken("pt_")
 	a, err := h.store.CreateAgent(strings.TrimSpace(in.Name), strings.TrimSpace(in.Location), hash)
 	if err != nil {
 		h.internalErr(w, err)
 		return
+	}
+	if country != "" {
+		if err := h.store.SetAgentCountry(a.ID, country); err != nil {
+			h.internalErr(w, err)
+			return
+		}
+		a.Country = country
 	}
 	writeJSON(w, 201, map[string]any{"agent": agentView{Agent: a, LocationID: AgentLocation(a.ID)}, "token": token, "hub_url": h.hubURL(r)})
 }
@@ -1494,14 +1539,34 @@ func (h *Hub) updateAgent(w http.ResponseWriter, r *http.Request, _ *store.User)
 		writeErr(w, 400, "invalid id")
 		return
 	}
-	var in agentInput
-	if readJSON(r, &in) != nil || strings.TrimSpace(in.Name) == "" {
+	cur, err := h.store.Agent(id)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, "agent not found")
+		return
+	} else if err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	// Fields the body leaves out keep their stored value.
+	in := agentInput{Name: cur.Name, Location: cur.Location, Country: cur.Country}
+	if readJSONOver(r, in, &in) != nil || strings.TrimSpace(in.Name) == "" {
 		writeErr(w, 400, "name is required")
+		return
+	}
+	country, ok := normalizeCountry(in.Country)
+	if !ok {
+		writeErr(w, 400, "country must be a two-letter ISO 3166-1 code")
 		return
 	}
 	if err := h.store.UpdateAgent(id, strings.TrimSpace(in.Name), strings.TrimSpace(in.Location)); err != nil {
 		h.internalErr(w, err)
 		return
+	}
+	if country != cur.Country {
+		if err := h.store.SetAgentCountry(id, country); err != nil {
+			h.internalErr(w, err)
+			return
+		}
 	}
 	if in.AlertOffline != nil {
 		if err := h.store.SetAgentAlertOffline(id, *in.AlertOffline); err != nil {
