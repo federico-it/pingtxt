@@ -28,26 +28,45 @@ database e non registra né il testo degli avvisi né i token dei telefoni; un h
 collegati a lui. Cambiare l'indirizzo del relay registra di nuovo l'hub, e ogni telefono si registra di nuovo al
 successivo avvio. Cosa invia l'app è descritto nella [privacy policy](https://pingtxt.com/privacy/).
 
+## Scegliere cosa riceve ogni telefono
+
+Ogni utente sceglie nell'app cosa ricevono i suoi telefoni:
+
+- **eventi**: down, di nuovo up, degradato, scadenza di certificato e dominio, agent offline.
+- **monitor**: tutti, oppure solo i monitor di alcuni gruppi (con i sottogruppi) e tag, più monitor scelti uno per
+  uno. Agent offline riguarda gli agent e segue solo gli eventi.
+- **silenzia**: tutto, o un monitor, per un po' o finché non lo riattivi.
+- **ricevi su**: tutti i telefoni, o solo uno (per esempio l'iPhone e non l'iPad), per non ricevere ogni avviso due
+  volte. Se quel telefono si scollega, gli altri tornano a ricevere gli avvisi.
+
+Queste preferenze di account valgono per tutti i tuoi telefoni. Un telefono può invece avere eventi e monitor suoi, e
+si può silenziare da solo: un avviso arriva a un telefono solo se né l'account né il telefono sono silenziati.
+
+Le preferenze sono personali, quindi le impostano anche gli utenti in sola lettura. Non cambiano nulla per le altre
+persone, i canali o le status page, e tolgono solo notifiche: un telefono non riceve mai qualcosa che i suoi canali
+non inviano. Le notifiche di prova arrivano sempre, e la Live Activity non cambia.
+
 ## Azioni nelle notifiche
 
 Tieni premuta una notifica (anche dalla schermata di blocco) per agire senza aprire l'app:
 
 | notifica | azioni |
 | --- | --- |
-| monitor down | controlla ora, silenzia 1 ora, metti in pausa |
-| monitor degradato | controlla ora, silenzia 1 ora |
-| scadenza di certificato o dominio | ricontrolla scadenza |
+| monitor down | controlla ora, silenzia 1 ora per me, silenzia 1 ora per tutti, metti in pausa |
+| monitor degradato | controlla ora, silenzia 1 ora per me, silenzia 1 ora per tutti |
+| scadenza di certificato o dominio | ricontrolla scadenza, silenzia 1 ora per me |
 | agent offline | apri agent |
 
 - **controlla ora** esegue subito il controllo da tutte le località e salva il risultato, quindi può chiudere
   l'incidente.
-- **silenzia 1 ora** crea una [finestra di manutenzione](alerts.md#finestre-di-manutenzione) di un'ora per quel
+- **silenzia 1 ora per me** silenzia quel monitor solo su questo telefono (vedi sopra). Possono usarlo tutti.
+- **silenzia 1 ora per tutti** crea una [finestra di manutenzione](alerts.md#finestre-di-manutenzione) di un'ora per quel
   monitor: niente avvisi né promemoria, i controlli continuano. Nel frattempo le status page pubbliche mostrano il
   monitor in manutenzione.
 - **metti in pausa** ferma i controlli e chiude l'incidente aperto.
 
-Le azioni che cambiano qualcosa richiedono un accesso in **lettura + scrittura** (admin). Le notifiche di prova non
-hanno pulsanti.
+Le altre azioni cambiano qualcosa per tutti e richiedono un accesso in **lettura + scrittura** (admin): gli altri
+telefoni ricevono solo le azioni che possono usare. Le notifiche di prova non hanno pulsanti.
 
 ## Live Activity
 
@@ -76,8 +95,12 @@ registrazione.
   vecchio revoca l'accesso, quindi rinnova una richiesta alla volta e salva il nuovo token prima di usarlo.
 - Push: l'app registra il suo token FCM tramite `/api/mobile/config` e `/api/mobile/devices`. Le notifiche hanno un
   `aps.category` (`MONITOR_DOWN`, `MONITOR_UP`, `MONITOR_DEGRADED`, `EXPIRY`, `AGENT_OFFLINE`, `AGENT_ONLINE`) e
-  `hub_id`, così un'app collegata a più hub sa quale chiamare. `POST /api/monitors/{id}/check` esegue subito un
-  controllo.
+  `hub_id`, così un'app collegata a più hub sa quale chiamare. I telefoni il cui accesso non può cambiare i dati
+  ricevono `MONITOR_DOWN_READONLY`, `MONITOR_DEGRADED_READONLY` e `EXPIRY_READONLY` al posto delle categorie con azioni
+  di scrittura. `POST /api/monitors/{id}/check` esegue subito un controllo.
+- Preferenze: `GET` e `PUT /api/mobile/preferences` per l'account (con `primary_device_id`), e
+  `/api/mobile/devices/{id}` per un telefono (`current` = il telefono dell'accesso che chiama, `follow_account`).
+  Silenzia con `POST .../mute` (`monitor_id`, `minutes`) su entrambi, riattiva con `DELETE .../mute`.
 - Live Activity: l'app invia i suoi token ActivityKit a `PUT /api/mobile/live-activity/start-token` e `/token`.
 
 Tutti gli endpoint sono nel [riferimento API](https://pingtxt.com/docs/api/).

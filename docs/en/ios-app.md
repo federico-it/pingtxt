@@ -27,23 +27,43 @@ has no database and does not log the text of the alerts or the phones' tokens; a
 signed in to it. Changing the relay address registers the hub again, and every phone enrolls again on its next
 start. What the app itself sends is described in the [privacy policy](https://pingtxt.com/privacy/).
 
+## Choose what each phone gets
+
+Each user chooses in the app what their phones get:
+
+- **events**: down, back up, degraded, certificate and domain expiry, agent offline.
+- **monitors**: all of them, or only the monitors of some groups (with their subgroups) and tags, plus monitors picked
+  one by one. Agent offline is about agents and follows the events only.
+- **mute**: everything, or one monitor, for a while or until you turn it back on.
+- **receive on**: every phone, or only one of them (for example the iPhone and not the iPad), to avoid getting each
+  alert twice. If that phone signs out, the others get the alerts again.
+
+These account preferences apply to all your phones. A phone can instead have events and monitors of its own, and can
+be muted by itself: an alert reaches a phone only when neither the account nor the phone is muted.
+
+The preferences are personal, so read-only users set them too. They change nothing for other people, channels or
+status pages, and they only leave notifications out: a phone never gets something its channels do not send. Test
+notifications always arrive, and the Live Activity is not affected.
+
 ## Actions in notifications
 
 Press and hold a notification (also on the lock screen) to act on it without opening the app:
 
 | notification | actions |
 | --- | --- |
-| monitor down | check now, mute for 1 hour, pause monitor |
-| monitor degraded | check now, mute for 1 hour |
-| certificate or domain expiry | check expiry again |
+| monitor down | check now, mute for me for 1 hour, mute for everyone for 1 hour, pause monitor |
+| monitor degraded | check now, mute for me for 1 hour, mute for everyone for 1 hour |
+| certificate or domain expiry | check expiry again, mute for me for 1 hour |
 | agent offline | open agent |
 
 - **check now** runs the check right away from every location and records the result, so it can close the incident.
-- **mute for 1 hour** creates a one-hour [maintenance window](alerts.md#maintenance-windows) for that monitor: no
+- **mute for me for 1 hour** mutes that monitor on this phone only (see above). Everyone can use it.
+- **mute for everyone for 1 hour** creates a one-hour [maintenance window](alerts.md#maintenance-windows) for that monitor: no
   alerts or reminders, checks keep running. Public status pages show the monitor in maintenance meanwhile.
 - **pause monitor** stops its checks and closes the open incident.
 
-Actions that change something need a **read + write** sign-in (admins). Test notifications have no buttons.
+The other actions change something for everyone and need a **read + write** sign-in (admins): the other phones get
+only the actions they can use. Test notifications have no buttons.
 
 ## Live Activity
 
@@ -72,8 +92,12 @@ registration.
   again revokes the sign-in, so refresh one request at a time and store the new token before using it.
 - Push: the app enrolls its FCM token through `/api/mobile/config` and `/api/mobile/devices`. Notifications carry an
   `aps.category` (`MONITOR_DOWN`, `MONITOR_UP`, `MONITOR_DEGRADED`, `EXPIRY`, `AGENT_OFFLINE`, `AGENT_ONLINE`) and
-  `hub_id`, so an app signed in to several hubs knows which one to call. `POST /api/monitors/{id}/check` runs a
-  check now.
+  `hub_id`, so an app signed in to several hubs knows which one to call. Phones whose sign-in cannot change data get
+  `MONITOR_DOWN_READONLY`, `MONITOR_DEGRADED_READONLY` and `EXPIRY_READONLY` instead of the categories with write
+  actions. `POST /api/monitors/{id}/check` runs a check now.
+- Preferences: `GET` and `PUT /api/mobile/preferences` for the account (with `primary_device_id`), and
+  `/api/mobile/devices/{id}` for one phone (`current` = the phone of the calling sign-in, `follow_account`). Mute with
+  `POST .../mute` (`monitor_id`, `minutes`) on either, unmute with `DELETE .../mute`.
 - Live Activity: the app sends its ActivityKit tokens to `PUT /api/mobile/live-activity/start-token` and `/token`.
 
 Every endpoint is in the [API reference](https://pingtxt.com/docs/api/).

@@ -714,6 +714,13 @@ var laterMigrations = []migration{
 	// 34: parent of a monitor group (0 = top level), for subgroups.
 	{sqlite: `ALTER TABLE monitor_groups ADD COLUMN parent_id INTEGER NOT NULL DEFAULT 0`,
 		mysql: `ALTER TABLE monitor_groups ADD COLUMN parent_id BIGINT NOT NULL DEFAULT 0`},
+	// 35: app notification preferences (events, monitors, mutes) as JSON,
+	// of each phone and of each user for all their phones; "" = everything
+	// the channels send.
+	{sqlite: `ALTER TABLE push_devices ADD COLUMN prefs TEXT NOT NULL DEFAULT '';
+	ALTER TABLE users ADD COLUMN push_prefs TEXT NOT NULL DEFAULT '';`,
+		mysql: `ALTER TABLE push_devices ADD COLUMN prefs MEDIUMTEXT NOT NULL DEFAULT ('');
+	ALTER TABLE users ADD COLUMN push_prefs MEDIUMTEXT NOT NULL DEFAULT ('');`},
 }
 
 func sqliteOnly(list []string) []migration {

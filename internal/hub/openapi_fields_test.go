@@ -40,6 +40,10 @@ var openAPISchemaFields = []struct {
 	{"GeneralSettings", GeneralSettings{}, nil},
 	{"BackupSettings", BackupSettings{}, nil},
 	{"ReportSettings", ReportSettings{}, nil},
+	{"PushDevice", store.PushDevice{}, nil},
+	{"PushPrefs", deviceBody{}, nil},
+	{"MonitorMute", store.MonitorMute{}, nil},
+	{"AccountPushPrefs", store.AccountPushPrefs{}, nil},
 }
 
 // Every JSON field of the Go types above must be documented in the schema.
