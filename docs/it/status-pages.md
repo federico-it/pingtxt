@@ -52,8 +52,8 @@ La sezione **aspetto** cambia come appare la pagina; l'anteprima mostra ogni mod
 - **intestazione**: semplice o una fascia del colore primario, a sinistra o centrata, un sottotitolo e fino a 6
   link.
 - **avviso**: un messaggio in evidenza sopra lo stato, per esempio un intervento programmato.
-- **footer**: testo libero e fino a 12 link, per esempio dati dell'azienda, contatti e privacy policy. **nascondi
-  "powered by pingtxt"** toglie la riga del credito.
+- **footer**: testo libero e fino a 12 link, per esempio dati dell'azienda, contatti e privacy policy. La riga del credito
+  "powered by pingtxt" porta a pingtxt.com; **nascondi "powered by pingtxt"** la toglie.
 - **usa il logo come icona della scheda**.
 
 Avviso e testo del footer accettano Markdown semplice: `**grassetto**`, `*corsivo*`, `[testo](https://…)` e una
