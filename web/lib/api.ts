@@ -271,6 +271,18 @@ export interface Agent {
   update_error?: string
 }
 
+/** The hub's own (built-in) location, listed with the agents. */
+export interface LocalAgent {
+  location_id: "local"
+  name: string
+  country: string
+  /** the hub runs checks itself */
+  enabled: boolean
+  ipv6: 0 | 1 | 2
+  monitors: number
+  version: string
+}
+
 /** Why a monitor cannot get a new agent: IPv6 monitor and the agent has no
  * IPv6 (or has not reported it yet), Docker check, or localhost target. */
 export type AgentSkipReason = "no_ipv6" | "ipv6_unknown" | "docker" | "loopback"

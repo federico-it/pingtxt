@@ -153,6 +153,7 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/locations", auth(h.listLocations))
 	mux.HandleFunc("GET /api/agents", auth(h.listAgents))
 	mux.HandleFunc("POST /api/agents", auth(h.createAgent))
+	mux.HandleFunc("PUT /api/agents/local", auth(h.updateLocalAgent))
 	mux.HandleFunc("PUT /api/agents/{id}", auth(h.updateAgent))
 	mux.HandleFunc("DELETE /api/agents/{id}", auth(h.deleteAgent))
 	mux.HandleFunc("POST /api/agents/{id}/token", auth(h.rotateAgentToken))
@@ -1483,10 +1484,64 @@ func (h *Hub) listAgents(w http.ResponseWriter, r *http.Request, _ *store.User) 
 		out = append(out, agentView{Agent: a, LocationID: loc, Online: h.AgentOnline(a.ID), Monitors: used[loc], updateView: h.agentUpdateView(a)})
 	}
 	writeJSON(w, 200, map[string]any{
-		"agents": out, "hub_url": h.hubURL(r),
+		"agents": out, "local": h.localAgentView(used[LocalLocation]), "hub_url": h.hubURL(r),
 		"hub_version": h.cfg.Version, "auto_update": h.agentUpdateSettings().AutoUpdate,
 		"offline_grace_min": int(h.agentUpdateSettings().offlineGrace() / time.Minute),
 	})
+}
+
+// localAgent is the hub's own (built-in) location, shown with the agents.
+type localAgent struct {
+	LocationID string `json:"location_id"` // always "local"
+	Name       string `json:"name"`
+	Country    string `json:"country"`
+	// Enabled: the hub runs checks itself. Off, the location is not offered.
+	Enabled  bool   `json:"enabled"`
+	IPv6     int    `json:"ipv6"`
+	Monitors int    `json:"monitors"`
+	Version  string `json:"version"`
+}
+
+func (h *Hub) localAgentView(monitors int) localAgent {
+	g := h.generalSettings()
+	return localAgent{LocationID: LocalLocation, Name: g.LocalName, Country: g.LocalCountry, Enabled: g.LocalEnabled,
+		IPv6: int(h.localIPv6.State()), Monitors: monitors, Version: h.cfg.Version}
+}
+
+// updateLocalAgent changes the name, country or switch of the hub's own
+// location. Fields the body leaves out keep their value.
+func (h *Hub) updateLocalAgent(w http.ResponseWriter, r *http.Request, _ *store.User) {
+	cur := h.generalSettings()
+	in := struct {
+		Name    string `json:"name"`
+		Country string `json:"country"`
+		Enabled bool   `json:"enabled"`
+	}{cur.LocalName, cur.LocalCountry, cur.LocalEnabled}
+	if readJSONOver(r, in, &in) != nil {
+		writeErr(w, 400, "invalid body")
+		return
+	}
+	country, ok := normalizeCountry(in.Country)
+	if !ok {
+		writeErr(w, 400, "country must be a two-letter ISO 3166-1 code")
+		return
+	}
+	g := cur
+	g.LocalName, g.LocalCountry, g.LocalEnabled = in.Name, country, in.Enabled
+	g.normalize()
+	if err := g.validate(); err != nil {
+		writeErr(w, 400, err.Error())
+		return
+	}
+	if err := h.store.SetSetting(keyGeneral, g); err != nil {
+		h.internalErr(w, err)
+		return
+	}
+	h.smu.Lock()
+	h.general = g
+	h.smu.Unlock()
+	ms, _ := h.store.ListMonitors()
+	writeJSON(w, 200, h.localAgentView(agentMonitorCounts(ms)[LocalLocation]))
 }
 
 type agentInput struct {

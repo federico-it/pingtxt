@@ -202,8 +202,11 @@ var auditRoutes = map[string]auditSpec{
 	"PUT /api/tags/{id}":                 {action: "tag.update", typ: "tag", load: loadTag},
 	"DELETE /api/tags/{id}":              {action: "tag.delete", typ: "tag", load: loadTag},
 	// agents
-	"POST /api/agents":               {action: "agent.create", typ: "agent", load: loadAgent},
-	"PUT /api/agents/{id}":           {action: "agent.update", typ: "agent", load: loadAgent},
+	"POST /api/agents":     {action: "agent.create", typ: "agent", load: loadAgent},
+	"PUT /api/agents/{id}": {action: "agent.update", typ: "agent", load: loadAgent},
+	"PUT /api/agents/local": {action: "agent.local_update", typ: "settings", singleton: true, load: func(h *Hub, _ *http.Request, _ *store.User, _ int64) (string, any, bool) {
+		return "local", h.localAgentView(0), true
+	}},
 	"DELETE /api/agents/{id}":        {action: "agent.delete", typ: "agent", load: loadAgent},
 	"POST /api/agents/{id}/token":    {action: "agent.token_rotate", typ: "agent", load: loadAgent},
 	"POST /api/agents/{id}/update":   {action: "agent.update_now", typ: "agent", load: loadAgent},

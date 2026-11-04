@@ -755,7 +755,15 @@
     "alertOffline": "alert when this agent goes offline",
     "alertOfflineHint": "Channels with the \"agent offline\" event are alerted after {min} min without a connection, and again when it is back.",
     "country": "country",
-    "countryHint": "Shown as a flag next to the location."
+    "countryHint": "Shown as a flag next to the location.",
+    "localOff": "off",
+    "builtIn": "built-in",
+    "builtInHint": "The hub's own location: checks run from the hub itself.",
+    "thisHub": "this hub",
+    "editLocalTitle": "edit built-in location",
+    "localDialogText": "The hub itself checks from here. The name is what you see on charts.",
+    "localEnabled": "run checks from the hub",
+    "localEnabledHint": "off: checks run only from agents"
   },
   "agentsOffline": {
     "title": "{count, plural, one {# agent offline} other {# agents offline}}:",

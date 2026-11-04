@@ -30,8 +30,10 @@ anche gli hub su IPv6 (`PINGTXT_HUB=http://[2001:db8::1]:8090`).
 Quando un nuovo agent si collega, l'hub propone di aggiungerlo a tutti i monitor che può eseguire. Altrimenti spunta
 la località nei monitor che vuoi (**seleziona tutte** nella sezione località spunta tutte quelle che il monitor può usare): l'hub pianifica ogni controllo e lo manda agli agent.
 
-Dai a ogni agent un **paese** (nella finestra di modifica dell'agent; per la località dell'hub è in **impostazioni →
-generali**): la sua bandiera compare accanto alla località nella pagina degli agent, nel form del monitor e nella
+La località dell'hub compare per prima nella pagina degli agent come **integrata**: **modifica** ne cambia il nome, il
+paese e se l'hub esegue i controlli da sé (gli stessi valori di **impostazioni → generali**).
+
+Dai a ogni agent un **paese** (nella finestra di modifica dell'agent, e allo stesso modo per la località integrata): la sua bandiera compare accanto alla località nella pagina degli agent, nel form del monitor e nella
 pagina del monitor.
 
 La pagina degli agent mostra di ognuno versione, indirizzo, se raggiunge IPv6 e quando è stato visto l'ultima volta.

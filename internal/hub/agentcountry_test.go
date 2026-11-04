@@ -72,3 +72,26 @@ func TestNormalizeCountry(t *testing.T) {
 		}
 	}
 }
+
+func TestLocalAgent(t *testing.T) {
+	h, _ := newTestHub(t)
+	put := func(body string) int {
+		w := httptest.NewRecorder()
+		h.updateLocalAgent(w, httptest.NewRequest("PUT", "/api/agents/local", strings.NewReader(body)), nil)
+		return w.Code
+	}
+	enabled := h.generalSettings().LocalEnabled
+	if c := put(`{"country":"it"}`); c != 200 {
+		t.Fatalf("put: %d", c)
+	}
+	g := h.generalSettings()
+	if g.LocalCountry != "IT" || g.LocalName != "hub" || g.LocalEnabled != enabled {
+		t.Fatalf("after put: %+v", g)
+	}
+	if c := put(`{"country":"Italy"}`); c != 400 {
+		t.Fatalf("invalid country: %d", c)
+	}
+	if v := h.localAgentView(0); v.LocationID != LocalLocation || v.Country != "IT" {
+		t.Fatalf("view: %+v", v)
+	}
+}

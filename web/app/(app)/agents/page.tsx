@@ -17,13 +17,23 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { api, useApi, useIsAdmin, type Agent } from "@/lib/api"
+import { api, useApi, useIsAdmin, type Agent, type LocalAgent } from "@/lib/api"
 import { segment } from "@/components/ui/control"
 import { useMinute } from "@/hooks/use-now"
+import { countryName } from "@/lib/country"
 import { ago, datetime } from "@/lib/format"
+import { useLocale } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
-type AgentsResp = { agents: Agent[]; hub_url: string; hub_version: string; auto_update: boolean; offline_grace_min: number }
+type AgentsResp = {
+  agents: Agent[]
+  /** the hub's own location (older hubs leave it out) */
+  local?: LocalAgent
+  hub_url: string
+  hub_version: string
+  auto_update: boolean
+  offline_grace_min: number
+}
 
 const maxGraceMin = 1440
 
@@ -49,7 +59,17 @@ function saveAsked(ids: number[]) {
 export default function AgentsPage() {
   const isAdmin = useIsAdmin()
   const t = useTranslations("agents")
-  const [edit, setEdit] = useState<{ id?: number; name: string; location: string; country: string; alert_offline: boolean } | null>(null)
+  const { locale } = useLocale()
+  const [edit, setEdit] = useState<{
+    id?: number
+    /** the hub's own location: name, country and switch only */
+    local?: boolean
+    name: string
+    location: string
+    country: string
+    alert_offline: boolean
+    enabled?: boolean
+  } | null>(null)
   const [onlyOffline, setOnlyOffline] = useState(false)
   const [grace, setGrace] = useState<string | null>(null)
   const now = useMinute()
@@ -81,7 +101,10 @@ export default function AgentsPage() {
     e.preventDefault()
     if (!edit) return
     try {
-      if (edit.id) {
+      if (edit.local) {
+        await api("/api/agents/local", { method: "PUT", body: { name: edit.name, country: edit.country, enabled: edit.enabled } })
+        toast.success(t("updated"))
+      } else if (edit.id) {
         await api(`/api/agents/${edit.id}`, { method: "PUT", body: edit })
         toast.success(t("updated"))
       } else {
@@ -204,7 +227,7 @@ export default function AgentsPage() {
         </div>
       )}
 
-      {data && data.agents.length === 0 ? (
+      {data && data.agents.length === 0 && !data.local ? (
         <Empty>{t("empty")}</Empty>
       ) : (
         <Table>
@@ -220,6 +243,51 @@ export default function AgentsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {data?.local && !onlyOffline && (
+              <TableRow>
+                <TableCell>
+                  {data.local.enabled ? (
+                    <span className="text-up">● {t("online")}</span>
+                  ) : (
+                    <span className="text-muted-foreground">○ {t("localOff")}</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="font-medium">
+                    {data.local.name}
+                    <span className="ml-2 text-[11px] font-normal text-muted-foreground" title={t("builtInHint")}>
+                      {t("builtIn")}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{t("monitors", { count: data.local.monitors })}</div>
+                </TableCell>
+                <TableCell>
+                  <CountryFlag code={data.local.country} />
+                  {data.local.country ? countryName(data.local.country, locale) : <span className="text-muted-foreground">--</span>}
+                </TableCell>
+                <TableCell className="hidden text-muted-foreground md:table-cell">
+                  {t("thisHub")}
+                  {data.local.ipv6 > 0 && (
+                    <span className={data.local.ipv6 === 1 ? "text-up" : undefined}> · {t(data.local.ipv6 === 1 ? "ipv6Yes" : "ipv6No")}</span>
+                  )}
+                </TableCell>
+                <TableCell className="hidden text-muted-foreground md:table-cell">{data.local.version}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{data.local.enabled ? t("now") : "--"}</TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() =>
+                        setEdit({ local: true, name: data.local!.name, location: "", country: data.local!.country, alert_offline: true, enabled: data.local!.enabled })
+                      }
+                    >
+                      {t("edit")}
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            )}
             {shown.map((a) => (
               <TableRow key={a.id}>
                 <TableCell>
@@ -301,22 +369,33 @@ export default function AgentsPage() {
         <DialogContent>
           <form onSubmit={save} className="grid gap-4">
             <DialogHeader>
-              <DialogTitle>{edit?.id ? t("editTitle") : t("add")}</DialogTitle>
-              <DialogDescription>{t("dialogText")}</DialogDescription>
+              <DialogTitle>{edit?.local ? t("editLocalTitle") : edit?.id ? t("editTitle") : t("add")}</DialogTitle>
+              <DialogDescription>{edit?.local ? t("localDialogText") : t("dialogText")}</DialogDescription>
             </DialogHeader>
             <div className="grid gap-1.5">
               <Label htmlFor="agent-name">{t("name")}</Label>
               <Input id="agent-name" required value={edit?.name ?? ""} onChange={(e) => setEdit((p) => p && { ...p, name: e.target.value })} placeholder="vps-fra-1" />
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="agent-loc">{t("location")}</Label>
-              <Input id="agent-loc" value={edit?.location ?? ""} onChange={(e) => setEdit((p) => p && { ...p, location: e.target.value })} placeholder="Frankfurt" />
-            </div>
+            {!edit?.local && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="agent-loc">{t("location")}</Label>
+                <Input id="agent-loc" value={edit?.location ?? ""} onChange={(e) => setEdit((p) => p && { ...p, location: e.target.value })} placeholder="Frankfurt" />
+              </div>
+            )}
             <div className="grid gap-1.5">
               <Label htmlFor="agent-country">{t("country")}</Label>
               <CountrySelect id="agent-country" value={edit?.country ?? ""} onChange={(v) => setEdit((p) => p && { ...p, country: v })} />
               <span className="text-xs text-muted-foreground">{t("countryHint")}</span>
             </div>
+            {edit?.local && (
+              <label className="flex cursor-pointer items-start gap-2">
+                <Switch className="mt-0.5" checked={!!edit.enabled} onCheckedChange={(v) => setEdit((p) => p && { ...p, enabled: v })} />
+                <span className="grid gap-0.5">
+                  <span>{t("localEnabled")}</span>
+                  <span className="text-xs text-muted-foreground">{t("localEnabledHint")}</span>
+                </span>
+              </label>
+            )}
             {edit?.id && (
               <label className="flex cursor-pointer items-start gap-2">
                 <Switch className="mt-0.5" checked={edit.alert_offline} onCheckedChange={(v) => setEdit((p) => p && { ...p, alert_offline: v })} />
@@ -327,7 +406,7 @@ export default function AgentsPage() {
               </label>
             )}
             <DialogFooter>
-              <Button type="submit">{edit?.id ? t("save") : t("create")}</Button>
+              <Button type="submit">{edit?.id || edit?.local ? t("save") : t("create")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
