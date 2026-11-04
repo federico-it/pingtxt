@@ -1,6 +1,9 @@
 package store
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // PushDevice is a phone that gets notifications through the push relay. The
 // handle is opaque (the relay encrypts the phone's FCM token in it) and
@@ -21,9 +24,95 @@ type PushDevice struct {
 	LAHubURL     string `json:"-"`
 	LAToken      string `json:"-"`
 	LAStartedAt  int64  `json:"-"`
+
+	// What the phone wants to hear about, set by its owner.
+	PushPrefs
 }
 
-const pushDeviceCols = `id, user_id, grant_id, handle, name, created_at, last_seen_at, la_start_token, la_hub_url, la_token, la_started_at`
+// Mute durations: MuteForever mutes until the owner turns it back on.
+const MuteForever int64 = -1
+
+// PushPrefs are the notification preferences of one phone. They only narrow
+// down what the app channels send to it: a phone never gets an event no
+// channel sends it.
+type PushPrefs struct {
+	// Events the phone gets (store.Event* names).
+	Events []string `json:"events"`
+	// Monitors the phone gets events of: every monitor, or those of the
+	// groups (with their subgroups), tags and monitors listed. Agent events
+	// are about no monitor and follow Events only.
+	AllMonitors bool    `json:"all_monitors"`
+	GroupIDs    []int64 `json:"group_ids"`
+	TagIDs      []int64 `json:"tag_ids"`
+	MonitorIDs  []int64 `json:"monitor_ids"`
+	// MutedUntil mutes the phone (unix ms; 0 = not muted, MuteForever).
+	MutedUntil int64 `json:"muted_until"`
+	// MutedMonitors mutes single monitors on the phone.
+	MutedMonitors []MonitorMute `json:"muted_monitors"`
+}
+
+// MonitorMute mutes one monitor on a phone until a time (unix ms, or MuteForever).
+type MonitorMute struct {
+	MonitorID int64 `json:"monitor_id"`
+	Until     int64 `json:"until"`
+}
+
+// DefaultPushPrefs: every event of every monitor, not muted.
+func DefaultPushPrefs() PushPrefs {
+	return PushPrefs{Events: append([]string(nil), NotifyEvents...), AllMonitors: true,
+		GroupIDs: []int64{}, TagIDs: []int64{}, MonitorIDs: []int64{}, MutedMonitors: []MonitorMute{}}
+}
+
+// Muted reports whether the phone is muted at t (unix ms).
+func (p PushPrefs) Muted(t int64) bool { return mutedAt(p.MutedUntil, t) }
+
+// MonitorMuted reports whether the monitor is muted on the phone at t.
+func (p PushPrefs) MonitorMuted(id, t int64) bool {
+	for _, m := range p.MutedMonitors {
+		if m.MonitorID == id && mutedAt(m.Until, t) {
+			return true
+		}
+	}
+	return false
+}
+
+func mutedAt(until, t int64) bool { return until == MuteForever || until > t }
+
+// Prune drops the mutes that ended before t.
+func (p *PushPrefs) Prune(t int64) {
+	if p.MutedUntil != MuteForever && p.MutedUntil <= t {
+		p.MutedUntil = 0
+	}
+	out := []MonitorMute{}
+	for _, m := range p.MutedMonitors {
+		if mutedAt(m.Until, t) {
+			out = append(out, m)
+		}
+	}
+	p.MutedMonitors = out
+}
+
+func decodePushPrefs(s string) PushPrefs {
+	p := DefaultPushPrefs()
+	if s == "" {
+		return p
+	}
+	_ = json.Unmarshal([]byte(s), &p)
+	if p.Events == nil {
+		p.Events = []string{}
+	}
+	for _, l := range []*[]int64{&p.GroupIDs, &p.TagIDs, &p.MonitorIDs} {
+		if *l == nil {
+			*l = []int64{}
+		}
+	}
+	if p.MutedMonitors == nil {
+		p.MutedMonitors = []MonitorMute{}
+	}
+	return p
+}
+
+const pushDeviceCols = `id, user_id, grant_id, handle, name, created_at, last_seen_at, la_start_token, la_hub_url, la_token, la_started_at, prefs`
 
 func scanPushDevices(rows interface {
 	Next() bool
@@ -35,10 +124,12 @@ func scanPushDevices(rows interface {
 	out := []*PushDevice{}
 	for rows.Next() {
 		d := &PushDevice{}
+		var prefs string
 		if err := rows.Scan(&d.ID, &d.UserID, &d.GrantID, &d.Handle, &d.Name, &d.CreatedAt, &d.LastSeenAt,
-			&d.LAStartToken, &d.LAHubURL, &d.LAToken, &d.LAStartedAt); err != nil {
+			&d.LAStartToken, &d.LAHubURL, &d.LAToken, &d.LAStartedAt, &prefs); err != nil {
 			return nil, err
 		}
+		d.PushPrefs = decodePushPrefs(prefs)
 		out = append(out, d)
 	}
 	return out, rows.Err()
@@ -87,6 +178,38 @@ func (s *Store) PushDevicesFor(userIDs []int64) ([]*PushDevice, error) {
 		return nil, err
 	}
 	return scanPushDevices(rows)
+}
+
+// UserPushDevice returns a device of a user.
+func (s *Store) UserPushDevice(userID, id int64) (*PushDevice, error) {
+	rows, err := s.db.Query(`SELECT `+pushDeviceCols+` FROM push_devices WHERE id = ? AND user_id = ?`, id, userID)
+	if err != nil {
+		return nil, err
+	}
+	list, err := scanPushDevices(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, ErrNotFound
+	}
+	return list[0], nil
+}
+
+// UpdatePushDevice saves the name and preferences of a device of a user.
+func (s *Store) UpdatePushDevice(userID int64, d *PushDevice) error {
+	b, err := json.Marshal(d.PushPrefs)
+	if err != nil {
+		return err
+	}
+	res, err := s.db.Exec(`UPDATE push_devices SET name = ?, prefs = ? WHERE id = ? AND user_id = ?`, d.Name, string(b), d.ID, userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // CountPushDevices counts every registered device.

@@ -183,3 +183,22 @@ func (s *Store) DeleteExpiredOAuthGrants(at int64) error {
 	_, err := s.db.Exec(`DELETE FROM oauth_grants WHERE refresh_expires < ?`, at)
 	return err
 }
+
+// WriteGrants returns the ids of the grants that can change data: write
+// scope of an admin.
+func (s *Store) WriteGrants() (map[int64]bool, error) {
+	rows, err := s.db.Query(`SELECT g.id FROM oauth_grants g JOIN users u ON u.id = g.user_id WHERE g.scope = 'write' AND u.role = 'admin'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}

@@ -1186,7 +1186,7 @@
     },
     "catHints": {
       "profile": "appearance, language",
-      "account": "password, connected logins, two-factor",
+      "account": "password, connected logins, two-factor, my phones",
       "tokens": "api tokens, connected apps",
       "general": "public url, history, updates, usage stats",
       "monitors": "defaults, degraded, ip, expiry alerts",
@@ -1200,7 +1200,8 @@
     "discard": "discard",
     "save": "save",
     "unsavedLeave": "You have unsaved changes in the settings. Leave without saving?",
-    "activity": "recent activity"
+    "activity": "recent activity",
+    "myPhones": "notifications on my phones"
   },
   "generalSettings": {
     "saved": "settings saved",
@@ -1729,5 +1730,31 @@
   },
   "country": {
     "none": "none"
+  },
+  "myPhones": {
+    "none": "No phone of yours gets app notifications yet: sign in to this hub with the pingtxt app and allow notifications.",
+    "hint": "What each of your phones gets from the app notification channels. These choices are yours only: they change nothing for other people, channels or status pages, and they can only leave notifications out, never add ones a channel does not send. Test notifications always arrive.",
+    "lastSeen": "signed in, last seen {date}",
+    "error": "error",
+    "saved": "saved",
+    "save": "save",
+    "mute": "mute",
+    "muteFor": "mute for",
+    "mutedToast": "phone muted",
+    "unmute": "unmute",
+    "unmuted": "unmuted",
+    "mutedForever": "muted until you turn it back on",
+    "mutedUntil": "muted until {time}",
+    "for": {
+      "60": "1 hour",
+      "480": "8 hours",
+      "1440": "1 day",
+      "0": "until turned back on"
+    },
+    "mutedMonitors": "monitors muted on this phone",
+    "eventsHint": "Only these events reach this phone.",
+    "alsoMonitors": "monitors",
+    "allHint": "Every monitor, also the ones added later.",
+    "scopeHint": "Only the monitors of the selected groups (with their subgroups) and tags, and the monitors ticked one by one. Agent offline follows the events only."
   }
 }

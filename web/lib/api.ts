@@ -873,6 +873,24 @@ export interface PushSettings {
   devices: number
 }
 
+/** A phone of the current user that gets app notifications, with its own preferences. */
+export interface PushDevice {
+  id: number
+  name: string
+  created_at: number
+  last_seen_at: number
+  /** The phone of the app sign-in that asks (never true in the web UI). */
+  current: boolean
+  events: NotifyEvent[]
+  all_monitors: boolean
+  group_ids: number[]
+  tag_ids: number[]
+  monitor_ids: number[]
+  /** Unix ms; 0 = not muted, -1 = until turned back on. */
+  muted_until: number
+  muted_monitors: { monitor_id: number; until: number }[]
+}
+
 export interface BackupSettings {
   enabled: boolean
   interval_hours: number

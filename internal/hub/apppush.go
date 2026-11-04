@@ -201,7 +201,28 @@ const (
 	CategoryExpiry          = "EXPIRY"
 	CategoryAgentOffline    = "AGENT_OFFLINE"
 	CategoryAgentOnline     = "AGENT_ONLINE"
+
+	// Read-only variants, for the phones whose sign-in cannot change data
+	// (read-only users, or a read scope): the app shows only the actions
+	// that act for that phone, like muting a monitor on it.
+	CategoryMonitorDownReadOnly     = "MONITOR_DOWN_READONLY"
+	CategoryMonitorDegradedReadOnly = "MONITOR_DEGRADED_READONLY"
+	CategoryExpiryReadOnly          = "EXPIRY_READONLY"
 )
+
+// readOnlyCategory is the variant of a category for phones that cannot
+// change data; categories without write actions have none.
+func readOnlyCategory(c string) string {
+	switch c {
+	case CategoryMonitorDown:
+		return CategoryMonitorDownReadOnly
+	case CategoryMonitorDegraded:
+		return CategoryMonitorDegradedReadOnly
+	case CategoryExpiry:
+		return CategoryExpiryReadOnly
+	}
+	return c
+}
 
 // appMessage turns an event into a notification for the app.
 func appMessage(e Event) pushMessage {
@@ -376,6 +397,75 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 		}
 		return setupError("no phone is signed in to the pingtxt app for this channel: sign in to this hub with the app and allow notifications")
 	}
+	// Each phone's own preferences (events, monitors, mutes).
+	if devices = n.filterPushDevices(e, devices); len(devices) == 0 {
+		return nil
+	}
+	msg := appMessage(e)
+	// The app may be signed in to several hubs: hub_id (also in
+	// /api/mobile/config) tells it which one a notification's actions call.
+	msg.Data["hub_id"] = ps.HubID
+	// Phones that cannot change data get the read-only variant of the
+	// category: no buttons that act for everyone.
+	writers := map[int64]bool{}
+	if ro := readOnlyCategory(msg.Category); ro != msg.Category {
+		if writers, err = n.store.WriteGrants(); err != nil {
+			return err
+		}
+	}
+	var rw, ro []*store.PushDevice
+	for _, d := range devices {
+		if writers[d.GrantID] {
+			rw = append(rw, d)
+		} else {
+			ro = append(ro, d)
+		}
+	}
+	if readOnlyCategory(msg.Category) == msg.Category {
+		rw, ro = devices, nil
+	}
+	var res deliveryResult
+	if len(rw) > 0 {
+		res.add(n.deliverApp(ctx, ps, msg, rw, e.Test))
+	}
+	if len(ro) > 0 {
+		m := msg
+		m.Category = readOnlyCategory(msg.Category)
+		res.add(n.deliverApp(ctx, ps, m, ro, e.Test))
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if res.sent == 0 && res.total > 0 && res.err == nil {
+		return setupError("every phone of this channel is gone, sign in again with the app")
+	}
+	if res.dropped > 0 && res.err != nil {
+		if res.sent == 0 {
+			return res.err
+		}
+		return fmt.Errorf("sent to %d of %d phones: %w", res.sent, res.total, res.err)
+	}
+	return nil
+}
+
+// deliveryResult counts the phones a push went to.
+type deliveryResult struct {
+	total, sent, dropped int
+	err                  error
+}
+
+func (r *deliveryResult) add(o deliveryResult) {
+	r.total += o.total
+	r.sent += o.sent
+	r.dropped += o.dropped
+	if o.err != nil {
+		r.err = o.err
+	}
+}
+
+// deliverApp pushes msg to the devices. Handles the relay reports gone are
+// deleted; failed ones are retried with backoff.
+func (n *Notifier) deliverApp(ctx context.Context, ps PushSettings, msg pushMessage, devices []*store.PushDevice, test bool) deliveryResult {
 	byHandle := map[string][]*store.PushDevice{}
 	pending := []string{}
 	for _, d := range devices {
@@ -384,19 +474,14 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 		}
 		byHandle[d.Handle] = append(byHandle[d.Handle], d)
 	}
-	msg := appMessage(e)
-	// The app may be signed in to several hubs: hub_id (also in
-	// /api/mobile/config) tells it which one a notification's actions call.
-	msg.Data["hub_id"] = ps.HubID
 	delays := n.pushRetry
 	if delays == nil {
 		delays = []time.Duration{10 * time.Second, time.Minute}
 	}
-	if e.Test {
+	if test {
 		delays = nil // a test answers right away
 	}
-	total, sent, dropped := len(pending), 0, 0
-	var lastErr error
+	res := deliveryResult{total: len(pending)}
 	for attempt := 0; ; attempt++ {
 		var retry []string
 		var wait time.Duration
@@ -408,11 +493,11 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 			}
 			err := n.relayCall(ctx, http.MethodPost, ps.RelayURL, "/v1/push", ps.HubToken, msg, &out)
 			if err != nil {
-				lastErr = err
+				res.err = err
 				var re *relayError
 				if errors.As(err, &re) && re.Status != http.StatusTooManyRequests && re.Status < 500 {
 					// 400/401/403/413: retrying does not help.
-					dropped += len(batch)
+					res.dropped += len(batch)
 					continue
 				}
 				if errors.As(err, &re) {
@@ -424,9 +509,9 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 			for _, r := range out.Results {
 				switch r.Status {
 				case "sent":
-					sent++
+					res.sent++
 				case "gone":
-					dropped++
+					res.dropped++
 					for _, d := range byHandle[r.Device] {
 						if err := n.store.DeletePushDeviceByID(d.ID, d.Handle); err != nil {
 							n.log.Error("delete push device", "err", err)
@@ -434,10 +519,10 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 					}
 				case "failed":
 					retry = append(retry, r.Device)
-					lastErr = fmt.Errorf("push relay: %s", r.Error)
+					res.err = fmt.Errorf("push relay: %s", r.Error)
 				default: // rate_limited, rejected
-					dropped++
-					lastErr = fmt.Errorf("push relay: %s: %s", r.Status, r.Error)
+					res.dropped++
+					res.err = fmt.Errorf("push relay: %s: %s", r.Status, r.Error)
 					if r.Status == "rejected" {
 						n.log.Warn("push rejected", "err", r.Error)
 					}
@@ -445,26 +530,18 @@ func (n *Notifier) sendApp(ctx context.Context, c map[string]string, e Event) er
 			}
 		}
 		if len(retry) == 0 || attempt >= len(delays) {
-			dropped += len(retry)
+			res.dropped += len(retry)
 			break
 		}
 		pending = retry
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			res.err = ctx.Err()
+			return res
 		case <-time.After(max(delays[attempt], min(wait, 5*time.Minute))):
 		}
 	}
-	if sent == 0 && total > 0 && lastErr == nil {
-		return setupError("every phone of this channel is gone, sign in again with the app")
-	}
-	if dropped > 0 && lastErr != nil {
-		if sent == 0 {
-			return lastErr
-		}
-		return fmt.Errorf("sent to %d of %d phones: %w", sent, total, lastErr)
-	}
-	return nil
+	return res
 }
 
 // appPushAllowed refuses to save an enabled app channel while push is off in
@@ -644,13 +721,17 @@ func (h *Hub) requirePersonal(fn func(http.ResponseWriter, *http.Request, *store
 	}
 }
 
-func (h *Hub) listMobileDevices(w http.ResponseWriter, r *http.Request, u *store.User, _ *store.APIToken) {
+func (h *Hub) listMobileDevices(w http.ResponseWriter, r *http.Request, u *store.User, tok *store.APIToken) {
 	list, err := h.store.UserPushDevices(u.ID)
 	if err != nil {
 		h.internalErr(w, err)
 		return
 	}
-	writeJSON(w, 200, list)
+	out := make([]mobileDevice, len(list))
+	for i, d := range list {
+		out[i] = deviceView(d, tok)
+	}
+	writeJSON(w, 200, out)
 }
 
 // saveMobileDevice stores the device handle of the app's sign-in. Only OAuth
