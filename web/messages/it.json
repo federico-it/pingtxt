@@ -1186,7 +1186,7 @@
     },
     "catHints": {
       "profile": "aspetto, lingua",
-      "account": "password, accessi collegati, due fattori, i miei telefoni",
+      "account": "password, accessi collegati, due fattori",
       "tokens": "token api, app collegate",
       "general": "url pubblico, storico, aggiornamenti, statistiche d'uso",
       "monitors": "default, degradato, ip, avvisi di scadenza",
@@ -1200,8 +1200,7 @@
     "discard": "scarta",
     "save": "salva",
     "unsavedLeave": "Hai modifiche non salvate nelle impostazioni. Uscire senza salvare?",
-    "activity": "attività recente",
-    "myPhones": "notifiche sui miei telefoni"
+    "activity": "attività recente"
   },
   "generalSettings": {
     "saved": "impostazioni salvate",
@@ -1730,31 +1729,5 @@
   },
   "country": {
     "none": "nessuno"
-  },
-  "myPhones": {
-    "none": "Nessun tuo telefono riceve ancora le notifiche dell'app: accedi a questo hub con l'app pingtxt e consenti le notifiche.",
-    "hint": "Cosa riceve ognuno dei tuoi telefoni dai canali di notifica dell'app. Queste scelte valgono solo per te: non cambiano nulla per le altre persone, i canali o le status page, e possono solo togliere notifiche, mai aggiungerne che un canale non invia. Le notifiche di prova arrivano sempre.",
-    "lastSeen": "collegato, visto l'ultima volta il {date}",
-    "error": "errore",
-    "saved": "salvato",
-    "save": "salva",
-    "mute": "silenzia",
-    "muteFor": "silenzia per",
-    "mutedToast": "telefono silenziato",
-    "unmute": "riattiva",
-    "unmuted": "riattivato",
-    "mutedForever": "silenziato finché non lo riattivi",
-    "mutedUntil": "silenziato fino al {time}",
-    "for": {
-      "60": "1 ora",
-      "480": "8 ore",
-      "1440": "1 giorno",
-      "0": "finché non lo riattivo"
-    },
-    "mutedMonitors": "monitor silenziati su questo telefono",
-    "eventsHint": "Solo questi eventi arrivano a questo telefono.",
-    "alsoMonitors": "monitor",
-    "allHint": "Tutti i monitor, anche quelli aggiunti dopo.",
-    "scopeHint": "Solo i monitor dei gruppi (con i sottogruppi) e tag selezionati, e i monitor scelti uno per uno. Agent offline segue solo gli eventi."
   }
 }

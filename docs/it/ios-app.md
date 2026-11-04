@@ -30,8 +30,7 @@ successivo avvio. Cosa invia l'app è descritto nella [privacy policy](https://p
 
 ## Scegliere cosa riceve ogni telefono
 
-Ogni telefono ha le sue preferenze di notifica, nell'app o in **impostazioni → account → notifiche sui miei
-telefoni**:
+Ogni telefono ha le sue preferenze di notifica, che si impostano nell'app su quel telefono:
 
 - **eventi**: down, di nuovo up, degradato, scadenza di certificato e dominio, agent offline.
 - **monitor**: tutti, oppure solo i monitor di alcuni gruppi (con i sottogruppi) e tag, più monitor scelti uno per

@@ -29,8 +29,7 @@ start. What the app itself sends is described in the [privacy policy](https://pi
 
 ## Choose what each phone gets
 
-Every phone has its own notification preferences, in the app or in **settings → account → notifications on my
-phones**:
+Every phone has its own notification preferences, set in the app on that phone:
 
 - **events**: down, back up, degraded, certificate and domain expiry, agent offline.
 - **monitors**: all of them, or only the monitors of some groups (with their subgroups) and tags, plus monitors picked
