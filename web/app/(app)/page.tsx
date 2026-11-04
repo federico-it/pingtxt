@@ -421,7 +421,7 @@ function Monitors() {
                 {t("bulk.selectAll")}
               </span>
             )}
-            <span className="ml-auto w-8 shrink-0" />
+            <span className="ml-auto w-11 shrink-0" />
           </div>
           {sections.map((sec) => (
             <div key={sec.key}>

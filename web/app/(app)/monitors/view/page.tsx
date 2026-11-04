@@ -152,7 +152,7 @@ function View() {
   return (
     <>
       <PageHeader cmd={`pingtxt monitors show ${id}`} title={d.name}>
-        <PinButton id={id} name={d.name} pinned={pins.has(id)} className="h-8 border" />
+        <PinButton id={id} name={d.name} pinned={pins.has(id)} className="size-8 self-auto border" />
         {isAdmin && (
           <>
             {d.type !== "push" && (
