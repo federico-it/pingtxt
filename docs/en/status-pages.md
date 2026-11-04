@@ -49,8 +49,8 @@ The **look** section changes how the page looks; the preview shows every change 
   cards, compact or airy spacing, narrow or wide page, block, rounded or thin bars.
 - **header**: plain or a band in the primary color, left or centered, a subtitle and up to 6 links.
 - **notice**: a highlighted message above the status, for example planned work.
-- **footer**: free text and up to 12 links, for example company details, contacts and privacy policy. **hide
-  "powered by pingtxt"** removes the credit line.
+- **footer**: free text and up to 12 links, for example company details, contacts and privacy policy. The credit line
+  "powered by pingtxt" links to pingtxt.com; **hide "powered by pingtxt"** removes it.
 - **use the logo as the browser tab icon**.
 
 Notice and footer text accept light Markdown: `**bold**`, `*italic*`, `[text](https://…)` and an empty line for a

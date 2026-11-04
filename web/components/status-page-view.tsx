@@ -223,11 +223,16 @@ export function StatusPageView({
             {theme?.footer_links?.length ? <PageLinks links={theme.footer_links} className="pt-footer-links" /> : null}
             <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
               {!theme?.hide_powered_by && (
-                <span>
+                <a
+                  href="https://pingtxt.com/?utm_source=status-page"
+                  target="_blank"
+                  rel="noopener"
+                  className="pt-powered-by hover:underline"
+                >
                   {t.rich("poweredBy", {
                     hl: (c) => <span className="text-foreground">{c}</span>,
                   })}
-                </span>
+                </a>
               )}
               <span className={cn(theme?.hide_powered_by && "ml-auto")}>{t("refreshes")}</span>
             </div>
