@@ -641,7 +641,7 @@
     "error": "errore",
     "groupSaved": "gruppo salvato",
     "tagSaved": "tag salvato",
-    "intro": "Un monitor appartiene al massimo a un gruppo e può avere quanti tag vuoi. I gruppi sono sezioni della dashboard e delle status page; entrambi servono a scegliere i monitor delle finestre di manutenzione e a filtrare l'elenco dei monitor.",
+    "intro": "Un monitor appartiene al massimo a un gruppo e può avere quanti tag vuoi. I gruppi sono sezioni della dashboard e delle status page e possono contenere sottogruppi; entrambi servono a scegliere i monitor delle finestre di manutenzione e a filtrare l'elenco dei monitor.",
     "groupsTitle": "gruppi ({count})",
     "tagsTitle": "tag ({count})",
     "noGroups": "ancora nessun gruppo.",
@@ -650,7 +650,7 @@
     "edit": "modifica",
     "rm": "rm",
     "deleteGroup": "eliminare il gruppo {name}?",
-    "deleteGroupText": "I suoi monitor restano, senza gruppo. Il gruppo viene tolto dalle finestre di manutenzione e dalle status page.",
+    "deleteGroupText": "I suoi monitor restano, senza gruppo, e i suoi sottogruppi salgono di un livello. Il gruppo viene tolto dalle finestre di manutenzione e dalle status page.",
     "deleteTag": "eliminare il tag {name}?",
     "deleteTagText": "Il tag viene tolto da tutti i monitor e dalle finestre di manutenzione.",
     "editGroup": "modifica gruppo",
@@ -678,7 +678,11 @@
       "purple": "viola",
       "pink": "rosa",
       "gray": "grigio"
-    }
+    },
+    "subgroupCount": "{count, plural, one {# sottogruppo} other {# sottogruppi}}",
+    "parent": "dentro il gruppo",
+    "noParent": "nessuno (primo livello)",
+    "parentHint": "Un sottogruppo compare annidato sotto il suo gruppo. Scegliere un gruppo per una manutenzione, una status page, un canale o un report include i suoi sottogruppi. Fino a {max} livelli."
   },
   "labels": {
     "error": "errore",

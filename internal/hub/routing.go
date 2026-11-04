@@ -46,6 +46,12 @@ func (h *Hub) loadRouting() ([]*store.Notifier, routing, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	// A channel scoped to a group also gets its subgroups (in memory only).
+	if t, err := h.groupTree(); err == nil {
+		for _, n := range list {
+			n.GroupIDs = t.Expand(n.GroupIDs)
+		}
+	}
 	links, err := h.store.ListChannelLinks()
 	if err != nil {
 		return nil, nil, err

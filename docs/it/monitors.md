@@ -188,7 +188,14 @@ Un monitor sta in un **gruppo** (o in nessuno) e ha quanti **tag** colorati vuoi
   compaiono;
 - scegliere i monitor per gruppo o tag nelle [finestre di manutenzione](alerts.md#finestre-di-manutenzione) e nei
   [canali di notifica](alerts.md#quali-monitor-ed-eventi-riceve-ogni-canale);
-- filtrare l'API: `GET /api/monitors?group=<id>` (o `group=none`) e `?tag=<id>`.
+- filtrare l'API: `GET /api/monitors?group=<id>` (o `group=none`) e `?tag=<id>`; aggiungi `include_subgroups=true`
+  per avere anche i monitor dei sottogruppi.
+
+Un gruppo può stare dentro un altro (**dentro il gruppo** nella finestra del gruppo), fino a 3 livelli, per esempio
+*progetto* con *api*, *sito* e *database*. I sottogruppi compaiono annidati sotto il loro gruppo nella dashboard e
+nella pagina dei gruppi, e come *progetto › api* nelle status page, nelle scelte e nei report. L'intestazione di un
+gruppo riassume anche i suoi sottogruppi, e scegliere un gruppo per una status page, una manutenzione, un canale o
+un report include i suoi sottogruppi. Eliminando un gruppo i suoi sottogruppi salgono di un livello.
 
 ## Diagnostica in caso di errore
 

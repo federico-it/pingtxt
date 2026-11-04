@@ -711,6 +711,9 @@ var laterMigrations = []migration{
 	// set), shown as a flag next to the location.
 	{sqlite: `ALTER TABLE agents ADD COLUMN country TEXT NOT NULL DEFAULT ''`,
 		mysql: `ALTER TABLE agents ADD COLUMN country VARCHAR(2) NOT NULL DEFAULT ''`},
+	// 34: parent of a monitor group (0 = top level), for subgroups.
+	{sqlite: `ALTER TABLE monitor_groups ADD COLUMN parent_id INTEGER NOT NULL DEFAULT 0`,
+		mysql: `ALTER TABLE monitor_groups ADD COLUMN parent_id BIGINT NOT NULL DEFAULT 0`},
 }
 
 func sqliteOnly(list []string) []migration {

@@ -299,9 +299,9 @@ export function MonitorForm({
   const guard = useUnsavedGuard(dirty, tr("unsavedChanges"))
   const groupItems = [
     { value: "0", label: tr("noGroup") },
-    ...(labels.groups.data ?? []).map((g) => ({
+    ...labels.tree.ordered.map((g) => ({
       value: String(g.id),
-      label: g.name,
+      label: g.path,
     })),
   ]
 

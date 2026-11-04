@@ -182,7 +182,14 @@ page. Then:
 - add whole groups to a [status page](status-pages.md): monitors added to the group later show up too;
 - pick monitors by group or tag in [maintenance windows](alerts.md#maintenance-windows) and
   [notification channels](alerts.md#which-monitors-and-events-each-channel-gets);
-- filter the API: `GET /api/monitors?group=<id>` (or `group=none`) and `?tag=<id>`.
+- filter the API: `GET /api/monitors?group=<id>` (or `group=none`) and `?tag=<id>`; add `include_subgroups=true` to
+  get the subgroups' monitors too.
+
+A group can sit inside another one (**inside group** in the group dialog), up to 3 levels, for example *project* with
+*api*, *site* and *database*. Subgroups show nested under their group on the dashboard and the groups page, and as
+*project › api* on status pages, in pickers and in reports. A group's header sums up its subgroups, and picking a
+group for a status page, maintenance window, channel or report includes its subgroups. Deleting a group moves its
+subgroups up one level.
 
 ## Diagnostics on failure
 

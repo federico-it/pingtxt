@@ -105,7 +105,7 @@ export default function MaintenancePage() {
   const zones = useMemo(() => timeZones(), [])
 
   const names = useMemo(() => new Map((monitors.data ?? []).map((m) => [m.id, m.name])), [monitors.data])
-  const { groups, tags, groupById, tagById } = useLabels()
+  const { groups, tags, groupById, tagById, tree } = useLabels()
 
   function set<K extends keyof Draft>(k: K, v: Draft[K]) {
     setDraft((p) => p && { ...p, [k]: v })
@@ -160,7 +160,7 @@ export default function MaintenancePage() {
   function scope(m: Maintenance) {
     if (m.all_monitors) return t("allMonitors")
     const list = [
-      ...(m.group_ids ?? []).map((id) => groupById.get(id) && `[${groupById.get(id)!.name}]`),
+      ...(m.group_ids ?? []).map((id) => groupById.get(id) && `[${groupById.get(id)!.path}]`),
       ...(m.tag_ids ?? []).map((id) => tagById.get(id) && `#${tagById.get(id)!.name}`),
       ...m.monitor_ids.map((id) => names.get(id)),
     ].filter(Boolean) as string[]
@@ -343,7 +343,7 @@ export default function MaintenancePage() {
                 {!draft.all_monitors && (groups.data?.length ?? 0) > 0 && (
                   <div className="flex flex-wrap items-center gap-1">
                     <span className="mr-1 text-xs text-muted-foreground">{t("groups")}</span>
-                    {(groups.data ?? []).map((g) => (
+                    {tree.ordered.map((g) => (
                       <GroupToggle key={g.id} group={g} on={draft.group_ids.includes(g.id)} onChange={(on) => toggle("group_ids", g.id, on)} />
                     ))}
                   </div>

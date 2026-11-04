@@ -547,9 +547,10 @@ func (h *Hub) pageMonitors(sp *store.StatusPage) ([]pageMonitor, error) {
 	if err != nil {
 		return nil, err
 	}
+	tree := store.NewGroupTree(groups)
 	names := map[int64]string{}
 	for _, g := range groups {
-		names[g.ID] = g.Name
+		names[g.ID] = tree.Path(g.ID, " › ")
 	}
 	var order []string
 	sections := map[string][]pageMonitor{}
@@ -574,13 +575,17 @@ func (h *Hub) pageMonitors(sp *store.StatusPage) ([]pageMonitor, error) {
 		}
 		add(m)
 	}
+	// A group picked as a whole brings its subgroups, each in its own
+	// section right after it.
 	for _, gid := range sp.GroupIDs {
-		ms, err := h.store.MonitorsInGroups([]int64{gid})
-		if err != nil {
-			return nil, err
-		}
-		for _, m := range ms {
-			add(m)
+		for _, g := range append([]int64{gid}, tree.Descendants(gid)...) {
+			ms, err := h.store.MonitorsInGroups([]int64{g})
+			if err != nil {
+				return nil, err
+			}
+			for _, m := range ms {
+				add(m)
+			}
 		}
 	}
 	out := []pageMonitor{}

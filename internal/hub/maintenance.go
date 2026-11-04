@@ -16,6 +16,13 @@ func (h *Hub) MaintenancesChanged() error {
 	if err != nil {
 		return err
 	}
+	// A window on a group covers its subgroups too. These copies stay in
+	// memory: the stored windows keep the groups as picked.
+	if t, err := h.groupTree(); err == nil {
+		for _, w := range list {
+			w.GroupIDs = t.Expand(w.GroupIDs)
+		}
+	}
 	h.mu.Lock()
 	h.maints = list
 	h.mu.Unlock()

@@ -147,7 +147,7 @@ function Monitors() {
   const [busy, setBusy] = useState(false)
   const now = useMinute()
   useHotkey("/", () => document.getElementById("monitor-search")?.focus())
-  const { groups, tags, groupById, tagById } = useLabels()
+  const { groups, tags, groupById, tagById, tree } = useLabels()
   const hasGroups = (groups.data?.length ?? 0) > 0
 
   const counts = useMemo(() => {
@@ -166,7 +166,8 @@ function Monitors() {
           group === "all" ||
           (group === "none"
             ? !groupById.has(m.group_id)
-            : String(m.group_id) === group)
+            : String(m.group_id) === group ||
+              !!groupById.get(m.group_id)?.ancestors.includes(Number(group)))
       )
       .filter((m) => tag === null || m.tag_ids?.includes(tag))
       .filter(
@@ -178,7 +179,7 @@ function Monitors() {
           m.tag_ids?.some((id) =>
             tagById.get(id)?.name.toLowerCase().includes(s)
           ) ||
-          groupById.get(m.group_id)?.name.toLowerCase().includes(s)
+          groupById.get(m.group_id)?.path.toLowerCase().includes(s)
       )
       .sort((a, b) => compare(sort, a, b))
   }, [data, query, filter, group, tag, sort, groupById, tagById, pendingDeletes])
@@ -254,9 +255,10 @@ function Monitors() {
 
 
   // Pinned monitors come first, in their own section. With groups, the rest
-  // is split in one section per group (by name), with monitors without a
-  // group last.
-  const sections = useMemo(() => {
+  // is split in one section per group, subgroups nested under their group
+  // (a group shows when one of its subgroups has monitors), with monitors
+  // without a group last.
+  const sections = useMemo((): Section[] => {
     const pinned = list.filter((m) => pins.has(m.id))
     const rest = list.filter((m) => !pins.has(m.id))
     const top = pinned.length ? [{ key: "pinned", title: t("pinned"), items: pinned }] : []
@@ -267,13 +269,21 @@ function Monitors() {
       const k = groupById.has(m.group_id) ? m.group_id : 0
       by.set(k, [...(by.get(k) ?? []), m])
     }
-    const out = (groups.data ?? [])
-      .filter((g) => by.has(g.id))
-      .map((g) => ({ key: String(g.id), title: g.name, items: by.get(g.id)! }))
+    const out: Section[] = tree.ordered
+      .map((g) => ({
+        key: String(g.id),
+        title: g.name,
+        items: by.get(g.id) ?? [],
+        depth: g.depth,
+        ancestors: g.ancestors,
+        // every monitor of the group and its subgroups, for the summary
+        nested: [g.id, ...tree.descendants(g.id)].flatMap((id) => by.get(id) ?? []),
+      }))
+      .filter((s) => s.nested.length > 0)
     if (by.has(0))
       out.push({ key: "none", title: t("ungrouped"), items: by.get(0)! })
     return [...top, ...out]
-  }, [list, pins, hasGroups, groups.data, groupById, t])
+  }, [list, pins, hasGroups, tree, groupById, t])
 
   return (
     <>
@@ -345,9 +355,9 @@ function Monitors() {
               <span className="text-muted-foreground">{t("group")}</span>
               {[
                 { k: "all", label: t("all") },
-                ...(groups.data ?? []).map((g) => ({
+                ...tree.ordered.map((g) => ({
                   k: String(g.id),
-                  label: g.name,
+                  label: g.path,
                 })),
                 { k: "none", label: t("ungrouped") },
               ].map((g) => (
@@ -423,7 +433,14 @@ function Monitors() {
             )}
             <span className="ml-auto w-11 shrink-0" />
           </div>
-          {sections.map((sec) => (
+          {sections
+            .filter((sec) => !sec.ancestors?.some((a) => collapsed.has(String(a))))
+            .map((sec) => {
+            // A group's header sums up its subgroups too.
+            const all = sec.nested ?? sec.items
+            const down = all.filter((m) => m.status === "down").length
+            const depth = sec.depth ?? 0
+            return (
             <div key={sec.key}>
               {sec.title && (
                 <button
@@ -431,16 +448,17 @@ function Monitors() {
                   onClick={() => collapsed.toggle(sec.key)}
                   aria-expanded={!collapsed.has(sec.key)}
                   className="flex w-full items-center gap-2 border-b border-dashed bg-muted/40 px-2 py-1 text-left text-xs hover:bg-muted/70"
+                  style={depth ? { paddingLeft: `${0.5 + depth * 1.25}rem` } : undefined}
                 >
                   <span className="w-3 text-muted-foreground">{collapsed.has(sec.key) ? "▸" : "▾"}</span>
                   {sec.key === "pinned" && <span className="text-warn">★</span>}
                   <span className="font-medium">{sec.title}</span>
                   <span className="text-muted-foreground">
-                    {sec.items.length}
-                    {sec.items.some((m) => m.status === "down") && (
+                    {all.length}
+                    {down > 0 && (
                       <span className="text-down">
                         {" · "}
-                        {t("down", { count: sec.items.filter((m) => m.status === "down").length })}
+                        {t("down", { count: down })}
                       </span>
                     )}
                   </span>
@@ -520,7 +538,8 @@ function Monitors() {
                 </div>
               ))}
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -545,9 +564,9 @@ function Monitors() {
               }
             />
             <DropdownMenuContent align="end" className="min-w-40">
-              {(groups.data ?? []).map((g) => (
+              {tree.ordered.map((g) => (
                 <DropdownMenuItem key={g.id} onClick={() => bulk("group", g.id)}>
-                  {g.name}
+                  {g.path}
                 </DropdownMenuItem>
               ))}
               {(groups.data?.length ?? 0) > 0 && <DropdownMenuSeparator />}
@@ -569,6 +588,19 @@ function Monitors() {
 }
 
 const collapsedKey = "pingtxt.collapsedGroups"
+
+/** A block of the monitor list: pinned, a group or the ungrouped ones. */
+type Section = {
+  key: string
+  title: string
+  items: MonitorSummary[]
+  /** groups: nesting level, 0 = top level */
+  depth?: number
+  /** groups: the groups it is inside of */
+  ancestors?: number[]
+  /** groups: its monitors and those of its subgroups */
+  nested?: MonitorSummary[]
+}
 
 /** Group sections the user folded, remembered in this browser. */
 function useCollapsedGroups() {

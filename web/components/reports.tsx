@@ -19,6 +19,7 @@ import {
   type Reports,
   type ReportSettings,
 } from "@/lib/api"
+import { groupTree } from "@/lib/groups"
 import { datetime } from "@/lib/format"
 import { option } from "@/components/ui/control"
 
@@ -193,9 +194,9 @@ function ReportsForm({
           <Toggle on={s.group_ids.length === 0} disabled={ro} onClick={() => setS((p) => ({ ...p, group_ids: [] }))}>
             {t("allMonitors")}
           </Toggle>
-          {(groups.data ?? []).map((g) => (
+          {groupTree(groups.data ?? []).ordered.map((g) => (
             <Toggle key={g.id} on={s.group_ids.includes(g.id)} disabled={ro} onClick={() => toggleID("group_ids", g.id)}>
-              {g.name}
+              {g.path}
             </Toggle>
           ))}
         </div>
