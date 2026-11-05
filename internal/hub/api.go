@@ -759,6 +759,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	if err := checkPingCount(m); err != nil {
 		return err
 	}
+	if err := h.checkDependencies(m); err != nil {
+		return err
+	}
 	if m.Headers == nil {
 		m.Headers = map[string]string{}
 	}
@@ -856,7 +859,7 @@ func validatePush(m *store.Monitor) error {
 		ID: m.ID, Name: m.Name, Type: m.Type, IntervalSec: m.IntervalSec, GraceSec: m.GraceSec,
 		TimeoutMs: 10000, Retries: 1, Method: "GET", Headers: map[string]string{},
 		Locations: []string{PushLocation}, Paused: m.Paused, Assertions: []check.Assertion{},
-		GroupID: m.GroupID, TagIDs: m.TagIDs,
+		GroupID: m.GroupID, TagIDs: m.TagIDs, DependsOn: m.DependsOn,
 	}
 	return nil
 }
@@ -870,6 +873,9 @@ type monitorSummary struct {
 	Expiry    []*store.ExpiryCheck `json:"expiry"`
 	// Maintenance is the window covering the monitor right now, if any.
 	Maintenance *activeMaint `json:"maintenance"`
+	// BlockedBy is the monitor it depends on that is down, if any: this
+	// one fails too but sends no alerts of its own.
+	BlockedBy *blockedInfo `json:"blocked_by"`
 }
 
 type activeMaint struct {
@@ -900,6 +906,7 @@ func (h *Hub) summary(m *store.Monitor, expiry []*store.ExpiryCheck) *monitorSum
 	if w, end := h.ActiveMaintenance(m); w != nil && !m.Paused {
 		s.Maintenance = &activeMaint{ID: w.ID, Name: w.Name, EndAt: end.UnixMilli()}
 	}
+	s.BlockedBy = h.blockedBy(m.ID)
 	// Bars, uptime and the last result come from the in-memory stats kept by
 	// HandleResult: no query on the results table.
 	h.mu.Lock()

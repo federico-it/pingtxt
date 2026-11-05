@@ -109,6 +109,12 @@ type monState struct {
 	// enough history, for monitors set to store.SlowAuto.
 	autoSlow map[string]float64
 
+	// Dependencies, see dependencies.go.
+	blockedBy    int64     // monitor down above this one (0 = not blocked)
+	blockedSince int64     // unix ms
+	hold         *depHold  // down alert waiting for fresh checks
+	lastAt       time.Time // when the last result arrived
+
 	busy  bool      // a local check is queued or running
 	stats *monStats // last 24h of results, for the dashboard
 }
@@ -316,6 +322,7 @@ func (h *Hub) MonitorChanged(id int64) {
 			st.real = ""
 			st.incident = false // pausing resolves open incidents
 			st.alerts = nil
+			st.blockedBy, st.blockedSince, st.hold = 0, 0, nil
 		}
 		// Re-evaluate maintenance on the next tick (pause/resume resets status).
 		st.inMaint = false
@@ -359,6 +366,7 @@ func jobFor(m *store.Monitor) check.Job {
 
 func (h *Hub) tick(ctx context.Context, now time.Time) {
 	h.maintTick(now)
+	h.depTick(now)
 	type dispatch struct {
 		loc string
 		job check.Job
@@ -577,6 +585,7 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		st.locs[loc] = ls
 	}
 	ls.lastMsg = r.Message
+	st.lastAt = time.Now()
 	if r.Diag != nil {
 		ls.diag, ls.diagID, ls.diagAt = r.Diag, 0, time.Now()
 	}
@@ -646,9 +655,9 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	}
 	since := m.StatusSince
 	name := m.Name
-	alert := h.alertLocked(st)
+	alert := h.alertLocked(st, time.Now(), true)
 	degraded := ""
-	if changed && !m.Paused {
+	if changed && !m.Paused && st.blockedBy == 0 {
 		degraded = degradedChange(prev, display)
 	}
 	row := &store.ResultRow{
@@ -836,13 +845,22 @@ func (h *Hub) SlowLimits(id int64) map[string]float64 {
 
 // alertLocked decides whether an incident must be opened ("down") or
 // resolved ("up") given the monitor's real status. Nothing is raised during
-// maintenance; pending alerts fire once the window ends. Call with h.mu held.
-func (h *Hub) alertLocked(st *monState) string {
-	if st.inMaint || st.m.Paused {
+// maintenance; pending alerts fire once the window ends. Down alerts of a
+// monitor blocked by its dependencies wait. fresh is true when st just got
+// a result. Call with h.mu held.
+func (h *Hub) alertLocked(st *monState, now time.Time, fresh bool) string {
+	if st.m.Paused {
+		return ""
+	}
+	wait := h.depsLocked(st, now, fresh)
+	if st.inMaint {
 		return ""
 	}
 	switch {
 	case st.real == StatusDown && !st.incident:
+		if wait {
+			return "" // blocked by a monitor it depends on, see dependencies.go
+		}
 		st.incident = true
 		return StatusDown
 	case st.real != "" && st.real != StatusDown && st.incident:

@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
 import { CountryFlag } from "@/components/country"
+import { DependsOnPicker } from "@/components/depends-on"
 import { covers, LinkRow, linkState } from "@/components/channel-links"
 import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
@@ -212,6 +213,7 @@ export const emptyMonitor: MonitorInput = {
   locations: ["local"],
   group_id: 0,
   tag_ids: [],
+  depends_on: [],
   notifiers: [],
   cert_expiry_alert: true,
   domain_expiry_alert: true,
@@ -1154,6 +1156,17 @@ export function MonitorForm({
           </div>
         </Section>
       )}
+
+      <Section title={tr("sections.dependencies")}>
+        <p className="mb-3 text-xs text-muted-foreground">
+          {tr("dependsOnHint")}
+        </p>
+        <DependsOnPicker
+          id={id}
+          value={m.depends_on ?? []}
+          onChange={(ids) => set("depends_on", ids)}
+        />
+      </Section>
 
       <Section title={tr("sections.notifications")}>
         <p className="mb-3 text-xs text-muted-foreground">

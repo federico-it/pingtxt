@@ -141,7 +141,8 @@
       },
       "undo": "undo",
       "undone": "undone"
-    }
+    },
+    "blockedBy": "blocked by {name}"
   },
   "monitor": {
     "resumed": "monitor resumed",
@@ -207,7 +208,8 @@
     "zoomed": "{from} → {to}",
     "zoomReset": "back to {range}",
     "noLocationOnline": "No location of this monitor is online: its checks are not running, so the status is pending until an agent reconnects.",
-    "diagnostics": "diagnostics"
+    "diagnostics": "diagnostics",
+    "blockedBy": "blocked by <hl>{name}</hl> since {since}: it is down too, so this monitor sends no alerts of its own. once it is back, an alert goes out only if this one still fails."
   },
   "browserNotify": {
     "title": "desktop notifications in this browser",
@@ -322,7 +324,8 @@
       "schedule": "schedule",
       "locations": "locations",
       "expiry": "expiry alerts",
-      "notifications": "notifications"
+      "notifications": "notifications",
+      "dependencies": "dependencies"
     },
     "noGroup": "no group",
     "noGrace": "none",
@@ -456,7 +459,8 @@
       "default": "instance default",
       "on": "on",
       "off": "off"
-    }
+    },
+    "dependsOnHint": "monitors this one depends on, e.g. the ping of the server it runs on. while one of them is down, this monitor sends no alerts: you get one alert for the server instead of one per service."
   },
   "testCheck": {
     "title": "test check",
@@ -1729,5 +1733,9 @@
   },
   "country": {
     "none": "none"
+  },
+  "dependencies": {
+    "add": "add a monitor…",
+    "remove": "remove {name}"
   }
 }

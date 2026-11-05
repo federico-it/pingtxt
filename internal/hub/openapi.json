@@ -10212,6 +10212,15 @@
               "format": "int64"
             }
           },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "maxItems": 20,
+            "description": "Ids of the monitors this one depends on, e.g. the ping of the server it runs on. While one of them is down this monitor is blocked: it still checks and shows its own status, but opens no incident and sends no alerts. When the monitor that is down comes back, an alert goes out only if this one still fails at its next check. If this monitor fails first, its alert waits (up to 10 minutes) for a fresh check of the monitors it depends on. No loops, not itself. Missing on PUT = unchanged."
+          },
           "notifiers": {
             "type": "array",
             "items": {
@@ -10472,6 +10481,31 @@
                   }
                 ],
                 "description": "Window covering the monitor right now."
+              },
+              "blocked_by": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "format": "int64"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "since": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Unix time in milliseconds."
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The monitor in depends_on (or further up) that is down while this one fails too. Set only while this monitor is down: it sends no alerts of its own. null otherwise."
               }
             }
           }

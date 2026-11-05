@@ -512,6 +512,7 @@ func monitorFields() map[string]any {
 		"locations":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Where to check from: ids from list_agents (\"local\" is the hub itself). Default local."},
 		"group_id":            prop("integer", "Group id from list_groups, 0 for none"),
 		"tag_ids":             intList("Tag ids from list_tags"),
+		"depends_on":          intList("Ids of monitors this one depends on (e.g. the ping of its server). While one of them is down this monitor sends no alerts of its own; [] for none"),
 		"cert_expiry_alert":   prop("boolean", "Alert before the TLS certificate expires"),
 		"domain_expiry_alert": prop("boolean", "Alert before the domain registration expires"),
 		"paused":              prop("boolean", "Create the monitor paused"),
@@ -526,7 +527,7 @@ func compactMonitor(v any) any {
 		return v
 	}
 	out := map[string]any{}
-	for _, k := range []string{"id", "name", "type", "target", "status", "status_since", "paused", "group_id", "tag_ids", "uptime_24h", "avg_ms_24h", "maintenance", "locations"} {
+	for _, k := range []string{"id", "name", "type", "target", "status", "status_since", "paused", "group_id", "tag_ids", "depends_on", "uptime_24h", "avg_ms_24h", "maintenance", "blocked_by", "locations"} {
 		if x, ok := m[k]; ok {
 			out[k] = x
 		}

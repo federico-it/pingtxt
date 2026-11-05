@@ -721,6 +721,30 @@ var laterMigrations = []migration{
 	ALTER TABLE users ADD COLUMN push_prefs TEXT NOT NULL DEFAULT '';`,
 		mysql: `ALTER TABLE push_devices ADD COLUMN prefs MEDIUMTEXT NOT NULL DEFAULT ('');
 	ALTER TABLE users ADD COLUMN push_prefs MEDIUMTEXT NOT NULL DEFAULT ('');`},
+	// 36: monitor dependencies. While a monitor that another one depends on
+	// (parent_id) is down, the dependent monitor sends no alerts of its own.
+	{
+		sqlite: `CREATE TABLE monitor_dependencies (
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		parent_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		PRIMARY KEY (monitor_id, parent_id)
+	);
+	CREATE INDEX monitor_dependencies_parent ON monitor_dependencies(parent_id);`,
+		postgres: `CREATE TABLE monitor_dependencies (
+		monitor_id BIGINT NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		parent_id BIGINT NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		PRIMARY KEY (monitor_id, parent_id)
+	);
+	CREATE INDEX monitor_dependencies_parent ON monitor_dependencies(parent_id);`,
+		mysql: `CREATE TABLE monitor_dependencies (
+		monitor_id BIGINT NOT NULL,
+		parent_id BIGINT NOT NULL,
+		PRIMARY KEY (monitor_id, parent_id),
+		INDEX monitor_dependencies_parent (parent_id),
+		FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE,
+		FOREIGN KEY (parent_id) REFERENCES monitors(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {
