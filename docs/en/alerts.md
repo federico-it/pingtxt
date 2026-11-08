@@ -85,6 +85,9 @@ any time zone), for some or all monitors, or whole groups and tags.
 During a window the monitors show **maintenance**: checks keep running, but no incidents open, no alerts are sent
 and those checks do not count toward uptime. A monitor still down when the window ends gets its alert then.
 
+A window can also be announced on status pages and emailed to their subscribers: see
+[scheduled maintenance](status-pages.md#scheduled-maintenance).
+
 ## Dependencies
 
 When many monitors run on the same server, tell each of them what it depends on: in the monitor form, under

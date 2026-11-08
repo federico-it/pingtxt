@@ -685,6 +685,18 @@
     "labelsHint": "Groups and tags also cover monitors added to them later.",
     "noMonitorsYet": "no monitors yet",
     "enabled": "enabled",
+    "publicSection": "status pages",
+    "public": "show on status pages",
+    "publicHint": "Visible on every status page that lists one of the selected monitors: upcoming, then in progress.",
+    "announcement": "public message (optional)",
+    "announcementPlaceholder": "The API is read-only while we upgrade the database.",
+    "announcementHint": "Shown on status pages and in emails. The notes above stay private.",
+    "notify": "email the subscribers",
+    "notifyHint": "Subscribers get an email when you save the window or change its schedule, when it starts, when it ends and if you cancel it.",
+    "remind": "reminder",
+    "remindNone": "no reminder",
+    "remindBefore": "{t} before",
+    "publicBadge": "public",
     "save": "save"
   },
   "groups": {
@@ -1039,7 +1051,7 @@
     "subscribeChannel": "send updates through",
     "subscribeOff": "off: visitors cannot subscribe",
     "channelDisabled": "disabled",
-    "subscribeHint": "Visitors can subscribe by email to the incidents you post. Emails go out through the SMTP server or Resend account and the sender of this email channel, not to its recipients.",
+    "subscribeHint": "Visitors can subscribe by email to the incidents you post and to the public maintenance windows of the page. Emails go out through the SMTP server or Resend account and the sender of this email channel, not to its recipients.",
     "subscribeNoChannel": "Add an email channel in notifications to let visitors subscribe.",
     "passwordTitle": "password",
     "protected": "protect with a password",
@@ -1201,6 +1213,15 @@
       "operational": "operational"
     },
     "reportStarted": "since {at}",
+    "maint": {
+      "scheduledTitle": "scheduled maintenance",
+      "scheduled": "scheduled",
+      "inProgress": "maintenance",
+      "startsIn": "{start} → {end} · in {in}",
+      "endsIn": "until {end} · ends in {in}",
+      "repeats": "repeats {kind}",
+      "affects": "affects: {names}"
+    },
     "subscribe": {
       "title": "get updates",
       "email": "email address",
@@ -1208,9 +1229,9 @@
       "submit": "subscribe",
       "sending": "sending...",
       "sent": "Check {email}: open the link we sent to confirm.",
-      "hint": "Incident updates by email. Every email has a link to unsubscribe.",
+      "hint": "Incident and maintenance updates by email. Every email has a link to unsubscribe.",
       "error": "error",
-      "confirmed": "{email} is subscribed: you will get incident updates by email.",
+      "confirmed": "{email} is subscribed: you will get incident and maintenance updates by email.",
       "unsubscribed": "{email} is unsubscribed: you will get no more emails.",
       "badLink": "this link is not valid anymore."
     },
@@ -1849,7 +1870,12 @@
       "incident.updated": "an incident gets an update",
       "incident.resolved": "an incident is resolved",
       "page.status_changed": "the status of the page changes",
-      "monitor.status_changed": "a monitor of the page changes status"
+      "monitor.status_changed": "a monitor of the page changes status",
+      "maintenance.scheduled": "a maintenance is announced or rescheduled",
+      "maintenance.reminder": "a maintenance reminder is due",
+      "maintenance.in_progress": "a maintenance starts",
+      "maintenance.completed": "a maintenance ends",
+      "maintenance.cancelled": "a maintenance is cancelled"
     },
     "add": "add webhook",
     "added": "webhook added",

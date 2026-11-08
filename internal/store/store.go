@@ -793,7 +793,27 @@ var laterMigrations = []migration{
 	// as JSON.
 	{sqlite: `ALTER TABLE monitors ADD COLUMN steps TEXT NOT NULL DEFAULT '[]'`,
 		mysql: `ALTER TABLE monitors ADD COLUMN steps MEDIUMTEXT NOT NULL DEFAULT ('[]')`},
-	// 39: who acknowledged an incident and when (0 = nobody): reminders and
+	// 39: maintenance windows announced on status pages (public, with a
+	// public message) and emailed to their subscribers (notify_subscribers,
+	// remind_min minutes before). notice_* hold the start (unix ms) of the
+	// occurrence whose reminder, start and end emails went out.
+	{
+		sqlite: `ALTER TABLE maintenances ADD COLUMN public INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN announcement TEXT NOT NULL DEFAULT '';
+	ALTER TABLE maintenances ADD COLUMN notify_subscribers INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN remind_min INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_remind BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_start BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_end BIGINT NOT NULL DEFAULT 0;`,
+		mysql: `ALTER TABLE maintenances ADD COLUMN public INT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN announcement TEXT NOT NULL DEFAULT ('');
+	ALTER TABLE maintenances ADD COLUMN notify_subscribers INT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN remind_min INT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_remind BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_start BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_end BIGINT NOT NULL DEFAULT 0;`,
+	},
+	// 40: who acknowledged an incident and when (0 = nobody): reminders and
 	// escalation stop while someone is on it. The email stays when the
 	// user is deleted.
 	{sqlite: `ALTER TABLE incidents ADD COLUMN acked_at INTEGER NOT NULL DEFAULT 0;

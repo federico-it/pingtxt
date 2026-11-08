@@ -63,6 +63,11 @@ func mailSamples(t *testing.T) map[string]fakeMail {
 	inc2 := *inc
 	inc2.ResolvedAt = at
 	add("incident-resolved", buildUpdateEmail(page, &inc2, store.PageIncidentUpdate{Status: store.ReportResolved, Message: "Latency is back to normal."}, sub, links, now))
+	mw := &store.Maintenance{Name: "Database upgrade", Kind: store.MaintWeekly, Weekdays: []int{0}, StartTime: "02:00", DurationMin: 90, Timezone: "Europe/Rome"}
+	pmw := publicMaintenance{Title: mw.Name, Description: "The API is read-only while we upgrade the database.", StartsAt: at + 3600_000, EndsAt: at + 3*3600_000, Kind: mw.Kind}
+	for _, ev := range []string{MaintScheduled, MaintReminder, MaintInProgress, MaintCompleted, MaintCancelled} {
+		add("maintenance-"+strings.ReplaceAll(ev, "_", "-"), buildMaintEmail(page, ev, pmw, []string{"api", "dashboard"}, mw, sub, links, now))
+	}
 	return out
 }
 
@@ -83,13 +88,16 @@ func TestMailViews(t *testing.T) {
 	}
 	s := mailSamples(t)
 	checks := map[string][]string{
-		"alert-down":        {"[DOWN] hub api", "http 503", "https://hub.example.com/monitors/view/?id=3"},
-		"alert-still-down":  {"[STILL DOWN] hub api", "47m", "#2"},
-		"alert-up":          {"[UP] hub api", "52m"},
-		"cert-expiring":     {"[CERT] example.com", "9 days"},
-		"report-weekly":     {"## production", "95.83%", "timeout after 10s", "ongoing", "dashboard: https://hub.example.com/"},
-		"subscribe-confirm": {"?confirm=" + strings.Repeat("ab", 24)},
-		"incident-update":   {"[IDENTIFIED] Slow API responses", "> We are failing over to the replica.", "?unsubscribe="},
+		"alert-down":            {"[DOWN] hub api", "http 503", "https://hub.example.com/monitors/view/?id=3"},
+		"alert-still-down":      {"[STILL DOWN] hub api", "47m", "#2"},
+		"alert-up":              {"[UP] hub api", "52m"},
+		"cert-expiring":         {"[CERT] example.com", "9 days"},
+		"report-weekly":         {"## production", "95.83%", "timeout after 10s", "ongoing", "dashboard: https://hub.example.com/"},
+		"subscribe-confirm":     {"?confirm=" + strings.Repeat("ab", 24)},
+		"maintenance-scheduled": {"[SCHEDULED] Database upgrade", "read-only", "every Sun at 02:00 Europe/Rome, for 1h 30m", "api, dashboard", "?unsubscribe="},
+		"maintenance-reminder":  {"[STARTS SOON] Database upgrade", "starts in 1h"},
+		"maintenance-completed": {"[COMPLETED] Database upgrade", "ended"},
+		"incident-update":       {"[IDENTIFIED] Slow API responses", "> We are failing over to the replica.", "?unsubscribe="},
 	}
 	for name, want := range checks {
 		pm := parseMail(t, s[name])

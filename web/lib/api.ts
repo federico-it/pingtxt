@@ -376,6 +376,14 @@ export interface Maintenance {
   timezone: string
   enabled: boolean
   created_at: number
+  /** shown on the status pages that list one of its monitors */
+  public?: boolean
+  /** public message on status pages and in subscriber emails */
+  announcement?: string
+  /** email the subscribers of those pages (public windows only) */
+  notify_subscribers?: boolean
+  /** also email a reminder this many minutes before each occurrence, 0 = none */
+  remind_min?: number
   active: boolean
   active_end?: number
   next_start?: number
@@ -842,6 +850,11 @@ export const pageWebhookEvents = [
   "incident.resolved",
   "page.status_changed",
   "monitor.status_changed",
+  "maintenance.scheduled",
+  "maintenance.reminder",
+  "maintenance.in_progress",
+  "maintenance.completed",
+  "maintenance.cancelled",
 ] as const
 export type PageWebhookEvent = (typeof pageWebhookEvents)[number]
 
@@ -920,9 +933,24 @@ export interface PublicStatusPage {
   }[]
   /** incidents written on the page: open ones, then recently resolved */
   reports: PageIncident[]
+  /** public maintenance windows covering a monitor of the page (missing on older hubs) */
+  maintenances?: PublicMaintenance[]
   /** visitors can subscribe by email */
   subscribe: boolean
   updated_at: number
+}
+
+/** A public maintenance window: in progress, or its next occurrence. */
+export interface PublicMaintenance {
+  id: number
+  title: string
+  description: string
+  status: "scheduled" | "in_progress"
+  starts_at: number
+  ends_at: number
+  kind: MaintenanceKind
+  /** monitors of the page that it covers */
+  monitor_ids: number[]
 }
 
 /** Public address of a status page. */
