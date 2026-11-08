@@ -36,6 +36,7 @@ var openAPISchemaFields = []struct {
 	{"PageLink", store.PageLink{}, nil},
 	{"PageIncident", store.PageIncident{}, nil},
 	{"PageIncidentUpdate", store.PageIncidentUpdate{}, nil},
+	{"PublicMaintenance", publicMaintenance{}, nil},
 	{"Agent", store.Agent{}, nil},
 	{"AuditEntry", store.AuditEntry{}, nil},
 	{"GeneralSettings", GeneralSettings{}, nil},

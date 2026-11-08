@@ -781,20 +781,24 @@ var mcpTools = []mcpTool{
 			"For a one-off window give start (default now) and end or duration_min. " +
 			"Recurring windows (daily, weekly, monthly) need start_time and duration_min, plus weekdays or month_days.",
 		schema: object(map[string]any{
-			"name":         prop("string", "Name shown on the dashboard and status pages"),
-			"description":  prop("string", "Optional details"),
-			"kind":         map[string]any{"type": "string", "enum": maintKinds, "description": "once (default), daily, weekly or monthly"},
-			"start":        prop("string", "Start, ISO 8601 (e.g. 2026-11-01T22:00:00Z). once: default now. Recurring: first day the window applies."),
-			"end":          prop("string", "End, ISO 8601. once: required unless duration_min is given. Recurring: last day (optional)."),
-			"start_time":   prop("string", "Recurring: local start time HH:MM"),
-			"duration_min": prop("integer", "Length in minutes"),
-			"weekdays":     intList("Weekly: days, 0 = Sunday … 6 = Saturday"),
-			"month_days":   intList("Monthly: days of the month, 1 … 31"),
-			"timezone":     prop("string", "IANA time zone of start_time, e.g. Europe/Rome (default UTC)"),
-			"all_monitors": prop("boolean", "Cover every monitor"),
-			"monitor_ids":  intList("Monitors to cover"),
-			"group_ids":    intList("Cover every monitor of these groups"),
-			"tag_ids":      intList("Cover every monitor with one of these tags"),
+			"name":               prop("string", "Name shown on the dashboard, and on status pages when public"),
+			"description":        prop("string", "Optional internal notes (not shown on status pages)"),
+			"kind":               map[string]any{"type": "string", "enum": maintKinds, "description": "once (default), daily, weekly or monthly"},
+			"start":              prop("string", "Start, ISO 8601 (e.g. 2026-11-01T22:00:00Z). once: default now. Recurring: first day the window applies."),
+			"end":                prop("string", "End, ISO 8601. once: required unless duration_min is given. Recurring: last day (optional)."),
+			"start_time":         prop("string", "Recurring: local start time HH:MM"),
+			"duration_min":       prop("integer", "Length in minutes"),
+			"weekdays":           intList("Weekly: days, 0 = Sunday … 6 = Saturday"),
+			"month_days":         intList("Monthly: days of the month, 1 … 31"),
+			"timezone":           prop("string", "IANA time zone of start_time, e.g. Europe/Rome (default UTC)"),
+			"all_monitors":       prop("boolean", "Cover every monitor"),
+			"monitor_ids":        intList("Monitors to cover"),
+			"group_ids":          intList("Cover every monitor of these groups"),
+			"tag_ids":            intList("Cover every monitor with one of these tags"),
+			"public":             prop("boolean", "Announce the window on the status pages that show one of its monitors"),
+			"announcement":       prop("string", "Public message shown with the window on status pages and in subscriber emails"),
+			"notify_subscribers": prop("boolean", "Email the subscribers of those status pages when it is announced, starts, ends or is cancelled (needs public). Ask the user first."),
+			"remind_min":         prop("integer", "With notify_subscribers, also email a reminder this many minutes before each occurrence"),
 		}, "name"),
 		run: func(c *mcpCall) (any, error) {
 			body, err := maintenanceBody(c.args, time.Now())
@@ -821,7 +825,7 @@ var mcpTools = []mcpTool{
 // maintenanceBody turns tool arguments into the API body of a maintenance window.
 func maintenanceBody(args map[string]any, now time.Time) (map[string]any, error) {
 	body := map[string]any{"enabled": true, "kind": store.MaintOnce}
-	for _, k := range []string{"name", "description", "kind", "start_time", "duration_min", "weekdays", "month_days", "timezone", "all_monitors", "monitor_ids", "group_ids", "tag_ids"} {
+	for _, k := range []string{"name", "description", "kind", "start_time", "duration_min", "weekdays", "month_days", "timezone", "all_monitors", "monitor_ids", "group_ids", "tag_ids", "public", "announcement", "notify_subscribers", "remind_min"} {
 		if v, ok := args[k]; ok && v != nil {
 			body[k] = v
 		}

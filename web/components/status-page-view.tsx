@@ -13,7 +13,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { UptimeBars } from "@/components/uptime-bars"
 import { reportImpactBorder, reportImpactText, ReportStatusText, ReportTimeline } from "@/components/report-timeline"
 import { RichText, safeLink } from "@/components/rich-text"
-import type { PageIncident, PageLink, PageLogo, PageStatus, PageTheme, PublicStatusPage } from "@/lib/api"
+import type { PageIncident, PageLink, PageLogo, PageStatus, PageTheme, PublicMaintenance, PublicStatusPage } from "@/lib/api"
 import { ago, datetime, duration, pct } from "@/lib/format"
 import { customCSS, themeCSS } from "@/lib/page-theme"
 import { cn } from "@/lib/utils"
@@ -55,6 +55,10 @@ export function StatusPageView({
   const reports = data.reports ?? []
   const openReports = reports.filter((r) => !r.resolved_at)
   const pastReports = reports.filter((r) => r.resolved_at)
+  const maints = data.maintenances ?? []
+  const activeMaints = maints.filter((m) => m.status === "in_progress")
+  const nextMaints = maints.filter((m) => m.status !== "in_progress")
+  const at = now || data.updated_at
 
   const theme = data.theme
   const forced = theme?.mode ?? ""
@@ -122,6 +126,14 @@ export function StatusPageView({
           </div>
         )}
 
+        {activeMaints.length > 0 && (
+          <div className="mt-6 grid gap-3">
+            {activeMaints.map((m) => (
+              <Maint key={m.id} m={m} page={data} now={at} box />
+            ))}
+          </div>
+        )}
+
         {open.length > 0 && (
           <Section title={t("ongoingIncidents")} className="pt-section">
             <div className="pt-list border-t border-dashed">
@@ -136,6 +148,16 @@ export function StatusPageView({
                     })}
                   </span>
                 </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {nextMaints.length > 0 && (
+          <Section title={t("maint.scheduledTitle")} className="pt-section">
+            <div className="pt-list border-t border-dashed">
+              {nextMaints.map((m) => (
+                <Maint key={m.id} m={m} page={data} now={at} />
               ))}
             </div>
           </Section>
@@ -373,6 +395,29 @@ function Report({ report }: { report: PageIncident }) {
       <div className="mt-3">
         <ReportTimeline incident={report} />
       </div>
+    </div>
+  )
+}
+
+/** A public maintenance window: a box while in progress, a row when scheduled. */
+function Maint({ m, page, now, box = false }: { m: PublicMaintenance; page: PublicStatusPage; now: number; box?: boolean }) {
+  const t = useTranslations("statusPublic.maint")
+  const tk = useTranslations("maintenance.kinds")
+  const active = m.status === "in_progress"
+  const names = page.monitors.filter((x) => m.monitor_ids?.includes(x.id)).map((x) => x.name)
+  const when = active
+    ? t("endsIn", { end: datetime(m.ends_at).slice(0, 16), in: duration(m.ends_at - now) })
+    : t("startsIn", { start: datetime(m.starts_at).slice(0, 16), end: datetime(m.ends_at).slice(0, 16), in: duration(m.starts_at - now) })
+  return (
+    <div className={cn("pt-maintenance", box ? "pt-box border border-info/40 px-4 py-3" : "pt-row border-b border-dashed px-2 py-2.5")}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className={cn("text-xs uppercase text-info", active && "animate-pulse")}>◇ {active ? t("inProgress") : t("scheduled")}</span>
+        <span className="min-w-0 flex-1 font-medium">{m.title}</span>
+        {m.kind !== "once" && <span className="text-xs text-muted-foreground">{t("repeats", { kind: tk(m.kind) })}</span>}
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">{when}</div>
+      {m.description && <p className="mt-2 whitespace-pre-line">{m.description}</p>}
+      {names.length > 0 && <div className="mt-1 text-xs text-muted-foreground">{t("affects", { names: names.join(", ") })}</div>}
     </div>
   )
 }

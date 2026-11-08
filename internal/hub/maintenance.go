@@ -143,6 +143,9 @@ func (h *Hub) validateMaintenance(m *store.Maintenance) error {
 			return err
 		}
 	}
+	if err := validateAnnouncement(m); err != nil {
+		return err
+	}
 	if m.Timezone == "" {
 		m.Timezone = "UTC"
 	}
@@ -243,6 +246,7 @@ func (h *Hub) createMaintenance(w http.ResponseWriter, r *http.Request, _ *store
 		return
 	}
 	h.afterMaintChange()
+	h.maintSaved(r, nil, &m)
 	writeJSON(w, 201, viewMaint(&m, time.Now()))
 }
 
@@ -272,6 +276,7 @@ func (h *Hub) updateMaintenance(w http.ResponseWriter, r *http.Request, _ *store
 		return
 	}
 	h.afterMaintChange()
+	h.maintSaved(r, old, &m)
 	writeJSON(w, 200, viewMaint(&m, time.Now()))
 }
 
@@ -281,11 +286,19 @@ func (h *Hub) deleteMaintenance(w http.ResponseWriter, r *http.Request, _ *store
 		writeErr(w, 400, "invalid id")
 		return
 	}
+	old, err := h.store.Maintenance(id)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		h.internalErr(w, err)
+		return
+	}
 	if err := h.store.DeleteMaintenance(id); err != nil {
 		h.internalErr(w, err)
 		return
 	}
 	h.afterMaintChange()
+	if old != nil && notifiable(old) {
+		h.cancelMaint(r, old)
+	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 
@@ -296,4 +309,5 @@ func (h *Hub) afterMaintChange() {
 		h.log.Error("reload maintenances", "err", err)
 	}
 	h.maintTick(time.Now())
+	h.dropPageCache()
 }

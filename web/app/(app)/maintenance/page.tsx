@@ -79,7 +79,20 @@ function newDraft(): Draft {
     month_days: [1],
     timezone: browserTZ(),
     enabled: true,
+    public: false,
+    announcement: "",
+    notify_subscribers: false,
+    remind_min: 0,
   }
+}
+
+// Reminder lead times offered in the form, in minutes.
+const reminders = [0, 15, 60, 180, 1440, 2880, 10080]
+
+function leadTime(n: number) {
+  if (n % 1440 === 0) return `${n / 1440}${tr("time.d")}`
+  if (n % 60 === 0) return `${n / 60}${tr("time.h")}`
+  return `${n}${tr("time.m")}`
 }
 
 function minutes(n: number) {
@@ -176,6 +189,8 @@ export default function MaintenancePage() {
   }
 
   const recurring = draft && draft.kind !== "once"
+  // A lead time set through the API is offered too.
+  const remindOpts = draft && !reminders.includes(draft.remind_min ?? 0) ? [...reminders, draft.remind_min ?? 0].sort((a, b) => a - b) : reminders
 
   return (
     <>
@@ -201,6 +216,7 @@ export default function MaintenancePage() {
                 <div className="flex flex-wrap items-baseline gap-x-3">
                   <span className="font-medium">{m.name}</span>
                   <span className="text-xs">{state(m)}</span>
+                  {m.public && <span className="text-xs text-info">[{t("publicBadge")}{m.notify_subscribers ? " · ✉" : ""}]</span>}
                 </div>
                 <div className="truncate text-xs text-muted-foreground">
                   {schedule(m)} · {scope(m)}
@@ -369,6 +385,52 @@ export default function MaintenancePage() {
                     ))}
                     {monitors.data?.length === 0 && <span className="text-xs text-muted-foreground">{t("noMonitorsYet")}</span>}
                   </div>
+                )}
+              </div>
+
+              <div className="grid gap-2 border-t border-dashed pt-4">
+                <Label>{t("publicSection")}</Label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Switch checked={!!draft.public} onCheckedChange={(v) => set("public", v)} />
+                  {t("public")}
+                </label>
+                <p className="text-xs text-muted-foreground">{t("publicHint")}</p>
+                {draft.public && (
+                  <>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="mw-ann">{t("announcement")}</Label>
+                      <Textarea id="mw-ann" rows={2} maxLength={5000} value={draft.announcement ?? ""} onChange={(e) => set("announcement", e.target.value)} placeholder={t("announcementPlaceholder")} />
+                      <p className="text-xs text-muted-foreground">{t("announcementHint")}</p>
+                    </div>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <Switch checked={!!draft.notify_subscribers} onCheckedChange={(v) => set("notify_subscribers", v)} />
+                      {t("notify")}
+                    </label>
+                    {draft.notify_subscribers && (
+                      <>
+                        <p className="text-xs text-muted-foreground">{t("notifyHint")}</p>
+                        <div className="grid gap-1.5">
+                          <Label>{t("remind")}</Label>
+                          <Select
+                            items={remindOpts.map((r) => ({ value: String(r), label: r ? t("remindBefore", { t: leadTime(r) }) : t("remindNone") }))}
+                            value={String(draft.remind_min ?? 0)}
+                            onValueChange={(v) => v != null && set("remind_min", Number(v))}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {remindOpts.map((r) => (
+                                <SelectItem key={r} value={String(r)}>
+                                  {r ? t("remindBefore", { t: leadTime(r) }) : t("remindNone")}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </>
+                    )}
+                  </>
                 )}
               </div>
 

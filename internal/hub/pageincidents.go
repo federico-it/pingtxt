@@ -642,10 +642,10 @@ func buildConfirmEmail(p *store.StatusPage, s *store.PageSubscriber, l pageLinks
 	title := oneLine(p.Title)
 	link := l.confirm(s.Token)
 	v := mailView{
-		Preheader: "Confirm that you want incident updates of " + title + " by email.",
+		Preheader: "Confirm that you want incident and maintenance updates of " + title + " by email.",
 		Command:   "pingtxt subscribe " + title,
 		Title:     "Confirm your subscription",
-		Lead:      "Confirm that you want to get incident updates of " + title + " by email.",
+		Lead:      "Confirm that you want to get incident and maintenance updates of " + title + " by email.",
 		Rows:      []mailRow{{Key: "status page", Value: title, Href: l.page}, {Key: "email", Value: s.Email}},
 		Action:    &mailLink{Label: "confirm subscription", Href: link},
 		Footer: []string{

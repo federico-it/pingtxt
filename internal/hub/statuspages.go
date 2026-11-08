@@ -367,6 +367,9 @@ type publicPage struct {
 	Incidents     []publicIncident `json:"incidents"`
 	// Reports are the incidents written on the page, with their updates.
 	Reports []*store.PageIncident `json:"reports"`
+	// Maintenances are the public maintenance windows that cover a monitor
+	// of the page: in progress, or their next occurrence.
+	Maintenances []publicMaintenance `json:"maintenances"`
 	// Subscribe is true when visitors can subscribe by email.
 	Subscribe bool  `json:"subscribe"`
 	UpdatedAt int64 `json:"updated_at"`
@@ -520,6 +523,7 @@ func (h *Hub) buildPublicPage(sp *store.StatusPage) (*publicPage, error) {
 		}
 		p.Monitors = append(p.Monitors, pm)
 	}
+	p.Maintenances = h.pageMaintenances(ms, now)
 	p.Status = worsePageStatus(overallStatus(p.Monitors), reportsStatus(p.Reports))
 	if sp.ShowIncidents {
 		incs, err := h.store.IncidentsSince(ids, from, 50)

@@ -61,7 +61,7 @@ riga vuota per un nuovo paragrafo. I link devono essere indirizzi `http://`, `ht
 
 Il **CSS personalizzato** viene aggiunto così com'è alla pagina pubblica, per tutto ciò che le opzioni non coprono.
 Queste classi sono stabili: `.pt-page`, `.pt-header`, `.pt-brand`, `.pt-tagline`, `.pt-notice`, `.pt-banner`,
-`.pt-section`, `.pt-list`, `.pt-monitor`, `.pt-group`, `.pt-bars`, `.pt-report`, `.pt-subscribe`, `.pt-footer`. I
+`.pt-section`, `.pt-list`, `.pt-monitor`, `.pt-group`, `.pt-bars`, `.pt-report`, `.pt-maintenance`, `.pt-subscribe`, `.pt-footer`. I
 colori sono variabili CSS (`--background`, `--foreground`, `--primary`, `--muted`, `--border`, `--up`, `--warn`,
 `--down`). Immagini o font che il CSS carica da altri siti vengono scaricati da ogni visitatore, che così mostra il
 proprio indirizzo a quei siti. Il modulo della password di una pagina protetta usa gli stessi colori, font e CSS,
@@ -81,6 +81,22 @@ visitatori inseriscono l'indirizzo sulla pagina e lo confermano con un link (val
 aggiornamento pubblicato con **avvisa gli iscritti via email** spuntato. Ogni email ha un link per disiscriversi e un
 header `List-Unsubscribe` con un clic. Gli admin vedono e rimuovono gli iscritti negli incidenti della pagina. I link
 puntano al dominio personalizzato della pagina, altrimenti all'URL pubblico delle impostazioni.
+
+## Manutenzioni programmate
+
+Attiva **mostra sulle status page** in una [finestra di manutenzione](alerts.md#finestre-di-manutenzione) per
+annunciarla su ogni pagina che mostra uno dei suoi monitor. Il nome è il titolo e sotto compare il **messaggio
+pubblico**; le note restano private. Le finestre in arrivo sono elencate in **manutenzioni programmate** con inizio,
+fine e i monitor della pagina che riguardano (quelle ricorrenti mostrano la prossima occorrenza); mentre una finestra è
+in corso sta in cima alla pagina. Una finestra non cambia il banner della pagina: i suoi monitor risultano in
+*manutenzione*.
+
+Con **avvisa gli iscritti via email** attivo, gli iscritti di quelle pagine ricevono un'email quando la finestra viene
+salvata o ne cambiano gli orari, se vuoi un **promemoria** prima di ogni occorrenza (da 15 minuti a 7 giorni), quando
+inizia, quando finisce e quando viene annullata (eliminata, disattivata o non più pubblica). Gli orari sono nel fuso
+della finestra, con accanto l'ora UTC. Le email inviate dallo scheduler (promemoria, inizio, fine) puntano al dominio
+personalizzato della pagina o all'URL pubblico delle impostazioni: senza nessuno dei due non vengono inviate. Un
+inizio o una fine notati con più di 15 minuti di ritardo, per esempio dopo un riavvio, non vengono inviati.
 
 ## Badge
 

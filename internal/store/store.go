@@ -745,6 +745,26 @@ var laterMigrations = []migration{
 		FOREIGN KEY (parent_id) REFERENCES monitors(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 37: maintenance windows announced on status pages (public, with a
+	// public message) and emailed to their subscribers (notify_subscribers,
+	// remind_min minutes before). notice_* hold the start (unix ms) of the
+	// occurrence whose reminder, start and end emails went out.
+	{
+		sqlite: `ALTER TABLE maintenances ADD COLUMN public INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN announcement TEXT NOT NULL DEFAULT '';
+	ALTER TABLE maintenances ADD COLUMN notify_subscribers INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN remind_min INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_remind BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_start BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_end BIGINT NOT NULL DEFAULT 0;`,
+		mysql: `ALTER TABLE maintenances ADD COLUMN public INT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN announcement TEXT NOT NULL DEFAULT ('');
+	ALTER TABLE maintenances ADD COLUMN notify_subscribers INT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN remind_min INT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_remind BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_start BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE maintenances ADD COLUMN notice_end BIGINT NOT NULL DEFAULT 0;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {
