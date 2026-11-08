@@ -16,11 +16,12 @@ import (
 // Maintenance windows announced on status pages.
 //
 // A public window shows on every status page that lists one of the monitors
-// it covers: in progress, or the next occurrence when it is scheduled. With
-// notify_subscribers on, the page's email subscribers hear about it when it
-// is announced (saved), remind_min minutes before each occurrence, when an
-// occurrence starts and ends, and when it is cancelled. Every one of these
-// goes through maintenanceEvent.
+// it covers: in progress, or the next occurrence when it is scheduled. The
+// page's webhooks get maintenance.* events when it is announced (saved or
+// rescheduled), remind_min minutes before each occurrence, when an
+// occurrence starts and ends, and when it is cancelled; with
+// notify_subscribers on, the page's email subscribers get the same news.
+// Every one of these goes through maintenanceEvent.
 
 // Maintenance events, also the status of the window in the event payload.
 const (
@@ -225,9 +226,9 @@ func (h *Hub) notifyMaint(r *http.Request, w *store.Maintenance, event string, s
 			links = h.linksFor(r, mp.page)
 		} else if l, ok := h.backgroundLinks(mp.page); ok {
 			links = l
-		} else {
+		} else if w.NotifySubscribers {
 			h.log.Warn("maintenance email skipped: set the public URL in settings", "page", mp.page.Slug)
-			continue
+			links = pageLinks{} // webhooks only
 		}
 		status := event
 		if event == MaintReminder {
@@ -239,8 +240,13 @@ func (h *Hub) notifyMaint(r *http.Request, w *store.Maintenance, event string, s
 }
 
 // maintenanceEvent tells the people following a status page about a
-// maintenance window: today the page's email subscribers.
+// maintenance window: its webhooks, and its email subscribers when the
+// window notifies them. It returns how many emails were queued.
 func (h *Hub) maintenanceEvent(p *store.StatusPage, l pageLinks, event string, m publicMaintenance, names []string, w *store.Maintenance) int {
+	h.pageEvent(p, "maintenance."+event, m)
+	if !w.NotifySubscribers || l.page == "" {
+		return 0
+	}
 	ec := h.subscribeChannel(p)
 	if ec == nil || !p.Published {
 		return 0
@@ -264,15 +270,15 @@ func (h *Hub) maintenanceEvent(p *store.StatusPage, l pageLinks, event string, m
 
 // ---------- scheduler ----------
 
-// maintNoticeTick sends the reminder, start and end emails of the windows
-// that notify subscribers.
+// maintNoticeTick sends the reminder, start and end events of the public
+// windows.
 func (h *Hub) maintNoticeTick(now time.Time) {
 	if now.Sub(h.maintNoticeAt) < maintNoticeEvery {
 		return
 	}
 	h.maintNoticeAt = now
 	for _, w := range h.maintSnapshot() {
-		if notifiable(w) {
+		if announced(w) {
 			h.maintNotices(w, now)
 		}
 	}
@@ -334,13 +340,15 @@ func sameSchedule(a, b *store.Maintenance) bool {
 		a.Timezone == b.Timezone
 }
 
-// maintSaved emails what changed for subscribers after a window is created
-// (old == nil) or updated.
+// maintSaved tells the pages' followers what changed after a window is
+// created (old == nil) or updated: announced when it becomes public, is
+// rescheduled or starts emailing subscribers; cancelled when it is no
+// longer shown.
 func (h *Hub) maintSaved(r *http.Request, old, cur *store.Maintenance) {
 	switch {
-	case notifiable(cur) && (old == nil || !notifiable(old) || !sameSchedule(old, cur)):
+	case announced(cur) && (old == nil || !announced(old) || !sameSchedule(old, cur) || notifiable(cur) && !notifiable(old)):
 		h.announceMaint(r, cur)
-	case old != nil && notifiable(old) && !announced(cur):
+	case old != nil && announced(old) && !announced(cur):
 		h.cancelMaint(r, old)
 	}
 }

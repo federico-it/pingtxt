@@ -8,6 +8,7 @@ import { AdminOnly } from "@/components/admin-only"
 import { PageHeader } from "@/components/page-header"
 import { AuditTrail } from "@/components/settings/audit-log"
 import { StatusPageForm } from "@/components/status-page-form"
+import { StatusPageHooks } from "@/components/status-page-hooks"
 import { useApi, type StatusPage } from "@/lib/api"
 
 function Edit() {
@@ -29,6 +30,7 @@ function Edit() {
     <>
       <PageHeader cmd={`pingtxt status-pages edit ${id}`} title={t("editTitle", { name: data.title })} />
       <StatusPageForm initial={data} key={data.id} />
+      <StatusPageHooks id={id} />
       <AuditTrail type="page" id={id} />
     </>
   )

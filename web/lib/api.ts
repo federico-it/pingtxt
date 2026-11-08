@@ -392,7 +392,20 @@ export interface Tag {
 }
 
 export type NotifierType =
-  "webhook" | "discord" | "slack" | "telegram" | "ntfy" | "email" | "app"
+  | "webhook"
+  | "discord"
+  | "slack"
+  | "telegram"
+  | "ntfy"
+  | "email"
+  | "app"
+  | "teams"
+  | "pagerduty"
+  | "opsgenie"
+  | "pushover"
+  | "gotify"
+  | "matrix"
+  | "twilio"
 
 /** What a channel can be sent. agent_offline is about agents, not monitors:
  * it ignores the channel's scope and monitor links cannot pick it. */
@@ -797,6 +810,47 @@ export interface PageSubscriber {
   /** 0 = waiting for confirmation */
   confirmed_at: number
   created_at: number
+}
+
+/** Events a status page webhook can get. */
+export const pageWebhookEvents = [
+  "incident.created",
+  "incident.updated",
+  "incident.resolved",
+  "page.status_changed",
+  "monitor.status_changed",
+  "maintenance.scheduled",
+  "maintenance.reminder",
+  "maintenance.in_progress",
+  "maintenance.completed",
+  "maintenance.cancelled",
+] as const
+export type PageWebhookEvent = (typeof pageWebhookEvents)[number]
+
+export interface PageWebhook {
+  id: number
+  page_id: number
+  url: string
+  /** signs every request (HMAC-SHA256) */
+  secret: string
+  /** empty = every event */
+  events: PageWebhookEvent[]
+  enabled: boolean
+  created_at: number
+  /** latest delivery, 0 = never */
+  last_at: number
+  /** HTTP status of the latest delivery, 0 = no answer */
+  last_status: number
+  /** "" when it worked */
+  last_error: string
+}
+
+export interface PageFeeds {
+  atom: string
+  rss: string
+  /** the links carry the private key of a protected page */
+  private: boolean
+  published: boolean
 }
 
 export type PageStatus =

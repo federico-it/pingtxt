@@ -296,7 +296,7 @@ func (h *Hub) deleteMaintenance(w http.ResponseWriter, r *http.Request, _ *store
 		return
 	}
 	h.afterMaintChange()
-	if old != nil && notifiable(old) {
+	if old != nil && announced(old) {
 		h.cancelMaint(r, old)
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})

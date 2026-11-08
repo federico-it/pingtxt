@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"strconv"
 	"strings"
@@ -166,5 +167,53 @@ func TestMaintenanceOnPageRecurring(t *testing.T) {
 	}
 	if rep := maintRepeat(w); rep != "every day at 02:00 UTC, for 30m" {
 		t.Errorf("repeat: %q", rep)
+	}
+}
+
+// Public windows send maintenance.* events to the page's webhooks, with or
+// without email subscribers.
+func TestMaintenanceWebhooks(t *testing.T) {
+	s := newPageTestServer(t)
+	sink := newHookSink(t)
+	m := &store.Monitor{Name: "api", Type: "http", Target: "http://x", IntervalSec: 60, Locations: []string{LocalLocation}}
+	must(t, s.st.CreateMonitor(m))
+	res, body := s.do("POST", "/api/status-pages", `{"slug":"acme","title":"Acme","published":true,"monitor_ids":[`+itoa(m.ID)+`]}`, "", s.admin)
+	wantCode(t, res, 201, body)
+	var page store.StatusPage
+	must(t, json.Unmarshal([]byte(body), &page))
+	res, body = s.do("POST", "/api/status-pages/"+itoa(page.ID)+"/webhooks", `{"url":"`+sink.srv.URL+`","events":["maintenance.scheduled","maintenance.in_progress","maintenance.completed","maintenance.cancelled"]}`, "", s.admin)
+	wantCode(t, res, 201, body)
+
+	start := time.Now().Add(time.Hour).Truncate(time.Minute)
+	res, body = s.do("POST", "/api/maintenances", `{"name":"Upgrade","kind":"once","public":true,"enabled":true,"monitor_ids":[`+itoa(m.ID)+`],"start_at":`+itoa(start.UnixMilli())+`,"end_at":`+itoa(start.Add(time.Hour).UnixMilli())+`}`, "", s.admin)
+	wantCode(t, res, 201, body)
+	var w maintView
+	must(t, json.Unmarshal([]byte(body), &w))
+	tick := func(at time.Time) {
+		s.h.maintNoticeAt = time.Time{}
+		s.h.maintNoticeTick(at)
+	}
+	tick(start.Add(time.Minute))
+	tick(start.Add(61 * time.Minute))
+	res, body = s.do("DELETE", "/api/maintenances/"+itoa(w.ID), "", "", s.admin)
+	wantCode(t, res, 200, body) // still ahead in real time: cancelled
+	s.h.hooks.wg.Wait()
+
+	calls := sink.calls()
+	var got []string
+	for _, c := range calls {
+		got = append(got, c.event)
+	}
+	if strings.Join(got, ",") != "maintenance.scheduled,maintenance.in_progress,maintenance.completed,maintenance.cancelled" {
+		t.Fatalf("events: %v", got)
+	}
+	var payload struct {
+		Event       string
+		Maintenance publicMaintenance
+	}
+	must(t, json.Unmarshal(calls[0].body, &payload))
+	if payload.Event != "maintenance.scheduled" || payload.Maintenance.Title != "Upgrade" || payload.Maintenance.Status != MaintScheduled ||
+		payload.Maintenance.StartsAt != start.UnixMilli() || len(payload.Maintenance.MonitorIDs) != 1 {
+		t.Fatalf("payload: %s", calls[0].body)
 	}
 }

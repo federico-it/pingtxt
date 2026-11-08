@@ -10,9 +10,20 @@ monitor ed eventi riceve, e può aspettare o ripetere. **invia test** prova un c
 | webhook (JSON) | un URL; pingtxt invia in POST un body JSON (campi [sotto](#contenuto-dei-webhook)) |
 | Discord, Slack | l'URL del webhook in ingresso del canale |
 | Telegram | il token di un bot e l'id della chat |
+| Microsoft Teams | l'URL di un workflow di Teams: nel canale, **⋯ → Workflow → Post to a channel when a webhook request is received** (il nome del modello cambia con la lingua di Teams). Funzionano anche i vecchi URL dei connettori (`webhook.office.com`). Gli avvisi sono Adaptive Card |
+| Matrix | l'URL dell'homeserver, l'access token di un account bot e la stanza (`!id:server` o `#alias:server`). Invita il bot nella stanza e accetta prima l'invito |
 | ntfy | l'URL del topic, e un access token per i topic protetti |
+| Gotify | l'URL del server e il token di un'applicazione Gotify. I problemi hanno priorità 8 (l'app Android suona), degradato 5, i ripristini 2 |
+| Pushover | la tua chiave utente (o di gruppo) e il token di un'applicazione Pushover; facoltativo un solo dispositivo. I problemi partono con priorità alta |
+| PagerDuty | l'integration key Events API v2 di un servizio, e la regione (USA o UE). Un down apre un incidente, i promemoria si uniscono a quello e il ripristino lo risolve; lo stesso per degradato, scadenze e agent |
+| Opsgenie | la chiave di un'integrazione API, e la regione (USA o UE). Gli avvisi hanno P1 (down, agent offline), P2 (scaduto) o P3 (in scadenza, degradato) e si chiudono da soli al ripristino |
+| SMS (Twilio) | account SID e auth token, il mittente (un numero Twilio o il SID di un messaging service `MG...`) e i numeri in formato internazionale (`+39...`). Ogni avviso è un SMS breve per numero, pagato sul tuo account Twilio |
 | email | un server SMTP (STARTTLS sulla 587, TLS sulla 465, o nessuno per un relay locale sulla 25), oppure l'API di [Resend](https://resend.com) con una chiave di un dominio verificato; poi mittente e destinatari |
 | app pingtxt (push) | le notifiche push attive in **impostazioni → integrazioni → app mobile**; gli utenti (email) i cui telefoni ricevono gli avvisi, vuoto per tutti. Vedi [App iOS](ios-app.md) |
+
+I link negli avvisi (Teams, Pushover, Gotify, Matrix, PagerDuty, Opsgenie) portano alla diagnostica, o al monitor
+quando l'URL pubblico è impostato nelle **impostazioni**. Un test inviato a PagerDuty o Opsgenie apre un incidente e lo
+risolve subito.
 
 Ogni avviso dice quale monitor, cosa è successo e, per gli avvisi di down, la causa per località e un link alla
 [diagnostica](monitors.md#diagnostica-in-caso-di-errore). Le email usano la stessa grafica dell'interfaccia web, in

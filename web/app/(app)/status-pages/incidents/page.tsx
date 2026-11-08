@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { Suspense, useState } from "react"
+import { createContext, Suspense, useContext, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
@@ -24,6 +24,7 @@ import {
   type PageIncident,
   type PageIncidentUpdate,
   type PageSubscriber,
+  type PageWebhook,
   type ReportImpact,
   type ReportStatus,
   type StatusPage,
@@ -130,12 +131,16 @@ function NewIncident({ base, subscribers, onDone }: { base: string; subscribers:
   )
 }
 
+/** Who an update posted with "notify" reaches: the label of the box. */
+const NotifyLabel = createContext<"notify" | "notifyWebhooks" | "notifyBoth">("notify")
+
 function NotifyBox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   const t = useTranslations("pageIncidents")
+  const label = useContext(NotifyLabel)
   return (
     <label className="flex cursor-pointer items-center gap-2 text-xs">
       <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} />
-      {t("notify")}
+      {t(label)}
     </label>
   )
 }
@@ -339,6 +344,7 @@ function Incidents() {
   const isAdmin = useIsAdmin()
   const page = useApi<StatusPage>(id ? base : null, { refreshInterval: 0 })
   const list = useApi<{ incidents: PageIncident[] }>(id ? `${base}/incidents` : null, { refreshInterval: 30_000 })
+  const hooks = useApi<{ webhooks: PageWebhook[] }>(id && isAdmin ? `${base}/webhooks` : null, { refreshInterval: 0 })
 
   if (!id) return <div className="text-down">! {t("noPage")}</div>
   if (page.error) return <div className="text-down">! {page.error.message}</div>
@@ -351,13 +357,16 @@ function Incidents() {
     )
   }
   const p = page.data
-  const subscribers = p.subscribe_notifier_id > 0
+  const emails = p.subscribe_notifier_id > 0
+  const webhooks = (hooks.data?.webhooks ?? []).some((w) => w.enabled)
+  // Updates reach someone besides the page: offer to keep them quiet.
+  const subscribers = emails || webhooks
   const incidents = list.data?.incidents ?? []
   const open = incidents.filter((i) => !i.resolved_at)
   const past = incidents.filter((i) => i.resolved_at)
 
   return (
-    <>
+    <NotifyLabel.Provider value={emails && webhooks ? "notifyBoth" : webhooks ? "notifyWebhooks" : "notify"}>
       <PageHeader cmd={`pingtxt status-pages incidents ${id}`} title={t("pageTitle", { name: p.title })}>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" render={<a href={`/status/${p.slug}/`} target="_blank" rel="noreferrer" />} nativeButton={false}>
@@ -368,7 +377,7 @@ function Incidents() {
           </Button>
         </div>
       </PageHeader>
-      <p className="-mt-3 mb-6 max-w-2xl text-xs text-muted-foreground">{subscribers ? t("introSubscribers") : t("intro")}</p>
+      <p className="-mt-3 mb-6 max-w-2xl text-xs text-muted-foreground">{emails ? t("introSubscribers") : t("intro")}</p>
 
       {isAdmin && <NewIncident base={base} subscribers={subscribers} onDone={() => list.mutate()} />}
 
@@ -395,7 +404,7 @@ function Incidents() {
       )}
 
       {isAdmin && <Subscribers base={base} />}
-    </>
+    </NotifyLabel.Provider>
   )
 }
 

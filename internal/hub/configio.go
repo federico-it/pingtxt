@@ -124,13 +124,20 @@ type cfgStatusPage struct {
 }
 
 // notifierSecrets are the config keys redacted from exports without secrets.
-// Discord and Slack webhook URLs carry their token in the path.
+// Discord, Slack and Teams webhook URLs carry their token in the path.
 var notifierSecrets = map[string][]string{
-	"email":    {"password", "api_key"},
-	"telegram": {"bot_token"},
-	"ntfy":     {"token"},
-	"discord":  {"url"},
-	"slack":    {"url"},
+	"email":     {"password", "api_key"},
+	"telegram":  {"bot_token"},
+	"ntfy":      {"token"},
+	"discord":   {"url"},
+	"slack":     {"url"},
+	"teams":     {"url"},
+	"pagerduty": {"routing_key"},
+	"opsgenie":  {"api_key"},
+	"pushover":  {"app_token", "user_key"},
+	"gotify":    {"token"},
+	"matrix":    {"access_token"},
+	"twilio":    {"auth_token"},
 }
 
 var (

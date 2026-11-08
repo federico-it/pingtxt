@@ -14,8 +14,9 @@ HetrixTools, but plain text, monospace, light and dark. Website and docs: [pingt
   Redis, MongoDB, Docker containers, gRPC, SMTP, MCP servers and heartbeats for cron jobs. IPv6 everywhere.
 - **Status**: up, degraded (some locations fail or answer too slowly) or down; uptime that follows it; diagnostics
   (DNS, TCP, TLS, headers, traceroute) collected at the first failure.
-- **Alerts**: email (SMTP or Resend), Slack, Discord, Telegram, ntfy, webhooks and the iOS app, with escalation,
-  reminders, maintenance windows, certificate and domain expiry, agent offline alerts and weekly reports.
+- **Alerts**: email (SMTP or Resend), Slack, Discord, Microsoft Teams, Telegram, Matrix, ntfy, Gotify, Pushover,
+  PagerDuty, Opsgenie, SMS (Twilio), webhooks and the iOS app, with escalation, reminders, maintenance windows,
+  certificate and domain expiry, agent offline alerts and weekly reports.
 - **Status pages** on your own domain, with incidents, email subscribers, password protection and badges.
 - **Teams**: admin and read-only users, GitHub / Google / OpenID Connect login, two-factor authentication, audit log.
 - **Integrations**: REST API with tokens, an MCP server for Claude and other AI assistants, Prometheus metrics,

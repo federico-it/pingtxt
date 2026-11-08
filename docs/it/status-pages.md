@@ -24,7 +24,7 @@ raggiungibili da lì.
 Per tenere privata una pagina, attiva **proteggi con una password**. I visitatori vedono allora un modulo per la
 password; quella giusta apre la pagina per 30 giorni in quel browser, insieme ai suoi badge e al modulo di
 iscrizione. La password è salvata come hash, i tentativi sbagliati sono limitati e cambiarla disconnette tutti i
-visitatori. Agli utenti con accesso non serve mai.
+visitatori. Agli utenti con accesso non serve mai. I lettori di feed usano invece dei [link privati](#feed-rss-e-atom).
 
 ## Link del nome e logo
 
@@ -97,6 +97,71 @@ inizia, quando finisce e quando viene annullata (eliminata, disattivata o non pi
 della finestra, con accanto l'ora UTC. Le email inviate dallo scheduler (promemoria, inizio, fine) puntano al dominio
 personalizzato della pagina o all'URL pubblico delle impostazioni: senza nessuno dei due non vengono inviate. Un
 inizio o una fine notati con più di 15 minuti di ritardo, per esempio dopo un riavvio, non vengono inviati.
+
+I [webhook](#webhook) di quelle pagine ricevono le stesse notizie come eventi `maintenance.*`, anche quando la finestra
+non avvisa gli iscritti.
+
+## Feed RSS e Atom
+
+Ogni pagina pubblicata ha un feed Atom e uno RSS, così i lettori di feed (o le app RSS di Slack e Teams) possono
+seguirla:
+
+| feed | sull'hub | su un dominio personalizzato |
+| --- | --- | --- |
+| Atom | `/api/public/status/<slug>/feed.atom` | `/api/public/status/feed.atom` |
+| RSS 2.0 | `/api/public/status/<slug>/feed.rss` | `/api/public/status/feed.rss` |
+
+Ogni incidente scritto sulla pagina è una voce con tutta la sua cronologia, dall'ultima modifica; se la pagina mostra
+lo storico degli incidenti, anche i disservizi dei suoi monitor sono voci. La pagina pubblica collega il feed nel
+footer e lo annuncia ai browser. L'editor della pagina mostra i due indirizzi in **feed rss e atom**.
+
+Un feed segue le regole della sua pagina: le bozze non ne hanno, e una pagina protetta da password chiede la
+password. I lettori di feed non possono inserirla, quindi l'editor di una pagina protetta mostra dei **link privati**
+con una chiave: chi ha il link può leggere il feed, e cambiare la password cambia i link.
+
+## Webhook
+
+In **webhook** nell'editor della pagina, gli admin aggiungono indirizzi che ricevono gli eventi della pagina come
+richieste `POST` in JSON, fino a 10 per pagina. Scegli gli eventi o lascia **tutti gli eventi**:
+
+| evento | quando parte |
+| --- | --- |
+| `incident.created` | si apre un incidente sulla pagina |
+| `incident.updated` | un incidente riceve un aggiornamento |
+| `incident.resolved` | un incidente riceve un aggiornamento *risolto* |
+| `page.status_changed` | cambia lo stato complessivo della pagina (`operational`, `degraded`, `partial_outage`, `major_outage`) |
+| `monitor.status_changed` | un monitor mostrato sulla pagina cambia stato |
+| `maintenance.scheduled` | una [manutenzione pubblica](#manutenzioni-programmate) su un monitor della pagina viene annunciata o riprogrammata |
+| `maintenance.reminder` | arriva il suo promemoria (se la finestra ne ha uno) |
+| `maintenance.in_progress` | inizia un'occorrenza |
+| `maintenance.completed` | finisce un'occorrenza |
+| `maintenance.cancelled` | viene eliminata, disattivata o resa non pubblica prima della fine |
+
+Gli eventi degli incidenti seguono la casella che avvisa gli iscritti (**manda ai webhook** se la pagina non ha
+iscrizioni via email): un aggiornamento pubblicato senza spunta resta silenzioso. I cambi di stato vengono controllati ogni 30 secondi. Solo le pagine pubblicate mandano eventi; **prova**
+manda in qualsiasi momento un evento `ping` a un webhook.
+
+Il body ha sempre `event`, `id` (della consegna), `at` (tempo Unix in millisecondi) e `page` (`id`, `slug`,
+`title`, `url`), poi i dati dell'evento: `incident` e `update`; `status` e `previous_status`; `monitor`
+(`id`, `name`, `group`, `status`, `previous_status`); oppure `maintenance` (`id`, `title`, `description`, `status`,
+`starts_at`, `ends_at`, `kind`, `monitor_ids`, come nella pagina pubblica).
+
+```json
+{
+  "event": "incident.resolved",
+  "id": "4f1c2a9e0b7d35c8e6a1f203",
+  "at": 1794150730633,
+  "page": { "id": 1, "slug": "acme", "title": "Acme", "url": "https://status.example.com/" },
+  "incident": { "id": 7, "title": "Login lenti", "impact": "major", "status": "resolved", "...": "..." },
+  "update": { "id": 19, "status": "resolved", "message": "Risolto.", "created_at": 1794150730600 }
+}
+```
+
+Ogni richiesta ha `X-Pingtxt-Event` e `X-Pingtxt-Signature: t=<secondi Unix>,v1=<firma>`, dove la firma è l'HMAC-SHA256
+esadecimale di `<t>.<body>` con il secret del webhook (mostrato nell'editor, dove puoi anche crearne uno nuovo).
+Verificala, e scarta i valori di `t` troppo vecchi, prima di fidarti di una richiesta. Una risposta fuori da 2xx è un
+errore: l'hub riprova dopo 10 secondi e dopo un minuto (non per le risposte 4xx diverse da 408 e 429), e l'editor
+mostra l'esito dell'ultima consegna. Ogni webhook riceve i suoi eventi uno alla volta, in ordine.
 
 ## Badge
 

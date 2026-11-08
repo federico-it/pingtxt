@@ -100,7 +100,8 @@ type reportInput struct {
 	Impact  string `json:"impact"`
 	Status  string `json:"status"`
 	Message string `json:"message"`
-	// Notify emails the update to the page's subscribers (default true).
+	// Notify emails the update to the page's subscribers and sends it to
+	// the page's webhooks (default true).
 	Notify *bool `json:"notify"`
 }
 
@@ -187,6 +188,7 @@ func (h *Hub) createPageIncident(w http.ResponseWriter, r *http.Request, _ *stor
 	n := 0
 	if in.notify() {
 		n = h.notifySubscribers(r, p, inc, *u)
+		h.incidentEvent(p, inc, *u, true)
 	}
 	writeJSON(w, 201, map[string]any{"incident": inc, "notified": n})
 }
@@ -284,6 +286,7 @@ func (h *Hub) addPageIncidentUpdate(w http.ResponseWriter, r *http.Request, _ *s
 	n := 0
 	if in.notify() {
 		n = h.notifySubscribers(r, p, inc, *u)
+		h.incidentEvent(p, inc, *u, false)
 	}
 	writeJSON(w, 201, map[string]any{"incident": inc, "notified": n})
 }

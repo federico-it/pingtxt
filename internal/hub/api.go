@@ -198,8 +198,16 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/status-pages/{id}/incidents/{incident}/updates/{update}", auth(h.deletePageIncidentUpdate))
 	mux.HandleFunc("GET /api/status-pages/{id}/subscribers", admin(h.listPageSubscribers)) // email addresses: admins only
 	mux.HandleFunc("DELETE /api/status-pages/{id}/subscribers/{subscriber}", admin(h.deletePageSubscriber))
+	mux.HandleFunc("GET /api/status-pages/{id}/feeds", auth(h.pageFeedLinks))        // RSS and Atom, see pagefeed.go
+	mux.HandleFunc("GET /api/status-pages/{id}/webhooks", admin(h.listPageWebhooks)) // secrets: admins only, see pagewebhooks.go
+	mux.HandleFunc("POST /api/status-pages/{id}/webhooks", admin(h.savePageWebhook))
+	mux.HandleFunc("PUT /api/status-pages/{id}/webhooks/{webhook}", admin(h.savePageWebhook))
+	mux.HandleFunc("DELETE /api/status-pages/{id}/webhooks/{webhook}", admin(h.deletePageWebhook))
+	mux.HandleFunc("POST /api/status-pages/{id}/webhooks/{webhook}/test", admin(h.testPageWebhook))
 	mux.HandleFunc("GET /api/public/status/{slug}", h.publicStatus)
 	mux.HandleFunc("GET /api/public/status/{slug}/logo/{file}", h.publicPageLogo)
+	mux.HandleFunc("GET /api/public/status/{slug}/feed.atom", h.publicAtom)
+	mux.HandleFunc("GET /api/public/status/{slug}/feed.rss", h.publicRSS)
 	mux.HandleFunc("GET /api/badge/{slug}/{kind}", h.pageBadge) // README badges, see badges.go
 	mux.HandleFunc("GET /api/badge/{slug}/{monitor}/{kind}", h.monitorBadge)
 	mux.HandleFunc("POST /api/public/status/{slug}/subscribe", h.publicSubscribe)
@@ -1725,6 +1733,9 @@ func validateNotifier(n *store.Notifier) error {
 	}
 	if n.Type == "app" {
 		return validateAppConfig(n.Config)
+	}
+	if ok, err := validateServiceConfig(n.Type, n.Config); ok {
+		return err
 	}
 	if n.Type == "email" {
 		delete(n.Config, "password_set")

@@ -59,7 +59,7 @@ const featuresEn: Feature[] = [
   },
   {
     title: "notifications",
-    body: "Webhook, Discord, Slack, Telegram, ntfy and email (SMTP). Test any channel before saving. Weekly or monthly email reports per group.",
+    body: "Email, Slack, Discord, Teams, Telegram, Matrix, ntfy, Gotify, Pushover, PagerDuty, Opsgenie, SMS and webhooks. Test any channel before saving. Weekly or monthly email reports per group.",
   },
   {
     title: "groups and tags",
@@ -110,7 +110,7 @@ const featuresIt: Feature[] = [
   },
   {
     title: "notifiche",
-    body: "Webhook, Discord, Slack, Telegram, ntfy ed email (SMTP). Prova ogni canale prima di salvarlo. Report via email settimanali o mensili per gruppo.",
+    body: "Email, Slack, Discord, Teams, Telegram, Matrix, ntfy, Gotify, Pushover, PagerDuty, Opsgenie, SMS e webhook. Prova ogni canale prima di salvarlo. Report via email settimanali o mensili per gruppo.",
   },
   {
     title: "gruppi e tag",

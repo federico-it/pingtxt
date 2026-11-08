@@ -38,6 +38,7 @@ export function StatusPageView({
   subscribe,
   preview = false,
   logoBase,
+  feed,
 }: {
   data: PublicStatusPage
   now: number
@@ -46,6 +47,8 @@ export function StatusPageView({
   preview?: boolean
   /** path of the logo files: the page JSON path + "/logo/" */
   logoBase?: string
+  /** address of the page's Atom feed, linked in the footer */
+  feed?: string
 }) {
   const t = useTranslations("statusPublic")
   const status = banner[data.status] ? data.status : "unknown"
@@ -198,7 +201,7 @@ export function StatusPageView({
                 {pastReports.length > 0 && (
                   <div className="pt-list border-t border-dashed">
                     {pastReports.map((r) => (
-                      <details key={r.id} className="pt-row group border-b border-dashed px-2 py-2">
+                      <details key={r.id} id={`incident-${r.id}`} className="pt-row group border-b border-dashed px-2 py-2">
                         <summary className="flex cursor-pointer list-none flex-wrap gap-x-4 [&::-webkit-details-marker]:hidden">
                           <span className="text-up">{t("resolved")}</span>
                           <span className="font-medium">{r.title}</span>
@@ -256,7 +259,14 @@ export function StatusPageView({
                   })}
                 </a>
               )}
-              <span className={cn(theme?.hide_powered_by && "ml-auto")}>{t("refreshes")}</span>
+              <span className={cn("flex flex-wrap gap-x-4", theme?.hide_powered_by && "ml-auto")}>
+                {feed && (
+                  <a href={feed} className="pt-feed hover:underline" type="application/atom+xml">
+                    {t("feed")}
+                  </a>
+                )}
+                <span>{t("refreshes")}</span>
+              </span>
             </div>
           </div>
         </div>
@@ -385,7 +395,7 @@ function Report({ report }: { report: PageIncident }) {
   const t = useTranslations("statusPublic")
   const ti = useTranslations("pageIncidents.impact")
   return (
-    <div className={cn("pt-report pt-box border px-4 py-3", reportImpactBorder[report.impact])}>
+    <div id={`incident-${report.id}`} className={cn("pt-report pt-box border px-4 py-3", reportImpactBorder[report.impact])}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <ReportStatusText status={report.status} className="text-xs uppercase" />
         <span className="min-w-0 flex-1 font-medium">{report.title}</span>
