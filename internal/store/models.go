@@ -1109,6 +1109,43 @@ type Incident struct {
 	// Diagnostics is true when locations sent diagnostics for it (set by
 	// the API, not stored).
 	Diagnostics bool `json:"diagnostics"`
+	// AckedAt is when someone acknowledged the incident (unix ms, 0 = not
+	// acknowledged), AckedBy their email: reminders and escalation stop.
+	AckedAt   int64  `json:"acked_at"`
+	AckedBy   string `json:"acked_by"`
+	AckedByID int64  `json:"-"`
+}
+
+const incidentCols = `i.id, i.monitor_id, m.name, i.started_at, i.resolved_at, i.cause, i.acked_at, i.acked_by, i.acked_by_email`
+
+func scanIncident(sc interface{ Scan(...any) error }) (*Incident, error) {
+	i := &Incident{}
+	err := sc.Scan(&i.ID, &i.MonitorID, &i.MonitorName, &i.StartedAt, &i.ResolvedAt, &i.Cause, &i.AckedAt, &i.AckedByID, &i.AckedBy)
+	return i, err
+}
+
+// Incident returns one incident.
+func (s *Store) Incident(id int64) (*Incident, error) {
+	i, err := scanIncident(s.db.QueryRow(`SELECT `+incidentCols+` FROM incidents i JOIN monitors m ON m.id = i.monitor_id WHERE i.id = ?`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return i, err
+}
+
+// AckIncident records that a user acknowledged an open incident (userID 0
+// and email "" take the acknowledgement back). It reports false when the
+// incident is not open.
+func (s *Store) AckIncident(id, userID int64, email string, at int64) (bool, error) {
+	if userID == 0 {
+		at, email = 0, ""
+	}
+	res, err := s.db.Exec(`UPDATE incidents SET acked_at = ?, acked_by = ?, acked_by_email = ? WHERE id = ? AND resolved_at = 0`, at, userID, email, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 // OpenIncident starts an incident and returns its id.
@@ -1119,7 +1156,7 @@ func (s *Store) OpenIncident(monitorID int64, at int64, cause string) (int64, er
 // OpenIncidentAlerts returns the unresolved incidents with the alerts sent
 // for each of them so far, keyed by monitor id (the latest incident wins).
 func (s *Store) OpenIncidentAlerts() (map[int64]*IncidentAlerts, error) {
-	rows, err := s.db.Query(`SELECT id, monitor_id, started_at, cause FROM incidents WHERE resolved_at = 0 ORDER BY started_at`)
+	rows, err := s.db.Query(`SELECT id, monitor_id, started_at, cause, acked_at, acked_by_email FROM incidents WHERE resolved_at = 0 ORDER BY started_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -1127,7 +1164,7 @@ func (s *Store) OpenIncidentAlerts() (map[int64]*IncidentAlerts, error) {
 	byID := map[int64]*IncidentAlerts{}
 	for rows.Next() {
 		a := &IncidentAlerts{Sent: map[int64]AlertSent{}}
-		if err := rows.Scan(&a.IncidentID, &a.MonitorID, &a.StartedAt, &a.Cause); err != nil {
+		if err := rows.Scan(&a.IncidentID, &a.MonitorID, &a.StartedAt, &a.Cause, &a.AckedAt, &a.AckedBy); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -1162,6 +1199,8 @@ type IncidentAlerts struct {
 	MonitorID  int64
 	StartedAt  int64
 	Cause      string
+	AckedAt    int64               // unix ms, 0 = not acknowledged
+	AckedBy    string              // email
 	Sent       map[int64]AlertSent // by notifier id
 }
 
@@ -1198,7 +1237,7 @@ type IncidentQuery struct {
 
 // FindIncidents returns the incidents matching q, newest first.
 func (s *Store) FindIncidents(iq IncidentQuery) ([]*Incident, error) {
-	q := `SELECT i.id, i.monitor_id, m.name, i.started_at, i.resolved_at, i.cause FROM incidents i JOIN monitors m ON m.id = i.monitor_id WHERE 1 = 1`
+	q := `SELECT ` + incidentCols + ` FROM incidents i JOIN monitors m ON m.id = i.monitor_id WHERE 1 = 1`
 	args := []any{}
 	if iq.MonitorID > 0 {
 		q += ` AND i.monitor_id = ?`
@@ -1223,8 +1262,8 @@ func (s *Store) FindIncidents(iq IncidentQuery) ([]*Incident, error) {
 	defer rows.Close()
 	out := []*Incident{}
 	for rows.Next() {
-		i := &Incident{}
-		if err := rows.Scan(&i.ID, &i.MonitorID, &i.MonitorName, &i.StartedAt, &i.ResolvedAt, &i.Cause); err != nil {
+		i, err := scanIncident(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, i)
@@ -1235,7 +1274,7 @@ func (s *Store) FindIncidents(iq IncidentQuery) ([]*Incident, error) {
 // IncidentsBetween returns the incidents that were open at some point in
 // [from, to), oldest first.
 func (s *Store) IncidentsBetween(from, to int64) ([]*Incident, error) {
-	rows, err := s.db.Query(`SELECT i.id, i.monitor_id, m.name, i.started_at, i.resolved_at, i.cause FROM incidents i JOIN monitors m ON m.id = i.monitor_id
+	rows, err := s.db.Query(`SELECT `+incidentCols+` FROM incidents i JOIN monitors m ON m.id = i.monitor_id
 		WHERE i.started_at < ? AND (i.resolved_at = 0 OR i.resolved_at >= ?) ORDER BY i.started_at, i.id`, to, from)
 	if err != nil {
 		return nil, err
@@ -1243,8 +1282,8 @@ func (s *Store) IncidentsBetween(from, to int64) ([]*Incident, error) {
 	defer rows.Close()
 	out := []*Incident{}
 	for rows.Next() {
-		i := &Incident{}
-		if err := rows.Scan(&i.ID, &i.MonitorID, &i.MonitorName, &i.StartedAt, &i.ResolvedAt, &i.Cause); err != nil {
+		i, err := scanIncident(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, i)
@@ -1254,7 +1293,7 @@ func (s *Store) IncidentsBetween(from, to int64) ([]*Incident, error) {
 
 // OpenIncidents returns the unresolved incidents, oldest first.
 func (s *Store) OpenIncidents() ([]*Incident, error) {
-	rows, err := s.db.Query(`SELECT i.id, i.monitor_id, m.name, i.started_at, i.resolved_at, i.cause FROM incidents i JOIN monitors m ON m.id = i.monitor_id
+	rows, err := s.db.Query(`SELECT ` + incidentCols + ` FROM incidents i JOIN monitors m ON m.id = i.monitor_id
 		WHERE i.resolved_at = 0 ORDER BY i.started_at, i.id`)
 	if err != nil {
 		return nil, err
@@ -1262,8 +1301,8 @@ func (s *Store) OpenIncidents() ([]*Incident, error) {
 	defer rows.Close()
 	out := []*Incident{}
 	for rows.Next() {
-		i := &Incident{}
-		if err := rows.Scan(&i.ID, &i.MonitorID, &i.MonitorName, &i.StartedAt, &i.ResolvedAt, &i.Cause); err != nil {
+		i, err := scanIncident(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, i)

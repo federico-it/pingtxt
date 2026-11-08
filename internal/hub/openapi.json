@@ -2511,6 +2511,120 @@
         }
       }
     },
+    "/api/incidents/{id}/ack": {
+      "post": {
+        "tags": [
+          "Incidents"
+        ],
+        "summary": "Acknowledge incident",
+        "operationId": "ackIncident",
+        "description": "Says that the calling user is on an open incident. Its reminders (`repeat_min`) and the alerts of channels still waiting for their `delay_min` stop until the monitor is back up or the acknowledgement is taken back; the recovery still goes to every channel that got the alert. Channels that got the down alert and have the `ack` event are told who acknowledged it. Acknowledging an incident someone else acknowledged takes it over; acknowledging it again changes nothing. 409 when the incident is resolved.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the incident."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The incident, with acked_at and acked_by.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Incident"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Incidents"
+        ],
+        "summary": "Take back acknowledgement",
+        "operationId": "unackIncident",
+        "description": "Takes back the acknowledgement of an open incident (whoever made it): reminders and escalation run again from where they stopped. Changes nothing when nobody acknowledged it. 409 when the incident is resolved.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the incident."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The incident, acked_at 0.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Incident"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
     "/api/locations": {
       "get": {
         "tags": [
@@ -10506,6 +10620,38 @@
                   }
                 ],
                 "description": "The monitor in depends_on (or further up) that is down while this one fails too. Set only while this monitor is down: it sends no alerts of its own. null otherwise."
+              },
+              "incident": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Incident id (see the Incidents endpoints)."
+                      },
+                      "started_at": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Unix time in milliseconds."
+                      },
+                      "acked_at": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "When someone acknowledged it (unix ms), 0 = nobody."
+                      },
+                      "acked_by": {
+                        "type": "string",
+                        "description": "Email of who acknowledged it, \"\" = nobody."
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The open incident of the monitor (its down alert was sent), with who acknowledged it. null when there is none."
               }
             }
           }
@@ -10640,6 +10786,15 @@
           "diagnostics": {
             "type": "boolean",
             "description": "Locations sent diagnostics for this incident (see getIncidentDiagnostics)."
+          },
+          "acked_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When someone acknowledged the incident (unix ms), 0 = nobody. While acknowledged, reminders and escalation stop."
+          },
+          "acked_by": {
+            "type": "string",
+            "description": "Email of the user who acknowledged the incident, \"\" = nobody."
           }
         }
       },
@@ -11085,13 +11240,14 @@
               "enum": [
                 "down",
                 "up",
+                "ack",
                 "degraded",
                 "cert_expiry",
                 "domain_expiry",
                 "agent_offline"
               ]
             },
-            "description": "What the channel gets for the monitors it covers. Default on create: down, up, cert_expiry, domain_expiry, agent_offline. down = the monitor went down (and the reminders of repeat_min), up = it is back up (only to channels that got the down alert), degraded = some locations fail and when that ends, cert_expiry / domain_expiry = the TLS certificate or the domain registration expires soon, expired or was renewed. agent_offline = an agent stayed disconnected longer than the grace period, and when it is back online (whatever monitors the channel covers; not available on monitor links)."
+            "description": "What the channel gets for the monitors it covers. Default on create: down, up, cert_expiry, domain_expiry, agent_offline. down = the monitor went down (and the reminders of repeat_min), up = it is back up (only to channels that got the down alert), ack = someone acknowledged the incident (only to channels that got the down alert; never a default), degraded = some locations fail and when that ends, cert_expiry / domain_expiry = the TLS certificate or the domain registration expires soon, expired or was renewed. agent_offline = an agent stayed disconnected longer than the grace period, and when it is back online (whatever monitors the channel covers; not available on monitor links)."
           },
           "monitors": {
             "type": "array",
@@ -12481,6 +12637,7 @@
               "enum": [
                 "down",
                 "up",
+                "ack",
                 "degraded",
                 "cert_expiry",
                 "domain_expiry"
@@ -13064,6 +13221,7 @@
               "enum": [
                 "down",
                 "up",
+                "ack",
                 "degraded",
                 "cert_expiry",
                 "domain_expiry",
@@ -13126,6 +13284,7 @@
               "enum": [
                 "down",
                 "up",
+                "ack",
                 "degraded",
                 "cert_expiry",
                 "domain_expiry",

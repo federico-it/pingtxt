@@ -142,6 +142,8 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("POST /api/monitors/{id}/expiry", auth(h.checkMonitorExpiry))
 	mux.HandleFunc("GET /api/incidents", auth(h.listIncidents))
 	mux.HandleFunc("GET /api/incidents/{id}/diagnostics", auth(h.incidentDiagnostics))
+	mux.HandleFunc("POST /api/incidents/{id}/ack", auth(h.ackIncident))
+	mux.HandleFunc("DELETE /api/incidents/{id}/ack", auth(h.unackIncident))
 	mux.HandleFunc("GET /api/monitors/{id}/diagnostics", auth(h.monitorDiagnostics))
 	mux.HandleFunc("GET /api/maintenances", auth(h.listMaintenances))
 	mux.HandleFunc("POST /api/maintenances", auth(h.createMaintenance))
@@ -876,6 +878,9 @@ type monitorSummary struct {
 	// BlockedBy is the monitor it depends on that is down, if any: this
 	// one fails too but sends no alerts of its own.
 	BlockedBy *blockedInfo `json:"blocked_by"`
+	// Incident is the open incident (down alert sent), if any, with who
+	// acknowledged it.
+	Incident *openIncident `json:"incident"`
 }
 
 type activeMaint struct {
@@ -907,6 +912,7 @@ func (h *Hub) summary(m *store.Monitor, expiry []*store.ExpiryCheck) *monitorSum
 		s.Maintenance = &activeMaint{ID: w.ID, Name: w.Name, EndAt: end.UnixMilli()}
 	}
 	s.BlockedBy = h.blockedBy(m.ID)
+	s.Incident = h.openIncidentOf(m.ID)
 	// Bars, uptime and the last result come from the in-memory stats kept by
 	// HandleResult: no query on the results table.
 	h.mu.Lock()

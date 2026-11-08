@@ -94,6 +94,7 @@ Cursor, Windsurf and other clients that take a URL and headers:
 | `list_maintenances` | maintenance windows with their next occurrence |
 | `list_groups`, `list_tags`, `list_agents`, `list_status_pages` | everything else a model needs to find ids |
 | `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | write token of an admin only |
+| `acknowledge_incident` | write token of an admin only; the incident is acknowledged by the token's user |
 | `create_maintenance`, `delete_maintenance` | write token of an admin only; times in ISO 8601 |
 
 Roles, validation and hidden secrets are exactly those of the REST API, and every write is in the

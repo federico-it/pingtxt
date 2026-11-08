@@ -70,6 +70,8 @@ func (e Event) notifyEvent() string {
 		return store.EventDegraded
 	case KindAgent:
 		return store.EventAgentOffline
+	case KindAck:
+		return store.EventAck
 	}
 	if e.Status == StatusDown {
 		return store.EventDown

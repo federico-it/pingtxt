@@ -201,6 +201,8 @@ const (
 	CategoryExpiry          = "EXPIRY"
 	CategoryAgentOffline    = "AGENT_OFFLINE"
 	CategoryAgentOnline     = "AGENT_ONLINE"
+	// An incident was acknowledged: replaces the down alert on the phone.
+	CategoryMonitorAcked = "MONITOR_ACKED"
 
 	// Read-only variants, for the phones whose sign-in cannot change data
 	// (read-only users, or a read scope): the app shows only the actions
@@ -231,6 +233,9 @@ func appMessage(e Event) pushMessage {
 		id := strconv.FormatInt(e.MonitorID, 10)
 		m.ThreadID, m.CollapseID = "monitor-"+id, "monitor-"+id
 		m.Data["monitor_id"] = id
+	}
+	if e.IncidentID > 0 {
+		m.Data["incident_id"] = strconv.FormatInt(e.IncidentID, 10)
 	}
 	var body []string
 	switch e.Kind {
@@ -273,6 +278,17 @@ func appMessage(e Event) pushMessage {
 				body = append(body, "After "+d+" offline")
 			}
 		}
+	case KindAck:
+		// Same collapse id as the down alert: the alert turns into "someone
+		// is on it" on every phone.
+		m.Title = e.Monitor + " acknowledged"
+		m.Category = CategoryMonitorAcked
+		body = append(body, "By "+e.AckBy)
+		line := e.Target
+		if d := e.downFor(); d != "" {
+			line += " · down for " + d
+		}
+		body = append(body, line)
 	case KindDegraded:
 		m.Title = e.Monitor + " is degraded"
 		m.Category = CategoryMonitorDegraded

@@ -148,6 +148,8 @@ export interface MonitorSummary extends Monitor {
   maintenance: { id: number; name: string; end_at: number } | null
   /** Monitor it depends on that is down while this one fails too (no alerts of its own). */
   blocked_by?: { id: number; name: string; since: number } | null
+  /** Open incident (down alert sent), with who acknowledged it. */
+  incident?: { id: number; started_at: number; acked_at: number; acked_by: string } | null
 }
 
 export interface LocationStatus {
@@ -210,6 +212,10 @@ export interface Incident {
   cause: string
   /** locations sent diagnostics for it */
   diagnostics: boolean
+  /** when someone acknowledged it (unix ms), 0 = nobody: reminders and escalation stop */
+  acked_at?: number
+  /** email of who acknowledged it, "" = nobody */
+  acked_by?: string
 }
 
 /** What a location found out about a failing check (see GET /api/incidents/{id}/diagnostics). */
@@ -388,9 +394,9 @@ export type NotifierType =
 
 /** What a channel can be sent. agent_offline is about agents, not monitors:
  * it ignores the channel's scope and monitor links cannot pick it. */
-export type NotifyEvent = "down" | "up" | "degraded" | "cert_expiry" | "domain_expiry" | "agent_offline"
+export type NotifyEvent = "down" | "up" | "ack" | "degraded" | "cert_expiry" | "domain_expiry" | "agent_offline"
 
-export const notifyEvents: NotifyEvent[] = ["down", "up", "degraded", "cert_expiry", "domain_expiry", "agent_offline"]
+export const notifyEvents: NotifyEvent[] = ["down", "up", "ack", "degraded", "cert_expiry", "domain_expiry", "agent_offline"]
 
 /** The events about a monitor, which monitor links can pick. */
 export const monitorEvents: NotifyEvent[] = notifyEvents.filter((e) => e !== "agent_offline")

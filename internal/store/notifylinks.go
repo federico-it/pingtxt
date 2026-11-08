@@ -15,10 +15,13 @@ const (
 	// EventAgentOffline is about an agent, not a monitor: a channel gets it
 	// whatever its scope, and monitor links cannot pick it.
 	EventAgentOffline = "agent_offline" // agent disconnected past the grace period, and back online
+	// EventAck: someone acknowledged an incident. Sent only to the channels
+	// that got its down alert, and only when picked (not a default event).
+	EventAck = "ack"
 )
 
 // NotifyEvents lists every event, in display order.
-var NotifyEvents = []string{EventDown, EventUp, EventDegraded, EventCertExpiry, EventDomainExpiry, EventAgentOffline}
+var NotifyEvents = []string{EventDown, EventUp, EventAck, EventDegraded, EventCertExpiry, EventDomainExpiry, EventAgentOffline}
 
 // DefaultNotifyEvents are the events a channel gets unless told otherwise:
 // everything that was sent before channels could be picked per monitor.

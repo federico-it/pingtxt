@@ -100,6 +100,7 @@ export function EventChips({
 const eventTone: Record<NotifyEvent, string> = {
   down: "border-down/50 bg-down/10 text-down",
   up: "border-up/50 bg-up/10 text-up",
+  ack: "border-info/50 bg-info/10 text-info",
   degraded: "border-warn/50 bg-warn/10 text-warn",
   cert_expiry: "border-info/50 bg-info/10 text-foreground",
   domain_expiry: "border-info/50 bg-info/10 text-foreground",

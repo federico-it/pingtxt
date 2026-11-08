@@ -40,7 +40,8 @@ A location is **slow** when its response time is above the monitor's
 ## Incidents
 
 An **incident** opens when a monitor goes down and closes when it is back up. Alerts are sent when it opens and
-closes (and as reminders in between, if you want). The incidents page lists them with their causes and, when
+closes (and as reminders in between, if you want). Someone can [acknowledge](alerts.md#acknowledging-incidents) an
+open incident to stop the reminders and show the others who is on it. The incidents page lists them with their causes and, when
 [diagnostics](monitors.md#diagnostics-on-failure) are on, what each location saw at the first failure.
 
 Status pages have incidents of their own: written updates you post for your visitors. See

@@ -142,7 +142,8 @@
       "undo": "undo",
       "undone": "undone"
     },
-    "blockedBy": "blocked by {name}"
+    "blockedBy": "blocked by {name}",
+    "ackedBy": "acknowledged by {name}"
   },
   "monitor": {
     "resumed": "monitor resumed",
@@ -209,7 +210,9 @@
     "zoomReset": "back to {range}",
     "noLocationOnline": "No location of this monitor is online: its checks are not running, so the status is pending until an agent reconnects.",
     "diagnostics": "diagnostics",
-    "blockedBy": "blocked by <hl>{name}</hl> since {since}: it is down too, so this monitor sends no alerts of its own. once it is back, an alert goes out only if this one still fails."
+    "blockedBy": "blocked by <hl>{name}</hl> since {since}: it is down too, so this monitor sends no alerts of its own. once it is back, an alert goes out only if this one still fails.",
+    "openIncident": "incident open since {since}",
+    "notAcked": "nobody has taken it yet: reminders and escalation run"
   },
   "browserNotify": {
     "title": "desktop notifications in this browser",
@@ -1623,10 +1626,11 @@
   },
   "channelLinks": {
     "events": "events",
-    "eventsHint": "What this channel gets for the monitors it covers. Recoveries go only to channels that got the down alert. Agent offline is about agents, not monitors: it is sent whatever monitors the channel covers.",
+    "eventsHint": "What this channel gets for the monitors it covers. Recoveries and acknowledgements go only to channels that got the down alert. Agent offline is about agents, not monitors: it is sent whatever monitors the channel covers.",
     "event": {
       "down": "down",
       "up": "back up",
+      "ack": "acknowledged",
       "degraded": "degraded",
       "cert_expiry": "certificate expiry",
       "domain_expiry": "domain expiry",
@@ -1635,6 +1639,7 @@
     "short": {
       "down": "down",
       "up": "up",
+      "ack": "ack",
       "degraded": "degraded",
       "cert_expiry": "cert",
       "domain_expiry": "domain",
@@ -1737,5 +1742,17 @@
   "dependencies": {
     "add": "add a monitor…",
     "remove": "remove {name}"
+  },
+  "ack": {
+    "ack": "acknowledge",
+    "takeOver": "take over",
+    "release": "release",
+    "ackHint": "Say you are on it: reminders and escalation stop until the monitor is back up, and channels with the acknowledged event are told.",
+    "releaseHint": "Leave the incident: reminders and escalation run again.",
+    "acked": "incident acknowledged",
+    "released": "incident released",
+    "onIt": "{name} on it · {ago}",
+    "you": "you",
+    "error": "could not change the incident"
   }
 }

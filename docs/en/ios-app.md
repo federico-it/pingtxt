@@ -51,11 +51,13 @@ Press and hold a notification (also on the lock screen) to act on it without ope
 
 | notification | actions |
 | --- | --- |
-| monitor down | check now, mute for me for 1 hour, mute for everyone for 1 hour, pause monitor |
+| monitor down | acknowledge, check now, mute for me for 1 hour, mute for everyone for 1 hour, pause monitor |
 | monitor degraded | check now, mute for me for 1 hour, mute for everyone for 1 hour |
 | certificate or domain expiry | check expiry again, mute for me for 1 hour |
 | agent offline | open agent |
 
+- **acknowledge** says you are on it: reminders and escalation stop and the others see who took it (see
+  [Acknowledging incidents](alerts.md#acknowledging-incidents)).
 - **check now** runs the check right away from every location and records the result, so it can close the incident.
 - **mute for me for 1 hour** mutes that monitor on this phone only (see above). Everyone can use it.
 - **mute for everyone for 1 hour** creates a one-hour [maintenance window](alerts.md#maintenance-windows) for that monitor: no
@@ -94,7 +96,9 @@ registration.
   `aps.category` (`MONITOR_DOWN`, `MONITOR_UP`, `MONITOR_DEGRADED`, `EXPIRY`, `AGENT_OFFLINE`, `AGENT_ONLINE`) and
   `hub_id`, so an app signed in to several hubs knows which one to call. Phones whose sign-in cannot change data get
   `MONITOR_DOWN_READONLY`, `MONITOR_DEGRADED_READONLY` and `EXPIRY_READONLY` instead of the categories with write
-  actions. `POST /api/monitors/{id}/check` runs a check now.
+  actions. `POST /api/monitors/{id}/check` runs a check now. Down, up and acknowledgement pushes carry `incident_id`;
+  `POST /api/incidents/{id}/ack` acknowledges, and the `MONITOR_ACKED` notification (same collapse id as the down
+  alert) tells the other phones who is on it.
 - Preferences: `GET` and `PUT /api/mobile/preferences` for the account (with `primary_device_id`), and
   `/api/mobile/devices/{id}` for one phone (`current` = the phone of the calling sign-in, `follow_account`). Mute with
   `POST .../mute` (`monitor_id`, `minutes`) on either, unmute with `DELETE .../mute`.

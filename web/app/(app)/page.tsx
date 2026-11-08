@@ -3,12 +3,13 @@
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
-import { PlusIcon } from "lucide-react"
+import { PlusIcon, UserCheckIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
 
 import { AgentsOffline } from "@/components/agents-offline"
+import { useAckName } from "@/components/incident-ack"
 import { ExpiryBadges } from "@/components/expiry"
 import { TagList, TagToggle, useLabels } from "@/components/labels"
 import { Empty, PageHeader } from "@/components/page-header"
@@ -128,6 +129,7 @@ export default function MonitorsPage() {
 function Monitors() {
   const { data, isLoading, mutate } = useApi<MonitorSummary[]>("/api/monitors")
   const isAdmin = useIsAdmin()
+  const ackName = useAckName()
   const t = useTranslations("dashboard")
   const ts = useTranslations("status")
   const { q, filter, group, tag, sort, setQ, setFilter, setGroup, setTag, setSort } =
@@ -493,6 +495,12 @@ function Monitors() {
                         {m.blocked_by && (
                           <span className="shrink-0 text-xs text-muted-foreground" title={t("blockedBy", { name: m.blocked_by.name })}>
                             ⛓ {m.blocked_by.name}
+                          </span>
+                        )}
+                        {!!m.incident?.acked_at && (
+                          <span className="inline-flex shrink-0 items-center gap-1 text-xs text-info" title={t("ackedBy", { name: ackName(m.incident.acked_by) })}>
+                            <UserCheckIcon className="size-3" />
+                            <span className="hidden sm:inline">{ackName(m.incident.acked_by)}</span>
                           </span>
                         )}
                         <TagList

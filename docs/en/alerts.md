@@ -27,7 +27,8 @@ Each channel has a **scope** and **events**:
 
 - **scope**: *all monitors* (also the ones added later), or the monitors of some **groups** and **tags**, or none
   (only the monitors linked one by one).
-- **events**: `down` (with its reminders), `up` (recovery, only to channels that got the alert), `degraded` (some
+- **events**: `down` (with its reminders), `up` (recovery, only to channels that got the alert), `ack` (someone
+  [acknowledged the incident](#acknowledging-incidents), only to channels that got the alert; off by default), `degraded` (some
   locations fail or are slow, and when that ends; off by default), `cert_expiry`, `domain_expiry` and
   `agent_offline` ([agent offline alerts](locations.md#agent-offline-alerts): about agents, so it ignores the
   scope and the monitor links).
@@ -48,6 +49,22 @@ Each channel has two optional settings, in minutes:
 
 Times count from when the incident opened. What each channel received is stored with the incident, so a restart
 does not repeat or skip alerts.
+
+## Acknowledging incidents
+
+When someone takes an open incident, everyone else should know and stop being paged. On the monitor page, the
+incidents page or from a notification of the iOS app, an admin presses **acknowledge**:
+
+- the incident shows **who is on it** and since when, on the dashboard, the monitor and the incidents page;
+- its `STILL DOWN` reminders stop, and so do the alerts of channels still waiting for their **send after** time
+  (escalation);
+- channels that got the down alert and have the `ack` event get a message with who acknowledged it. On the iOS app
+  it replaces the down notification.
+
+The recovery still goes to every channel that got the alert. **release** takes the acknowledgement back: reminders
+and escalation run again from where they stopped. Another admin can **take over** an incident someone else
+acknowledged. Read-only users see who is on it but cannot acknowledge. API: `POST` and `DELETE
+/api/incidents/{id}/ack`; acknowledgements are in the [audit log](security.md#audit-log).
 
 ## Maintenance windows
 
@@ -96,9 +113,11 @@ Webhooks get a JSON body with `monitor_id`, `monitor`, `target`, `status`, `caus
 
 | field | when |
 | --- | --- |
-| `kind` | empty for down and up, `degraded`, `cert_expiry`, `domain_expiry` or `agent` |
-| `status` | `down` / `up`, `expiring` / `expired` / `renewed` for expiry events, `offline` / `online` for agents |
+| `kind` | empty for down and up, `ack`, `degraded`, `cert_expiry`, `domain_expiry` or `agent` |
+| `status` | `down` / `up`, `acknowledged`, `expiring` / `expired` / `renewed` for expiry events, `offline` / `online` for agents |
 | `reminder`, `down_since` | reminders (`down_since` in unix ms) |
+| `incident_id` | down, up and acknowledgement events |
+| `ack_by` | acknowledgements: email of who acknowledged the incident |
 | `subject`, `expires_at`, `days_left` | expiry events (host name or domain) |
 | `agent_id`, `agent`, `down_since` | agent offline and online alerts |
 | `diagnostics`, `diagnostics_url` | the first down alert, when diagnostics were collected |

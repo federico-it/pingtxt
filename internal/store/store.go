@@ -745,6 +745,18 @@ var laterMigrations = []migration{
 		FOREIGN KEY (parent_id) REFERENCES monitors(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 37: who acknowledged an incident and when (0 = nobody): reminders and
+	// escalation stop while someone is on it. The email stays when the
+	// user is deleted.
+	{sqlite: `ALTER TABLE incidents ADD COLUMN acked_at INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE incidents ADD COLUMN acked_by INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE incidents ADD COLUMN acked_by_email TEXT NOT NULL DEFAULT '';`,
+		postgres: `ALTER TABLE incidents ADD COLUMN acked_at BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE incidents ADD COLUMN acked_by BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE incidents ADD COLUMN acked_by_email TEXT NOT NULL DEFAULT '';`,
+		mysql: `ALTER TABLE incidents ADD COLUMN acked_at BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE incidents ADD COLUMN acked_by BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE incidents ADD COLUMN acked_by_email VARCHAR(254) NOT NULL DEFAULT '';`},
 }
 
 func sqliteOnly(list []string) []migration {
