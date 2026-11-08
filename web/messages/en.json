@@ -835,7 +835,14 @@
       "telegram": "telegram",
       "ntfy": "ntfy",
       "email": "email",
-      "app": "pingtxt app (push)"
+      "app": "pingtxt app (push)",
+      "teams": "microsoft teams",
+      "pagerduty": "pagerduty",
+      "opsgenie": "opsgenie",
+      "pushover": "pushover",
+      "gotify": "gotify",
+      "matrix": "matrix",
+      "twilio": "sms (twilio)"
     },
     "fields": {
       "url": "url",
@@ -853,20 +860,44 @@
       "password": "password",
       "from": "from",
       "to": "to",
-      "users": "users (emails)"
+      "users": "users (emails)",
+      "homeserver": "homeserver url",
+      "botAccessToken": "access token of the bot account",
+      "room": "room",
+      "serverUrl": "server url",
+      "appToken": "application token",
+      "userKey": "user or group key",
+      "device": "device (optional)",
+      "routingKey": "integration key",
+      "region": "region",
+      "opsgenieKey": "api key",
+      "accountSid": "account sid",
+      "authToken": "auth token",
+      "smsFrom": "from",
+      "phoneNumbers": "phone numbers"
     },
     "options": {
       "smtp": "smtp server",
       "resend": "resend (http api)",
       "starttls": "starttls (587)",
       "tls": "tls (465)",
-      "none": "none (25, local relay)"
+      "none": "none (25, local relay)",
+      "us": "us",
+      "eu": "eu"
     },
     "pushOff": "Push notifications to the mobile app are off: turn them on in <settings>Settings, mobile app</settings> to enable this channel.",
     "hints": {
       "commaSeparated": "comma separated",
       "appUsers": "Comma separated. Empty = every user. Each user gets the alerts on the phones signed in with the pingtxt app.",
-      "resendKey": "Create a key with sending access in <link>Resend, API keys</link>. The from address must be on a domain verified in Resend."
+      "resendKey": "Create a key with sending access in <link>Resend, API keys</link>. The from address must be on a domain verified in Resend.",
+      "teamsUrl": "In the Teams channel: ⋯ → Workflows → “Post to a channel when a webhook request is received”, then copy the URL of the flow. Old connector URLs (webhook.office.com) work too.",
+      "pagerdutyKey": "Events API v2 integration key of a PagerDuty service. pingtxt opens an incident on down and resolves it when the monitor is back up.",
+      "opsgenieKey": "Key of an API integration in Opsgenie (Settings → Integrations → API). Alerts close by themselves when the monitor is back up.",
+      "pushoverDevice": "Empty = every device of the user.",
+      "gotifyToken": "Create an application in Gotify and paste its token.",
+      "matrixRoom": "Room id (!abc:server) or alias (#room:server). Invite the bot account to the room and accept the invite with it first.",
+      "twilioFrom": "A Twilio phone number, or the SID of a messaging service (MG...).",
+      "phoneNumbers": "International format (+39...), comma separated. Every alert is an SMS for each number, paid on your Twilio account."
     }
   },
   "reports": {

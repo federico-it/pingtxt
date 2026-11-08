@@ -57,8 +57,9 @@ controlli fatti durante le finestre di manutenzione non contano.
 
 ## Canali di notifica
 
-Un **canale** è dove arrivano gli avvisi: email, Slack, Discord, Telegram, ntfy, un webhook o l'app iOS. Ogni canale
-sceglie i monitor e gli eventi che riceve. Vedi [Avvisi e notifiche](alerts.md).
+Un **canale** è dove arrivano gli avvisi: email, Slack, Discord, Microsoft Teams, Telegram, Matrix,
+ntfy, Gotify, Pushover, PagerDuty, Opsgenie, SMS (Twilio), un webhook o l'app iOS. Ogni canale sceglie i monitor e
+gli eventi che riceve. Vedi [Avvisi e notifiche](alerts.md).
 
 ## Gruppi e tag
 

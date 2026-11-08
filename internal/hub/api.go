@@ -1726,6 +1726,9 @@ func validateNotifier(n *store.Notifier) error {
 	if n.Type == "app" {
 		return validateAppConfig(n.Config)
 	}
+	if ok, err := validateServiceConfig(n.Type, n.Config); ok {
+		return err
+	}
 	if n.Type == "email" {
 		delete(n.Config, "password_set")
 		delete(n.Config, "api_key_set")

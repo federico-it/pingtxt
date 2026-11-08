@@ -46,7 +46,18 @@ type Field = {
   options?: string[]
   half?: boolean
   required?: boolean
-  hint?: "commaSeparated" | "appUsers" | "resendKey"
+  hint?:
+    | "commaSeparated"
+    | "appUsers"
+    | "resendKey"
+    | "teamsUrl"
+    | "pagerdutyKey"
+    | "opsgenieKey"
+    | "pushoverDevice"
+    | "gotifyToken"
+    | "matrixRoom"
+    | "twilioFrom"
+    | "phoneNumbers"
   /** Shown only when this returns true for the current config. */
   when?: (config: Record<string, string>) => boolean
 }
@@ -59,16 +70,59 @@ const kinds: Record<NotifierType, { fields: Field[] }> = {
   webhook: { fields: [{ key: "url", label: "url", placeholder: "https://example.com/hooks/pingtxt" }] },
   discord: { fields: [{ key: "url", label: "webhookUrl", placeholder: "https://discord.com/api/webhooks/...", secret: true }] },
   slack: { fields: [{ key: "url", label: "webhookUrl", placeholder: "https://hooks.slack.com/services/...", secret: true }] },
+  teams: {
+    fields: [{ key: "url", label: "webhookUrl", placeholder: "https://....powerplatform.com/powerautomate/...", secret: true, hint: "teamsUrl" }],
+  },
   telegram: {
     fields: [
       { key: "bot_token", label: "botToken", placeholder: "123456:ABC...", secret: true },
       { key: "chat_id", label: "chatId", placeholder: "-1001234567890" },
     ],
   },
+  matrix: {
+    fields: [
+      { key: "url", label: "homeserver", placeholder: "https://matrix.org", required: true },
+      { key: "access_token", label: "botAccessToken", placeholder: "syt_...", secret: true, required: true },
+      { key: "room_id", label: "room", placeholder: "!abc123:matrix.org", required: true, hint: "matrixRoom" },
+    ],
+  },
   ntfy: {
     fields: [
       { key: "url", label: "topicUrl", placeholder: "https://ntfy.sh/my-alerts" },
       { key: "token", label: "accessToken", placeholder: "tk_...", secret: true },
+    ],
+  },
+  gotify: {
+    fields: [
+      { key: "url", label: "serverUrl", placeholder: "https://gotify.example.com", required: true },
+      { key: "token", label: "appToken", placeholder: "A1b2C3...", secret: true, required: true, hint: "gotifyToken" },
+    ],
+  },
+  pushover: {
+    fields: [
+      { key: "user_key", label: "userKey", placeholder: "uQiRzpo4DXghDmr9QzzfQu27cmVRsG", secret: true, required: true, half: true },
+      { key: "app_token", label: "appToken", placeholder: "azGDORePK8gMaC0QOYAMyEEuzJnyUi", secret: true, required: true, half: true },
+      { key: "device", label: "device", placeholder: "iphone", hint: "pushoverDevice" },
+    ],
+  },
+  pagerduty: {
+    fields: [
+      { key: "routing_key", label: "routingKey", placeholder: "R0123456789ABCDEF...", secret: true, required: true, hint: "pagerdutyKey" },
+      { key: "region", label: "region", options: ["us", "eu"] },
+    ],
+  },
+  opsgenie: {
+    fields: [
+      { key: "api_key", label: "opsgenieKey", placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", secret: true, required: true, hint: "opsgenieKey" },
+      { key: "region", label: "region", options: ["us", "eu"] },
+    ],
+  },
+  twilio: {
+    fields: [
+      { key: "account_sid", label: "accountSid", placeholder: "AC...", required: true, half: true },
+      { key: "auth_token", label: "authToken", secret: true, required: true, half: true },
+      { key: "from", label: "smsFrom", placeholder: "+15550001111", required: true, hint: "twilioFrom" },
+      { key: "to", label: "phoneNumbers", placeholder: "+393331234567, +393337654321", required: true, hint: "phoneNumbers" },
     ],
   },
   email: {
