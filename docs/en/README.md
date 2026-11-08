@@ -22,7 +22,7 @@ New to pingtxt? [Concepts](concepts.md) explains hubs, locations, statuses and i
 | [Locations (agents)](locations.md) | add an agent, how locations vote, offline alerts, agent updates |
 | [Monitors](monitors.md) | every check type, JSON rules, slow threshold, IPv6, groups and tags, diagnostics |
 | [Alerts and notifications](alerts.md) | channels, which events each channel gets, escalation, maintenance, expiry alerts, reports |
-| [Status pages](status-pages.md) | public pages, custom domain, password, logo, incidents and subscribers, badges |
+| [Status pages](status-pages.md) | public pages, custom domain, password, logo, incidents and subscribers, feeds, webhooks, badges |
 | [iOS app](ios-app.md) | sign in, push notifications and their actions, Live Activity |
 | [Users and security](security.md) | roles, single sign-on, two-factor authentication, audit log |
 | [Integrations](integrations.md) | API tokens and REST API, MCP server for AI assistants, Prometheus |

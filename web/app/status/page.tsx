@@ -39,6 +39,25 @@ export default function PublicStatusPage() {
   const lockedTitle = locked ? ((error.data as { title?: string }).title ?? "") : ""
   const lockedTheme = locked ? (error.data as { theme?: PageTheme }).theme : undefined
 
+  // Lets browsers and feed readers find the feeds of the page.
+  const feed = data && path ? `${path}/feed.atom` : undefined
+  useEffect(() => {
+    if (!feed || !path) return
+    const links = [
+      { href: feed, type: "application/atom+xml" },
+      { href: `${path}/feed.rss`, type: "application/rss+xml" },
+    ].map(({ href, type }) => {
+      const l = document.createElement("link")
+      l.rel = "alternate"
+      l.type = type
+      l.href = href
+      l.title = document.title
+      document.head.appendChild(l)
+      return l
+    })
+    return () => links.forEach((l) => l.remove())
+  }, [feed, path])
+
   useEffect(() => {
     if (data) document.title = data.title
     else if (lockedTitle) document.title = lockedTitle
@@ -72,6 +91,7 @@ export default function PublicStatusPage() {
       data={data}
       now={now}
       logoBase={path ? `${path}/logo/` : undefined}
+      feed={feed}
       notice={<SubscriptionNotice />}
       subscribe={data.subscribe && path ? <SubscribeForm endpoint={`${path}/subscribe`} /> : null}
     />

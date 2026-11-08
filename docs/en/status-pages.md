@@ -24,6 +24,7 @@ reachable there.
 To keep a page private, turn on **protect with a password**. Visitors then see a password form; the right password
 opens the page for 30 days in that browser, together with its badges and subscription form. The password is stored
 hashed, wrong attempts are rate limited, and changing it logs every visitor out. Logged-in users never need it.
+Feed readers use [private links](#rss-and-atom-feeds) instead.
 
 ## Name link and logo
 
@@ -77,6 +78,62 @@ page and confirm it through a link (valid 7 days); then every update posted with
 reaches them. Each email has an unsubscribe link and a one-click `List-Unsubscribe` header. Admins see and remove
 subscribers under the incidents of the page. Links point to the custom domain of the page, or else to the public URL
 from the settings.
+
+## RSS and Atom feeds
+
+Every published page has an Atom and an RSS feed, so feed readers (or the RSS apps of Slack and Teams) can follow it:
+
+| feed | on the hub | on a custom domain |
+| --- | --- | --- |
+| Atom | `/api/public/status/<slug>/feed.atom` | `/api/public/status/feed.atom` |
+| RSS 2.0 | `/api/public/status/<slug>/feed.rss` | `/api/public/status/feed.rss` |
+
+Each incident written on the page is one entry with its whole timeline, the latest change first; when the page shows
+the incident history, the outages of its monitors are entries too. The public page links the feed in its footer and
+announces it to browsers. The page editor shows both addresses under **rss and atom feeds**.
+
+A feed follows the rules of its page: drafts have none, and a password protected page needs the password. Feed
+readers cannot type one, so the editor of a protected page shows **private links** with a key: anyone with the link
+can read the feed, and changing the password changes the links.
+
+## Webhooks
+
+Under **webhooks** in the page editor, admins add addresses that get the events of the page as JSON `POST`
+requests, up to 10 per page. Pick the events or keep **every event**:
+
+| event | sent when |
+| --- | --- |
+| `incident.created` | an incident is opened on the page |
+| `incident.updated` | an incident gets an update |
+| `incident.resolved` | an incident gets a *resolved* update |
+| `page.status_changed` | the overall status of the page changes (`operational`, `degraded`, `partial_outage`, `major_outage`) |
+| `monitor.status_changed` | a monitor shown on the page changes status |
+
+Incident events follow the box that notifies subscribers (**send to webhooks** when the page has no email
+subscriptions): an update posted with it unchecked stays quiet. Status changes are
+checked every 30 seconds. Only published pages send events; **test** sends a `ping` event to one webhook at any
+time.
+
+The body always has `event`, `id` (of the delivery), `at` (Unix time in milliseconds) and `page` (`id`, `slug`,
+`title`, `url`), then the data of the event: `incident` and `update`; `status` and `previous_status`; or `monitor`
+(`id`, `name`, `group`, `status`, `previous_status`).
+
+```json
+{
+  "event": "incident.resolved",
+  "id": "4f1c2a9e0b7d35c8e6a1f203",
+  "at": 1794150730633,
+  "page": { "id": 1, "slug": "acme", "title": "Acme", "url": "https://status.example.com/" },
+  "incident": { "id": 7, "title": "Slow logins", "impact": "major", "status": "resolved", "...": "..." },
+  "update": { "id": 19, "status": "resolved", "message": "Fixed.", "created_at": 1794150730600 }
+}
+```
+
+Every request carries `X-Pingtxt-Event` and `X-Pingtxt-Signature: t=<Unix seconds>,v1=<signature>`, where the
+signature is the hex HMAC-SHA256 of `<t>.<body>` with the secret of the webhook (shown in the editor, where you can
+also make a new one). Check it, and reject old `t` values, before trusting a request. An answer outside 2xx counts
+as a failure: the hub tries again after 10 seconds and after a minute (not for 4xx answers other than 408 and 429),
+and the editor shows the result of the latest delivery. Each webhook gets its events one at a time, in order.
 
 ## Badges
 

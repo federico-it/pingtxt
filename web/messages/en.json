@@ -1142,7 +1142,8 @@
       "checking": "checking...",
       "wrong": "wrong password",
       "error": "error"
-    }
+    },
+    "feed": "rss feed"
   },
   "settings": {
     "title": "settings",
@@ -1619,7 +1620,9 @@
       "major": "major",
       "critical": "critical"
     },
-    "addUpdate": "add an update"
+    "addUpdate": "add an update",
+    "notifyBoth": "email subscribers and webhooks",
+    "notifyWebhooks": "send to webhooks"
   },
   "channelLinks": {
     "events": "events",
@@ -1737,5 +1740,46 @@
   "dependencies": {
     "add": "add a monitor…",
     "remove": "remove {name}"
+  },
+  "pageHooks": {
+    "feedsTitle": "rss and atom feeds",
+    "feedsHint": "Feed readers, Slack or Teams can follow the incidents of this page with these addresses. The public page links them too.",
+    "feedsPrivate": "The page has a password: these private links open the feed without it. Share them only with who may see the page; a new password changes them.",
+    "feedsDraft": "The page is a draft: the feeds work once it is published.",
+    "webhooksTitle": "webhooks ({count})",
+    "webhooksHint": "Send the incidents of this page and its status changes as JSON to other systems. Every request is signed with the webhook's secret (header X-Pingtxt-Signature). Only published pages send events.",
+    "url": "address",
+    "allEvents": "every event",
+    "event": {
+      "incident.created": "an incident is opened",
+      "incident.updated": "an incident gets an update",
+      "incident.resolved": "an incident is resolved",
+      "page.status_changed": "the status of the page changes",
+      "monitor.status_changed": "a monitor of the page changes status"
+    },
+    "add": "add webhook",
+    "added": "webhook added",
+    "enabled": "send events",
+    "turnedOn": "webhook on",
+    "turnedOff": "webhook off",
+    "neverSent": "nothing sent yet",
+    "lastOk": "sent {when} · {status}",
+    "lastFailed": "failed {when} · {status}",
+    "test": "test",
+    "testOk": "test event delivered ({status})",
+    "testFailed": "test event failed: {error}",
+    "edit": "edit",
+    "close": "close",
+    "rm": "rm",
+    "removeTitle": "Remove the webhook {url}?",
+    "removed": "webhook removed",
+    "secret": "secret",
+    "secretHint": "Check X-Pingtxt-Signature (t=<seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\">) with it.",
+    "rotate": "new secret",
+    "rotateTitle": "Make a new secret? Requests signed with the old one stop matching.",
+    "rotated": "new secret made",
+    "saveEvents": "save events",
+    "saved": "webhook saved",
+    "error": "something went wrong"
   }
 }

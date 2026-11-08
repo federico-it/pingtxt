@@ -7792,6 +7792,427 @@
         }
       }
     },
+    "/api/status-pages/{id}/feeds": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Feed addresses of a status page",
+        "operationId": "pageFeedLinks",
+        "description": "The Atom and RSS addresses of the page, on its custom domain when it has one. For a password protected page they carry a private `key` (`private` is true): anyone with the link can read the feed, and changing the password changes the link.\n\n**Access:** Any API token or session.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feed addresses.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "atom": {
+                      "type": "string"
+                    },
+                    "rss": {
+                      "type": "string"
+                    },
+                    "private": {
+                      "type": "boolean"
+                    },
+                    "published": {
+                      "type": "boolean",
+                      "description": "Drafts have no public feed."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}/webhooks": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "List the webhooks of a status page",
+        "operationId": "listPageWebhooks",
+        "description": "Addresses that get the page's events as signed JSON POST requests, with the result of their latest delivery. `events` lists the events a webhook can pick.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhooks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "webhooks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PageWebhook"
+                      }
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Add a webhook to a status page",
+        "operationId": "createPageWebhook",
+        "description": "Only published pages send events. Every request has the headers `X-Pingtxt-Event` and `X-Pingtxt-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\" with the secret>`. The body has `event`, `id` (of the delivery), `at` (unix ms), `page` (`id`, `slug`, `title`, `url`) and the event's data: `incident` and `update`; `status` and `previous_status`; or `monitor` (`id`, `name`, `group`, `status`, `previous_status`). A failed delivery is tried twice more. Events: `incident.created`, `incident.updated`, `incident.resolved` (incidents written on the page, sent when the update is posted with `notify`), `page.status_changed` (overall status of the page), `monitor.status_changed` (status of a monitor shown on the page). At most 10 webhooks per page.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageWebhookInput"
+              },
+              "example": {
+                "url": "https://example.com/hooks/status",
+                "events": [
+                  "incident.created",
+                  "incident.resolved"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new webhook, with its secret.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageWebhook"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}/webhooks/{webhook}": {
+      "put": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Change a webhook",
+        "operationId": "updatePageWebhook",
+        "description": "Fields left out keep their value. `\"secret\": \"\"` makes a new secret.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          },
+          {
+            "name": "webhook",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the webhook."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageWebhookInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The webhook.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageWebhook"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Remove a webhook",
+        "operationId": "deletePageWebhook",
+        "description": "The address gets no more events.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          },
+          {
+            "name": "webhook",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the webhook."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/status-pages/{id}/webhooks/{webhook}/test": {
+      "post": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Send a test event to a webhook",
+        "operationId": "testPageWebhook",
+        "description": "Sends one `ping` event now, also for drafts and disabled webhooks, and answers with the result (no retries).\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the status page."
+          },
+          {
+            "name": "webhook",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the webhook."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result of the delivery.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "description": "HTTP status of the answer, 0 = no answer."
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/oauth/authorize": {
       "get": {
         "tags": [
@@ -9019,6 +9440,96 @@
           },
           "404": {
             "description": "No such page or logo."
+          }
+        }
+      }
+    },
+    "/api/public/status/{slug}/feed.atom": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "Atom feed of a status page",
+        "operationId": "publicPageAtom",
+        "description": "The incidents written on the page (one entry per incident with its whole timeline, the latest change first) and, when the page shows them, the outages of its monitors. Same access rules as the page: drafts only for logged-in users; a password protected page needs the unlock cookie, a logged-in user or `?key=`. On a custom domain the path is `/api/public/status/feed.atom`.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Private key of a password protected page, from `GET /api/status-pages/{id}/feeds`. Changes when the password changes."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The feed.",
+            "content": {
+              "application/atom+xml": {}
+            }
+          },
+          "403": {
+            "description": "Password required."
+          },
+          "404": {
+            "description": "No such page."
+          }
+        }
+      }
+    },
+    "/api/public/status/{slug}/feed.rss": {
+      "get": {
+        "tags": [
+          "Status pages"
+        ],
+        "summary": "RSS 2.0 feed of a status page",
+        "operationId": "publicPageRSS",
+        "description": "The incidents written on the page (one entry per incident with its whole timeline, the latest change first) and, when the page shows them, the outages of its monitors. Same access rules as the page: drafts only for logged-in users; a password protected page needs the unlock cookie, a logged-in user or `?key=`. On a custom domain the path is `/api/public/status/feed.rss`.\n\n**Access:** No authentication.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Private key of a password protected page, from `GET /api/status-pages/{id}/feeds`. Changes when the password changes."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The feed.",
+            "content": {
+              "application/rss+xml": {}
+            }
+          },
+          "403": {
+            "description": "Password required."
+          },
+          "404": {
+            "description": "No such page."
           }
         }
       }
@@ -12271,7 +12782,7 @@
           },
           "notify": {
             "type": "boolean",
-            "description": "Email the update to the confirmed subscribers of the page (default true). Ignored when editing the title or impact."
+            "description": "Email the update to the confirmed subscribers of the page and send it to its webhooks (default true). Ignored when editing the title or impact."
           }
         }
       },
@@ -12300,6 +12811,88 @@
             "description": "Unix time in milliseconds (0 = never / unknown)."
           }
         }
+      },
+      "PageWebhook": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "url": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "string",
+            "description": "Signs every request (HMAC-SHA256). Made by the hub when empty."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "incident.created",
+                "incident.updated",
+                "incident.resolved",
+                "page.status_changed",
+                "monitor.status_changed"
+              ]
+            },
+            "description": "Events to send, empty = every event."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds (0 = never / unknown)."
+          },
+          "last_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Latest delivery, unix ms. 0 = never."
+          },
+          "last_status": {
+            "type": "integer",
+            "description": "HTTP status of the latest delivery, 0 = no answer."
+          },
+          "last_error": {
+            "type": "string",
+            "description": "Error of the latest delivery, \"\" when it worked."
+          }
+        }
+      },
+      "PageWebhookInput": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "http:// or https:// address."
+          },
+          "secret": {
+            "type": "string",
+            "description": "16 to 128 characters; empty = the hub makes one."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Empty = every event."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Default true."
+          }
+        },
+        "required": [
+          "url"
+        ]
       },
       "OAuthError": {
         "type": "object",
