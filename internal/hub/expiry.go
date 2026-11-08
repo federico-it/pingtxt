@@ -51,7 +51,9 @@ func expiryTargets(m *store.Monitor) []expiryTarget {
 		return nil
 	}
 	var out []expiryTarget
-	isHTTPS := (m.Type == check.TypeHTTP || m.Type == check.TypeKeyword || m.Type == check.TypeMCP) && strings.HasPrefix(strings.ToLower(m.Target), "https://")
+	t := strings.ToLower(m.Target)
+	isHTTPS := (m.Type == check.TypeHTTP || m.Type == check.TypeKeyword || m.Type == check.TypeMCP) && strings.HasPrefix(t, "https://") ||
+		m.Type == check.TypeWS && strings.HasPrefix(t, "wss://")
 	if m.CertExpiryAlert && isHTTPS {
 		subject := host
 		if port != "" && port != "443" {

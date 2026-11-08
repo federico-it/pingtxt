@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/federico-it/pingtxt/internal/check"
 	"github.com/federico-it/pingtxt/internal/store"
 )
 
@@ -138,6 +139,20 @@ func redactMonitor(m *store.Monitor) {
 	if m.Body != "" {
 		m.Body = redacted
 	}
+	steps := make([]check.Step, len(m.Steps))
+	for i, st := range m.Steps {
+		st.URL = redactTarget(st.URL)
+		hdr := make(map[string]string, len(st.Headers))
+		for k := range st.Headers {
+			hdr[k] = redacted
+		}
+		st.Headers = hdr
+		if st.Body != "" {
+			st.Body = redacted
+		}
+		steps[i] = st
+	}
+	m.Steps = steps
 	m.PushToken = ""
 }
 

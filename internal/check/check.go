@@ -33,6 +33,8 @@ const (
 	TypeGRPC     = "grpc"
 	TypeSMTP     = "smtp"
 	TypeMCP      = "mcp"
+	TypeUDP      = "udp"
+	TypeWS       = "websocket"
 	// TypePush is a heartbeat monitor: the monitored job calls the hub, so
 	// it is never probed and Run does not handle it.
 	TypePush = "push"
@@ -69,6 +71,9 @@ type Job struct {
 	// PingLossPct fails a ping check when at least this share (percent) of
 	// the packets is lost; 0 = only when all are lost.
 	PingLossPct int `json:"ping_loss_pct,omitempty"`
+	// Steps are HTTP requests made before the http/keyword request, e.g. a
+	// login. Older agents ignore them.
+	Steps []Step `json:"steps,omitempty"`
 }
 
 // Result is the outcome of a Job.
@@ -101,6 +106,9 @@ type Result struct {
 	// PingSent is how many echo requests a ping check sent. Agents older
 	// than the packet loss threshold never set it.
 	PingSent int `json:"ping_sent,omitempty"`
+	// Steps is how many steps of the job ran (the failed one included).
+	// Agents older than steps never set it.
+	Steps int `json:"steps,omitempty"`
 }
 
 // Timing is the time spent in each phase of an HTTP request, in ms. With
@@ -163,6 +171,10 @@ func runJob(ctx context.Context, j Job) Result {
 		r = runSMTP(ctx, j)
 	case TypeMCP:
 		r = runMCP(ctx, j, timeout)
+	case TypeUDP:
+		r = runUDP(ctx, j)
+	case TypeWS:
+		r = runWebSocket(ctx, j, timeout)
 	default:
 		r = Result{Message: "unknown monitor type: " + j.Type}
 	}
@@ -176,22 +188,12 @@ func runJob(ctx context.Context, j Job) Result {
 
 func ms(d time.Duration) float64 { return float64(d.Microseconds()) / 1000 }
 
+const userAgent = "pingtxt/1.0 (+https://github.com/federico-it/pingtxt)"
+
 func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 	method := strings.ToUpper(j.Method)
 	if method == "" {
 		method = http.MethodGet
-	}
-	var body io.Reader
-	if j.Body != "" {
-		body = strings.NewReader(j.Body)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, j.Target, body)
-	if err != nil {
-		return Result{Message: err.Error()}
-	}
-	req.Header.Set("User-Agent", "pingtxt/1.0 (+https://github.com/federico-it/pingtxt)")
-	for k, v := range j.Headers {
-		req.Header.Set(k, v)
 	}
 	tr := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
@@ -224,15 +226,44 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 			}
 		}
 	}
-	req = req.WithContext(httptrace.WithClientTrace(ctx, ct))
+	ctx = httptrace.WithClientTrace(ctx, ct)
 	start := time.Now()
+
+	// Steps (a login...) run first; what they extract fills {{variables}}
+	// in the monitor's own request.
+	target, headers, reqBody := j.Target, j.Headers, j.Body
+	steps := 0
+	if len(j.Steps) > 0 {
+		client.Jar = newCookieJar()
+		vars, n, failed := runSteps(ctx, j, client, pt)
+		steps = n
+		if failed != nil {
+			failed.LatencyMs = ms(time.Since(start))
+			failed.Steps = steps
+			return *failed
+		}
+		target, headers, reqBody = expand(target, vars), expandHeaders(headers, vars), expand(reqBody, vars)
+	}
+
+	var body io.Reader
+	if reqBody != "" {
+		body = strings.NewReader(reqBody)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, target, body)
+	if err != nil {
+		return Result{Message: err.Error(), Steps: steps}
+	}
+	req.Header.Set("User-Agent", userAgent)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return Result{LatencyMs: ms(time.Since(start)), Message: cleanErr(err)}
+		return Result{LatencyMs: ms(time.Since(start)), Message: cleanErr(err), Steps: steps, Timing: pt.timing()}
 	}
 	defer resp.Body.Close()
 
-	r := Result{StatusCode: resp.StatusCode, Timing: pt.timing()}
+	r := Result{StatusCode: resp.StatusCode, Timing: pt.timing(), Steps: steps}
 	if j.Diagnose {
 		pt.mu.Lock()
 		r.http = diagHTTP(resp, remote, redirects)

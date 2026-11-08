@@ -197,6 +197,11 @@ func (h *Hub) testAt(ctx context.Context, loc string, job check.Job) (check.Resu
 // checkAgentSupport fails a result from an agent too old for the monitor's
 // response rules or IP family, like HandleResult does.
 func checkAgentSupport(m *store.Monitor, loc string, fam int, r check.Result) check.Result {
+	if msg := oldAgentError(m, loc, r); msg != "" {
+		r.OK = false
+		r.Message = msg
+		return r
+	}
 	if loc == LocalLocation || !r.OK {
 		return r
 	}
@@ -211,6 +216,22 @@ func checkAgentSupport(m *store.Monitor, loc string, fam int, r check.Result) ch
 		r.Message = errOldPingAgent
 	}
 	return r
+}
+
+// oldAgentError explains a result, up or down, from an agent too old for
+// the monitor: one that does not know its type, or ignored its steps (it
+// skipped the login and checked the last request alone).
+func oldAgentError(m *store.Monitor, loc string, r check.Result) string {
+	if loc == LocalLocation {
+		return ""
+	}
+	if strings.HasPrefix(r.Message, "unknown monitor type") {
+		return fmt.Sprintf("this agent cannot run %s checks: update it", m.Type)
+	}
+	if len(m.Steps) > 0 && r.Steps == 0 && (m.Type == check.TypeHTTP || m.Type == check.TypeKeyword) {
+		return "this agent cannot run request steps: update it"
+	}
+	return ""
 }
 
 const errOldPingAgent = "this agent cannot check the packet loss threshold: update it"
