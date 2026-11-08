@@ -54,8 +54,9 @@ Checks taken during maintenance windows do not count.
 
 ## Notification channels
 
-A **channel** is where alerts go: email, Slack, Discord, Telegram, ntfy, a webhook or the iOS app. Each channel
-picks the monitors and the events it gets. See [Alerts and notifications](alerts.md).
+A **channel** is where alerts go: email, Slack, Discord, Microsoft Teams, Telegram, Matrix, ntfy,
+Gotify, Pushover, PagerDuty, Opsgenie, SMS (Twilio), a webhook or the iOS app. Each channel picks the monitors and
+the events it gets. See [Alerts and notifications](alerts.md).
 
 ## Groups and tags
 

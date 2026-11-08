@@ -835,7 +835,14 @@
       "telegram": "telegram",
       "ntfy": "ntfy",
       "email": "email (smtp)",
-      "app": "app pingtxt (push)"
+      "app": "app pingtxt (push)",
+      "teams": "microsoft teams",
+      "pagerduty": "pagerduty",
+      "opsgenie": "opsgenie",
+      "pushover": "pushover",
+      "gotify": "gotify",
+      "matrix": "matrix",
+      "twilio": "sms (twilio)"
     },
     "fields": {
       "url": "url",
@@ -853,20 +860,44 @@
       "password": "password",
       "from": "mittente",
       "to": "destinatari",
-      "users": "utenti (email)"
+      "users": "utenti (email)",
+      "homeserver": "url dell'homeserver",
+      "botAccessToken": "access token dell'account bot",
+      "room": "stanza",
+      "serverUrl": "url del server",
+      "appToken": "token dell'applicazione",
+      "userKey": "chiave utente o gruppo",
+      "device": "dispositivo (facoltativo)",
+      "routingKey": "integration key",
+      "region": "regione",
+      "opsgenieKey": "api key",
+      "accountSid": "account sid",
+      "authToken": "auth token",
+      "smsFrom": "mittente",
+      "phoneNumbers": "numeri di telefono"
     },
     "options": {
       "smtp": "server smtp",
       "resend": "resend (api http)",
       "starttls": "starttls (587)",
       "tls": "tls (465)",
-      "none": "nessuna (25, relay locale)"
+      "none": "nessuna (25, relay locale)",
+      "us": "usa",
+      "eu": "ue"
     },
     "pushOff": "Le notifiche push all'app mobile sono disattivate: attivale in <settings>Impostazioni, app mobile</settings> per abilitare questo canale.",
     "hints": {
       "commaSeparated": "separati da virgola",
       "appUsers": "Separati da virgola. Vuoto = tutti gli utenti. Ogni utente riceve gli avvisi sui telefoni in cui ha fatto l'accesso con l'app pingtxt.",
-      "resendKey": "Crea una chiave con accesso in invio in <link>Resend, API keys</link>. L'indirizzo del mittente deve essere su un dominio verificato in Resend."
+      "resendKey": "Crea una chiave con accesso in invio in <link>Resend, API keys</link>. L'indirizzo del mittente deve essere su un dominio verificato in Resend.",
+      "teamsUrl": "Nel canale Teams: ⋯ → Workflow → il modello “Post to a channel when a webhook request is received” (il nome cambia con la lingua di Teams), poi copia l'URL del flusso. Funzionano anche i vecchi URL dei connettori (webhook.office.com).",
+      "pagerdutyKey": "Integration key Events API v2 di un servizio PagerDuty. pingtxt apre un incidente quando il monitor va down e lo risolve quando torna su.",
+      "opsgenieKey": "Chiave di un'integrazione API in Opsgenie (Settings → Integrations → API). Gli avvisi si chiudono da soli quando il monitor torna su.",
+      "pushoverDevice": "Vuoto = tutti i dispositivi dell'utente.",
+      "gotifyToken": "Crea un'applicazione in Gotify e incolla il suo token.",
+      "matrixRoom": "Id della stanza (!abc:server) o alias (#stanza:server). Invita l'account bot nella stanza e accetta l'invito con quell'account.",
+      "twilioFrom": "Un numero Twilio, o il SID di un messaging service (MG...).",
+      "phoneNumbers": "Formato internazionale (+39...), separati da virgola. Ogni avviso è un SMS per ogni numero, pagato sul tuo account Twilio."
     }
   },
   "reports": {
