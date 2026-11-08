@@ -7927,7 +7927,7 @@
         ],
         "summary": "Add a webhook to a status page",
         "operationId": "createPageWebhook",
-        "description": "Only published pages send events. Every request has the headers `X-Pingtxt-Event` and `X-Pingtxt-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\" with the secret>`. The body has `event`, `id` (of the delivery), `at` (unix ms), `page` (`id`, `slug`, `title`, `url`) and the event's data: `incident` and `update`; `status` and `previous_status`; or `monitor` (`id`, `name`, `group`, `status`, `previous_status`). A failed delivery is tried twice more. Events: `incident.created`, `incident.updated`, `incident.resolved` (incidents written on the page, sent when the update is posted with `notify`), `page.status_changed` (overall status of the page), `monitor.status_changed` (status of a monitor shown on the page). At most 10 webhooks per page.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "description": "Only published pages send events. Every request has the headers `X-Pingtxt-Event` and `X-Pingtxt-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\" with the secret>`. The body has `event`, `id` (of the delivery), `at` (unix ms), `page` (`id`, `slug`, `title`, `url`) and the event's data: `incident` and `update`; `status` and `previous_status`; `monitor` (`id`, `name`, `group`, `status`, `previous_status`); or `maintenance`. A failed delivery is tried twice more. Events: `incident.created`, `incident.updated`, `incident.resolved` (incidents written on the page, sent when the update is posted with `notify`), `page.status_changed` (overall status of the page), `monitor.status_changed` (status of a monitor shown on the page), `maintenance.scheduled`, `maintenance.reminder`, `maintenance.in_progress`, `maintenance.completed`, `maintenance.cancelled` (public maintenance windows covering a monitor of the page; data `maintenance`, a PublicMaintenance). At most 10 webhooks per page.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
         "x-pingtxt-access": "admin",
         "security": [
           {
@@ -11413,6 +11413,24 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "public": {
+            "type": "boolean",
+            "description": "Show the window on the status pages that list one of its monitors (default false). The name is its title there."
+          },
+          "announcement": {
+            "type": "string",
+            "description": "Public message shown with the window on status pages and in the subscriber emails, at most 5000 characters. Empty = only the name."
+          },
+          "notify_subscribers": {
+            "type": "boolean",
+            "description": "Email the subscribers of those status pages when the window is announced or rescheduled, starts, ends or is cancelled (default false; only with public)."
+          },
+          "remind_min": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10080,
+            "description": "With notify_subscribers, also email a reminder this many minutes before each occurrence (0 = no reminder)."
           }
         },
         "required": [
@@ -11935,7 +11953,67 @@
           },
           "subscribe": {
             "type": "boolean",
-            "description": "Visitors can subscribe to incident updates by email."
+            "description": "Visitors can subscribe to incident and maintenance updates by email."
+          },
+          "maintenances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicMaintenance"
+            },
+            "description": "Public maintenance windows that cover a monitor of the page, in progress or upcoming, by start. Older hubs leave it out."
+          }
+        }
+      },
+      "PublicMaintenance": {
+        "type": "object",
+        "description": "A public maintenance window as visitors of a status page see it.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "description": "The window's public message, may be empty."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "in_progress"
+            ],
+            "description": "In progress now, or scheduled (the next occurrence)."
+          },
+          "starts_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Start of the occurrence in progress or of the next one, unix ms."
+          },
+          "ends_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Its end, unix ms."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "once",
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "description": "A recurring window shows its current or next occurrence."
+          },
+          "monitor_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Monitors of the page that the window covers."
           }
         }
       },
@@ -12942,7 +13020,12 @@
                 "incident.updated",
                 "incident.resolved",
                 "page.status_changed",
-                "monitor.status_changed"
+                "monitor.status_changed",
+                "maintenance.scheduled",
+                "maintenance.reminder",
+                "maintenance.in_progress",
+                "maintenance.completed",
+                "maintenance.cancelled"
               ]
             },
             "description": "Events to send, empty = every event."

@@ -59,7 +59,7 @@ new paragraph. Links must be `http://`, `https://` or `mailto:` addresses.
 
 **custom CSS** is added to the public page as is, for anything the options do not cover. These classes are stable:
 `.pt-page`, `.pt-header`, `.pt-brand`, `.pt-tagline`, `.pt-notice`, `.pt-banner`, `.pt-section`, `.pt-list`,
-`.pt-monitor`, `.pt-group`, `.pt-bars`, `.pt-report`, `.pt-subscribe`, `.pt-footer`. Colors are CSS variables
+`.pt-monitor`, `.pt-group`, `.pt-bars`, `.pt-report`, `.pt-maintenance`, `.pt-subscribe`, `.pt-footer`. Colors are CSS variables
 (`--background`, `--foreground`, `--primary`, `--muted`, `--border`, `--up`, `--warn`, `--down`). Images or fonts
 the CSS loads from other sites are fetched by every visitor, so they see the visitor's address. The password form
 of a protected page uses the same colors, font and CSS, without texts and links.
@@ -78,6 +78,24 @@ page and confirm it through a link (valid 7 days); then every update posted with
 reaches them. Each email has an unsubscribe link and a one-click `List-Unsubscribe` header. Admins see and remove
 subscribers under the incidents of the page. Links point to the custom domain of the page, or else to the public URL
 from the settings.
+
+## Scheduled maintenance
+
+Turn on **show on status pages** in a [maintenance window](alerts.md#maintenance-windows) to announce it on every
+page that shows one of its monitors. Its name is the title and the **public message** is shown under it; the notes
+stay private. Upcoming windows are listed under **scheduled maintenance** with their start, end and the monitors of
+the page they cover (recurring windows show their next occurrence); while a window is running it sits at the top of
+the page. A window does not change the page banner: its monitors show *maintenance*.
+
+With **email the subscribers** on, the subscribers of those pages get an email when the window is saved or its
+schedule changes, optionally a **reminder** before each occurrence (15 minutes to 7 days), when it starts, when it
+ends and when it is cancelled (deleted, disabled or no longer public). Times are in the time zone of the window, with
+UTC next to them. Emails sent by the scheduler (reminder, start, end) link to the custom domain of the page or to the
+public URL from the settings: without either they are skipped. A start or end found more than 15 minutes late, for
+example after a restart, is not emailed.
+
+The [webhooks](#webhooks) of those pages get the same news as `maintenance.*` events, also when the window does not
+email subscribers.
 
 ## RSS and Atom feeds
 
@@ -108,6 +126,11 @@ requests, up to 10 per page. Pick the events or keep **every event**:
 | `incident.resolved` | an incident gets a *resolved* update |
 | `page.status_changed` | the overall status of the page changes (`operational`, `degraded`, `partial_outage`, `major_outage`) |
 | `monitor.status_changed` | a monitor shown on the page changes status |
+| `maintenance.scheduled` | a [public maintenance window](#scheduled-maintenance) covering a monitor of the page is announced or rescheduled |
+| `maintenance.reminder` | its reminder is due (when the window has one) |
+| `maintenance.in_progress` | an occurrence starts |
+| `maintenance.completed` | an occurrence ends |
+| `maintenance.cancelled` | it is deleted, disabled or no longer public before it ends |
 
 Incident events follow the box that notifies subscribers (**send to webhooks** when the page has no email
 subscriptions): an update posted with it unchecked stays quiet. Status changes are
@@ -115,8 +138,9 @@ checked every 30 seconds. Only published pages send events; **test** sends a `pi
 time.
 
 The body always has `event`, `id` (of the delivery), `at` (Unix time in milliseconds) and `page` (`id`, `slug`,
-`title`, `url`), then the data of the event: `incident` and `update`; `status` and `previous_status`; or `monitor`
-(`id`, `name`, `group`, `status`, `previous_status`).
+`title`, `url`), then the data of the event: `incident` and `update`; `status` and `previous_status`; `monitor`
+(`id`, `name`, `group`, `status`, `previous_status`); or `maintenance` (`id`, `title`, `description`, `status`,
+`starts_at`, `ends_at`, `kind`, `monitor_ids`, like the public page).
 
 ```json
 {

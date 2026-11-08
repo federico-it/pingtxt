@@ -70,6 +70,9 @@ Durante una finestra i monitor risultano in **manutenzione**: i controlli contin
 partono avvisi e quei controlli non contano per l'uptime. Un monitor ancora down quando la finestra finisce riceve
 l'avviso in quel momento.
 
+Una finestra può anche essere annunciata sulle status page e inviata via email ai loro iscritti: vedi
+[manutenzioni programmate](status-pages.md#manutenzioni-programmate).
+
 ## Dipendenze
 
 Quando molti monitor girano sullo stesso server, di' a ognuno da cosa dipende: nel modulo del monitor, sotto

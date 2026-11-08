@@ -41,6 +41,12 @@ const (
 	PageEventStatusChanged   = "page.status_changed"
 	PageEventMonitorChanged  = "monitor.status_changed"
 	PageEventPing            = "ping" // test deliveries only
+	// Maintenance windows announced on the page, see pagemaint.go.
+	PageEventMaintScheduled  = "maintenance." + MaintScheduled
+	PageEventMaintReminder   = "maintenance." + MaintReminder
+	PageEventMaintInProgress = "maintenance." + MaintInProgress
+	PageEventMaintCompleted  = "maintenance." + MaintCompleted
+	PageEventMaintCancelled  = "maintenance." + MaintCancelled
 )
 
 // pageWebhookEvents are the events a webhook can pick. Other features add
@@ -48,6 +54,7 @@ const (
 var pageWebhookEvents = []string{
 	PageEventIncidentCreated, PageEventIncidentUpdated, PageEventIncidentResolve,
 	PageEventStatusChanged, PageEventMonitorChanged,
+	PageEventMaintScheduled, PageEventMaintReminder, PageEventMaintInProgress, PageEventMaintCompleted, PageEventMaintCancelled,
 }
 
 const (

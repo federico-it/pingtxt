@@ -131,6 +131,8 @@ type Hub struct {
 	agents   map[int64]*agentConn
 	monitors map[int64]*monState
 	maints   []*store.Maintenance
+	// maintNoticeAt is when maintNoticeTick last ran (tick goroutine only).
+	maintNoticeAt time.Time
 	// warmUntil is when the monitors were loaded: older results are added to
 	// the dashboard stats from the database by warmStats.
 	warmUntil int64
@@ -369,6 +371,7 @@ func jobFor(m *store.Monitor) check.Job {
 
 func (h *Hub) tick(ctx context.Context, now time.Time) {
 	h.maintTick(now)
+	h.maintNoticeTick(now)
 	h.depTick(now)
 	type dispatch struct {
 		loc string

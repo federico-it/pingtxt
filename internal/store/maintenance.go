@@ -46,7 +46,29 @@ type Maintenance struct {
 	Timezone    string  `json:"timezone"`
 	Enabled     bool    `json:"enabled"`
 	CreatedAt   int64   `json:"created_at"`
+	// Public shows the window on the status pages that list one of its
+	// monitors, with Name as title and Announcement as message.
+	Public       bool   `json:"public"`
+	Announcement string `json:"announcement"`
+	// NotifySubscribers emails the subscribers of those pages when the
+	// window is announced, starts, ends or is cancelled (public windows only).
+	NotifySubscribers bool `json:"notify_subscribers"`
+	// RemindMin sends a reminder this many minutes before each occurrence
+	// (0 = no reminder).
+	RemindMin int `json:"remind_min"`
+	// Start (unix ms) of the occurrence whose reminder, start and end
+	// emails went out, so a restart does not send them twice.
+	NoticeRemind int64 `json:"-"`
+	NoticeStart  int64 `json:"-"`
+	NoticeEnd    int64 `json:"-"`
 }
+
+// Maintenance notices, see SetMaintenanceNotice.
+const (
+	NoticeRemind = "notice_remind"
+	NoticeStart  = "notice_start"
+	NoticeEnd    = "notice_end"
+)
 
 // Covers reports whether the window applies to a monitor: picked directly,
 // through its group or through one of its tags.
@@ -153,6 +175,14 @@ func (m *Maintenance) ActiveAt(t time.Time) (start, end time.Time, ok bool) {
 	return
 }
 
+// OccurrenceEnd returns the end of the occurrence starting at start.
+func (m *Maintenance) OccurrenceEnd(start time.Time) time.Time {
+	if m.Kind == MaintOnce {
+		return time.UnixMilli(m.EndAt)
+	}
+	return start.Add(time.Duration(m.DurationMin) * time.Minute)
+}
+
 // NextAfter returns the first occurrence starting after t (within ~13 months).
 func (m *Maintenance) NextAfter(t time.Time) (start, end time.Time, ok bool) {
 	if !m.Enabled {
@@ -183,12 +213,12 @@ func (m *Maintenance) NextAfter(t time.Time) (start, end time.Time, ok bool) {
 	return
 }
 
-const maintCols = `id, name, description, all_monitors, monitor_ids, kind, start_at, end_at, start_time, duration_min, weekdays, month_days, timezone, enabled, created_at, group_ids, tag_ids`
+const maintCols = `id, name, description, all_monitors, monitor_ids, kind, start_at, end_at, start_time, duration_min, weekdays, month_days, timezone, enabled, created_at, group_ids, tag_ids, public, announcement, notify_subscribers, remind_min, notice_remind, notice_start, notice_end`
 
 func scanMaintenance(sc interface{ Scan(...any) error }) (*Maintenance, error) {
 	m := &Maintenance{}
 	var ids, wd, md, gids, tids string
-	err := sc.Scan(&m.ID, &m.Name, &m.Description, &m.AllMonitors, &ids, &m.Kind, &m.StartAt, &m.EndAt, &m.StartTime, &m.DurationMin, &wd, &md, &m.Timezone, &m.Enabled, &m.CreatedAt, &gids, &tids)
+	err := sc.Scan(&m.ID, &m.Name, &m.Description, &m.AllMonitors, &ids, &m.Kind, &m.StartAt, &m.EndAt, &m.StartTime, &m.DurationMin, &wd, &md, &m.Timezone, &m.Enabled, &m.CreatedAt, &gids, &tids, &m.Public, &m.Announcement, &m.NotifySubscribers, &m.RemindMin, &m.NoticeRemind, &m.NoticeStart, &m.NoticeEnd)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -249,9 +279,10 @@ func jsonIDs[T any](v []T) string {
 
 func (s *Store) CreateMaintenance(m *Maintenance) error {
 	m.CreatedAt = now()
-	id, err := s.db.insert(s.db, `INSERT INTO maintenances (name, description, all_monitors, monitor_ids, kind, start_at, end_at, start_time, duration_min, weekdays, month_days, timezone, enabled, created_at, group_ids, tag_ids)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.Name, m.Description, b2i(m.AllMonitors), jsonIDs(m.MonitorIDs), m.Kind, m.StartAt, m.EndAt, m.StartTime, m.DurationMin, jsonIDs(m.Weekdays), jsonIDs(m.MonthDays), m.Timezone, b2i(m.Enabled), m.CreatedAt, jsonIDs(m.GroupIDs), jsonIDs(m.TagIDs))
+	id, err := s.db.insert(s.db, `INSERT INTO maintenances (name, description, all_monitors, monitor_ids, kind, start_at, end_at, start_time, duration_min, weekdays, month_days, timezone, enabled, created_at, group_ids, tag_ids, public, announcement, notify_subscribers, remind_min, notice_remind, notice_start, notice_end)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.Name, m.Description, b2i(m.AllMonitors), jsonIDs(m.MonitorIDs), m.Kind, m.StartAt, m.EndAt, m.StartTime, m.DurationMin, jsonIDs(m.Weekdays), jsonIDs(m.MonthDays), m.Timezone, b2i(m.Enabled), m.CreatedAt, jsonIDs(m.GroupIDs), jsonIDs(m.TagIDs),
+		b2i(m.Public), m.Announcement, b2i(m.NotifySubscribers), m.RemindMin, m.NoticeRemind, m.NoticeStart, m.NoticeEnd)
 	if err != nil {
 		return err
 	}
@@ -260,8 +291,21 @@ func (s *Store) CreateMaintenance(m *Maintenance) error {
 }
 
 func (s *Store) UpdateMaintenance(m *Maintenance) error {
-	_, err := s.db.Exec(`UPDATE maintenances SET name = ?, description = ?, all_monitors = ?, monitor_ids = ?, kind = ?, start_at = ?, end_at = ?, start_time = ?, duration_min = ?, weekdays = ?, month_days = ?, timezone = ?, enabled = ?, group_ids = ?, tag_ids = ? WHERE id = ?`,
-		m.Name, m.Description, b2i(m.AllMonitors), jsonIDs(m.MonitorIDs), m.Kind, m.StartAt, m.EndAt, m.StartTime, m.DurationMin, jsonIDs(m.Weekdays), jsonIDs(m.MonthDays), m.Timezone, b2i(m.Enabled), jsonIDs(m.GroupIDs), jsonIDs(m.TagIDs), m.ID)
+	_, err := s.db.Exec(`UPDATE maintenances SET name = ?, description = ?, all_monitors = ?, monitor_ids = ?, kind = ?, start_at = ?, end_at = ?, start_time = ?, duration_min = ?, weekdays = ?, month_days = ?, timezone = ?, enabled = ?, group_ids = ?, tag_ids = ?, public = ?, announcement = ?, notify_subscribers = ?, remind_min = ? WHERE id = ?`,
+		m.Name, m.Description, b2i(m.AllMonitors), jsonIDs(m.MonitorIDs), m.Kind, m.StartAt, m.EndAt, m.StartTime, m.DurationMin, jsonIDs(m.Weekdays), jsonIDs(m.MonthDays), m.Timezone, b2i(m.Enabled), jsonIDs(m.GroupIDs), jsonIDs(m.TagIDs),
+		b2i(m.Public), m.Announcement, b2i(m.NotifySubscribers), m.RemindMin, m.ID)
+	return err
+}
+
+// SetMaintenanceNotice records that the email of one notice (NoticeRemind,
+// NoticeStart or NoticeEnd) went out for the occurrence starting at start.
+func (s *Store) SetMaintenanceNotice(id int64, notice string, start int64) error {
+	switch notice {
+	case NoticeRemind, NoticeStart, NoticeEnd:
+	default:
+		return fmt.Errorf("unknown notice %q", notice)
+	}
+	_, err := s.db.Exec(`UPDATE maintenances SET `+notice+` = ? WHERE id = ?`, start, id)
 	return err
 }
 
