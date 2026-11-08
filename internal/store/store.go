@@ -789,6 +789,10 @@ var laterMigrations = []migration{
 		FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 38: HTTP requests made before an http/keyword check (a login...),
+	// as JSON.
+	{sqlite: `ALTER TABLE monitors ADD COLUMN steps TEXT NOT NULL DEFAULT '[]'`,
+		mysql: `ALTER TABLE monitors ADD COLUMN steps MEDIUMTEXT NOT NULL DEFAULT ('[]')`},
 }
 
 func sqliteOnly(list []string) []migration {

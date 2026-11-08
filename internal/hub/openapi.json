@@ -10569,6 +10569,93 @@
         ],
         "description": "A rule on the JSON body of an http or keyword response."
       },
+      "Step": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Shown in messages, e.g. step 1 (login): unexpected status 401."
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "HEAD",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "OPTIONS"
+            ],
+            "description": "Default GET."
+          },
+          "url": {
+            "type": "string",
+            "description": "http(s) URL; can use {{variables}} of earlier steps.",
+            "examples": [
+              "https://example.com/api/login"
+            ]
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Request headers; values can use {{variables}}."
+          },
+          "body": {
+            "type": "string",
+            "description": "Request body; can use {{variables}}."
+          },
+          "expected_status": {
+            "type": "string",
+            "description": "Accepted status codes, as for the monitor. Empty = 200-399."
+          },
+          "extract": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Extract"
+            },
+            "description": "Values of the response saved as variables, at most 10."
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "Extract": {
+        "type": "object",
+        "properties": {
+          "var": {
+            "type": "string",
+            "description": "Variable name: letters, digits and _, not starting with a digit. Used as {{var}}.",
+            "examples": [
+              "token"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "enum": [
+              "json",
+              "header",
+              "regex"
+            ],
+            "description": "json: path in the JSON body (as in response rules). header: a response header. regex: regular expression on the body, its first group (or the whole match)."
+          },
+          "path": {
+            "type": "string",
+            "description": "The JSON path, header name or regular expression.",
+            "examples": [
+              "data.token"
+            ]
+          }
+        },
+        "required": [
+          "var",
+          "from",
+          "path"
+        ]
+      },
       "MonitorInput": {
         "type": "object",
         "properties": {
@@ -10591,12 +10678,14 @@
               "docker",
               "grpc",
               "smtp",
-              "mcp"
+              "mcp",
+              "udp",
+              "websocket"
             ]
           },
           "target": {
             "type": "string",
-            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp), host:port (tcp, IPv6 in brackets: [2001:db8::1]:443), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port]. Empty for push.",
+            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp; http and keyword can use {{variables}} set by steps), host:port (tcp, udp, IPv6 in brackets: [2001:db8::1]:443), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port], a ws:// or wss:// URL (websocket). Empty for push.",
             "examples": [
               "https://example.com/health"
             ]
@@ -10615,7 +10704,7 @@
           },
           "method": {
             "type": "string",
-            "description": "HTTP method for http/keyword (default GET). For mcp: the transport, auto, streamable or sse."
+            "description": "HTTP method for http/keyword (default GET). For mcp: the transport, auto, streamable or sse. For udp: how the payload (body) and the expected reply (keyword) are written, text (default) or hex."
           },
           "expected_status": {
             "type": "string",
@@ -10623,7 +10712,7 @@
           },
           "keyword": {
             "type": "string",
-            "description": "keyword: text that must appear in the body. mcp: comma separated tool names that must be listed."
+            "description": "keyword: text that must appear in the body. mcp: comma separated tool names that must be listed. udp: bytes the reply must contain (text or hex, see method). websocket: text the first message from the server must contain."
           },
           "keyword_invert": {
             "type": "boolean",
@@ -10661,11 +10750,11 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Request headers (http, keyword, mcp)."
+            "description": "Request headers (http, keyword, mcp, websocket handshake). For websocket, Sec-WebSocket-Protocol lists the subprotocols to ask for. http/keyword headers can use {{variables}} set by steps."
           },
           "body": {
             "type": "string",
-            "description": "Request body (http, keyword)."
+            "description": "Request body (http, keyword; can use {{variables}} set by steps). udp: the payload to send (text or hex, see method), up to 8 KB. websocket: a text message sent after connecting; the check then waits for the server's reply."
           },
           "assertions": {
             "type": "array",
@@ -10673,6 +10762,13 @@
               "$ref": "#/components/schemas/Assertion"
             },
             "description": "JSON response rules, http and keyword only, at most 20."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            },
+            "description": "http and keyword only, at most 10: requests made in order before the monitor's own request, e.g. a login. Values they extract are used as {{name}} in the URL, headers and body of later steps and of the monitor's request; cookies carry over. A failing step fails the check. Agents older than steps fail the check with \"update it\". Hidden headers and body for read-only users. Omitted in a PUT: kept."
           },
           "grace_sec": {
             "type": "integer",

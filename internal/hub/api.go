@@ -583,6 +583,7 @@ func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.Us
 var validTypes = []string{
 	check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush,
 	check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo, check.TypeDocker, check.TypeGRPC, check.TypeSMTP, check.TypeMCP,
+	check.TypeUDP, check.TypeWS,
 }
 
 // urlSchemes lists the accepted target URL schemes of URL-based types.
@@ -595,6 +596,9 @@ var urlSchemes = map[string][]string{
 var containerRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
 var hostPortRe = regexp.MustCompile(`^[^\s/]+:\d{1,5}$`)
 
+// stepVarRe matches a {{variable}} set by a step.
+var stepVarRe = regexp.MustCompile(`\{\{\s*[A-Za-z_][A-Za-z0-9_]*\s*\}\}`)
+
 var errIPv6Brackets = errors.New("put IPv6 addresses in brackets before the port, e.g. [2001:db8::1]:443")
 
 // checkIPv6Brackets rejects URL targets with a bare IPv6 address, like
@@ -602,7 +606,7 @@ var errIPv6Brackets = errors.New("put IPv6 addresses in brackets before the port
 func checkIPv6Brackets(m *store.Monitor) error {
 	t := m.Target
 	switch m.Type {
-	case check.TypeHTTP, check.TypeKeyword, check.TypeMCP, check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo:
+	case check.TypeHTTP, check.TypeKeyword, check.TypeMCP, check.TypeWS, check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo:
 	case check.TypeGRPC:
 		if !strings.Contains(t, "://") {
 			t = "grpc://" + t
@@ -650,6 +654,18 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 	if m.Type != check.TypeHTTP && m.Type != check.TypeKeyword {
 		m.Assertions = []check.Assertion{}
+		m.Steps = []check.Step{}
+	}
+	if m.Steps == nil {
+		m.Steps = []check.Step{}
+	}
+	if len(m.Steps) > check.MaxSteps {
+		return fmt.Errorf("at most %d steps", check.MaxSteps)
+	}
+	for i := range m.Steps {
+		if err := check.ValidateStep(&m.Steps[i]); err != nil {
+			return fmt.Errorf("step %d: %w", i+1, err)
+		}
 	}
 	switch {
 	case m.Type == check.TypePush || m.Type == check.TypeDocker:
@@ -682,7 +698,8 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 	switch m.Type {
 	case check.TypeHTTP, check.TypeKeyword:
-		u, err := url.Parse(m.Target)
+		// With steps, variables can stand for parts of the URL.
+		u, err := url.Parse(stepVarRe.ReplaceAllString(m.Target, "x"))
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			return errors.New("target must be an http(s) URL")
 		}
@@ -693,6 +710,30 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 			m.Method = "GET"
 		}
 		m.Method = strings.ToUpper(m.Method)
+	case check.TypeUDP:
+		if !hostPortRe.MatchString(m.Target) {
+			return errors.New("target must be host:port")
+		}
+		if _, _, err := net.SplitHostPort(m.Target); err != nil {
+			return errIPv6Brackets
+		}
+		if m.Method != check.UDPHex {
+			m.Method = check.UDPText
+		}
+		if len(m.Body) > 8192 {
+			return errors.New("the payload is longer than 8 KB")
+		}
+		if _, err := check.DecodeUDP(m.Body, m.Method); err != nil {
+			return fmt.Errorf("payload: %w", err)
+		}
+		if _, err := check.DecodeUDP(m.Keyword, m.Method); err != nil {
+			return fmt.Errorf("expected reply: %w", err)
+		}
+	case check.TypeWS:
+		u, err := url.Parse(m.Target)
+		if err != nil || (u.Scheme != "ws" && u.Scheme != "wss") || u.Host == "" {
+			return errors.New("target must be a ws:// or wss:// URL")
+		}
 	case check.TypeTCP:
 		if !hostPortRe.MatchString(m.Target) {
 			return errors.New("target must be host:port")

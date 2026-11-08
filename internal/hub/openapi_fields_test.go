@@ -24,6 +24,8 @@ var openAPISchemaFields = []struct {
 	{"MonitorSummary", monitorSummary{}, nil},
 	{"MonitorInput", store.Monitor{}, []string{"id", "push_token", "paused", "status", "status_since", "created_at"}},
 	{"Assertion", check.Assertion{}, nil},
+	{"Step", check.Step{}, nil},
+	{"Extract", check.Extract{}, nil},
 	{"ChannelLink", store.ChannelLink{}, nil},
 	{"Group", store.Group{}, nil},
 	{"LocalAgent", localAgent{}, nil},

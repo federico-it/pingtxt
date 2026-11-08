@@ -124,12 +124,13 @@ type diagTarget struct {
 
 func targetFor(j Job) diagTarget {
 	switch j.Type {
-	case TypeHTTP, TypeKeyword, TypeMCP:
+	case TypeHTTP, TypeKeyword, TypeMCP, TypeWS:
 		u, err := url.Parse(j.Target)
 		if err != nil || u.Hostname() == "" {
 			return diagTarget{note: "invalid URL"}
 		}
-		t := diagTarget{host: u.Hostname(), port: u.Port(), tls: u.Scheme == "https", tlsName: u.Hostname()}
+		secure := u.Scheme == "https" || u.Scheme == "wss"
+		t := diagTarget{host: u.Hostname(), port: u.Port(), tls: secure, tlsName: u.Hostname()}
 		if t.port == "" {
 			t.port = "80"
 			if t.tls {
@@ -137,6 +138,13 @@ func targetFor(j Job) diagTarget {
 			}
 		}
 		return t
+	case TypeUDP:
+		// No TCP connection to try: DNS and the route to the host.
+		h, _, err := net.SplitHostPort(j.Target)
+		if err != nil {
+			return diagTarget{note: "invalid host:port"}
+		}
+		return diagTarget{host: h}
 	case TypeTCP:
 		h, p, err := net.SplitHostPort(j.Target)
 		if err != nil {
