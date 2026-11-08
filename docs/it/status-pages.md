@@ -24,7 +24,7 @@ raggiungibili da lì.
 Per tenere privata una pagina, attiva **proteggi con una password**. I visitatori vedono allora un modulo per la
 password; quella giusta apre la pagina per 30 giorni in quel browser, insieme ai suoi badge e al modulo di
 iscrizione. La password è salvata come hash, i tentativi sbagliati sono limitati e cambiarla disconnette tutti i
-visitatori. Agli utenti con accesso non serve mai.
+visitatori. Agli utenti con accesso non serve mai. I lettori di feed usano invece dei [link privati](#feed-rss-e-atom).
 
 ## Link del nome e logo
 
@@ -81,6 +81,62 @@ visitatori inseriscono l'indirizzo sulla pagina e lo confermano con un link (val
 aggiornamento pubblicato con **avvisa gli iscritti via email** spuntato. Ogni email ha un link per disiscriversi e un
 header `List-Unsubscribe` con un clic. Gli admin vedono e rimuovono gli iscritti negli incidenti della pagina. I link
 puntano al dominio personalizzato della pagina, altrimenti all'URL pubblico delle impostazioni.
+
+## Feed RSS e Atom
+
+Ogni pagina pubblicata ha un feed Atom e uno RSS, così i lettori di feed (o le app RSS di Slack e Teams) possono
+seguirla:
+
+| feed | sull'hub | su un dominio personalizzato |
+| --- | --- | --- |
+| Atom | `/api/public/status/<slug>/feed.atom` | `/api/public/status/feed.atom` |
+| RSS 2.0 | `/api/public/status/<slug>/feed.rss` | `/api/public/status/feed.rss` |
+
+Ogni incidente scritto sulla pagina è una voce con tutta la sua cronologia, dall'ultima modifica; se la pagina mostra
+lo storico degli incidenti, anche i disservizi dei suoi monitor sono voci. La pagina pubblica collega il feed nel
+footer e lo annuncia ai browser. L'editor della pagina mostra i due indirizzi in **feed rss e atom**.
+
+Un feed segue le regole della sua pagina: le bozze non ne hanno, e una pagina protetta da password chiede la
+password. I lettori di feed non possono inserirla, quindi l'editor di una pagina protetta mostra dei **link privati**
+con una chiave: chi ha il link può leggere il feed, e cambiare la password cambia i link.
+
+## Webhook
+
+In **webhook** nell'editor della pagina, gli admin aggiungono indirizzi che ricevono gli eventi della pagina come
+richieste `POST` in JSON, fino a 10 per pagina. Scegli gli eventi o lascia **tutti gli eventi**:
+
+| evento | quando parte |
+| --- | --- |
+| `incident.created` | si apre un incidente sulla pagina |
+| `incident.updated` | un incidente riceve un aggiornamento |
+| `incident.resolved` | un incidente riceve un aggiornamento *risolto* |
+| `page.status_changed` | cambia lo stato complessivo della pagina (`operational`, `degraded`, `partial_outage`, `major_outage`) |
+| `monitor.status_changed` | un monitor mostrato sulla pagina cambia stato |
+
+Gli eventi degli incidenti seguono la casella che avvisa gli iscritti (**manda ai webhook** se la pagina non ha
+iscrizioni via email): un aggiornamento pubblicato senza spunta resta silenzioso. I cambi di stato vengono controllati ogni 30 secondi. Solo le pagine pubblicate mandano eventi; **prova**
+manda in qualsiasi momento un evento `ping` a un webhook.
+
+Il body ha sempre `event`, `id` (della consegna), `at` (tempo Unix in millisecondi) e `page` (`id`, `slug`,
+`title`, `url`), poi i dati dell'evento: `incident` e `update`; `status` e `previous_status`; oppure `monitor`
+(`id`, `name`, `group`, `status`, `previous_status`).
+
+```json
+{
+  "event": "incident.resolved",
+  "id": "4f1c2a9e0b7d35c8e6a1f203",
+  "at": 1794150730633,
+  "page": { "id": 1, "slug": "acme", "title": "Acme", "url": "https://status.example.com/" },
+  "incident": { "id": 7, "title": "Login lenti", "impact": "major", "status": "resolved", "...": "..." },
+  "update": { "id": 19, "status": "resolved", "message": "Risolto.", "created_at": 1794150730600 }
+}
+```
+
+Ogni richiesta ha `X-Pingtxt-Event` e `X-Pingtxt-Signature: t=<secondi Unix>,v1=<firma>`, dove la firma è l'HMAC-SHA256
+esadecimale di `<t>.<body>` con il secret del webhook (mostrato nell'editor, dove puoi anche crearne uno nuovo).
+Verificala, e scarta i valori di `t` troppo vecchi, prima di fidarti di una richiesta. Una risposta fuori da 2xx è un
+errore: l'hub riprova dopo 10 secondi e dopo un minuto (non per le risposte 4xx diverse da 408 e 429), e l'editor
+mostra l'esito dell'ultima consegna. Ogni webhook riceve i suoi eventi uno alla volta, in ordine.
 
 ## Badge
 

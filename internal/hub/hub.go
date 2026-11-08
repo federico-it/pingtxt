@@ -157,6 +157,7 @@ type Hub struct {
 
 	pages     statusPages
 	subLimits subscribeLimits // status page subscriptions, see pageincidents.go
+	hooks     pageHooks       // status page webhooks, see pagewebhooks.go
 
 	metricsCache metricsCache
 	updates      agentUpdates
@@ -240,6 +241,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.escalationLoop(ctx)
 	go h.agentOfflineLoop(ctx)
 	go h.liveActivityLoop(ctx)
+	go h.pageWatchLoop(ctx)
 	go h.localIPv6.Run(ctx, 10*time.Minute)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()

@@ -804,6 +804,42 @@ export interface PageSubscriber {
   created_at: number
 }
 
+/** Events a status page webhook can get. */
+export const pageWebhookEvents = [
+  "incident.created",
+  "incident.updated",
+  "incident.resolved",
+  "page.status_changed",
+  "monitor.status_changed",
+] as const
+export type PageWebhookEvent = (typeof pageWebhookEvents)[number]
+
+export interface PageWebhook {
+  id: number
+  page_id: number
+  url: string
+  /** signs every request (HMAC-SHA256) */
+  secret: string
+  /** empty = every event */
+  events: PageWebhookEvent[]
+  enabled: boolean
+  created_at: number
+  /** latest delivery, 0 = never */
+  last_at: number
+  /** HTTP status of the latest delivery, 0 = no answer */
+  last_status: number
+  /** "" when it worked */
+  last_error: string
+}
+
+export interface PageFeeds {
+  atom: string
+  rss: string
+  /** the links carry the private key of a protected page */
+  private: boolean
+  published: boolean
+}
+
 export type PageStatus =
   "operational" | "degraded" | "partial_outage" | "major_outage" | "unknown"
 

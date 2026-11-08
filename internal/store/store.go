@@ -745,6 +745,50 @@ var laterMigrations = []migration{
 		FOREIGN KEY (parent_id) REFERENCES monitors(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 37: outgoing webhooks of a status page: incident updates and status
+	// changes POSTed as signed JSON to the addresses its admins add.
+	{
+		sqlite: `CREATE TABLE page_webhooks (
+		id INTEGER PRIMARY KEY,
+		page_id INTEGER NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		url TEXT NOT NULL,
+		secret TEXT NOT NULL,
+		events TEXT NOT NULL DEFAULT '',
+		enabled INTEGER NOT NULL DEFAULT 1,
+		created_at INTEGER NOT NULL,
+		last_at INTEGER NOT NULL DEFAULT 0,
+		last_status INTEGER NOT NULL DEFAULT 0,
+		last_error TEXT NOT NULL DEFAULT ''
+	);
+	CREATE INDEX page_webhooks_page ON page_webhooks(page_id);`,
+		postgres: `CREATE TABLE page_webhooks (
+		id BIGSERIAL PRIMARY KEY,
+		page_id BIGINT NOT NULL REFERENCES status_pages(id) ON DELETE CASCADE,
+		url TEXT NOT NULL,
+		secret TEXT NOT NULL,
+		events TEXT NOT NULL DEFAULT '',
+		enabled INTEGER NOT NULL DEFAULT 1,
+		created_at BIGINT NOT NULL,
+		last_at BIGINT NOT NULL DEFAULT 0,
+		last_status INTEGER NOT NULL DEFAULT 0,
+		last_error TEXT NOT NULL DEFAULT ''
+	);
+	CREATE INDEX page_webhooks_page ON page_webhooks(page_id);`,
+		mysql: `CREATE TABLE page_webhooks (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		page_id BIGINT NOT NULL,
+		url TEXT NOT NULL,
+		secret VARCHAR(128) NOT NULL,
+		events TEXT NOT NULL,
+		enabled INT NOT NULL DEFAULT 1,
+		created_at BIGINT NOT NULL,
+		last_at BIGINT NOT NULL DEFAULT 0,
+		last_status INT NOT NULL DEFAULT 0,
+		last_error TEXT NOT NULL,
+		INDEX page_webhooks_page (page_id),
+		FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

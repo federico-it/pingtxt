@@ -23,7 +23,7 @@ Nuovo su pingtxt? [Concetti](concepts.md) spiega hub, località, stati e inciden
 | [Località (agent)](locations.md) | aggiungere un agent, come votano le località, avvisi offline, aggiornamento degli agent |
 | [Monitor](monitors.md) | tutti i tipi di controllo, regole JSON, soglia di lentezza, IPv6, gruppi e tag, diagnostica |
 | [Avvisi e notifiche](alerts.md) | canali, quali eventi riceve ogni canale, escalation, manutenzione, scadenze, report |
-| [Status page](status-pages.md) | pagine pubbliche, dominio personalizzato, password, logo, incidenti e iscritti, badge |
+| [Status page](status-pages.md) | pagine pubbliche, dominio personalizzato, password, logo, incidenti e iscritti, feed, webhook, badge |
 | [App iOS](ios-app.md) | accesso, notifiche push e le loro azioni, Live Activity |
 | [Utenti e sicurezza](security.md) | ruoli, single sign-on, autenticazione a due fattori, registro attività |
 | [Integrazioni](integrations.md) | token API e REST API, server MCP per gli assistenti AI, Prometheus |

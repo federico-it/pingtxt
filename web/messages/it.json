@@ -1173,7 +1173,8 @@
       "checking": "verifica...",
       "wrong": "password errata",
       "error": "errore"
-    }
+    },
+    "feed": "feed rss"
   },
   "settings": {
     "title": "impostazioni",
@@ -1650,7 +1651,9 @@
       "major": "grave",
       "critical": "critico"
     },
-    "addUpdate": "aggiungi un aggiornamento"
+    "addUpdate": "aggiungi un aggiornamento",
+    "notifyBoth": "avvisa gli iscritti via email e i webhook",
+    "notifyWebhooks": "manda ai webhook"
   },
   "channelLinks": {
     "events": "eventi",
@@ -1768,5 +1771,46 @@
   "dependencies": {
     "add": "aggiungi un monitor…",
     "remove": "rimuovi {name}"
+  },
+  "pageHooks": {
+    "feedsTitle": "feed rss e atom",
+    "feedsHint": "Lettori di feed, Slack o Teams possono seguire gli incidenti di questa pagina con questi indirizzi. Anche la pagina pubblica li collega.",
+    "feedsPrivate": "La pagina ha una password: questi link privati aprono il feed senza. Condividili solo con chi può vedere la pagina; una nuova password li cambia.",
+    "feedsDraft": "La pagina è una bozza: i feed funzionano quando è pubblicata.",
+    "webhooksTitle": "webhook ({count})",
+    "webhooksHint": "Manda gli incidenti di questa pagina e i cambi di stato in JSON ad altri sistemi. Ogni richiesta è firmata con il secret del webhook (header X-Pingtxt-Signature). Solo le pagine pubblicate mandano eventi.",
+    "url": "indirizzo",
+    "allEvents": "tutti gli eventi",
+    "event": {
+      "incident.created": "si apre un incidente",
+      "incident.updated": "un incidente riceve un aggiornamento",
+      "incident.resolved": "un incidente è risolto",
+      "page.status_changed": "cambia lo stato della pagina",
+      "monitor.status_changed": "un monitor della pagina cambia stato"
+    },
+    "add": "aggiungi webhook",
+    "added": "webhook aggiunto",
+    "enabled": "manda eventi",
+    "turnedOn": "webhook attivo",
+    "turnedOff": "webhook spento",
+    "neverSent": "ancora niente inviato",
+    "lastOk": "inviato {when} · {status}",
+    "lastFailed": "fallito {when} · {status}",
+    "test": "prova",
+    "testOk": "evento di prova consegnato ({status})",
+    "testFailed": "evento di prova fallito: {error}",
+    "edit": "modifica",
+    "close": "chiudi",
+    "rm": "rm",
+    "removeTitle": "Rimuovere il webhook {url}?",
+    "removed": "webhook rimosso",
+    "secret": "secret",
+    "secretHint": "Usalo per verificare X-Pingtxt-Signature (t=<secondi>,v1=<HMAC-SHA256 esadecimale di \"<t>.<body>\">).",
+    "rotate": "nuovo secret",
+    "rotateTitle": "Creare un nuovo secret? Le richieste firmate con il vecchio non corrisponderanno più.",
+    "rotated": "nuovo secret creato",
+    "saveEvents": "salva eventi",
+    "saved": "webhook salvato",
+    "error": "qualcosa è andato storto"
   }
 }

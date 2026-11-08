@@ -84,6 +84,8 @@ func (h *Hub) customDomains(next http.Handler, ui fs.FS) http.Handler {
 			h.servePublicPage(w, r, slug, true)
 		case p == "/api/public/status/subscribe" && r.Method == http.MethodPost:
 			h.serveSubscribe(w, r, slug, true)
+		case (p == "/api/public/status/feed.atom" || p == "/api/public/status/feed.rss") && r.Method == http.MethodGet:
+			h.serveFeed(w, r, slug, strings.TrimPrefix(p, "/api/public/status/feed."), true)
 		case p == "/api/public/status/unlock" && r.Method == http.MethodPost:
 			h.serveUnlock(w, r, slug)
 		case strings.HasPrefix(p, "/api/public/status/logo/") && r.Method == http.MethodGet:
