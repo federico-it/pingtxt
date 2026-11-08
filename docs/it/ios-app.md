@@ -52,11 +52,13 @@ Tieni premuta una notifica (anche dalla schermata di blocco) per agire senza apr
 
 | notifica | azioni |
 | --- | --- |
-| monitor down | controlla ora, silenzia 1 ora per me, silenzia 1 ora per tutti, metti in pausa |
+| monitor down | prendi in carico, controlla ora, silenzia 1 ora per me, silenzia 1 ora per tutti, metti in pausa |
 | monitor degradato | controlla ora, silenzia 1 ora per me, silenzia 1 ora per tutti |
 | scadenza di certificato o dominio | ricontrolla scadenza, silenzia 1 ora per me |
 | agent offline | apri agent |
 
+- **prendi in carico** fa sapere che te ne occupi tu: promemoria ed escalation si fermano e gli altri vedono chi l'ha
+  preso (vedi [Prendere in carico gli incidenti](alerts.md#prendere-in-carico-gli-incidenti)).
 - **controlla ora** esegue subito il controllo da tutte le località e salva il risultato, quindi può chiudere
   l'incidente.
 - **silenzia 1 ora per me** silenzia quel monitor solo su questo telefono (vedi sopra). Possono usarlo tutti.
@@ -97,7 +99,9 @@ registrazione.
   `aps.category` (`MONITOR_DOWN`, `MONITOR_UP`, `MONITOR_DEGRADED`, `EXPIRY`, `AGENT_OFFLINE`, `AGENT_ONLINE`) e
   `hub_id`, così un'app collegata a più hub sa quale chiamare. I telefoni il cui accesso non può cambiare i dati
   ricevono `MONITOR_DOWN_READONLY`, `MONITOR_DEGRADED_READONLY` e `EXPIRY_READONLY` al posto delle categorie con azioni
-  di scrittura. `POST /api/monitors/{id}/check` esegue subito un controllo.
+  di scrittura. `POST /api/monitors/{id}/check` esegue subito un controllo. Le push di down, up e presa in carico
+  hanno `incident_id`; `POST /api/incidents/{id}/ack` prende in carico l'incidente, e la notifica `MONITOR_ACKED`
+  (stesso collapse id dell'avviso di down) dice agli altri telefoni chi se ne occupa.
 - Preferenze: `GET` e `PUT /api/mobile/preferences` per l'account (con `primary_device_id`), e
   `/api/mobile/devices/{id}` per un telefono (`current` = il telefono dell'accesso che chiama, `follow_account`).
   Silenzia con `POST .../mute` (`monitor_id`, `minutes`) su entrambi, riattiva con `DELETE .../mute`.

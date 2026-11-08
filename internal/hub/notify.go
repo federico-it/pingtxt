@@ -29,7 +29,13 @@ const (
 	// Degraded events: status "degraded" when some locations start failing,
 	// "up" when all of them work again.
 	KindDegraded = "degraded"
+	// Acknowledgement of an incident: status "acknowledged", sent to the
+	// channels that got its down alert (see ack.go).
+	KindAck = "ack"
 )
+
+// StatusAcked is the status of acknowledgement events.
+const StatusAcked = "acknowledged"
 
 // Expiry event statuses.
 const (
@@ -52,6 +58,10 @@ type Event struct {
 	// for "down", the reminder number (0 = first alert).
 	DownSince int64 `json:"down_since,omitempty"`
 	Reminder  int   `json:"reminder,omitempty"`
+	// IncidentID is the incident of down, up and acknowledgement events
+	// (0 when it could not be stored); AckBy who acknowledged it (email).
+	IncidentID int64  `json:"incident_id,omitempty"`
+	AckBy      string `json:"ack_by,omitempty"`
 	// Expiry events only.
 	Subject   string `json:"subject,omitempty"`    // host name or domain
 	ExpiresAt int64  `json:"expires_at,omitempty"` // unix ms
@@ -137,6 +147,13 @@ func (e Event) Text() string {
 	}
 	if e.Kind == KindAgent {
 		return e.agentText(prefix)
+	}
+	if e.Kind == KindAck {
+		s := fmt.Sprintf("%s[ACK] %s (%s) acknowledged by %s at %s", prefix, e.Monitor, e.Target, e.AckBy, ts)
+		if d := e.downFor(); d != "" {
+			s += ", down for " + d
+		}
+		return s + "\n> reminders and escalation stop until it is back up"
 	}
 	if e.Kind == KindDegraded {
 		if e.Status == StatusDegraded {
@@ -258,6 +275,8 @@ func (n *Notifier) Deliver(ctx context.Context, nt *store.Notifier, e Event) err
 			hdr["Tags"] = "warning"
 		case e.Status == StatusDegraded:
 			hdr["Tags"] = "warning"
+		case e.Kind == KindAck:
+			hdr["Tags"] = "eyes"
 		default:
 			hdr["Tags"] = "green_circle"
 		}

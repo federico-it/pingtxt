@@ -15,8 +15,8 @@ events it gets, and can wait or repeat. **send test** checks a channel before yo
 | ntfy | the topic URL, and an access token for protected topics |
 | Gotify | the server URL and the token of a Gotify application. Problems have priority 8 (the Android app rings), degraded 5, recoveries 2 |
 | Pushover | your user (or group) key and the token of a Pushover application; optionally one device. Problems are sent with high priority |
-| PagerDuty | the Events API v2 integration key of a service, and the region (US or EU). A down opens an incident, its reminders join it and the recovery resolves it; the same for degraded, expiry and agent alerts |
-| Opsgenie | the key of an API integration, and the region (US or EU). Alerts get P1 (down, agent offline), P2 (expired) or P3 (expiring, degraded) and close by themselves on recovery |
+| PagerDuty | the Events API v2 integration key of a service, and the region (US or EU). A down opens an incident, its reminders join it and the recovery resolves it; the same for degraded, expiry and agent alerts. With the `ack` event, acknowledging in pingtxt acknowledges the PagerDuty incident |
+| Opsgenie | the key of an API integration, and the region (US or EU). Alerts get P1 (down, agent offline), P2 (expired) or P3 (expiring, degraded) and close by themselves on recovery. With the `ack` event, acknowledging in pingtxt acknowledges the alert |
 | SMS (Twilio) | the account SID and auth token, the sender (a Twilio number or a messaging service SID `MG...`) and the numbers in international format (`+39...`). Each alert is one short SMS per number, paid on your Twilio account |
 | email | an SMTP server (STARTTLS on 587, TLS on 465, or none for a local relay on 25), or the [Resend](https://resend.com) API with a key from a verified domain; then the sender and the recipients |
 | pingtxt app (push) | push turned on in **settings → integrations → mobile app**; the users (emails) whose phones get the alerts, empty for everyone. See [iOS app](ios-app.md) |
@@ -38,7 +38,8 @@ Each channel has a **scope** and **events**:
 
 - **scope**: *all monitors* (also the ones added later), or the monitors of some **groups** and **tags**, or none
   (only the monitors linked one by one).
-- **events**: `down` (with its reminders), `up` (recovery, only to channels that got the alert), `degraded` (some
+- **events**: `down` (with its reminders), `up` (recovery, only to channels that got the alert), `ack` (someone
+  [acknowledged the incident](#acknowledging-incidents), only to channels that got the alert; off by default), `degraded` (some
   locations fail or are slow, and when that ends; off by default), `cert_expiry`, `domain_expiry` and
   `agent_offline` ([agent offline alerts](locations.md#agent-offline-alerts): about agents, so it ignores the
   scope and the monitor links).
@@ -59,6 +60,22 @@ Each channel has two optional settings, in minutes:
 
 Times count from when the incident opened. What each channel received is stored with the incident, so a restart
 does not repeat or skip alerts.
+
+## Acknowledging incidents
+
+When someone takes an open incident, everyone else should know and stop being paged. On the monitor page, the
+incidents page or from a notification of the iOS app, an admin presses **acknowledge**:
+
+- the incident shows **who is on it** and since when, on the dashboard, the monitor and the incidents page;
+- its `STILL DOWN` reminders stop, and so do the alerts of channels still waiting for their **send after** time
+  (escalation);
+- channels that got the down alert and have the `ack` event get a message with who acknowledged it. On the iOS app
+  it replaces the down notification.
+
+The recovery still goes to every channel that got the alert. **release** takes the acknowledgement back: reminders
+and escalation run again from where they stopped. Another admin can **take over** an incident someone else
+acknowledged. Read-only users see who is on it but cannot acknowledge. API: `POST` and `DELETE
+/api/incidents/{id}/ack`; acknowledgements are in the [audit log](security.md#audit-log).
 
 ## Maintenance windows
 
@@ -110,9 +127,11 @@ Webhooks get a JSON body with `monitor_id`, `monitor`, `target`, `status`, `caus
 
 | field | when |
 | --- | --- |
-| `kind` | empty for down and up, `degraded`, `cert_expiry`, `domain_expiry` or `agent` |
-| `status` | `down` / `up`, `expiring` / `expired` / `renewed` for expiry events, `offline` / `online` for agents |
+| `kind` | empty for down and up, `ack`, `degraded`, `cert_expiry`, `domain_expiry` or `agent` |
+| `status` | `down` / `up`, `acknowledged`, `expiring` / `expired` / `renewed` for expiry events, `offline` / `online` for agents |
 | `reminder`, `down_since` | reminders (`down_since` in unix ms) |
+| `incident_id` | down, up and acknowledgement events |
+| `ack_by` | acknowledgements: email of who acknowledged the incident |
 | `subject`, `expires_at`, `days_left` | expiry events (host name or domain) |
 | `agent_id`, `agent`, `down_since` | agent offline and online alerts |
 | `diagnostics`, `diagnostics_url` | the first down alert, when diagnostics were collected |

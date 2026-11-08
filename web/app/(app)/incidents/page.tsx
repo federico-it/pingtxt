@@ -14,6 +14,7 @@ import { useMinute, useNow } from "@/hooks/use-now"
 import { datetime, duration } from "@/lib/format"
 import { segment } from "@/components/ui/control"
 import { IncidentDiagnostics } from "@/components/diagnostics"
+import { AckButton, AckNote } from "@/components/incident-ack"
 
 const states = ["all", "open", "resolved"] as const
 const periods = ["24h", "7d", "30d", "all"] as const
@@ -53,7 +54,7 @@ function Incidents() {
   if (monitor) q.set("monitor", String(monitor))
   // Rounded to the minute so the request (and its cache key) stays stable.
   if (periodMs[period] && minute) q.set("since", String(minute - periodMs[period]))
-  const { data } = useApi<Incident[]>(`/api/incidents?${q}`)
+  const { data, mutate } = useApi<Incident[]>(`/api/incidents?${q}`, { refreshInterval: 30_000 })
   const monitors = useApi<MonitorSummary[]>("/api/monitors", { refreshInterval: 60_000 })
   const loaded = !!data
   useEffect(() => {
@@ -151,7 +152,13 @@ function Incidents() {
                     {i.resolved_at ? (
                       <span className="text-up">{t("resolved")}</span>
                     ) : (
-                      <span className="animate-pulse text-down">{t("ongoing")}</span>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="animate-pulse text-down">{t("ongoing")}</span>
+                        <AckButton incident={{ id: i.id, acked_at: i.acked_at ?? 0, acked_by: i.acked_by ?? "" }} onChange={() => mutate()} />
+                      </div>
+                    )}
+                    {!i.resolved_at && !!i.acked_at && (
+                      <AckNote incident={{ id: i.id, acked_at: i.acked_at, acked_by: i.acked_by ?? "" }} className="mt-1 flex max-w-72 text-xs" />
                     )}
                   </TableCell>
                   <TableCell>

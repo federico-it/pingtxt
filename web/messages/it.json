@@ -142,7 +142,8 @@
       "undo": "annulla",
       "undone": "annullato"
     },
-    "blockedBy": "bloccato da {name}"
+    "blockedBy": "bloccato da {name}",
+    "ackedBy": "preso in carico da {name}"
   },
   "monitor": {
     "resumed": "monitor ripreso",
@@ -209,7 +210,9 @@
     "zoomReset": "torna a {range}",
     "noLocationOnline": "Nessuna località di questo monitor è online: i controlli non sono in esecuzione, quindi lo stato resta pending finché un agent non si ricollega.",
     "diagnostics": "diagnostica",
-    "blockedBy": "bloccato da <hl>{name}</hl> dal {since}: è giù anche quello, quindi questo monitor non manda avvisi propri. quando torna su, arriva un avviso solo se questo continua a fallire."
+    "blockedBy": "bloccato da <hl>{name}</hl> dal {since}: è giù anche quello, quindi questo monitor non manda avvisi propri. quando torna su, arriva un avviso solo se questo continua a fallire.",
+    "openIncident": "incidente aperto dal {since}",
+    "notAcked": "nessuno l'ha ancora preso in carico: promemoria ed escalation sono attivi"
   },
   "browserNotify": {
     "title": "notifiche desktop in questo browser",
@@ -1724,10 +1727,11 @@
   },
   "channelLinks": {
     "events": "eventi",
-    "eventsHint": "Cosa riceve questo canale per i monitor che copre. I ripristini vanno solo ai canali che hanno ricevuto l'avviso di down. Agent offline riguarda gli agent, non i monitor: viene inviato qualunque monitor copra il canale.",
+    "eventsHint": "Cosa riceve questo canale per i monitor che copre. I ripristini e le prese in carico vanno solo ai canali che hanno ricevuto l'avviso di down. Agent offline riguarda gli agent, non i monitor: viene inviato qualunque monitor copra il canale.",
     "event": {
       "down": "down",
       "up": "di nuovo up",
+      "ack": "preso in carico",
       "degraded": "degradato",
       "cert_expiry": "scadenza certificato",
       "domain_expiry": "scadenza dominio",
@@ -1736,6 +1740,7 @@
     "short": {
       "down": "down",
       "up": "up",
+      "ack": "presa",
       "degraded": "degradato",
       "cert_expiry": "cert",
       "domain_expiry": "dominio",
@@ -1838,6 +1843,18 @@
   "dependencies": {
     "add": "aggiungi un monitor…",
     "remove": "rimuovi {name}"
+  },
+  "ack": {
+    "ack": "prendi in carico",
+    "takeOver": "subentra",
+    "release": "rilascia",
+    "ackHint": "Fai sapere che te ne occupi tu: promemoria ed escalation si fermano finché il monitor non torna su, e i canali con l'evento preso in carico vengono avvisati.",
+    "releaseHint": "Lascia l'incidente: promemoria ed escalation ripartono.",
+    "acked": "incidente preso in carico",
+    "released": "incidente rilasciato",
+    "onIt": "{name} se ne occupa · {ago}",
+    "you": "tu",
+    "error": "impossibile modificare l'incidente"
   },
   "pageHooks": {
     "feedsTitle": "feed rss e atom",

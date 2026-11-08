@@ -548,7 +548,7 @@ func compactMonitor(v any) any {
 		return v
 	}
 	out := map[string]any{}
-	for _, k := range []string{"id", "name", "type", "target", "status", "status_since", "paused", "group_id", "tag_ids", "depends_on", "uptime_24h", "avg_ms_24h", "maintenance", "blocked_by", "locations"} {
+	for _, k := range []string{"id", "name", "type", "target", "status", "status_since", "paused", "group_id", "tag_ids", "depends_on", "uptime_24h", "avg_ms_24h", "maintenance", "blocked_by", "incident", "locations"} {
 		if x, ok := m[k]; ok {
 			out[k] = x
 		}
@@ -652,7 +652,7 @@ var mcpTools = []mcpTool{
 	},
 	{
 		name: "list_incidents", title: "List incidents",
-		description: "Downtime incidents, newest first (up to 100). An incident with resolved_at null is still open.",
+		description: "Downtime incidents, newest first (up to 100). An incident with resolved_at null is still open; acked_by is who acknowledged it (reminders and escalation stopped).",
 		schema: object(map[string]any{
 			"monitor_id": prop("integer", "Only incidents of this monitor"),
 			"open_only":  prop("boolean", "Only incidents still open"),
@@ -782,6 +782,25 @@ var mcpTools = []mcpTool{
 			}
 			res, err := c.do("POST", fmt.Sprintf("/api/monitors/%d/pause", id), map[string]bool{"paused": paused})
 			return compactMonitor(res), err
+		},
+	},
+	{
+		name: "acknowledge_incident", title: "Acknowledge incident", write: true, idempotent: true,
+		description: "Acknowledge an open incident for the user of the token (someone is on it: its reminders and escalation stop, and channels that ask for it are told), or take the acknowledgement back with acknowledged=false.",
+		schema: object(map[string]any{
+			"incident_id":  prop("integer", "Incident id from list_incidents (or incident.id of a monitor)"),
+			"acknowledged": prop("boolean", "false to take the acknowledgement back (default true)"),
+		}, "incident_id"),
+		run: func(c *mcpCall) (any, error) {
+			id, err := c.id("incident_id")
+			if err != nil {
+				return nil, err
+			}
+			method := "POST"
+			if ack, ok := c.boolean("acknowledged"); ok && !ack {
+				method = "DELETE"
+			}
+			return c.do(method, fmt.Sprintf("/api/incidents/%d/ack", id), nil)
 		},
 	},
 	{

@@ -28,10 +28,14 @@ type alertState struct {
 	sent     map[int64]store.AlertSent // by notifier id
 	diags    []EventDiag               // for the first alert
 	diagURL  string
+	// Acknowledgement, see ack.go: while someone is on it, no reminders
+	// and no escalation to further channels.
+	ackAt int64 // unix ms, 0 = not acknowledged
+	ackBy string
 }
 
 func newAlertState(a *store.IncidentAlerts) *alertState {
-	return &alertState{incident: a.IncidentID, started: a.StartedAt, cause: a.Cause, sent: a.Sent}
+	return &alertState{incident: a.IncidentID, started: a.StartedAt, cause: a.Cause, sent: a.Sent, ackAt: a.AckedAt, ackBy: a.AckedBy}
 }
 
 // due reports whether the channel must be alerted at now (unix ms).
@@ -56,7 +60,7 @@ type pendingAlert struct {
 // h.mu held.
 func (h *Hub) dueAlertsLocked(st *monState, list []*store.Notifier, rt routing, now int64) []pendingAlert {
 	a := st.alerts
-	if a == nil || !st.incident || st.inMaint || st.m.Paused {
+	if a == nil || !st.incident || st.inMaint || st.m.Paused || a.ackAt > 0 {
 		return nil
 	}
 	var out []pendingAlert
@@ -72,7 +76,7 @@ func (h *Hub) dueAlertsLocked(st *monState, list []*store.Notifier, rt routing, 
 			ev: Event{
 				MonitorID: st.m.ID, Monitor: st.m.Name, Target: eventTarget(st.m), Status: StatusDown,
 				Cause: a.cause, At: now, DownSince: a.started, Reminder: prev.Count,
-				DiagnosticsURL: a.diagURL,
+				DiagnosticsURL: a.diagURL, IncidentID: a.incident,
 			},
 		})
 		if prev.Count == 0 {
@@ -131,7 +135,7 @@ func (h *Hub) closeAlerts(m *store.Monitor, at int64) {
 	}
 	ev := Event{MonitorID: m.ID, Monitor: m.Name, Target: eventTarget(m), Status: StatusUp, At: at}
 	if a != nil {
-		ev.DownSince = a.started
+		ev.DownSince, ev.IncidentID = a.started, a.incident
 	}
 	for _, nt := range list {
 		if !rt.wants(nt, m, store.EventUp) {

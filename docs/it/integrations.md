@@ -96,6 +96,7 @@ Cursor, Windsurf e altri client che accettano un URL e degli header:
 | `list_maintenances` | finestre di manutenzione con la prossima occorrenza |
 | `list_groups`, `list_tags`, `list_agents`, `list_status_pages` | tutto il resto che serve a un modello per trovare gli id |
 | `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | solo token di scrittura di un admin |
+| `acknowledge_incident` | solo token di scrittura di un admin; l'incidente viene preso in carico dall'utente del token |
 | `create_maintenance`, `delete_maintenance` | solo token di scrittura di un admin; orari in ISO 8601 |
 
 Ruoli, validazione e segreti nascosti sono esattamente quelli della REST API, e ogni scrittura finisce nel

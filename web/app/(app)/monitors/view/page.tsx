@@ -21,6 +21,7 @@ import { OkText, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
 import { ResultsLog, type TimeWindow } from "@/components/results-log"
 import { IncidentDiagnostics } from "@/components/diagnostics"
+import { AckButton, AckNote } from "@/components/incident-ack"
 import { TestResults, type TestResult } from "@/components/test-results"
 import { Button } from "@/components/ui/button"
 import {
@@ -265,6 +266,28 @@ function View() {
         </div>
       )}
 
+      {d.incident && !d.paused && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 border border-dashed border-down/60 px-3 py-2 text-xs">
+          <span className="text-down">
+            {t("openIncident", { since: datetime(d.incident.started_at) })}
+          </span>
+          {d.incident.acked_at ? (
+            <AckNote incident={d.incident} />
+          ) : (
+            <span className="text-muted-foreground">{t("notAcked")}</span>
+          )}
+          <span className="ml-auto">
+            <AckButton
+              incident={d.incident}
+              onChange={() => {
+                m.mutate()
+                incidents.mutate()
+              }}
+            />
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 border-y border-dashed py-4 sm:grid-cols-3 lg:grid-cols-6">
         <KV k={t("kv.status")} v={<StatusText status={d.status} />} />
         <KV
@@ -440,6 +463,9 @@ function View() {
                 >
                   {i.resolved_at ? `[${t("resolved")}]` : `[${t("ongoing")}] `}
                 </span>
+                {!i.resolved_at && !!i.acked_at && (
+                  <AckNote incident={{ id: i.id, acked_at: i.acked_at, acked_by: i.acked_by ?? "" }} />
+                )}
                 <span>{datetime(i.started_at)}</span>
                 <span className="text-muted-foreground">
                   {duration((i.resolved_at || now) - i.started_at)}

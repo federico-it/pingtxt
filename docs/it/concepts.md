@@ -42,7 +42,8 @@ Una località è **lenta** quando il suo tempo di risposta supera la
 ## Incidenti
 
 Un **incidente** si apre quando un monitor va down e si chiude quando torna up. Gli avvisi partono all'apertura e
-alla chiusura (e, se vuoi, come promemoria nel frattempo). La pagina incidenti li elenca con le cause e, se la
+alla chiusura (e, se vuoi, come promemoria nel frattempo). Qualcuno può [prendere in carico](alerts.md#prendere-in-carico-gli-incidenti)
+un incidente aperto per fermare i promemoria e far vedere agli altri chi se ne occupa. La pagina incidenti li elenca con le cause e, se la
 [diagnostica](monitors.md#diagnostica-in-caso-di-errore) è attiva, con quello che ogni località ha visto al primo
 errore.
 

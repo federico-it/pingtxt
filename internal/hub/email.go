@@ -128,6 +128,9 @@ func emailSubject(e Event) string {
 	if e.Kind == KindAgent {
 		return fmt.Sprintf("%s[pingtxt] agent %s is %s", prefix, e.Agent, e.Status)
 	}
+	if e.Kind == KindAck {
+		return fmt.Sprintf("%s[pingtxt] %s acknowledged by %s", prefix, e.Monitor, e.AckBy)
+	}
 	return fmt.Sprintf("%s[pingtxt] %s is %s", prefix, e.Monitor, e.statusWord())
 }
 
@@ -186,6 +189,18 @@ func statusMailView(v *mailView, e Event) {
 	v.Badge = e.statusWord()
 	v.Note = e.Cause
 	v.Rows = append(v.Rows, mailRow{Key: "monitor", Value: e.Monitor}, mailRow{Key: "target", Value: e.Target})
+	if e.Kind == KindAck {
+		v.Tone = toneInfo
+		v.Lead = e.AckBy + " is working on it. Reminders and escalation stop until the monitor is back up."
+		v.Rows = append(v.Rows, mailRow{Key: "acknowledged by", Value: e.AckBy}, mailRow{Key: "acknowledged at", Value: mailTime(e.At)})
+		if e.DownSince > 0 {
+			v.Rows = append(v.Rows, mailRow{Key: "down since", Value: mailTime(e.DownSince)})
+		}
+		if d := e.downFor(); d != "" {
+			v.Rows = append(v.Rows, mailRow{Key: "down for", Value: d, Tone: toneDown})
+		}
+		return
+	}
 	if e.Kind == KindDegraded {
 		if e.Status == StatusDegraded {
 			v.Tone = toneWarn

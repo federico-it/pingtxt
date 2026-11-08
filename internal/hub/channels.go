@@ -60,7 +60,7 @@ func (n *Notifier) link(e Event) string {
 // resolves reports whether the event ends a problem (back up, no longer
 // degraded, certificate or domain renewed, agent back online).
 func (e Event) resolves() bool {
-	return !e.Alert() && e.Status != StatusDegraded
+	return !e.Alert() && e.Status != StatusDegraded && e.Kind != KindAck
 }
 
 // alertKey identifies the problem an event belongs to, so incident tools
@@ -188,6 +188,12 @@ func (n *Notifier) sendPagerDuty(ctx context.Context, c map[string]string, e Eve
 			"routing_key": c["routing_key"], "event_action": "resolve", "dedup_key": key,
 		}), nil)
 	}
+	if e.Kind == KindAck {
+		// Acknowledged in pingtxt: acknowledge the PagerDuty incident too.
+		return n.post(ctx, u, "application/json", mustJSON(map[string]any{
+			"routing_key": c["routing_key"], "event_action": "acknowledge", "dedup_key": key,
+		}), nil)
+	}
 	details := map[string]any{"text": e.Text()}
 	if e.Cause != "" {
 		details["cause"] = e.Cause
@@ -241,6 +247,11 @@ func (n *Notifier) sendOpsgenie(ctx context.Context, c map[string]string, e Even
 	}
 	if e.resolves() {
 		return closeAlert()
+	}
+	if e.Kind == KindAck {
+		// Acknowledged in pingtxt: acknowledge the Opsgenie alert too.
+		u := base + "/" + url.PathEscape(key) + "/acknowledge?identifierType=alias"
+		return n.post(ctx, u, "application/json", mustJSON(map[string]string{"source": "pingtxt", "user": e.AckBy, "note": truncate(e.Text(), 25000)}), hdr)
 	}
 	priority := "P3"
 	switch e.severity() {

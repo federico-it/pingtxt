@@ -15,8 +15,8 @@ monitor ed eventi riceve, e può aspettare o ripetere. **invia test** prova un c
 | ntfy | l'URL del topic, e un access token per i topic protetti |
 | Gotify | l'URL del server e il token di un'applicazione Gotify. I problemi hanno priorità 8 (l'app Android suona), degradato 5, i ripristini 2 |
 | Pushover | la tua chiave utente (o di gruppo) e il token di un'applicazione Pushover; facoltativo un solo dispositivo. I problemi partono con priorità alta |
-| PagerDuty | l'integration key Events API v2 di un servizio, e la regione (USA o UE). Un down apre un incidente, i promemoria si uniscono a quello e il ripristino lo risolve; lo stesso per degradato, scadenze e agent |
-| Opsgenie | la chiave di un'integrazione API, e la regione (USA o UE). Gli avvisi hanno P1 (down, agent offline), P2 (scaduto) o P3 (in scadenza, degradato) e si chiudono da soli al ripristino |
+| PagerDuty | l'integration key Events API v2 di un servizio, e la regione (USA o UE). Un down apre un incidente, i promemoria si uniscono a quello e il ripristino lo risolve; lo stesso per degradato, scadenze e agent. Con l'evento `ack`, la presa in carico in pingtxt fa l'acknowledge anche dell'incidente PagerDuty |
+| Opsgenie | la chiave di un'integrazione API, e la regione (USA o UE). Gli avvisi hanno P1 (down, agent offline), P2 (scaduto) o P3 (in scadenza, degradato) e si chiudono da soli al ripristino. Con l'evento `ack`, la presa in carico in pingtxt fa l'acknowledge anche dell'avviso |
 | SMS (Twilio) | account SID e auth token, il mittente (un numero Twilio o il SID di un messaging service `MG...`) e i numeri in formato internazionale (`+39...`). Ogni avviso è un SMS breve per numero, pagato sul tuo account Twilio |
 | email | un server SMTP (STARTTLS sulla 587, TLS sulla 465, o nessuno per un relay locale sulla 25), oppure l'API di [Resend](https://resend.com) con una chiave di un dominio verificato; poi mittente e destinatari |
 | app pingtxt (push) | le notifiche push attive in **impostazioni → integrazioni → app mobile**; gli utenti (email) i cui telefoni ricevono gli avvisi, vuoto per tutti. Vedi [App iOS](ios-app.md) |
@@ -39,7 +39,9 @@ Ogni canale ha un **ambito** e degli **eventi**:
 
 - **ambito**: *tutti i monitor* (anche quelli aggiunti in seguito), oppure i monitor di alcuni **gruppi** e **tag**,
   oppure nessuno (solo i monitor collegati uno per uno).
-- **eventi**: `down` (con i suoi promemoria), `up` (ripristino, solo ai canali che hanno ricevuto l'avviso),
+- **eventi**: `down` (con i suoi promemoria), `up` (ripristino, solo ai canali che hanno ricevuto l'avviso), `ack`
+  (qualcuno ha [preso in carico l'incidente](#prendere-in-carico-gli-incidenti), solo ai canali che hanno ricevuto
+  l'avviso; spento di default),
   `degraded` (alcune località falliscono o sono lente, e quando finisce; spento di default), `cert_expiry`,
   `domain_expiry` e `agent_offline` ([avvisi di agent offline](locations.md#avvisi-di-agent-offline): riguarda gli
   agent, quindi ignora l'ambito e i collegamenti dei monitor).
@@ -60,6 +62,22 @@ Ogni canale ha due impostazioni facoltative, in minuti:
 
 I tempi contano da quando si è aperto l'incidente. Quello che ogni canale ha ricevuto viene salvato con l'incidente,
 quindi un riavvio non ripete né salta avvisi.
+
+## Prendere in carico gli incidenti
+
+Quando qualcuno si occupa di un incidente aperto, gli altri devono saperlo e smettere di essere avvisati. Dalla pagina
+del monitor, dalla pagina incidenti o da una notifica dell'app iOS, un admin preme **prendi in carico**:
+
+- l'incidente mostra **chi se ne occupa** e da quando, nella dashboard, nel monitor e nella pagina incidenti;
+- i promemoria `STILL DOWN` si fermano, e così gli avvisi dei canali che stanno ancora aspettando il loro tempo di
+  **invia dopo** (escalation);
+- i canali che hanno ricevuto l'avviso di down e hanno l'evento `ack` ricevono un messaggio con chi l'ha preso in
+  carico. Nell'app iOS sostituisce la notifica di down.
+
+Il ripristino va comunque a tutti i canali che hanno ricevuto l'avviso. **rilascia** annulla la presa in carico:
+promemoria ed escalation ripartono da dove si erano fermati. Un altro admin può **subentrare** in un incidente preso
+in carico da qualcun altro. Gli utenti in sola lettura vedono chi se ne occupa ma non possono prenderlo in carico.
+API: `POST` e `DELETE /api/incidents/{id}/ack`; le prese in carico finiscono nel [registro attività](security.md#registro-attività).
 
 ## Finestre di manutenzione
 
@@ -112,9 +130,11 @@ I webhook ricevono un body JSON con `monitor_id`, `monitor`, `target`, `status`,
 
 | campo | quando |
 | --- | --- |
-| `kind` | vuoto per down e up, `degraded`, `cert_expiry`, `domain_expiry` o `agent` |
-| `status` | `down` / `up`, `expiring` / `expired` / `renewed` per le scadenze, `offline` / `online` per gli agent |
+| `kind` | vuoto per down e up, `ack`, `degraded`, `cert_expiry`, `domain_expiry` o `agent` |
+| `status` | `down` / `up`, `acknowledged`, `expiring` / `expired` / `renewed` per le scadenze, `offline` / `online` per gli agent |
 | `reminder`, `down_since` | promemoria (`down_since` in unix ms) |
+| `incident_id` | eventi di down, up e presa in carico |
+| `ack_by` | prese in carico: email di chi ha preso in carico l'incidente |
 | `subject`, `expires_at`, `days_left` | eventi di scadenza (nome host o dominio) |
 | `agent_id`, `agent`, `down_since` | avvisi di agent offline e online |
 | `diagnostics`, `diagnostics_url` | il primo avviso di down, quando è stata raccolta la diagnostica |

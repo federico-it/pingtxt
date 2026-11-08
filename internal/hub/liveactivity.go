@@ -60,6 +60,9 @@ type laOutage struct {
 	MonitorName string  `json:"monitorName"`
 	Since       float64 `json:"since"` // seconds since 2001-01-01
 	Cause       string  `json:"cause"`
+	// AckedBy is who acknowledged the incident (email), omitted when nobody
+	// did. Older apps ignore it.
+	AckedBy string `json:"ackedBy,omitempty"`
 }
 
 // laState is OutageActivityAttributes.ContentState of the app.
@@ -98,6 +101,7 @@ func buildLAState(open []*store.Incident) laState {
 		st.Outages = append(st.Outages, laOutage{
 			ID: i.ID, MonitorID: i.MonitorID, MonitorName: truncateUTF8(i.MonitorName, laMaxName),
 			Since: appleTime(i.StartedAt), Cause: truncateUTF8(i.Cause, laMaxCause),
+			AckedBy: truncateUTF8(i.AckedBy, laMaxName),
 		})
 	}
 	return st
