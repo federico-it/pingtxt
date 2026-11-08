@@ -31,6 +31,12 @@ func TestValidateNewMonitorTypes(t *testing.T) {
 		{check.TypeSMTP, "mx.example.com", true},
 		{check.TypeSMTP, "smtps://mx.example.com:465", true},
 		{check.TypeSMTP, "http://mx.example.com", false},
+		{check.TypeUDP, "ntp.example.com:123", true},
+		{check.TypeUDP, "[2001:db8::1]:53", true},
+		{check.TypeUDP, "ntp.example.com", false},
+		{check.TypeWS, "wss://example.com/socket", true},
+		{check.TypeWS, "ws://[2001:db8::1]:8080/", true},
+		{check.TypeWS, "https://example.com/socket", false},
 	}
 	for _, c := range cases {
 		m := &store.Monitor{Name: "x", Type: c.typ, Target: c.target}
@@ -66,6 +72,59 @@ func TestValidateMCP(t *testing.T) {
 		if c.ok && (m.Method != c.wantMethod || m.Keyword != c.wantKW || m.ExpectedStatus != c.wantMin) {
 			t.Errorf("%q: got %q %q %q", c.target, m.Method, m.Keyword, m.ExpectedStatus)
 		}
+	}
+}
+
+func TestValidateUDP(t *testing.T) {
+	h, _ := newTestHub(t)
+	m := &store.Monitor{Name: "x", Type: check.TypeUDP, Target: "h:53", Method: "weird", Body: "ping"}
+	if err := h.validateMonitor(m); err != nil || m.Method != check.UDPText {
+		t.Fatalf("%v %q", err, m.Method)
+	}
+	m = &store.Monitor{Name: "x", Type: check.TypeUDP, Target: "h:53", Method: check.UDPHex, Body: "0x0g"}
+	if err := h.validateMonitor(m); err == nil {
+		t.Fatal("bad hex accepted")
+	}
+}
+
+func TestValidateSteps(t *testing.T) {
+	h, _ := newTestHub(t)
+	login := check.Step{Method: "post", URL: "https://example.com/login", Extract: []check.Extract{{Var: "token", From: check.FromJSON, Path: "token"}}}
+	m := &store.Monitor{Name: "x", Type: check.TypeHTTP, Target: "https://{{host}}/me?t={{token}}", Steps: []check.Step{login}}
+	if err := h.validateMonitor(m); err != nil || m.Steps[0].Method != "POST" {
+		t.Fatalf("%v %+v", err, m.Steps)
+	}
+	bad := login
+	bad.URL = "example.com/login"
+	m.Steps = []check.Step{login, bad}
+	if err := h.validateMonitor(m); err == nil || err.Error() != "step 2: url must be an http(s) URL" {
+		t.Fatalf("bad step: %v", err)
+	}
+	m.Steps = make([]check.Step, check.MaxSteps+1)
+	if err := h.validateMonitor(m); err == nil {
+		t.Fatal("too many steps accepted")
+	}
+	// Other types drop them.
+	m = &store.Monitor{Name: "x", Type: check.TypeTCP, Target: "h:1", Steps: []check.Step{login}}
+	if err := h.validateMonitor(m); err != nil || len(m.Steps) != 0 {
+		t.Fatalf("%v %+v", err, m.Steps)
+	}
+}
+
+func TestOldAgentError(t *testing.T) {
+	steps := &store.Monitor{Type: check.TypeHTTP, Steps: []check.Step{{URL: "https://x/login"}}}
+	if got := oldAgentError(steps, "agent:1", check.Result{OK: true}); got != "this agent cannot run request steps: update it" {
+		t.Errorf("steps: %q", got)
+	}
+	if got := oldAgentError(steps, "agent:1", check.Result{OK: false, Steps: 1}); got != "" {
+		t.Errorf("new agent: %q", got)
+	}
+	if got := oldAgentError(steps, LocalLocation, check.Result{OK: true}); got != "" {
+		t.Errorf("local: %q", got)
+	}
+	udp := &store.Monitor{Type: check.TypeUDP}
+	if got := oldAgentError(udp, "agent:1", check.Result{Message: "unknown monitor type: udp"}); got != "this agent cannot run udp checks: update it" {
+		t.Errorf("udp: %q", got)
 	}
 }
 
@@ -123,5 +182,18 @@ func TestValidateIPFamily(t *testing.T) {
 	m := &store.Monitor{Name: "x", Type: check.TypeDocker, Target: "web", IPFamily: 6}
 	if err := h.validateMonitor(m); err != nil || m.IPFamily != 0 {
 		t.Fatalf("docker keeps ip_family %d, err %v", m.IPFamily, err)
+	}
+}
+
+func TestRedactSteps(t *testing.T) {
+	stored := check.Step{URL: "https://u:pw@x/login", Headers: map[string]string{"X-Key": "k"}, Body: `{"password":"pw"}`}
+	m := &store.Monitor{Type: check.TypeHTTP, Steps: []check.Step{stored}}
+	redactMonitor(m)
+	s := m.Steps[0]
+	if s.URL != "https://u:"+redacted+"@x/login" || s.Headers["X-Key"] != redacted || s.Body != redacted {
+		t.Fatalf("%+v", s)
+	}
+	if stored.Headers["X-Key"] != "k" {
+		t.Fatal("redaction changed the stored headers")
 	}
 }

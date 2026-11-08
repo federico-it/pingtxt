@@ -307,6 +307,14 @@
         "label": "smtp",
         "hint": "read the greeting, EHLO and STARTTLS when offered"
       },
+      "udp": {
+        "label": "udp",
+        "hint": "sends a datagram and waits for the reply. IPv6 in brackets: [2001:db8::1]:123"
+      },
+      "websocket": {
+        "label": "websocket",
+        "hint": "opens a ws:// or wss:// connection, optionally sends a message and checks the reply"
+      },
       "push": {
         "label": "heartbeat (push)",
         "hint": "your cron job or service calls a URL; down when the calls stop"
@@ -341,6 +349,19 @@
     "pushHint": "pingtxt gives this monitor a secret URL. Call it at the end of every run of your job: the monitor goes down when no call arrives within the expected period plus the grace time. The URL is shown after saving.",
     "dockerHint": "Checked on the docker engine of each selected location: the hub or agent needs access to /var/run/docker.sock (or DOCKER_HOST). With docker, mount it with -v /var/run/docker.sock:/var/run/docker.sock:ro.",
     "grpcHint": "grpc:// for plaintext, grpcs:// for TLS. The path is the service name to check; leave it out to check the whole server.",
+    "udpPayload": "payload",
+    "udpPayloadHint": "Sent to the server at every check. UDP has no handshake: the check needs a reply, so send something the service answers.",
+    "udpEncoding": "written as",
+    "udpEncodings": {
+      "text": "text",
+      "hex": "hex bytes"
+    },
+    "expectedReply": "expected reply",
+    "udpReplyHint": "The reply must contain it. Empty: any reply.",
+    "wsMessage": "message to send",
+    "wsMessageHint": "Optional text message sent after connecting. Empty: the check only opens the connection, unless you expect a reply.",
+    "wsReplyHint": "Text the first message from the server must contain. Empty with no message to send: connecting is enough.",
+    "wsHeadersHint": "Sent with the handshake, one per line. Sec-WebSocket-Protocol: chat asks for subprotocols.",
     "mcpTransport": "transport",
     "mcpTransports": {
       "auto": "auto (streamable http, then legacy sse)",
@@ -463,7 +484,32 @@
       "on": "on",
       "off": "off"
     },
-    "dependsOnHint": "monitors this one depends on, e.g. the ping of the server it runs on. while one of them is down, this monitor sends no alerts: you get one alert for the server instead of one per service."
+    "dependsOnHint": "monitors this one depends on, e.g. the ping of the server it runs on. while one of them is down, this monitor sends no alerts: you get one alert for the server instead of one per service.",
+    "steps": {
+      "title": "steps before the request",
+      "hint": "Requests made in order before the one above, e.g. a login. A value you extract becomes a variable: write <code>{example}</code> in the URL, headers or body of the next steps and of the request above. Cookies carry over. The check fails at the first step that fails.",
+      "number": "#{n}",
+      "name": "step name",
+      "namePlaceholder": "login",
+      "url": "url",
+      "moveUp": "move up",
+      "moveDown": "move down",
+      "remove": "remove step",
+      "add": "add step",
+      "available": "variables you can use here: {vars}",
+      "final": "The request above runs last, with these variables: {vars}",
+      "extract": "save values",
+      "var": "variable",
+      "source": "from",
+      "path": "path, header or regex",
+      "from": {
+        "json": "json path",
+        "header": "header",
+        "regex": "regex"
+      },
+      "removeValue": "remove value",
+      "addValue": "save a value"
+    }
   },
   "testCheck": {
     "title": "test check",
@@ -1176,7 +1222,8 @@
       "checking": "checking...",
       "wrong": "wrong password",
       "error": "error"
-    }
+    },
+    "feed": "rss feed"
   },
   "settings": {
     "title": "settings",
@@ -1653,7 +1700,9 @@
       "major": "major",
       "critical": "critical"
     },
-    "addUpdate": "add an update"
+    "addUpdate": "add an update",
+    "notifyBoth": "email subscribers and webhooks",
+    "notifyWebhooks": "send to webhooks"
   },
   "channelLinks": {
     "events": "events",
@@ -1785,5 +1834,46 @@
     "onIt": "{name} on it · {ago}",
     "you": "you",
     "error": "could not change the incident"
+  },
+  "pageHooks": {
+    "feedsTitle": "rss and atom feeds",
+    "feedsHint": "Feed readers, Slack or Teams can follow the incidents of this page with these addresses. The public page links them too.",
+    "feedsPrivate": "The page has a password: these private links open the feed without it. Share them only with who may see the page; a new password changes them.",
+    "feedsDraft": "The page is a draft: the feeds work once it is published.",
+    "webhooksTitle": "webhooks ({count})",
+    "webhooksHint": "Send the incidents of this page and its status changes as JSON to other systems. Every request is signed with the webhook's secret (header X-Pingtxt-Signature). Only published pages send events.",
+    "url": "address",
+    "allEvents": "every event",
+    "event": {
+      "incident.created": "an incident is opened",
+      "incident.updated": "an incident gets an update",
+      "incident.resolved": "an incident is resolved",
+      "page.status_changed": "the status of the page changes",
+      "monitor.status_changed": "a monitor of the page changes status"
+    },
+    "add": "add webhook",
+    "added": "webhook added",
+    "enabled": "send events",
+    "turnedOn": "webhook on",
+    "turnedOff": "webhook off",
+    "neverSent": "nothing sent yet",
+    "lastOk": "sent {when} · {status}",
+    "lastFailed": "failed {when} · {status}",
+    "test": "test",
+    "testOk": "test event delivered ({status})",
+    "testFailed": "test event failed: {error}",
+    "edit": "edit",
+    "close": "close",
+    "rm": "rm",
+    "removeTitle": "Remove the webhook {url}?",
+    "removed": "webhook removed",
+    "secret": "secret",
+    "secretHint": "Check X-Pingtxt-Signature (t=<seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\">) with it.",
+    "rotate": "new secret",
+    "rotateTitle": "Make a new secret? Requests signed with the old one stop matching.",
+    "rotated": "new secret made",
+    "saveEvents": "save events",
+    "saved": "webhook saved",
+    "error": "something went wrong"
   }
 }

@@ -30,6 +30,7 @@ func runBoth(ctx context.Context, j Job, run func(context.Context, Job) Result) 
 	r.OK = r4.OK && r6.OK
 	r.LatencyMs = max(r4.LatencyMs, r6.LatencyMs)
 	r.Asserted = min(r4.Asserted, r6.Asserted)
+	r.Steps = min(r4.Steps, r6.Steps)
 	switch {
 	case !r4.OK && !r6.OK:
 		r.Message = "IPv4: " + r4.Message + "; IPv6: " + r6.Message

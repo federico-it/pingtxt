@@ -481,16 +481,16 @@ func monitorFields() map[string]any {
 	return map[string]any{
 		"name":            prop("string", "Display name"),
 		"type":            map[string]any{"type": "string", "enum": validTypes, "description": "Check type"},
-		"target":          prop("string", "What to check: URL for http/keyword, host:port for tcp ([2001:db8::1]:443 for IPv6), host or IP for ping/dns, connection URL for databases, container for docker, grpc://host:port, smtp://host. Empty for push."),
+		"target":          prop("string", "What to check: URL for http/keyword, host:port for tcp ([2001:db8::1]:443 for IPv6), host or IP for ping/dns, connection URL for databases, container for docker, grpc://host:port, smtp://host, host:port for udp, ws(s):// URL for websocket. Empty for push."),
 		"interval_sec":    prop("integer", "Seconds between checks (10 to 86400, default 60). For push monitors: expected heartbeat period."),
 		"timeout_ms":      prop("integer", "Timeout in milliseconds (500 to 60000, default 10000)"),
 		"retries":         prop("integer", "Failed checks in a row before the monitor is down (1 to 10)"),
-		"method":          prop("string", "HTTP method (default GET)"),
+		"method":          prop("string", "HTTP method (default GET). udp: text or hex, how body and keyword are written"),
 		"expected_status": prop("string", "Accepted HTTP status codes, e.g. 200-299 or 200,301"),
-		"keyword":         prop("string", "Text the response must contain (keyword type)"),
+		"keyword":         prop("string", "Text the response must contain (keyword type; udp and websocket: the reply)"),
 		"keyword_invert":  prop("boolean", "Fail when the keyword is present instead"),
 		"headers":         map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}, "description": "HTTP request headers"},
-		"body":            prop("string", "HTTP request body"),
+		"body":            prop("string", "HTTP request body. udp: payload to send. websocket: message sent after connecting"),
 		"assertions": map[string]any{"type": "array", "description": "http/keyword: rules on the JSON response body, all must pass", "items": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -499,6 +499,27 @@ func monitorFields() map[string]any {
 				"value": prop("string", "Expected value (not for exists/not_exists)"),
 			},
 			"required": []string{"path", "op"},
+		}},
+		"steps": map[string]any{"type": "array", "description": "http/keyword: requests made in order before the monitor's own one, e.g. a login. Extracted values are used as {{var}} in the URL, headers and body of later steps and of the monitor's request; cookies carry over. At most 10", "items": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"name":            prop("string", "Shown in messages"),
+				"method":          prop("string", "HTTP method (default GET). udp: text or hex, how body and keyword are written"),
+				"url":             prop("string", "http(s) URL, can use {{var}}"),
+				"headers":         map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}},
+				"body":            prop("string", "Request body, can use {{var}}"),
+				"expected_status": prop("string", "Accepted status codes (default 200-399)"),
+				"extract": map[string]any{"type": "array", "items": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"var":  prop("string", "Variable name"),
+						"from": map[string]any{"type": "string", "enum": []string{check.FromJSON, check.FromHeader, check.FromRegex}},
+						"path": prop("string", "JSON path, header name or regular expression (first group)"),
+					},
+					"required": []string{"var", "from", "path"},
+				}},
+			},
+			"required": []string{"url"},
 		}},
 		"dns_record":          prop("string", "DNS record type, e.g. A, AAAA, MX, TXT"),
 		"dns_expected":        prop("string", "Expected DNS answer"),

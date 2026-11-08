@@ -157,6 +157,7 @@ type Hub struct {
 
 	pages     statusPages
 	subLimits subscribeLimits // status page subscriptions, see pageincidents.go
+	hooks     pageHooks       // status page webhooks, see pagewebhooks.go
 
 	metricsCache metricsCache
 	updates      agentUpdates
@@ -240,6 +241,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.escalationLoop(ctx)
 	go h.agentOfflineLoop(ctx)
 	go h.liveActivityLoop(ctx)
+	go h.pageWatchLoop(ctx)
 	go h.localIPv6.Run(ctx, 10*time.Minute)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
@@ -361,6 +363,7 @@ func jobFor(m *store.Monitor) check.Job {
 		Assertions:     m.Assertions,
 		PingCount:      m.PingCount,
 		PingLossPct:    m.PingLossPct,
+		Steps:          m.Steps,
 	}
 }
 
@@ -559,6 +562,10 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		return
 	}
 	m := st.m
+	if msg := oldAgentError(m, loc, r); msg != "" {
+		r.OK = false
+		r.Message = msg
+	}
 	// An agent built before response rules existed ignores them and would
 	// report the monitor up: fail instead, so the problem is visible.
 	if r.OK && len(m.Assertions) > 0 && r.Asserted < len(m.Assertions) && loc != LocalLocation {

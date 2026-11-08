@@ -234,6 +234,10 @@ var auditRoutes = map[string]auditSpec{
 	"DELETE /api/status-pages/{id}/incidents/{incident}/updates/{update}": {action: "page_incident.delete_update", typ: "page_incident", load: loadPageIncident, idParam: "incident"},
 	"GET /api/status-pages/{id}/subscribers":                              {action: "page.subscribers_view", typ: "page", load: loadPageName},
 	"DELETE /api/status-pages/{id}/subscribers/{subscriber}":              {action: "page.subscriber_delete", typ: "page", load: loadPageName},
+	"POST /api/status-pages/{id}/webhooks":                                {action: "page.webhook_create", typ: "page", load: loadPageName},
+	"PUT /api/status-pages/{id}/webhooks/{webhook}":                       {action: "page.webhook_update", typ: "page", load: loadPageName},
+	"DELETE /api/status-pages/{id}/webhooks/{webhook}":                    {action: "page.webhook_delete", typ: "page", load: loadPageName},
+	"POST /api/status-pages/{id}/webhooks/{webhook}/test":                 skipAudit,
 	// the app's own phone and Live Activity tokens change often and say
 	// nothing about the configuration: not logged.
 }

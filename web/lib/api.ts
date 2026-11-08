@@ -17,6 +17,8 @@ export type MonitorType =
   | "grpc"
   | "smtp"
   | "mcp"
+  | "udp"
+  | "websocket"
 
 export type AssertionOp =
   | "eq"
@@ -38,6 +40,27 @@ export interface Assertion {
   value?: string
 }
 
+/** Where a step takes a value from: JSON path, response header or regex. */
+export type ExtractFrom = "json" | "header" | "regex"
+
+/** A value of a step's response saved as {{var}}. */
+export interface Extract {
+  var: string
+  from: ExtractFrom
+  path: string
+}
+
+/** An HTTP request made before an http/keyword check, e.g. a login. */
+export interface Step {
+  name?: string
+  method: string
+  url: string
+  headers?: Record<string, string>
+  body?: string
+  expected_status?: string
+  extract?: Extract[]
+}
+
 export interface Monitor {
   id: number
   name: string
@@ -57,6 +80,8 @@ export interface Monitor {
   headers: Record<string, string>
   body: string
   assertions: Assertion[]
+  /** http/keyword: requests made first (a login...), passing {{variables}} */
+  steps: Step[]
   push_token: string
   grace_sec: number
   /** percent of failing locations that marks the monitor degraded; 0 = instance default */
@@ -808,6 +833,42 @@ export interface PageSubscriber {
   /** 0 = waiting for confirmation */
   confirmed_at: number
   created_at: number
+}
+
+/** Events a status page webhook can get. */
+export const pageWebhookEvents = [
+  "incident.created",
+  "incident.updated",
+  "incident.resolved",
+  "page.status_changed",
+  "monitor.status_changed",
+] as const
+export type PageWebhookEvent = (typeof pageWebhookEvents)[number]
+
+export interface PageWebhook {
+  id: number
+  page_id: number
+  url: string
+  /** signs every request (HMAC-SHA256) */
+  secret: string
+  /** empty = every event */
+  events: PageWebhookEvent[]
+  enabled: boolean
+  created_at: number
+  /** latest delivery, 0 = never */
+  last_at: number
+  /** HTTP status of the latest delivery, 0 = no answer */
+  last_status: number
+  /** "" when it worked */
+  last_error: string
+}
+
+export interface PageFeeds {
+  atom: string
+  rss: string
+  /** the links carry the private key of a protected page */
+  private: boolean
+  published: boolean
 }
 
 export type PageStatus =

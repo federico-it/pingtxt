@@ -11,6 +11,7 @@ import { DependsOnPicker } from "@/components/depends-on"
 import { covers, LinkRow, linkState } from "@/components/channel-links"
 import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
+import { RequestSteps } from "@/components/request-steps"
 import { ResponseRules } from "@/components/response-rules"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -38,6 +39,7 @@ import {
 } from "@/lib/api"
 import { isCurl, parseCurl, type CurlRequest } from "@/lib/curl"
 import { interval } from "@/lib/format"
+import { headersToText, textToHeaders } from "@/lib/headers"
 import { cn } from "@/lib/utils"
 
 // Labels and hints are in messages: monitorForm.types.<value>.
@@ -45,7 +47,7 @@ const types: {
   value: MonitorType
   placeholder: string
   /** Label of the target field (monitorForm.target.<key>); defaults to "host". */
-  target?: "url" | "container" | "address" | "server" | "endpoint"
+  target?: "url" | "container" | "address" | "server" | "endpoint" | "hostPort"
 }[] = [
   {
     value: "http",
@@ -107,6 +109,16 @@ const types: {
     value: "smtp",
     placeholder: "smtp://mail.example.com:587",
     target: "server",
+  },
+  {
+    value: "udp",
+    placeholder: "ntp.example.com:123",
+    target: "hostPort",
+  },
+  {
+    value: "websocket",
+    placeholder: "wss://example.com/socket",
+    target: "url",
   },
   {
     value: "push",
@@ -179,6 +191,8 @@ const ipFamilyKey = {
 } as const
 // Labels are in messages: monitorForm.mcpTransports.<value>.
 const mcpTransports = ["auto", "streamable", "sse"] as const
+// Labels are in messages: monitorForm.udpEncodings.<value>.
+const udpEncodings = ["text", "hex"] as const
 
 export type MonitorInput = Omit<
   Monitor,
@@ -203,6 +217,7 @@ export const emptyMonitor: MonitorInput = {
   headers: {},
   body: "",
   assertions: [],
+  steps: [],
   grace_sec: 300,
   degraded_pct: 0,
   slow_ms: 0,
@@ -226,21 +241,6 @@ function hostOf(url: string) {
   } catch {
     return ""
   }
-}
-
-function headersToText(h: Record<string, string>) {
-  return Object.entries(h)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join("\n")
-}
-
-function textToHeaders(t: string) {
-  const out: Record<string, string> = {}
-  for (const line of t.split("\n")) {
-    const i = line.indexOf(":")
-    if (i > 0) out[line.slice(0, i).trim()] = line.slice(i + 1).trim()
-  }
-  return out
 }
 
 function Field({
@@ -274,6 +274,7 @@ export function MonitorForm({
   const [m, setM] = useState<MonitorInput>({
     ...initial,
     assertions: initial.assertions ?? [],
+    steps: initial.steps ?? [],
   })
   const [headers, setHeaders] = useState(headersToText(initial.headers))
   const [busy, setBusy] = useState(false)
@@ -292,6 +293,7 @@ export function MonitorForm({
       JSON.stringify({
         ...initial,
         assertions: initial.assertions ?? [],
+        steps: initial.steps ?? [],
         headers: textToHeaders(headersToText(initial.headers)),
       }),
     [initial]
@@ -312,8 +314,12 @@ export function MonitorForm({
   const t = types.find((x) => x.value === m.type) ?? types[0]
   const isHTTP = m.type === "http" || m.type === "keyword"
   const isMCP = m.type === "mcp"
+  const isUDP = m.type === "udp"
+  const isWS = m.type === "websocket"
+  const lowerTarget = m.target.trim().toLowerCase()
   const isHTTPS =
-    (isHTTP || isMCP) && m.target.trim().toLowerCase().startsWith("https://")
+    ((isHTTP || isMCP) && lowerTarget.startsWith("https://")) ||
+    (isWS && lowerTarget.startsWith("wss://"))
   const isPush = m.type === "push"
   const slowMode =
     m.slow_ms === -1 ? "auto" : m.slow_ms > 0 ? "fixed" : "off"
@@ -326,6 +332,7 @@ export function MonitorForm({
     "grpc",
     "smtp",
     "mcp",
+    "websocket",
   ].includes(m.type)
   const ivList = isPush
     ? withValue(pushIntervals, m.interval_sec)
@@ -341,9 +348,13 @@ export function MonitorForm({
   function setType(type: MonitorType) {
     setM((p) => {
       const next = { ...p, type }
-      if ((type === "mcp") !== (p.type === "mcp")) {
-        // mcp reuses method, keyword and expected_status for its own settings
-        next.method = type === "mcp" ? "auto" : "GET"
+      if (
+        (type === "mcp") !== (p.type === "mcp") ||
+        (type === "udp") !== (p.type === "udp")
+      ) {
+        // mcp and udp reuse method, keyword and expected_status for their
+        // own settings
+        next.method = type === "mcp" ? "auto" : type === "udp" ? "text" : "GET"
         next.keyword = ""
         next.expected_status = ""
       }
@@ -543,6 +554,92 @@ export function MonitorForm({
             <p className="text-xs text-muted-foreground sm:col-span-2">
               {tr("grpcHint")}
             </p>
+          )}
+          {isUDP && (
+            <>
+              <Field
+                label={tr("udpPayload")}
+                hint={tr("udpPayloadHint")}
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  rows={2}
+                  className="font-mono"
+                  value={m.body}
+                  onChange={(e) => set("body", e.target.value)}
+                  placeholder={m.method === "hex" ? "1b 00 00 00" : "ping"}
+                />
+              </Field>
+              <Field label={tr("udpEncoding")}>
+                <Select
+                  items={udpEncodings.map((x) => ({
+                    value: x,
+                    label: tr(`udpEncodings.${x}`),
+                  }))}
+                  value={m.method === "hex" ? "hex" : "text"}
+                  onValueChange={(v) => v && set("method", v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {udpEncodings.map((x) => (
+                      <SelectItem key={x} value={x}>
+                        {tr(`udpEncodings.${x}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label={tr("expectedReply")} hint={tr("udpReplyHint")}>
+                <Input
+                  className="font-mono"
+                  value={m.keyword}
+                  onChange={(e) => set("keyword", e.target.value)}
+                  placeholder={m.method === "hex" ? "1c" : "pong"}
+                />
+              </Field>
+            </>
+          )}
+          {isWS && (
+            <>
+              <Field
+                label={tr("wsMessage")}
+                hint={tr("wsMessageHint")}
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  rows={2}
+                  className="font-mono"
+                  value={m.body}
+                  onChange={(e) => set("body", e.target.value)}
+                  placeholder='{"type": "ping"}'
+                />
+              </Field>
+              <Field
+                label={tr("expectedReply")}
+                hint={tr("wsReplyHint")}
+                className="sm:col-span-2"
+              >
+                <Input
+                  value={m.keyword}
+                  onChange={(e) => set("keyword", e.target.value)}
+                  placeholder="pong"
+                />
+              </Field>
+              <Field
+                label={tr("headers")}
+                hint={tr("wsHeadersHint")}
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  rows={2}
+                  value={headers}
+                  onChange={(e) => setHeaders(e.target.value)}
+                  placeholder="Authorization: Bearer ..."
+                />
+              </Field>
+            </>
           )}
           {isMCP && (
             <>
@@ -1112,6 +1209,15 @@ export function MonitorForm({
               {tr("ignoreTls")}
             </label>
           </div>
+        </Section>
+      )}
+
+      {isHTTP && (
+        <Section title={tr("steps.title")}>
+          <RequestSteps
+            value={m.steps}
+            onChange={(v) => set("steps", v)}
+          />
         </Section>
       )}
 
