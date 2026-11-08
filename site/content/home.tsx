@@ -43,7 +43,7 @@ const featuresEn: Feature[] = [
   },
   {
     title: "lots of check types",
-    body: "HTTP(S), keyword, TCP, ICMP ping, DNS, PostgreSQL, MySQL, Redis, MongoDB, Docker, gRPC health, SMTP, MCP servers and heartbeat.",
+    body: "HTTP(S) with multi-step requests, keyword, TCP, UDP, WebSocket, ICMP ping, DNS, PostgreSQL, MySQL, Redis, MongoDB, Docker, gRPC health, SMTP, MCP servers and heartbeat.",
   },
   {
     title: "status pages",
@@ -94,7 +94,7 @@ const featuresIt: Feature[] = [
   },
   {
     title: "tanti tipi di controllo",
-    body: "HTTP(S), parola chiave, TCP, ping ICMP, DNS, PostgreSQL, MySQL, Redis, MongoDB, Docker, gRPC health, SMTP, server MCP e heartbeat.",
+    body: "HTTP(S) anche a più passaggi, parola chiave, TCP, UDP, WebSocket, ping ICMP, DNS, PostgreSQL, MySQL, Redis, MongoDB, Docker, gRPC health, SMTP, server MCP e heartbeat.",
   },
   {
     title: "status page",

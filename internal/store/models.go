@@ -278,8 +278,11 @@ type Monitor struct {
 	Body           string            `json:"body"`
 	// Assertions are rules on the JSON body of http/keyword responses.
 	Assertions []check.Assertion `json:"assertions"`
-	PushToken  string            `json:"push_token"`
-	GraceSec   int               `json:"grace_sec"`
+	// Steps are HTTP requests made before the http/keyword request (a
+	// login...), passing values to it as {{variables}}.
+	Steps     []check.Step `json:"steps"`
+	PushToken string       `json:"push_token"`
+	GraceSec  int          `json:"grace_sec"`
 	// DegradedPct is the share of failing locations (percent) from which the
 	// monitor is degraded. 0 uses the instance default.
 	DegradedPct int `json:"degraded_pct"`
@@ -321,13 +324,13 @@ type Monitor struct {
 // its own history.
 const SlowAuto = -1
 
-const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct`
+const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps`
 
 func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	m := &Monitor{}
-	var headers, locations, assertions string
+	var headers, locations, assertions, steps string
 	var group sql.NullInt64
-	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group, &m.DegradedPct, &assertions, &m.IPFamily, &m.SlowMs, &m.Diagnostics, &m.PingCount, &m.PingLossPct)
+	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group, &m.DegradedPct, &assertions, &m.IPFamily, &m.SlowMs, &m.Diagnostics, &m.PingCount, &m.PingLossPct, &steps)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -342,6 +345,10 @@ func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	_ = json.Unmarshal([]byte(assertions), &m.Assertions)
 	if m.Assertions == nil {
 		m.Assertions = []check.Assertion{}
+	}
+	_ = json.Unmarshal([]byte(steps), &m.Steps)
+	if m.Steps == nil {
+		m.Steps = []check.Step{}
 	}
 	if m.Headers == nil {
 		m.Headers = map[string]string{}
@@ -451,9 +458,9 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 		return err
 	}
 	defer tx.Rollback()
-	id, err := s.db.insert(tx, `INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt, nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct)
+	id, err := s.db.insert(tx, `INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt, nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, stepsJSON(m.Steps))
 	if err != nil {
 		return err
 	}
@@ -480,8 +487,8 @@ func (s *Store) UpdateMonitor(m *Monitor) error {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ?, group_id = ?, degraded_pct = ?, assertions = ?, ip_family = ?, slow_ms = ?, diagnostics = ?, ping_count = ?, ping_loss_pct = ? WHERE id = ?`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, m.ID)
+	_, err = tx.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ?, group_id = ?, degraded_pct = ?, assertions = ?, ip_family = ?, slow_ms = ?, diagnostics = ?, ping_count = ?, ping_loss_pct = ?, steps = ? WHERE id = ?`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, stepsJSON(m.Steps), m.ID)
 	if err != nil {
 		return err
 	}
@@ -504,6 +511,14 @@ func assertionsJSON(a []check.Assertion) string {
 		return "[]"
 	}
 	b, _ := json.Marshal(a)
+	return string(b)
+}
+
+func stepsJSON(s []check.Step) string {
+	if len(s) == 0 {
+		return "[]"
+	}
+	b, _ := json.Marshal(s)
 	return string(b)
 }
 

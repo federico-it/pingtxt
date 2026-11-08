@@ -17,6 +17,8 @@ export type MonitorType =
   | "grpc"
   | "smtp"
   | "mcp"
+  | "udp"
+  | "websocket"
 
 export type AssertionOp =
   | "eq"
@@ -38,6 +40,27 @@ export interface Assertion {
   value?: string
 }
 
+/** Where a step takes a value from: JSON path, response header or regex. */
+export type ExtractFrom = "json" | "header" | "regex"
+
+/** A value of a step's response saved as {{var}}. */
+export interface Extract {
+  var: string
+  from: ExtractFrom
+  path: string
+}
+
+/** An HTTP request made before an http/keyword check, e.g. a login. */
+export interface Step {
+  name?: string
+  method: string
+  url: string
+  headers?: Record<string, string>
+  body?: string
+  expected_status?: string
+  extract?: Extract[]
+}
+
 export interface Monitor {
   id: number
   name: string
@@ -57,6 +80,8 @@ export interface Monitor {
   headers: Record<string, string>
   body: string
   assertions: Assertion[]
+  /** http/keyword: requests made first (a login...), passing {{variables}} */
+  steps: Step[]
   push_token: string
   grace_sec: number
   /** percent of failing locations that marks the monitor degraded; 0 = instance default */

@@ -789,7 +789,11 @@ var laterMigrations = []migration{
 		FOREIGN KEY (page_id) REFERENCES status_pages(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
-	// 38: maintenance windows announced on status pages (public, with a
+	// 38: HTTP requests made before an http/keyword check (a login...),
+	// as JSON.
+	{sqlite: `ALTER TABLE monitors ADD COLUMN steps TEXT NOT NULL DEFAULT '[]'`,
+		mysql: `ALTER TABLE monitors ADD COLUMN steps MEDIUMTEXT NOT NULL DEFAULT ('[]')`},
+	// 39: maintenance windows announced on status pages (public, with a
 	// public message) and emailed to their subscribers (notify_subscribers,
 	// remind_min minutes before). notice_* hold the start (unix ms) of the
 	// occurrence whose reminder, start and end emails went out.

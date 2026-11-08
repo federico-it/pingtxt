@@ -304,6 +304,14 @@
         "label": "smtp",
         "hint": "legge il saluto, EHLO e STARTTLS quando disponibile"
       },
+      "udp": {
+        "label": "udp",
+        "hint": "invia un datagramma e attende la risposta. IPv6 tra parentesi: [2001:db8::1]:123"
+      },
+      "websocket": {
+        "label": "websocket",
+        "hint": "apre una connessione ws:// o wss://, se vuoi invia un messaggio e controlla la risposta"
+      },
       "push": {
         "label": "heartbeat (push)",
         "hint": "il tuo cron job o servizio chiama un URL; down quando le chiamate si fermano"
@@ -338,6 +346,19 @@
     "pushHint": "pingtxt assegna a questo monitor un URL segreto. Chiamalo alla fine di ogni esecuzione del tuo job: il monitor va down quando non arriva nessuna chiamata entro il periodo atteso più la tolleranza. L'URL viene mostrato dopo il salvataggio.",
     "dockerHint": "Controllato sul docker engine di ogni località selezionata: l'hub o l'agent deve poter accedere a /var/run/docker.sock (o DOCKER_HOST). Con docker, montalo con -v /var/run/docker.sock:/var/run/docker.sock:ro.",
     "grpcHint": "grpc:// in chiaro, grpcs:// con TLS. Il percorso è il nome del servizio da controllare; omettilo per controllare tutto il server.",
+    "udpPayload": "payload",
+    "udpPayloadHint": "Inviato al server a ogni controllo. UDP non ha handshake: il controllo richiede una risposta, quindi invia qualcosa a cui il servizio risponde.",
+    "udpEncoding": "scritto come",
+    "udpEncodings": {
+      "text": "testo",
+      "hex": "byte esadecimali"
+    },
+    "expectedReply": "risposta attesa",
+    "udpReplyHint": "La risposta deve contenerla. Vuota: va bene qualsiasi risposta.",
+    "wsMessage": "messaggio da inviare",
+    "wsMessageHint": "Messaggio di testo facoltativo inviato dopo la connessione. Vuoto: il controllo apre solo la connessione, a meno che tu non attenda una risposta.",
+    "wsReplyHint": "Testo che il primo messaggio del server deve contenere. Vuoto e senza messaggio da inviare: basta la connessione.",
+    "wsHeadersHint": "Inviati con l'handshake, uno per riga. Sec-WebSocket-Protocol: chat chiede dei sottoprotocolli.",
     "mcpTransport": "trasporto",
     "mcpTransports": {
       "auto": "auto (streamable http, poi sse legacy)",
@@ -460,7 +481,32 @@
       "on": "attiva",
       "off": "spenta"
     },
-    "dependsOnHint": "monitor da cui dipende questo, per esempio il ping del server su cui gira. finché uno di loro è giù, questo monitor non manda avvisi: ricevi un solo avviso per il server invece di uno per servizio."
+    "dependsOnHint": "monitor da cui dipende questo, per esempio il ping del server su cui gira. finché uno di loro è giù, questo monitor non manda avvisi: ricevi un solo avviso per il server invece di uno per servizio.",
+    "steps": {
+      "title": "passi prima della richiesta",
+      "hint": "Richieste fatte in ordine prima di quella sopra, per esempio un login. Un valore che estrai diventa una variabile: scrivi <code>{example}</code> nell'URL, negli header o nel body dei passi successivi e della richiesta sopra. I cookie passano da un passo all'altro. Il controllo fallisce al primo passo che fallisce.",
+      "number": "#{n}",
+      "name": "nome del passo",
+      "namePlaceholder": "login",
+      "url": "url",
+      "moveUp": "sposta su",
+      "moveDown": "sposta giù",
+      "remove": "rimuovi passo",
+      "add": "aggiungi passo",
+      "available": "variabili che puoi usare qui: {vars}",
+      "final": "La richiesta sopra viene fatta per ultima, con queste variabili: {vars}",
+      "extract": "salva valori",
+      "var": "variabile",
+      "source": "da",
+      "path": "percorso, header o regex",
+      "from": {
+        "json": "percorso json",
+        "header": "header",
+        "regex": "regex"
+      },
+      "removeValue": "rimuovi valore",
+      "addValue": "salva un valore"
+    }
   },
   "testCheck": {
     "title": "controllo di prova",
