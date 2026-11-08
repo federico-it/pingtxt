@@ -25,7 +25,7 @@ Incolla un comando `curl` nel campo URL di un monitor HTTP per compilare metodo,
 
 | tipo | destinazione | cosa viene controllato |
 | --- | --- | --- |
-| http(s) | `https://example.com/health` | codice di stato (predefinito 200-399), header, body, [regole JSON](#controlli-sulla-risposta-json), scadenza TLS |
+| http(s) | `https://example.com/health` | codice di stato (predefinito 200-399), header, body, [regole JSON](#controlli-sulla-risposta-json), scadenza TLS; [passi prima](#controlli-http-a-passi) facoltativi come un login |
 | parola chiave | URL + testo | il body della risposta contiene (o non contiene) il testo |
 | porta tcp | `host:porta` | la connessione si apre |
 | ping | host o IP | echo ICMP, o ICMPv6 |
@@ -38,11 +38,13 @@ Incolla un comando `curl` nel campo URL di un monitor HTTP per compilare metodo,
 | grpc health | `grpc://host:porta[/servizio]`, `grpcs://` per TLS | `grpc.health.v1.Health/Check` risponde `SERVING` |
 | smtp | `smtp://host:25`, `smtp://host:587`, `smtps://host:465` | saluto, `EHLO`, `STARTTLS` quando disponibile (certificato verificato) |
 | server mcp | `https://mcp.example.com/mcp` | l'handshake MCP e i suoi tool, vedi [server MCP](#server-mcp) |
+| udp | `host:porta` | un datagramma riceve risposta, eventualmente con un testo o dei byte, vedi [UDP](#udp) |
+| websocket | `wss://example.com/socket` | la connessione si apre; se vuoi un messaggio riceve la risposta attesa, vedi [WebSocket](#websocket) |
 | heartbeat (push) | nessuna: pingtxt ti dà un URL | il tuo job chiama l'URL; down quando le chiamate smettono, vedi [heartbeat](#monitor-heartbeat-cron-job) |
 
 I monitor HTTP accettano anche metodo, header e body della richiesta, i codici di stato accettati e se ignorare gli
-errori del certificato TLS. Gli agent più vecchi di un tipo di controllo segnalano `unknown monitor type`:
-aggiornali.
+errori del certificato TLS. Gli agent più vecchi di un tipo di controllo ne falliscono i controlli con "this agent
+cannot run ... checks: update it".
 
 I monitor ping inviano di default **3 richieste echo** per controllo, a 300 ms l'una dall'altra; imposta
 **pacchetti per controllo** da 1 a 20 (API `ping_count`). Il controllo è up se torna almeno una risposta, e il
@@ -76,6 +78,30 @@ l'avviso dicono quale regola non è rispettata, per esempio `checks.redis.status
   oggetti e array come JSON.
 - Le regole funzionano anche sugli agent. Gli agent più vecchi di questa funzione fanno fallire il controllo
   chiedendo di aggiornarli, invece di farlo passare senza verificarlo.
+
+## Controlli HTTP a passi
+
+Un monitor http(s) o parola chiave può fare prima altre richieste, in **passi prima della richiesta** (API `steps`):
+fare il login, prendere il token dalla risposta, poi controllare un endpoint protetto. I passi vengono eseguiti in
+ordine, al massimo 10, e la richiesta del monitor viene fatta per ultima.
+
+Ogni passo ha metodo, URL, header, body e codici di stato accettati (predefinito 200-399), e può **salvare valori**
+dalla risposta come variabili:
+
+| da | percorso | esempio |
+| --- | --- | --- |
+| percorso json | un percorso nel body JSON, come nei [controlli sulla risposta](#controlli-sulla-risposta-json) | `data.token` |
+| header | un header della risposta | `X-Csrf-Token` |
+| regex | un'espressione regolare sul body: il primo gruppo, o tutta la corrispondenza | `name="csrf" value="([^"]+)"` |
+
+Scrivi `{{token}}` per usare una variabile nell'URL, negli header o nel body dei passi successivi e della richiesta
+del monitor, per esempio `Authorization: Bearer {{token}}`. I cookie impostati da una risposta vengono inviati con le
+richieste successive, quindi i login a sessione funzionano senza variabili.
+
+Il controllo fallisce al primo passo che fallisce, e il messaggio lo indica: `step 1 (login): unexpected status 401`
+o `step 2: {{token}}: data.token not found`. La latenza comprende tutte le richieste. Header e body dei passi
+(password) sono nascosti agli utenti in sola lettura. Gli agent più vecchi dei passi falliscono il controllo con
+"update it" invece di saltare il login.
 
 ## Tempo di risposta per fase
 
@@ -163,6 +189,35 @@ server dichiara dei tool o è impostata una condizione sui tool, e infine chiude
 chiamati. Il risultato mostra nome e versione del server, versione del protocollo, trasporto e numero di tool, per
 esempio `my-server 1.4.0 · mcp 2025-06-18 · streamable · 12 tools`. Gli endpoint https ricevono gli avvisi di
 scadenza del certificato.
+
+## UDP
+
+Un monitor **udp** invia un **payload** a `host:porta` e attende la risposta. UDP non ha una connessione da aprire,
+quindi un servizio che tace non si distingue da uno fermo: il controllo passa solo se arriva una risposta entro il
+timeout. Invia qualcosa a cui il servizio risponde, per esempio una query DNS, una richiesta NTP o la query di stato
+del tuo server di gioco.
+
+- **scritto come** (API `method`): `text` (predefinito) o `hex`. In esadecimale i byte possono essere separati da
+  spazi o due punti: `1b 00 00 00`.
+- **risposta attesa** (API `keyword`): testo o byte che la risposta deve contenere, nella stessa codifica. Vuota:
+  va bene qualsiasi risposta.
+
+Il risultato è `reply 48 bytes`, `no reply (timeout)` oppure `port unreachable` quando l'host risponde che sulla
+porta non c'è nessuno in ascolto. La diagnostica in caso di errore risolve il nome e traccia il percorso (non c'è una
+connessione TCP da provare).
+
+## WebSocket
+
+Un monitor **websocket** apre una connessione `ws://` o `wss://`; un upgrade rifiutato fallisce con il suo stato
+HTTP, per esempio `unexpected status 401 (no WebSocket upgrade)`.
+
+- **messaggio da inviare** (API `body`): messaggio di testo facoltativo inviato dopo la connessione.
+- **risposta attesa** (API `keyword`): testo che il primo messaggio del server deve contenere. Con un messaggio o una
+  risposta attesa impostati, il controllo attende quel primo messaggio.
+- **header**: inviati con l'handshake, per esempio `Authorization: Bearer <token>`. `Sec-WebSocket-Protocol: chat, v2`
+  chiede dei sottoprotocolli; quello scelto dal server compare nel risultato, per esempio `connected (chat)`.
+
+Gli endpoint `wss://` ricevono gli avvisi di scadenza del certificato.
 
 ## Monitor heartbeat (cron job)
 

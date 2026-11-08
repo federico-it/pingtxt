@@ -25,7 +25,7 @@ Paste a `curl` command in the URL field of an HTTP monitor to fill in the method
 
 | type | target | what is checked |
 | --- | --- | --- |
-| http(s) | `https://example.com/health` | status code (default 200-399), headers, body, [JSON rules](#response-checks-json), TLS expiry |
+| http(s) | `https://example.com/health` | status code (default 200-399), headers, body, [JSON rules](#response-checks-json), TLS expiry; optional [steps before it](#multi-step-http-checks) such as a login |
 | keyword | URL + text | the response body contains (or does not contain) the text |
 | tcp port | `host:port` | the connection opens |
 | ping | host or IP | ICMP echo, or ICMPv6 |
@@ -38,10 +38,12 @@ Paste a `curl` command in the URL field of an HTTP monitor to fill in the method
 | grpc health | `grpc://host:port[/service]`, `grpcs://` for TLS | `grpc.health.v1.Health/Check` returns `SERVING` |
 | smtp | `smtp://host:25`, `smtp://host:587`, `smtps://host:465` | greeting, `EHLO`, `STARTTLS` when offered (certificate verified) |
 | mcp server | `https://mcp.example.com/mcp` | the MCP handshake and its tools, see [MCP servers](#mcp-servers) |
+| udp | `host:port` | a datagram gets a reply, optionally containing a text or bytes, see [UDP](#udp) |
+| websocket | `wss://example.com/socket` | the connection opens; optionally a message gets the expected reply, see [WebSocket](#websocket) |
 | heartbeat (push) | none: pingtxt gives you a URL | your job calls the URL; down when the calls stop, see [heartbeat](#heartbeat-monitors-cron-jobs) |
 
 HTTP monitors also take a method, request headers and body, the accepted status codes and whether to skip TLS
-verification. Agents older than a check type report `unknown monitor type`: update them.
+verification. Agents older than a check type fail its checks with "this agent cannot run ... checks: update it".
 
 Ping monitors send **3 echo requests** per check by default, 300 ms apart; set **packets per check** from 1 to 20
 (API `ping_count`). The check is up when at least one reply comes back, and the result shows how many did, e.g.
@@ -74,6 +76,30 @@ rule broke, e.g. `checks.redis.status: expected "ok", got "error"`.
   and arrays as JSON.
 - Rules run on agents too. Agents older than this feature fail the check with "update it" instead of passing it
   unchecked.
+
+## Multi-step HTTP checks
+
+An http(s) or keyword monitor can make other requests first, under **steps before the request** (API `steps`): log in,
+take the token from the answer, then check a protected endpoint. Steps run in order, at most 10, and the monitor's own
+request runs last.
+
+Each step has a method, URL, headers, body and accepted status codes (default 200-399), and can **save values** from
+its response as variables:
+
+| from | path | example |
+| --- | --- | --- |
+| json path | a path in the JSON body, as in [response checks](#response-checks-json) | `data.token` |
+| header | a response header | `X-Csrf-Token` |
+| regex | a regular expression on the body: its first group, or the whole match | `name="csrf" value="([^"]+)"` |
+
+Write `{{token}}` to use a variable in the URL, headers or body of the next steps and of the monitor's request, e.g.
+`Authorization: Bearer {{token}}`. Cookies set by any response are sent with the next requests, so session logins
+work without variables.
+
+The check fails at the first step that fails, and the message names it: `step 1 (login): unexpected status 401` or
+`step 2: {{token}}: data.token not found`. The latency covers all the requests. Step headers and bodies (passwords)
+are hidden from read-only users. Agents older than steps fail the check with "update it" instead of skipping the
+login.
 
 ## Response time per phase
 
@@ -159,6 +185,32 @@ Each check runs `initialize`, sends `notifications/initialized`, then `tools/lis
 advertises tools or a tool condition is set, and finally deletes the session. Tools are never called. The result
 shows the server name and version, the protocol version, the transport and the tool count, e.g.
 `my-server 1.4.0 · mcp 2025-06-18 · streamable · 12 tools`. https endpoints get certificate expiry alerts.
+
+## UDP
+
+A **udp** monitor sends a **payload** to `host:port` and waits for the reply. UDP has no connection to open, so a
+silent service cannot be told from a stopped one: the check passes only when a reply arrives within the timeout.
+Send something the service answers, e.g. a DNS query, an NTP request or your game server's status query.
+
+- **written as** (API `method`): `text` (default) or `hex`. In hex, bytes may be separated by spaces or colons:
+  `1b 00 00 00`.
+- **expected reply** (API `keyword`): text or bytes the reply must contain, in the same encoding. Empty: any reply.
+
+The result is `reply 48 bytes`, `no reply (timeout)` or `port unreachable` when the host answers that nothing
+listens on the port. Diagnostics on failure look up the name and trace the route (there is no TCP connection to try).
+
+## WebSocket
+
+A **websocket** monitor opens a `ws://` or `wss://` connection; a refused upgrade fails with its HTTP status, e.g.
+`unexpected status 401 (no WebSocket upgrade)`.
+
+- **message to send** (API `body`): optional text message sent once connected.
+- **expected reply** (API `keyword`): text the first message from the server must contain. With a message or an
+  expected reply set, the check waits for that first message.
+- **headers**: sent with the handshake, e.g. `Authorization: Bearer <token>`. `Sec-WebSocket-Protocol: chat, v2`
+  asks for subprotocols; the one the server picks shows in the result, e.g. `connected (chat)`.
+
+`wss://` endpoints get certificate expiry alerts.
 
 ## Heartbeat monitors (cron jobs)
 

@@ -10,8 +10,9 @@ HetrixTools, but plain text, monospace, light and dark. Website and docs: [pingt
 - **One container** for the hub: Go API, scheduler, SQLite (or PostgreSQL / MariaDB) and the web UI.
 - **Agents** for checks from many places: a ~8 MB static binary or Docker image that only dials *out* to the hub.
   No open ports, works behind NAT, updates itself. A monitor is down when more than half of its locations fail.
-- **Checks**: HTTP(S) with JSON rules and timing per phase, keyword, TCP, ping, DNS, PostgreSQL, MySQL/MariaDB,
-  Redis, MongoDB, Docker containers, gRPC, SMTP, MCP servers and heartbeats for cron jobs. IPv6 everywhere.
+- **Checks**: HTTP(S) with JSON rules, timing per phase and steps (log in, then check), keyword, TCP, UDP,
+  WebSocket, ping, DNS, PostgreSQL, MySQL/MariaDB, Redis, MongoDB, Docker containers, gRPC, SMTP, MCP servers and
+  heartbeats for cron jobs. IPv6 everywhere.
 - **Status**: up, degraded (some locations fail or answer too slowly) or down; uptime that follows it; diagnostics
   (DNS, TCP, TLS, headers, traceroute) collected at the first failure.
 - **Alerts**: email (SMTP or Resend), Slack, Discord, Microsoft Teams, Telegram, Matrix, ntfy, Gotify, Pushover,
