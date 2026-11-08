@@ -18,7 +18,8 @@ import (
 )
 
 // Notifier types.
-var NotifierTypes = []string{"webhook", "discord", "slack", "telegram", "ntfy", "email", "app"}
+var NotifierTypes = []string{"webhook", "discord", "slack", "telegram", "ntfy", "email", "app",
+	"teams", "pagerduty", "opsgenie", "pushover", "gotify", "matrix", "twilio"}
 
 // Event kinds. Status events have an empty kind for compatibility.
 const (
@@ -227,6 +228,8 @@ type Notifier struct {
 	resendWait func(try int) time.Duration
 	// publicURL returns the public URL setting, to link the hub from emails.
 	publicURL func() string
+	// endpoints overrides the API addresses of hosted services (tests only).
+	endpoints map[string]string
 	// pushRetry overrides the waits before retrying failed phones (tests only).
 	pushRetry []time.Duration
 }
@@ -281,6 +284,20 @@ func (n *Notifier) Deliver(ctx context.Context, nt *store.Notifier, e Event) err
 			hdr["Authorization"] = "Bearer " + c["token"]
 		}
 		return n.post(ctx, c["url"], "text/plain", []byte(text), hdr)
+	case "teams":
+		return n.sendTeams(ctx, c, e)
+	case "pagerduty":
+		return n.sendPagerDuty(ctx, c, e)
+	case "opsgenie":
+		return n.sendOpsgenie(ctx, c, e)
+	case "pushover":
+		return n.sendPushover(ctx, c, e)
+	case "gotify":
+		return n.sendGotify(ctx, c, e)
+	case "matrix":
+		return n.sendMatrix(ctx, c, e)
+	case "twilio":
+		return n.sendTwilio(ctx, c, e)
 	case "email":
 		return n.sendEmail(ctx, c, e)
 	case "app":
@@ -290,28 +307,59 @@ func (n *Notifier) Deliver(ctx context.Context, nt *store.Notifier, e Event) err
 }
 
 func (n *Notifier) post(ctx context.Context, u, ctype string, body []byte, hdr map[string]string) error {
-	if u == "" {
-		return errors.New("url is required")
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
+	return n.request(ctx, http.MethodPost, u, ctype, body, hdr)
+}
+
+func (n *Notifier) request(ctx context.Context, method, u, ctype string, body []byte, hdr map[string]string) error {
+	resp, err := n.do(ctx, method, u, ctype, body, hdr)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", ctype)
+	resp.Body.Close()
+	return nil
+}
+
+// getJSON reads a JSON answer into out.
+func (n *Notifier) getJSON(ctx context.Context, u string, hdr map[string]string, out any) error {
+	resp, err := n.do(ctx, http.MethodGet, u, "", nil, hdr)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(out)
+}
+
+// do sends a request and fails on answers other than 2xx, with the start
+// of the body as the error.
+func (n *Notifier) do(ctx context.Context, method, u, ctype string, body []byte, hdr map[string]string) (*http.Response, error) {
+	if u == "" {
+		return nil, errors.New("url is required")
+	}
+	var rd io.Reader
+	if body != nil {
+		rd = bytes.NewReader(body)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, u, rd)
+	if err != nil {
+		return nil, err
+	}
+	if ctype != "" {
+		req.Header.Set("Content-Type", ctype)
+	}
 	req.Header.Set("User-Agent", "pingtxt")
 	for k, v := range hdr {
 		req.Header.Set(k, v)
 	}
 	resp, err := n.client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
+		defer resp.Body.Close()
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
-		return fmt.Errorf("http %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+		return nil, fmt.Errorf("http %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
 	}
-	return nil
+	return resp, nil
 }
 
 func mustJSON(v any) []byte {

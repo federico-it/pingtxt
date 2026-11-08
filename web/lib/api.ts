@@ -390,7 +390,20 @@ export interface Tag {
 }
 
 export type NotifierType =
-  "webhook" | "discord" | "slack" | "telegram" | "ntfy" | "email" | "app"
+  | "webhook"
+  | "discord"
+  | "slack"
+  | "telegram"
+  | "ntfy"
+  | "email"
+  | "app"
+  | "teams"
+  | "pagerduty"
+  | "opsgenie"
+  | "pushover"
+  | "gotify"
+  | "matrix"
+  | "twilio"
 
 /** What a channel can be sent. agent_offline is about agents, not monitors:
  * it ignores the channel's scope and monitor links cannot pick it. */
