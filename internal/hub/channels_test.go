@@ -350,3 +350,28 @@ func TestServiceChannelSecrets(t *testing.T) {
 		}
 	}
 }
+
+// An acknowledgement acknowledges the PagerDuty incident or Opsgenie alert
+// instead of resolving it.
+func TestAckOnIncidentTools(t *testing.T) {
+	ack := Event{Kind: KindAck, MonitorID: 7, Monitor: "api", Target: "x", Status: StatusAcked, AckBy: "a@b.c", At: 1}
+	var pc capture
+	psrv := pc.server(t, func(*http.Request) (int, string) { return 202, `{"status":"success"}` })
+	pd := testNotifierFor(map[string]string{"pagerduty": psrv.URL})
+	if err := pd.Deliver(context.Background(), &store.Notifier{Type: "pagerduty", Config: map[string]string{"routing_key": "R"}}, ack); err != nil {
+		t.Fatal(err)
+	}
+	if b := pc.all()[0].json(t); b["event_action"] != "acknowledge" || b["dedup_key"] != "pingtxt-monitor-7" {
+		t.Fatalf("pagerduty ack: %v", b)
+	}
+	var oc capture
+	osrv := oc.server(t, func(*http.Request) (int, string) { return 202, `{}` })
+	og := testNotifierFor(map[string]string{"opsgenie": osrv.URL})
+	if err := og.Deliver(context.Background(), &store.Notifier{Type: "opsgenie", Config: map[string]string{"api_key": "k"}}, ack); err != nil {
+		t.Fatal(err)
+	}
+	r := oc.all()[0]
+	if r.Path != "/v2/alerts/pingtxt-monitor-7/acknowledge" || r.Query != "identifierType=alias" || r.json(t)["user"] != "a@b.c" {
+		t.Fatalf("opsgenie ack: %s?%s %v", r.Path, r.Query, r.json(t))
+	}
+}

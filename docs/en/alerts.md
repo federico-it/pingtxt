@@ -15,8 +15,8 @@ events it gets, and can wait or repeat. **send test** checks a channel before yo
 | ntfy | the topic URL, and an access token for protected topics |
 | Gotify | the server URL and the token of a Gotify application. Problems have priority 8 (the Android app rings), degraded 5, recoveries 2 |
 | Pushover | your user (or group) key and the token of a Pushover application; optionally one device. Problems are sent with high priority |
-| PagerDuty | the Events API v2 integration key of a service, and the region (US or EU). A down opens an incident, its reminders join it and the recovery resolves it; the same for degraded, expiry and agent alerts |
-| Opsgenie | the key of an API integration, and the region (US or EU). Alerts get P1 (down, agent offline), P2 (expired) or P3 (expiring, degraded) and close by themselves on recovery |
+| PagerDuty | the Events API v2 integration key of a service, and the region (US or EU). A down opens an incident, its reminders join it and the recovery resolves it; the same for degraded, expiry and agent alerts. With the `ack` event, acknowledging in pingtxt acknowledges the PagerDuty incident |
+| Opsgenie | the key of an API integration, and the region (US or EU). Alerts get P1 (down, agent offline), P2 (expired) or P3 (expiring, degraded) and close by themselves on recovery. With the `ack` event, acknowledging in pingtxt acknowledges the alert |
 | SMS (Twilio) | the account SID and auth token, the sender (a Twilio number or a messaging service SID `MG...`) and the numbers in international format (`+39...`). Each alert is one short SMS per number, paid on your Twilio account |
 | email | an SMTP server (STARTTLS on 587, TLS on 465, or none for a local relay on 25), or the [Resend](https://resend.com) API with a key from a verified domain; then the sender and the recipients |
 | pingtxt app (push) | push turned on in **settings → integrations → mobile app**; the users (emails) whose phones get the alerts, empty for everyone. See [iOS app](ios-app.md) |

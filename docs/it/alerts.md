@@ -15,8 +15,8 @@ monitor ed eventi riceve, e può aspettare o ripetere. **invia test** prova un c
 | ntfy | l'URL del topic, e un access token per i topic protetti |
 | Gotify | l'URL del server e il token di un'applicazione Gotify. I problemi hanno priorità 8 (l'app Android suona), degradato 5, i ripristini 2 |
 | Pushover | la tua chiave utente (o di gruppo) e il token di un'applicazione Pushover; facoltativo un solo dispositivo. I problemi partono con priorità alta |
-| PagerDuty | l'integration key Events API v2 di un servizio, e la regione (USA o UE). Un down apre un incidente, i promemoria si uniscono a quello e il ripristino lo risolve; lo stesso per degradato, scadenze e agent |
-| Opsgenie | la chiave di un'integrazione API, e la regione (USA o UE). Gli avvisi hanno P1 (down, agent offline), P2 (scaduto) o P3 (in scadenza, degradato) e si chiudono da soli al ripristino |
+| PagerDuty | l'integration key Events API v2 di un servizio, e la regione (USA o UE). Un down apre un incidente, i promemoria si uniscono a quello e il ripristino lo risolve; lo stesso per degradato, scadenze e agent. Con l'evento `ack`, la presa in carico in pingtxt fa l'acknowledge anche dell'incidente PagerDuty |
+| Opsgenie | la chiave di un'integrazione API, e la regione (USA o UE). Gli avvisi hanno P1 (down, agent offline), P2 (scaduto) o P3 (in scadenza, degradato) e si chiudono da soli al ripristino. Con l'evento `ack`, la presa in carico in pingtxt fa l'acknowledge anche dell'avviso |
 | SMS (Twilio) | account SID e auth token, il mittente (un numero Twilio o il SID di un messaging service `MG...`) e i numeri in formato internazionale (`+39...`). Ogni avviso è un SMS breve per numero, pagato sul tuo account Twilio |
 | email | un server SMTP (STARTTLS sulla 587, TLS sulla 465, o nessuno per un relay locale sulla 25), oppure l'API di [Resend](https://resend.com) con una chiave di un dominio verificato; poi mittente e destinatari |
 | app pingtxt (push) | le notifiche push attive in **impostazioni → integrazioni → app mobile**; gli utenti (email) i cui telefoni ricevono gli avvisi, vuoto per tutti. Vedi [App iOS](ios-app.md) |
