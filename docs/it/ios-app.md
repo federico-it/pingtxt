@@ -74,7 +74,9 @@ telefoni ricevono solo le azioni che possono usare. Le notifiche di prova non ha
 
 Con le push attive, l'hub tiene aggiornata la Live Activity dell'app anche ad app chiusa: la avvia (iOS 17.2+), la
 aggiorna e la chiude tramite il relay quando gli incidenti si aprono o si chiudono. Mostra fino a tre monitor down,
-con le loro cause.
+con le loro cause. Quando si chiude l'ultimo incidente, l'attività termina con un riepilogo ("api is up, down for
+12m", oppure "All monitors are up" con il tempo di down di ogni monitor) e resta sulla schermata di blocco per 15
+minuti.
 
 ## Per chi sviluppa l'app
 

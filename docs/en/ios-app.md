@@ -71,7 +71,8 @@ only the actions they can use. Test notifications have no buttons.
 
 With push on, the hub keeps the app's Live Activity current even when the app is closed: it starts (iOS 17.2+),
 updates and ends the activity through the relay whenever incidents open or close. It shows up to three monitors
-that are down, with their causes.
+that are down, with their causes. When the last incident closes, the activity ends with a summary ("api is up, down for
+12m", or "All monitors are up" with each monitor's downtime) and stays on the lock screen for 15 minutes.
 
 ## For app developers
 
