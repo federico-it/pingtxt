@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ const (
 	laRefresh        = 15 * time.Minute // refresh while incidents are open
 	laRestartAfter   = 10 * time.Minute // no second remote start before the app sent the new token
 	laDebounce       = 2 * time.Second  // several monitors failing together: one push
+	laEndShown       = 15 * time.Minute // the ended activity stays on the lock screen with the summary
 	laMaxToken       = 1024
 	laMaxHubURL      = 1024
 	laMaxName        = 100
@@ -51,6 +53,9 @@ type liveActivities struct {
 	last     string         // content state last sent
 	lastIDs  map[int64]bool // incident ids last sent
 	lastSent time.Time
+	// episode lists every incident open since the activities started, for
+	// the summary sent when they end.
+	episode map[int64]bool
 }
 
 // laOutage is HubStatus.Outage of the app.
@@ -170,6 +175,12 @@ func (h *Hub) syncLiveActivities(ctx context.Context, now time.Time) {
 			newIncident = true
 		}
 	}
+	if h.la.episode == nil {
+		h.la.episode = map[int64]bool{}
+	}
+	for id := range ids {
+		h.la.episode[id] = true
+	}
 	if !h.la.ready {
 		// Startup: the phones already have this state (or will load it).
 		h.la.ready, h.la.last, h.la.lastIDs, h.la.lastSent = true, string(raw), ids, now
@@ -204,8 +215,12 @@ func (h *Hub) syncLiveActivities(ctx context.Context, now time.Time) {
 	}
 	base := laMessage{ContentState: raw, Timestamp: now.Unix(), Priority: "high"}
 	if len(open) == 0 {
-		// Every incident closed: end the activities, removed right away.
-		base.Event, base.DismissalDate = "end", now.Unix()
+		// Every incident closed: end the activities with a summary alert.
+		// The ended activity stays on the lock screen for laEndShown.
+		episode := h.la.episode
+		h.la.episode = nil
+		base.Event, base.DismissalDate = "end", now.Add(laEndShown).Unix()
+		base.Title, base.Body = h.laSummary(episode)
 		h.sendLiveActivity(ctx, ps, base, running, false)
 		for _, d := range running {
 			if err := h.store.ClearLiveActivityToken(d.ID, d.LAToken); err != nil {
@@ -221,10 +236,17 @@ func (h *Hub) syncLiveActivities(ctx context.Context, now time.Time) {
 		upd.Priority = "normal" // a refresh: no hurry, and no budget spent
 	}
 	upd.TTL = int(laStale / time.Second)
-	h.sendLiveActivity(ctx, ps, upd, running, false)
+	gone := h.sendLiveActivity(ctx, ps, upd, running, false)
 
 	if !newIncident {
 		return
+	}
+	// An activity the relay reported gone (dismissed on the phone while the
+	// app was suspended) does not stop a new start.
+	for _, d := range gone {
+		if d.LAStartToken != "" && d.LAHubURL != "" {
+			idle = append(idle, d)
+		}
 	}
 	// A new incident: start the activity on the phones that have none.
 	byHub := map[string][]*store.PushDevice{}
@@ -270,10 +292,47 @@ func laAlert(open []*store.Incident) (title, body string) {
 	return fmt.Sprintf("%d monitors are down", len(open)), truncateUTF8(strings.Join(names, ", "), maxPushBody)
 }
 
+// laSummary is the alert of the end: which monitors were down and for how
+// long. Incidents of deleted monitors are left out.
+func (h *Hub) laSummary(episode map[int64]bool) (title, body string) {
+	var list []*store.Incident
+	for id := range episode {
+		i, err := h.store.Incident(id)
+		if err != nil || i.ResolvedAt == 0 {
+			continue
+		}
+		list = append(list, i)
+	}
+	return laSummaryText(list)
+}
+
+func laSummaryText(list []*store.Incident) (title, body string) {
+	sort.Slice(list, func(a, b int) bool { return list[a].StartedAt < list[b].StartedAt })
+	down := func(i *store.Incident) string {
+		return fmtDuration(max(time.Duration(i.ResolvedAt-i.StartedAt)*time.Millisecond, time.Minute))
+	}
+	switch len(list) {
+	case 0:
+		return "All monitors are up", ""
+	case 1:
+		return truncateUTF8(list[0].MonitorName+" is up", maxPushTitle), "Down for " + down(list[0])
+	}
+	parts := []string{}
+	for _, i := range list[:min(len(list), laMaxShown)] {
+		parts = append(parts, i.MonitorName+" "+down(i))
+	}
+	if len(list) > laMaxShown {
+		parts = append(parts, fmt.Sprintf("+%d", len(list)-laMaxShown))
+	}
+	return "All monitors are up", truncateUTF8("Down: "+strings.Join(parts, ", "), maxPushBody)
+}
+
 // sendLiveActivity sends one event to the devices, in batches, and applies
 // what the relay reports: gone tokens are forgotten, gone handles deleted.
-// No retries: the next change or refresh sends the state again.
-func (h *Hub) sendLiveActivity(ctx context.Context, ps PushSettings, msg laMessage, devices []*store.PushDevice, start bool) {
+// It returns the devices whose token was gone. No retries: the next change
+// or refresh sends the state again.
+func (h *Hub) sendLiveActivity(ctx context.Context, ps PushSettings, msg laMessage, devices []*store.PushDevice, start bool) []*store.PushDevice {
+	var gone []*store.PushDevice
 	for i := 0; i < len(devices); i += relayBatch {
 		batch := devices[i:min(i+relayBatch, len(devices))]
 		msg.Targets = make([]laTarget, 0, len(batch))
@@ -306,6 +365,7 @@ func (h *Hub) sendLiveActivity(ctx context.Context, ps PushSettings, msg laMessa
 			var err error
 			switch r.Status {
 			case "gone":
+				gone = append(gone, d)
 				if start {
 					err = h.store.ClearLiveActivityStart(d.ID, d.LAStartToken)
 				} else {
@@ -322,6 +382,7 @@ func (h *Hub) sendLiveActivity(ctx context.Context, ps PushSettings, msg laMessa
 			}
 		}
 	}
+	return gone
 }
 
 // ---------- API for the app ----------

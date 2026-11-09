@@ -137,8 +137,9 @@ func TestLiveActivity(t *testing.T) {
 	st.ResolveIncident(m2.ID, time.Now().UnixMilli())
 	end := t0.Add(3*time.Second + laRefresh)
 	h.syncLiveActivities(t.Context(), end)
-	if len(relay.las) != 4 || relay.las[3].Event != "end" || relay.las[3].DismissalDate != end.Unix() || len(relay.las[3].Targets) != 1 ||
-		string(relay.las[3].ContentState) != `{"outages":[],"count":0}` {
+	if len(relay.las) != 4 || relay.las[3].Event != "end" || relay.las[3].DismissalDate != end.Add(laEndShown).Unix() || len(relay.las[3].Targets) != 1 ||
+		string(relay.las[3].ContentState) != `{"outages":[],"count":0}` || relay.las[3].Title != "All monitors are up" ||
+		!strings.HasPrefix(relay.las[3].Body, "Down: api ") || !strings.Contains(relay.las[3].Body, ", web ") {
 		t.Fatalf("end: %+v", relay.las[3:])
 	}
 	if d, _ := st.PushDeviceByGrant(grantOf(t, st, "pma_admin")); d.LAToken != "" || d.LAStartToken != startA {
@@ -155,6 +156,23 @@ func TestLiveActivity(t *testing.T) {
 	}
 	if list := decode[[]store.PushDevice](t, bearerDo(t, srv.URL, "pma_viewer", "GET", "/api/mobile/devices", nil)); len(list) != 0 {
 		t.Fatalf("device_gone kept: %+v", list)
+	}
+
+	// The admin dismissed the activity with the app suspended: the hub still
+	// has its token. A new monitor fails, the update comes back gone, and the
+	// activity starts again on that phone.
+	relay.laStat[startA] = ""
+	if res := bearerDo(t, srv.URL, "pma_admin", "PUT", "/api/mobile/live-activity/token", map[string]string{"token": tokA}); res.StatusCode != 200 {
+		t.Fatal(res.StatusCode)
+	}
+	relay.laStat[tokA] = "gone"
+	m3 := &store.Monitor{Name: "db", Type: "http", Target: "https://z"}
+	st.CreateMonitor(m3)
+	st.OpenIncident(m3.ID, time.Now().UnixMilli(), "refused")
+	h.syncLiveActivities(t.Context(), end.Add(2*laRestartAfter))
+	if n := len(relay.las); n != 7 || relay.las[5].Event != "update" || relay.las[6].Event != "start" ||
+		len(relay.las[6].Targets) != 1 || relay.las[6].Targets[0].Token != startA {
+		t.Fatalf("start after a gone activity: %+v", relay.las[5:])
 	}
 
 	// The app can clear its tokens.
@@ -175,6 +193,24 @@ func grantOf(t *testing.T, st *store.Store, token string) int64 {
 		t.Fatal(err)
 	}
 	return g.ID
+}
+
+func TestLiveActivitySummary(t *testing.T) {
+	min := int64(time.Minute / time.Millisecond)
+	if title, body := laSummaryText(nil); title != "All monitors are up" || body != "" {
+		t.Fatalf("%q %q", title, body)
+	}
+	one := []*store.Incident{{MonitorName: "api", StartedAt: 0, ResolvedAt: 12 * min}}
+	if title, body := laSummaryText(one); title != "api is up" || body != "Down for 12m" {
+		t.Fatalf("%q %q", title, body)
+	}
+	many := []*store.Incident{
+		{MonitorName: "c", StartedAt: 3, ResolvedAt: 3 + 90*min}, {MonitorName: "a", StartedAt: 1, ResolvedAt: 1 + 10},
+		{MonitorName: "b", StartedAt: 2, ResolvedAt: 2 + 5*min}, {MonitorName: "d", StartedAt: 4, ResolvedAt: 4 + min},
+	}
+	if title, body := laSummaryText(many); title != "All monitors are up" || body != "Down: a 1m, b 5m, c 1h 30m, +1" {
+		t.Fatalf("%q %q", title, body)
+	}
 }
 
 func TestLiveActivityAlert(t *testing.T) {
