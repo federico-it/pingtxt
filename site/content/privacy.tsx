@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-import { Prompt, REPO, SectionTitle } from "@/components/site-shell"
+import { Eyebrow, REPO, SectionTitle } from "@/components/site-shell"
 import { localePath, tx, type Lang } from "@/lib/i18n"
 import { docHref } from "@/lib/docs"
 import { pageMeta } from "@/lib/seo"
@@ -88,8 +88,8 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
 
       <div className="min-w-0 max-w-3xl space-y-12">
         <div className="space-y-2">
-          <Prompt>cat PRIVACY</Prompt>
-          <h1 className="text-xl font-semibold">{t("privacy policy", "informativa sulla privacy")}</h1>
+          <Eyebrow>privacy</Eyebrow>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{t("privacy policy", "informativa sulla privacy")}</h1>
           <p className="text-muted-foreground">
             {t(
               `For the pingtxt iOS app and the pingtxt.com website. Last updated ${UPDATED.en}.`,

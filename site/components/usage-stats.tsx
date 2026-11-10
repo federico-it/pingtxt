@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 
 import { useT } from "@/components/lang"
-import { SectionTitle } from "@/components/site-shell"
+import { Eyebrow, WRAP } from "@/components/ui"
 
 // Totals from the opt-in usage stats of self-hosted hubs, served by
 // pingtxt-telemetry (public JSON, cross-origin reads allowed).
@@ -43,17 +43,17 @@ export function UsageStats({ docsHref }: { docsHref: string }) {
     [live.agents, t("agents", "agent")],
   ]
   return (
-    <section className="space-y-6">
-      <SectionTitle>{t("in the wild", "in giro per il mondo")}</SectionTitle>
-      <div className="grid gap-3 sm:grid-cols-3">
+    <section className={`${WRAP} pb-20 sm:pb-24`}>
+      <Eyebrow>{t("in the wild", "in giro per il mondo")}</Eyebrow>
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
         {items.map(([n, label]) => (
-          <div key={label} className="border border-dashed p-4">
-            <div className="text-2xl font-semibold">{n.toLocaleString(t("en-US", "it-IT"))}</div>
-            <div className="text-xs text-muted-foreground">{label}</div>
+          <div key={label} className="border border-edge bg-background p-5 shadow-[4px_4px_0_0_var(--color-up)]">
+            <div className="text-3xl font-bold tabular-nums">{n.toLocaleString(t("en-US", "it-IT"))}</div>
+            <div className="mt-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</div>
           </div>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="mt-6 text-xs text-muted-foreground">
         {t(
           "Live numbers from hubs whose admins chose to share anonymous usage stats.",
           "Numeri in tempo reale dagli hub i cui admin hanno scelto di condividere statistiche d'uso anonime.",
