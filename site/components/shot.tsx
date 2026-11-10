@@ -32,21 +32,21 @@ export function Shot({
     decoding: "async" as const,
   }
   return (
-    <figure className="space-y-2">
-      <div className="border border-dashed bg-muted/40 p-1">
+    <figure className="space-y-3">
+      <div className="border border-edge bg-background shadow-[6px_6px_0_0_var(--color-hard)] dark:shadow-[6px_6px_0_0_var(--color-up)]">
         <div
           aria-hidden
-          className="flex items-center gap-1.5 border-b border-dashed px-2 pb-1.5 pt-0.5 text-[11px] text-muted-foreground"
+          className="flex items-center gap-1.5 border-b border-edge px-3 py-2 text-[11px] text-muted-foreground"
         >
-          <span className="size-2 rounded-full bg-down/70" />
-          <span className="size-2 rounded-full bg-warn/70" />
-          <span className="size-2 rounded-full bg-up/70" />
+          <span className="size-2 bg-down/80" />
+          <span className="size-2 bg-warn/80" />
+          <span className="size-2 bg-up/80" />
           <span className="ml-2 truncate">{label}</span>
         </div>
         <img src={light} {...img} className={dark ? "block h-auto w-full dark:hidden" : "block h-auto w-full"} />
         {dark && <img src={dark} {...img} className="hidden h-auto w-full dark:block" />}
       </div>
-      {caption && <figcaption className="text-xs text-muted-foreground">{caption}</figcaption>}
+      {caption && <figcaption className="text-xs font-semibold text-muted-foreground">{caption}</figcaption>}
     </figure>
   )
 }
