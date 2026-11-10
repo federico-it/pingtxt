@@ -37,10 +37,11 @@ export default function SettingsIndex() {
     <div className="md:hidden">
       {groups.map((g) => (
         <section key={g.key} className="mb-6">
-          <div className="mb-2 text-[11px] text-muted-foreground uppercase">
-            ── {t(`nav.${g.key}`)}
+          <div className="mb-2 text-[11px] font-semibold tracking-widest text-up uppercase">
+            {"// "}
+            {t(`nav.${g.key}`)}
           </div>
-          <div className="divide-y divide-dashed border border-dashed">
+          <div className="divide-y divide-dashed border border-edge">
             {g.cats.map((slug) => (
               <Link
                 key={slug}

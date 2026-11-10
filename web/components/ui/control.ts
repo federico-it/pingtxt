@@ -29,7 +29,7 @@ export const segment = cva(
   "inline-flex shrink-0 items-center px-2 whitespace-nowrap text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
-      active: { true: "bg-accent text-foreground", false: "" },
+      active: { true: "bg-up/15 text-foreground", false: "" },
       size: { xs: "h-6 text-xs", sm: "h-7 text-xs" },
     },
     defaultVariants: { active: false, size: "xs" },

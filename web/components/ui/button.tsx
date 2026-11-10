@@ -7,9 +7,10 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        default:
+          "border-edge bg-primary text-primary-foreground [--sh:var(--color-up)] hover:bg-primary/90 dark:border-primary dark:[--sh:var(--color-hard)]",
         outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+          "border-edge bg-background [--sh:var(--color-up)] hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
@@ -29,6 +30,23 @@ const buttonVariants = cva(
         "icon-xs": "size-6 [&_svg:not([class*='size-'])]:size-3",
       },
     },
+    // Like the buttons of the public site: an offset shadow that grows on
+    // hover and goes away on press. Only on the md and sm sizes; xs buttons
+    // sit inside table rows, where shadows would be noise.
+    compoundVariants: [
+      {
+        variant: ["default", "outline"],
+        size: ["default", "icon"],
+        className:
+          "shadow-[3px_3px_0_0_var(--sh)] hover:-translate-x-px hover:-translate-y-px hover:shadow-[4px_4px_0_0_var(--sh)] active:not-aria-[haspopup]:translate-x-0.5 active:not-aria-[haspopup]:translate-y-0.5 active:not-aria-[haspopup]:shadow-none disabled:shadow-none",
+      },
+      {
+        variant: ["default", "outline"],
+        size: ["sm", "icon-sm"],
+        className:
+          "shadow-[2px_2px_0_0_var(--sh)] hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_var(--sh)] active:not-aria-[haspopup]:translate-x-0.5 active:not-aria-[haspopup]:translate-y-0.5 active:not-aria-[haspopup]:shadow-none disabled:shadow-none",
+      },
+    ],
     defaultVariants: {
       variant: "default",
       size: "default",
