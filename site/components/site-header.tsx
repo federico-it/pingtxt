@@ -51,47 +51,6 @@ function LangSwitch() {
   )
 }
 
-// On an English page, a browser set to Italian gets a one-line hint, until a
-// language is picked or the hint is closed.
-function ItalianHint() {
-  const lang = useLang()
-  const [other, href] = useOther()
-  const [show, setShow] = useState(false)
-  useEffect(() => {
-    if (lang !== "en") return
-    let saved: string | null = null
-    try {
-      saved = localStorage.getItem(LANG_KEY)
-    } catch {}
-    const it = (navigator.languages ?? [navigator.language]).some((l) => l?.toLowerCase().startsWith("it"))
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!saved && it) setShow(true)
-  }, [lang])
-  if (!show || other !== "it") return null
-  return (
-    <div lang="it" className={`${WRAP} flex items-center gap-2 border-t border-dashed py-1.5 text-xs text-muted-foreground`}>
-      <span className="text-up">$</span>
-      <span>
-        questa pagina è anche in italiano:{" "}
-        <a href={href} hrefLang="it" onClick={(e) => go(e, "it")} className="text-foreground underline underline-offset-4">
-          leggi in italiano
-        </a>
-      </span>
-      <button
-        type="button"
-        onClick={() => {
-          remember("en")
-          setShow(false)
-        }}
-        aria-label="chiudi"
-        className={`${item} ml-auto`}
-      >
-        [×]
-      </button>
-    </div>
-  )
-}
-
 // One row from md up. Below md: logo, language, theme and a [≡] button that
 // opens the nav as a panel under the bar (closed again on navigation).
 export function SiteHeader({ nav, switcher = true }: { nav: NavItem[]; switcher?: boolean }) {
@@ -148,7 +107,6 @@ export function SiteHeader({ nav, switcher = true }: { nav: NavItem[]; switcher?
           </div>
         </nav>
       )}
-      {switcher && <ItalianHint />}
     </header>
   )
 }
