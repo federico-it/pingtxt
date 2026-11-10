@@ -43,6 +43,9 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    --color-band: var(--band);
+    --color-edge: var(--edge);
+    --color-hard: var(--hard);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -83,7 +86,13 @@
     --chart-6: oklch(0.6 0.14 45);
     --chart-7: oklch(0.52 0.15 285);
     --chart-8: oklch(0.55 0.11 110);
-    --radius: 0.125rem;
+    --radius: 0rem;
+    /* Like the public site: tinted bands with graph paper, a dark edge around
+       cards and offset shadows under buttons and dialogs. */
+    --band: oklch(0.95 0.05 150);
+    --band-line: oklch(0.58 0.15 150 / 0.12);
+    --edge: oklch(0.2 0.005 90 / 0.85);
+    --hard: oklch(0.2 0.005 90);
     --sidebar: oklch(0.97 0.003 90);
     --sidebar-foreground: oklch(0.2 0.005 90);
     --sidebar-primary: oklch(0.2 0.005 90);
@@ -125,6 +134,10 @@
     --chart-6: oklch(0.76 0.14 45);
     --chart-7: oklch(0.72 0.14 285);
     --chart-8: oklch(0.78 0.12 110);
+    --band: oklch(0.2 0.035 150);
+    --band-line: oklch(0.78 0.17 150 / 0.08);
+    --edge: oklch(0.42 0.012 150);
+    --hard: oklch(0.42 0.012 150);
     --sidebar: oklch(0.17 0.004 150);
     --sidebar-foreground: oklch(0.9 0.01 150);
     --sidebar-primary: oklch(0.82 0.16 150);
@@ -159,6 +172,25 @@
   50% {
     opacity: 0;
   }
+}
+
+/* Graph paper behind a band: 16px squares. */
+@utility bg-grid {
+  background-image:
+    linear-gradient(var(--band-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--band-line) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/* A stair-stepped pixel edge on top of a band, as on the public site. The
+   element is painted in its own background color through a mask of 8px
+   squares rising from the bottom, so it works in both themes. */
+@utility pixel-edge {
+  height: 24px;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='24' shape-rendering='crispEdges'%3E%3Cpath d='M0 16h96v8H0zM0 8h8v8H0zM16 8h16v8H16zM40 8h8v8H40zM56 8h24v8H56zM88 8h8v8H88zM16 0h8v8H16zM64 0h8v8H64z'/%3E%3C/svg%3E");
+  mask-repeat: repeat-x;
+  mask-size: 96px 24px;
+  mask-position: bottom left;
 }
 
 /* Heartbeat line of the "hub restarting" screen (components/hub-offline.tsx). */
