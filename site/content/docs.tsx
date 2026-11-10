@@ -1,13 +1,11 @@
 import type { Metadata } from "next"
-import Link from "next/link"
-
 import { CopyBlock } from "@/components/copy-block"
-import { Prompt, REPO, SectionTitle } from "@/components/site-shell"
+import { Prompt, REPO } from "@/components/site-shell"
+import { DocHeading, DocsFrame } from "@/content/docs-frame"
 import {
   blockHtml,
   inlineHtml,
   checkDocs,
-  DOC_PAGES,
   docHref,
   loadDoc,
   neighbours,
@@ -36,43 +34,30 @@ export function docsMeta(lang: Lang, slug: DocSlug | ""): Metadata {
 }
 
 const prose =
-  "space-y-4 text-muted-foreground [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-4 " +
-  "[&_strong]:text-foreground [&_strong]:font-semibold [&_code]:bg-muted [&_code]:px-1 [&_code]:text-foreground " +
-  "[&_kbd]:border [&_kbd]:px-1 [&_kbd]:text-foreground [&_li]:ml-4 [&_ul>li]:list-['-_'] [&_ol>li]:list-decimal " +
-  "[&_ol]:ml-4 [&_ol]:space-y-1 [&_ul]:space-y-1 [&_em]:italic"
+  "space-y-5 text-[14px] leading-7 [&_a]:underline [&_a]:decoration-up [&_a]:underline-offset-4 [&_a:hover]:decoration-2 " +
+  "[&_strong]:font-semibold [&_code]:bg-muted [&_code]:px-1 [&_code]:py-px [&_code]:text-[12.5px] [&_code]:text-up " +
+  "[&_kbd]:border [&_kbd]:px-1 [&_kbd]:text-[12px] [&_li]:ml-5 [&_li]:pl-1 [&_ul>li]:list-['–'] [&_ul>li]:marker:text-muted-foreground " +
+  "[&_ol>li]:list-decimal [&_ol>li]:marker:text-muted-foreground [&_ol]:space-y-1.5 [&_ul]:space-y-1.5 [&_em]:italic"
 
 const table =
-  "overflow-x-auto [&_table]:w-full [&_table]:text-left [&_table]:text-[12px] [&_th]:border-b [&_th]:border-dashed " +
-  "[&_th]:px-2 [&_th]:py-1.5 [&_th]:text-[11px] [&_th]:font-normal [&_th]:uppercase [&_th]:tracking-wider " +
-  "[&_td]:border-b [&_td]:border-dashed [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top " +
-  "[&_td:first-child]:text-foreground [&_td:first-child_code]:whitespace-nowrap"
+  "overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_table]:border [&_table]:text-left [&_table]:text-[12.5px] [&_table]:leading-relaxed " +
+  "[&_th]:border [&_th]:bg-muted [&_th]:px-3 [&_th]:py-2 [&_th]:text-[11px] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider " +
+  "[&_td]:border [&_td]:px-3 [&_td]:py-2 [&_td]:align-top [&_td:first-child_code]:whitespace-nowrap"
 
 function Body({ doc }: { doc: Doc }) {
   const seen = new Map<string, number>()
   const out: React.ReactNode[] = []
+  let lead = true
   doc.tokens.forEach((tok, i) => {
     if (tok.type === "heading") {
       const id = slugify(plain(tok.text), seen)
       if (tok.depth === 1) return
-      const html = inlineHtml(doc.lang, tok.text)
-      if (tok.depth === 2) {
-        out.push(
-          <div key={i} className="pt-6">
-            <SectionTitle id={id}>
-              <span dangerouslySetInnerHTML={{ __html: html }} />
-            </SectionTitle>
-          </div>,
-        )
-      } else {
-        out.push(
-          <h3
-            key={i}
-            id={id}
-            className="scroll-mt-20 pt-2 font-semibold text-foreground"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />,
-        )
-      }
+      lead = false
+      out.push(
+        <DocHeading key={i} depth={tok.depth} id={id}>
+          <span dangerouslySetInnerHTML={{ __html: inlineHtml(doc.lang, tok.text) }} />
+        </DocHeading>,
+      )
       return
     }
     if (tok.type === "code") {
@@ -81,63 +66,18 @@ function Body({ doc }: { doc: Doc }) {
       return
     }
     if (tok.type === "space") return
+    // The first paragraph is the page's lead.
+    const isLead = lead && tok.type === "paragraph"
+    lead = false
     out.push(
       <div
         key={i}
-        className={tok.type === "table" ? table : undefined}
+        className={tok.type === "table" ? table : isLead ? "text-[15px] text-muted-foreground" : undefined}
         dangerouslySetInnerHTML={{ __html: blockHtml(doc.lang, tok) }}
       />,
     )
   })
   return <div className={prose}>{out}</div>
-}
-
-function Sidebar({ lang, current }: { lang: Lang; current: Doc }) {
-  const t = tx(lang)
-  const item = (slug: DocSlug | "", label: string) => {
-    const active = slug === current.slug
-    return (
-      <li key={slug || "index"}>
-        <Link
-          href={docHref(lang, slug)}
-          className={active ? "text-foreground" : "text-muted-foreground transition-colors hover:text-foreground"}
-        >
-          {active ? "> " : ""}
-          {label}
-        </Link>
-        {active && slug && (
-          <ul className="mt-1 mb-2 hidden space-y-0.5 border-l border-dashed pl-3 text-[12px] lg:block">
-            {current.headings
-              .filter((h) => h.depth === 2)
-              .map((h) => (
-                <li key={h.id}>
-                  <a href={`#${h.id}`} className="text-muted-foreground transition-colors hover:text-foreground">
-                    {h.text}
-                  </a>
-                </li>
-              ))}
-          </ul>
-        )}
-      </li>
-    )
-  }
-  return (
-    <aside className="lg:sticky lg:top-20 lg:max-h-[calc(100svh-6rem)] lg:self-start lg:overflow-y-auto">
-      <div className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">{t("docs", "documentazione")}</div>
-      <ul className="flex flex-wrap gap-x-3 gap-y-0.5 lg:flex-col">
-        {item("", t("Overview", "Panoramica"))}
-        {DOC_PAGES.map((s) => item(s, loadDoc(lang, s).title))}
-        <li>
-          <Link
-            href={localePath(lang, "/docs/api/")}
-            className="text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {t("REST API reference", "Riferimento API")}
-          </Link>
-        </li>
-      </ul>
-    </aside>
-  )
 }
 
 // Old links to the single docs page (pingtxt.com/docs/#upgrade) jump to the
@@ -153,39 +93,26 @@ export function DocsPage({ lang, slug }: { lang: Lang; slug: DocSlug | "" }) {
   const t = tx(lang)
   const doc = loadDoc(lang, slug)
   const { prev, next } = neighbours(slug)
-  const link = (s: DocSlug | "" | undefined, dir: string) =>
-    s === undefined ? (
-      <span />
-    ) : (
-      <Link href={docHref(lang, s)} className="text-muted-foreground transition-colors hover:text-foreground">
-        {dir === "prev" ? "← " : ""}
-        {s ? loadDoc(lang, s).title : t("Overview", "Panoramica")}
-        {dir === "next" ? " →" : ""}
-      </Link>
-    )
+  const page = (s: DocSlug | "") => ({
+    href: docHref(lang, s),
+    title: s ? loadDoc(lang, s).title : t("Overview", "Panoramica"),
+  })
   return (
-    <div className="grid gap-10 py-12 lg:grid-cols-[200px_1fr]">
+    <DocsFrame
+      lang={lang}
+      toc={doc.headings.filter((h) => h.depth === 2 || h.depth === 3)}
+      prev={prev === undefined ? undefined : page(prev)}
+      next={next === undefined ? { href: localePath(lang, "/docs/api/"), title: t("REST API", "REST API") } : page(next)}
+      source={{ path: `docs/${lang}/${doc.file}`, edit: true }}
+    >
       {!slug && <OldAnchors lang={lang} />}
-      <Sidebar lang={lang} current={doc} />
-      <article className="min-w-0 max-w-3xl space-y-6">
-        <div className="space-y-2">
-          <Prompt>man pingtxt{slug ? `-${slug}` : ""}</Prompt>
-          <h1 className="text-xl font-semibold">{doc.title}</h1>
-        </div>
+      <header className="border-b pb-5">
+        <Prompt>man pingtxt{slug ? `-${slug}` : ""}</Prompt>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{doc.title}</h1>
+      </header>
+      <div className="mt-8">
         <Body doc={doc} />
-        <nav className="flex flex-wrap justify-between gap-4 border-t border-dashed pt-4 text-sm">
-          {link(prev, "prev")}
-          {link(next, "next")}
-        </nav>
-        <p className="text-xs text-muted-foreground">
-          <a
-            href={`${REPO}/blob/main/docs/${lang}/${doc.file}`}
-            className="underline-offset-4 hover:text-foreground hover:underline"
-          >
-            {t("edit this page on GitHub", "modifica questa pagina su GitHub")}
-          </a>
-        </p>
-      </article>
-    </div>
+      </div>
+    </DocsFrame>
   )
 }

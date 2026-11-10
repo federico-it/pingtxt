@@ -30,6 +30,16 @@ export const DOC_PAGES = [
 ] as const
 export type DocSlug = (typeof DOC_PAGES)[number]
 
+// The sidebar groups, in DOC_PAGES order (checkDocs verifies it). The index
+// page and the first group have no heading; the REST API reference closes
+// the last group.
+export const DOC_GROUPS: { en: string; it: string; pages: DocSlug[] }[] = [
+  { en: "", it: "", pages: ["concepts"] },
+  { en: "Setup", it: "Installazione", pages: ["install", "locations"] },
+  { en: "Monitoring", it: "Monitoraggio", pages: ["monitors", "alerts", "status-pages", "ios-app"] },
+  { en: "Operation", it: "Gestione", pages: ["security", "integrations", "administration"] },
+]
+
 export type Heading = { depth: number; text: string; id: string }
 export type Doc = {
   lang: Lang
@@ -159,6 +169,9 @@ export function checkDocs() {
       }
     })
   }
+  if (DOC_GROUPS.flatMap((g) => g.pages).join() !== DOC_PAGES.join()) {
+    errors.push("site/lib/docs.ts: DOC_GROUPS must list every page of DOC_PAGES, in the same order")
+  }
   if (errors.length) throw new Error(`docs check failed:\n${errors.join("\n")}`)
   checked = true
 }
@@ -234,4 +247,43 @@ export function oldAnchorMap(lang: Lang) {
   return Object.fromEntries(
     Object.entries(OLD_ANCHORS).map(([old, [slug, id]]) => [old, docHref(lang, slug, id)]),
   )
+}
+
+// The search index of a language, served as /docs-search.<lang>.json and
+// loaded by the sidebar's search box on first use: one entry per page and
+// per section, with its text as plain words.
+export type SearchEntry = { page: string; title: string; href: string; text: string }
+
+export function searchIndex(lang: Lang): SearchEntry[] {
+  const out: SearchEntry[] = []
+  for (const d of allDocs(lang)) {
+    const page = localePath(lang, d.slug ? `/docs/${d.slug}/` : "/docs/")
+    const seen = new Map<string, number>()
+    let cur: SearchEntry = { page: d.title, title: d.title, href: page, text: "" }
+    out.push(cur)
+    for (const t of d.tokens) {
+      if (t.type === "heading") {
+        const text = plain((t as Tokens.Heading).text)
+        const id = slugify(text, seen)
+        if (t.depth === 1) continue
+        cur = { page: d.title, title: text, href: `${page}#${id}`, text: "" }
+        out.push(cur)
+      } else if (t.type !== "space" && t.type !== "code") {
+        cur.text += " " + searchText(t.raw)
+      }
+    }
+  }
+  for (const e of out) e.text = e.text.replace(/\s+/g, " ").trim()
+  return out
+}
+
+// Plain words of a Markdown block for the search index. Unlike plain(), "_"
+// inside words stays (PINGTXT_DB_URL).
+function searchText(md: string) {
+  return md
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^[|:\-\s]+$/gm, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/[`*|>#]/g, " ")
+    .replace(/(^|\s)_+|_+(?=\s|$|[.,;:])/g, "$1")
 }
