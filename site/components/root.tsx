@@ -5,7 +5,7 @@ import "@/app/globals.css"
 import { LangProvider } from "@/components/lang"
 import { SiteShell } from "@/components/site-shell"
 import { ThemeProvider } from "@/components/theme"
-import { OG_LOCALE, tx, type Lang } from "@/lib/i18n"
+import { LANG_KEY, OG_LOCALE, tx, type Lang } from "@/lib/i18n"
 import { NAME, ogImage, SITE } from "@/lib/seo"
 
 // The two root layouts, app/(en)/layout.tsx and app/it/layout.tsx, are this
@@ -65,9 +65,30 @@ export const viewport: Viewport = {
   ],
 }
 
+// Runs before the page paints. Without a saved choice, a browser that prefers
+// Italian over English goes from an English page to the same page in Italian.
+// A choice made with the [it] / [en] switch (saved in localStorage) wins both
+// ways. Search engines send no language, so they keep the English pages.
+const pickLang = `(function(){try{
+var p=location.pathname,onIt=p==="/it"||p.indexOf("/it/")===0,saved=null;
+try{saved=localStorage.getItem(${JSON.stringify(LANG_KEY)})}catch(e){}
+var want=saved;
+if(!want){var ls=navigator.languages||[navigator.language];
+for(var i=0;i<ls.length;i++){var l=(ls[i]||"").toLowerCase();
+if(l.indexOf("it")===0){want="it";break}if(l.indexOf("en")===0){want="en";break}}}
+var rest=location.search+location.hash;
+if(want==="it"&&!onIt)location.replace("/it"+p+rest);
+else if(saved==="en"&&onIt)location.replace((p.slice(3)||"/")+rest);
+}catch(e){}})()`
+
 export function Root({ lang, notFound, children }: { lang: Lang; notFound?: boolean; children: React.ReactNode }) {
   return (
     <html lang={lang} suppressHydrationWarning>
+      {!notFound && (
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: pickLang }} />
+        </head>
+      )}
       <body>
         <LangProvider lang={lang}>
           <ThemeProvider>

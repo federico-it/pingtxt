@@ -28,3 +28,6 @@ export function tx(lang: Lang) {
     return lang === "it" ? it : en
   }
 }
+
+// Where the visitor's choice of language is kept (only in their browser).
+export const LANG_KEY = "pingtxt.lang"

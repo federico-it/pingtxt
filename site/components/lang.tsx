@@ -19,5 +19,4 @@ export function useT() {
   return tx(useLang())
 }
 
-// Where the visitor's choice of language is kept (only in their browser).
-export const LANG_KEY = "pingtxt.lang"
+export { LANG_KEY } from "@/lib/i18n"
