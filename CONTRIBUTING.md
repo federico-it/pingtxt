@@ -178,8 +178,8 @@ build time, see [`site/lib/docs.ts`](site/lib/docs.ts)).
   build fails on a link to a page or anchor that does not exist.
 - Write for someone running pingtxt, not for someone reading the code: what to click, what to set, what happens.
   Name settings as the UI does (**settings → monitors**).
-- A new page needs its file in both languages and an entry in `DOC_PAGES` in `site/lib/docs.ts`, plus a line in
-  `docs/en/README.md` and `docs/it/README.md`.
+- A new page needs its file in both languages, an entry in `DOC_PAGES` and in a sidebar group of `DOC_GROUPS` in
+  `site/lib/docs.ts`, plus a line in `docs/en/README.md` and `docs/it/README.md`.
 - Check the result with `cd site && npm run build` (or `npm run dev`).
 
 ## Translating the interface

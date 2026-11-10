@@ -19,7 +19,7 @@ export function SiteShell({ lang, notFound, children }: { lang: Lang; notFound?:
     { href: REPO, label: "github" },
   ]
   return (
-    <div className="mx-auto flex min-h-svh w-full max-w-6xl flex-col px-4 sm:px-6">
+    <div className="mx-auto flex min-h-svh w-full max-w-6xl flex-col px-4 sm:px-6 has-[.docs-frame]:max-w-[88rem]">
       <SiteHeader nav={nav} switcher={!notFound} />
       <main className="flex-1">{children}</main>
       <footer className="mt-16 flex flex-wrap items-center justify-between gap-2 border-t border-dashed py-4 text-xs text-muted-foreground">

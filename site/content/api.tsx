@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { CopyBlock } from "@/components/copy-block";
-import { Prompt, REPO, SectionTitle } from "@/components/site-shell";
+import { Prompt, REPO } from "@/components/site-shell";
 import {
   loadOpenAPI,
   mediaExample,
@@ -12,6 +12,8 @@ import {
   type Operation,
   type Schema,
 } from "@/lib/openapi";
+import { DocHeading, DocsFrame } from "@/content/docs-frame";
+import { docHref, loadDoc } from "@/lib/docs";
 import { tx, type Lang } from "@/lib/i18n";
 import { pageMeta } from "@/lib/seo";
 
@@ -313,37 +315,24 @@ export function ApiPage({ lang }: { lang: Lang }) {
   const count = [...byTag.values()].reduce((n, l) => n + l.length, 0);
 
   return (
-    <div className="grid gap-10 py-12 lg:grid-cols-[180px_1fr]">
-      <aside className="lg:sticky lg:top-20 lg:self-start">
-        <div className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-          {t("contents", "indice")}
-        </div>
-        <nav className="flex flex-wrap gap-x-3 gap-y-0.5 lg:flex-col">
-          <a
-            href="#auth"
-            className="text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {t("authentication", "autenticazione")}
-          </a>
-          {doc.tags.map((t) => (
-            <a
-              key={t.name}
-              href={`#${slug(t.name)}`}
-              className="text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {t.name.toLowerCase()}
-            </a>
-          ))}
-        </nav>
-      </aside>
-
+    <DocsFrame
+      lang={lang}
+      toc={[
+        { id: "auth", text: t("authentication", "autenticazione"), depth: 2 },
+        ...doc.tags.map((g) => ({ id: slug(g.name), text: g.name.toLowerCase(), depth: 2 })),
+      ]}
+      prev={{ href: docHref(lang, "administration"), title: loadDoc(lang, "administration").title }}
+      source={{ path: "internal/hub/openapi.json", edit: false }}
+    >
       <div className="min-w-0 space-y-12">
-        <div className="space-y-2">
-          <Prompt>curl /api/openapi.json</Prompt>
-          <h1 className="text-xl font-semibold">
-            {t("api reference", "riferimento api")}
-          </h1>
-          <p className="max-w-2xl text-muted-foreground">
+        <div>
+          <header className="border-b pb-5">
+            <Prompt>curl /api/openapi.json</Prompt>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+              {t("REST API reference", "Riferimento REST API")}
+            </h1>
+          </header>
+          <p className="mt-8 text-[15px] leading-7 text-muted-foreground">
             {t(
               <>
                 The {count} operations of the hub&apos;s REST API, the same the
@@ -387,12 +376,11 @@ export function ApiPage({ lang }: { lang: Lang }) {
         </div>
 
         <section
-          id="auth"
           className="space-y-3 [&_li]:ml-4 [&_li]:list-['-_'] [&_p]:text-muted-foreground [&_ul]:space-y-1 [&_ul]:text-muted-foreground"
         >
-          <SectionTitle id="auth">
+          <DocHeading depth={2} id="auth">
             {t("authentication", "autenticazione")}
-          </SectionTitle>
+          </DocHeading>
           <p>
             {t(
               <>
@@ -449,9 +437,9 @@ curl -X POST -H "Authorization: Bearer ptk_..." -H "Content-Type: application/js
 
         {doc.tags.map((t) => (
           <section key={t.name} className="space-y-4">
-            <SectionTitle id={slug(t.name)}>
+            <DocHeading depth={2} id={slug(t.name)}>
               {t.name.toLowerCase()}
-            </SectionTitle>
+            </DocHeading>
             {t.description && (
               <p className="text-muted-foreground">{t.description}</p>
             )}
@@ -468,6 +456,6 @@ curl -X POST -H "Authorization: Bearer ptk_..." -H "Content-Type: application/js
           </section>
         ))}
       </div>
-    </div>
+    </DocsFrame>
   );
 }
