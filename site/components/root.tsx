@@ -81,14 +81,17 @@ if(want==="it"&&!onIt)location.replace("/it"+p+rest);
 else if(saved==="en"&&onIt)location.replace((p.slice(3)||"/")+rest);
 }catch(e){}})()`
 
+// Rybbit, the website's analytics (pingtxt.com only, never the hub).
+const RYBBIT_SCRIPT = "https://rybbit.js.lc/api/script.js?siteId=11b089d40cca"
+
 export function Root({ lang, notFound, children }: { lang: Lang; notFound?: boolean; children: React.ReactNode }) {
   return (
     <html lang={lang} suppressHydrationWarning>
-      {!notFound && (
-        <head>
-          <script dangerouslySetInnerHTML={{ __html: pickLang }} />
-        </head>
-      )}
+      <head>
+        {!notFound && <script dangerouslySetInnerHTML={{ __html: pickLang }} />}
+        {/* Cookieless page-view analytics; described in the privacy policy. */}
+        <script src={RYBBIT_SCRIPT} defer />
+      </head>
       <body>
         <LangProvider lang={lang}>
           <ThemeProvider>
