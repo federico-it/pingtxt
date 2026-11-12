@@ -212,9 +212,7 @@
     "diagnostics": "diagnostica",
     "blockedBy": "bloccato da <hl>{name}</hl> dal {since}: è giù anche quello, quindi questo monitor non manda avvisi propri. quando torna su, arriva un avviso solo se questo continua a fallire.",
     "openIncident": "incidente aperto dal {since}",
-    "notAcked": "nessuno l'ha ancora preso in carico: promemoria ed escalation sono attivi",
-    "whyDegraded": "degradato perché",
-    "whyDown": "down perché"
+    "notAcked": "nessuno l'ha ancora preso in carico: promemoria ed escalation sono attivi"
   },
   "browserNotify": {
     "title": "notifiche desktop in questo browser",
