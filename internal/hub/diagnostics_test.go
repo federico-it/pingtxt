@@ -69,12 +69,15 @@ func TestDiagnosticsFlow(t *testing.T) {
 	if want := diagURL("https://hub.example", incs[0].ID); got.DiagnosticsURL != want {
 		t.Fatalf("url %q, want %q", got.DiagnosticsURL, want)
 	}
-	if !strings.Contains(got.Text(), "\n  hub: DNS 192.0.2.10") || !strings.Contains(got.Text(), "diagnostics: "+got.DiagnosticsURL) {
+	if !strings.Contains(got.Text(), "\n  hub: No answer on port 443") || !strings.Contains(got.Text(), " · DNS 192.0.2.10") || !strings.Contains(got.Text(), "diagnostics: "+got.DiagnosticsURL) {
 		t.Fatalf("text: %q", got.Text())
 	}
 	linked, _ := st.IncidentDiagnostics(incs[0].ID)
 	if len(linked) != 1 || linked[0].Location != LocalLocation {
 		t.Fatalf("linked: %+v", linked)
+	}
+	if v := h.diagViews(linked); len(v[0].Findings) != 2 || v[0].Findings[0].Code != "tcp_timeout" || v[0].Findings[1].Code != "trace_stops" {
+		t.Fatalf("findings: %+v", v[0].Findings)
 	}
 
 	// Reminders carry only the link.

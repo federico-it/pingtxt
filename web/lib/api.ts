@@ -261,7 +261,22 @@ export interface Diag {
     hops?: { ttl: number; addr?: string; name?: string; rtt_ms?: number }[]
   }
   note?: string
+  /** monitor type (left out by older agents on old diagnostics) */
+  type?: string
+  /** error of the failing check */
+  check?: string
+  /** first line the server sent (SMTP greeting) */
+  banner?: string
   ms: number
+}
+
+/** What the diagnostics point at, worked out by the hub. Codes can be new: show text for unknown ones. */
+export interface DiagFinding {
+  code: string
+  step: string
+  level: "down" | "warn" | "ok"
+  params?: Record<string, string>
+  text: string
 }
 
 export interface Diagnostic {
@@ -272,6 +287,8 @@ export interface Diagnostic {
   location_name: string
   at: number
   data: Diag
+  /** most telling first; missing on hubs older than findings */
+  findings?: DiagFinding[]
 }
 
 export interface Agent {

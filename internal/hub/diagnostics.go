@@ -55,7 +55,8 @@ func diagEnabled(m *store.Monitor, g GeneralSettings) bool {
 // should collect diagnostics if it fails: only when the location is not
 // failing already and has not sent diagnostics lately. Call with h.mu held.
 func (h *Hub) wantDiagLocked(st *monState, loc string, g GeneralSettings, now time.Time) bool {
-	if !diagEnabled(st.m, g) || st.m.Type == check.TypePush {
+	// Push and docker checks have no network path to look at.
+	if !diagEnabled(st.m, g) || st.m.Type == check.TypePush || st.m.Type == check.TypeDocker {
 		return false
 	}
 	ls := st.locs[loc]
@@ -139,6 +140,20 @@ func diagMailRows(d *check.Diag) []mailRow {
 		return nil
 	}
 	var rows []mailRow
+	// What the diagnostics point at comes first.
+	for i, f := range d.Findings() {
+		if i == 3 || i > 0 && f.Level == check.FindOK {
+			break
+		}
+		key := "finding"
+		if i == 0 {
+			key = "diagnosis"
+		}
+		rows = append(rows, mailRow{Key: key, Value: f.Text, Tone: map[string]string{check.FindDown: toneDown, check.FindWarn: toneWarn}[f.Level]})
+	}
+	if d.Banner != "" {
+		rows = append(rows, mailRow{Key: "banner", Value: d.Banner})
+	}
 	for _, q := range d.DNS {
 		v := strings.Join(q.Answers, ", ")
 		tone := ""
@@ -233,18 +248,29 @@ func fmtDiagMs(v float64) string {
 	return strconv.Itoa(int(v+0.5)) + " ms"
 }
 
-// diagnosticView is a stored diagnostic with its location name.
+// diagnosticView is a stored diagnostic with its location name and what it
+// points at.
 type diagnosticView struct {
 	*store.Diagnostic
-	LocationName string `json:"location_name"`
+	LocationName string          `json:"location_name"`
+	Findings     []check.Finding `json:"findings"`
 }
 
 func (h *Hub) diagViews(list []*store.Diagnostic) []diagnosticView {
 	out := make([]diagnosticView, len(list))
+	for i, d := range list {
+		out[i] = diagnosticView{Diagnostic: d, Findings: []check.Finding{}}
+		var data check.Diag
+		if json.Unmarshal(d.Data, &data) == nil {
+			if f := data.Findings(); f != nil {
+				out[i].Findings = f
+			}
+		}
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for i, d := range list {
-		out[i] = diagnosticView{Diagnostic: d, LocationName: h.locationNameLocked(d.Location)}
+		out[i].LocationName = h.locationNameLocked(d.Location)
 	}
 	return out
 }
