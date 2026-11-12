@@ -41,16 +41,19 @@ export function parseCause(cause: string): Reason[] {
 
 // ReasonList shows each problem once, with the locations that report it.
 // With total (the monitor's location count) a problem seen everywhere says
-// "all locations"; with compact, more than two locations become a count.
+// "all locations" (or nothing, with omitAll); with compact, more than two locations become a count.
 export function ReasonList({
   reasons,
   total = 0,
   compact = false,
+  omitAll = false,
   className,
 }: {
   reasons: Reason[]
   total?: number
   compact?: boolean
+  /** say nothing about locations for a problem seen at all of them */
+  omitAll?: boolean
   className?: string
 }) {
   const t = useTranslations("reasons")
@@ -63,7 +66,7 @@ export function ReasonList({
         return (
           <li key={i} className="min-w-0 [overflow-wrap:anywhere]">
             <span className="text-foreground">{r.message || t("noMessage")}</span>
-            {r.locations.length > 0 && (
+            {r.locations.length > 0 && !(all && omitAll) && (
               <span className="text-muted-foreground" title={many || all ? r.locations.join("\n") : undefined}>
                 {" — "}
                 {all

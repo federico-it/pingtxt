@@ -17,7 +17,7 @@ import { PinButton } from "@/components/pin-button"
 import { PhaseChart, hasPhases, phaseLocations, phaseTitle } from "@/components/phase-chart"
 import { TagList, useLabels } from "@/components/labels"
 import { KV, PageHeader, Section } from "@/components/page-header"
-import { OkText, StatusText } from "@/components/status"
+import { OkText, StatusGlyph, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
 import { ResultsLog, type TimeWindow } from "@/components/results-log"
 import { IncidentDiagnostics } from "@/components/diagnostics"
@@ -87,6 +87,7 @@ function View() {
   const t = useTranslations("monitor")
   const tc = useTranslations("common")
   const tp = useTranslations("phaseChart")
+  const ts = useTranslations("status")
   const series = useApi<Series>(
     !id ? null : zoom ? `/api/monitors/${id}/series?start=${zoom.start}&end=${zoom.end}` : `/api/monitors/${id}/series?range=${range}`,
     // A zoomed window is in the past: nothing new to fetch.
@@ -239,6 +240,20 @@ function View() {
         </div>
       )}
 
+      {!d.paused && (d.status === "degraded" || d.status === "down") && (d.reasons?.length ?? 0) > 0 && (
+        <div
+          className={cn(
+            "mb-4 border border-dashed px-3 py-2 text-xs",
+            d.status === "down" ? "border-down/60" : "border-warn/60"
+          )}
+        >
+          <div className={cn("mb-1 uppercase tracking-wide", d.status === "down" ? "text-down" : "text-warn")}>
+            <StatusGlyph status={d.status} /> {ts(d.status)}
+          </div>
+          <ReasonList reasons={d.reasons!} total={d.location_status.length} omitAll className="text-sm" />
+        </div>
+      )}
+
       {d.maintenance && (
         <div className="mb-4 border border-dashed border-info/60 px-3 py-2 text-xs text-info">
           ◇{" "}
@@ -290,19 +305,6 @@ function View() {
         </div>
       )}
 
-      {!d.paused && (d.status === "degraded" || d.status === "down") && (d.reasons?.length ?? 0) > 0 && (
-        <div
-          className={cn(
-            "mb-4 border border-dashed px-3 py-2 text-xs",
-            d.status === "down" ? "border-down/60" : "border-warn/60"
-          )}
-        >
-          <div className={cn("mb-1", d.status === "down" ? "text-down" : "text-warn")}>
-            {d.status === "down" ? t("whyDown") : t("whyDegraded")}
-          </div>
-          <ReasonList reasons={d.reasons!} total={d.location_status.length} />
-        </div>
-      )}
 
       <div className="grid grid-cols-2 gap-4 border-y border-dashed py-4 sm:grid-cols-3 lg:grid-cols-6">
         <KV k={t("kv.status")} v={<StatusText status={d.status} />} />
@@ -425,50 +427,59 @@ function View() {
               <TableHead>{d.type === "push" ? t("cols.source") : t("cols.location")}</TableHead>
               <TableHead>{t("cols.state")}</TableHead>
               <TableHead className="text-right">{t("cols.latency")}</TableHead>
-              <TableHead className="hidden md:table-cell">{t("cols.message")}</TableHead>
-              <TableHead className="text-right">{t("cols.checked")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {d.location_status.map((l) => (
-              <TableRow key={l.id}>
-                <TableCell>
-                  <CountryFlag code={l.country} />
-                  {l.name}
-                  {l.last?.message && (
-                    <div className="mt-1 max-w-[60vw] whitespace-normal text-xs text-muted-foreground [overflow-wrap:anywhere] md:hidden">
-                      {l.last.message}
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {!l.online ? (
-                    <span className="text-muted-foreground">{t("offline")}</span>
-                  ) : l.last?.ok && l.degraded ? (
-                    <StatusText status="degraded" />
-                  ) : l.last ? (
-                    <OkText ok={l.last.ok} />
-                  ) : (
-                    <span className="text-muted-foreground">{t("waiting")}</span>
-                  )}
-                </TableCell>
-                <TableCell
-                  className="text-right"
-                  title={l.last ? phaseTitle(l.last.timing, l.last.latency_ms, tp) : undefined}
-                >
-                  {ms(l.last?.latency_ms)}
-                </TableCell>
-                <TableCell className="hidden min-w-56 max-w-md whitespace-normal text-muted-foreground [overflow-wrap:anywhere] md:table-cell">
-                  {l.last?.message}
-                </TableCell>
-                <TableCell
-                  className="text-right text-muted-foreground"
-                  title={l.last?.ts ? datetime(l.last.ts) : undefined}
-                >
-                  {ago(l.last?.ts)}
-                </TableCell>
-              </TableRow>
-            ))}
+            {d.location_status.map((l) => {
+              const st = !l.online
+                ? "paused"
+                : !l.last
+                  ? "pending"
+                  : !l.last.ok
+                    ? "down"
+                    : l.degraded
+                      ? "degraded"
+                      : "up"
+              // The message is in the box at the top when it explains the
+              // monitor's status: show it here only when it adds something.
+              const note =
+                (st === "down" || st === "degraded") &&
+                l.last?.message &&
+                !d.reasons?.some((r) => r.message === l.last!.message)
+                  ? l.last.message
+                  : ""
+              return (
+                <TableRow key={l.id} title={l.last?.message || undefined}>
+                  <TableCell className="whitespace-normal">
+                    <StatusGlyph status={st} className="mr-2" />
+                    <CountryFlag code={l.country} />
+                    {l.name}
+                    {note && (
+                      <div className="mt-1 max-w-[65vw] whitespace-normal pl-5 text-xs text-muted-foreground [overflow-wrap:anywhere] md:max-w-xl">
+                        {note}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell title={l.last?.ts ? `${datetime(l.last.ts)} · ${ago(l.last.ts)}` : undefined}>
+                    {!l.online ? (
+                      <span className="text-muted-foreground">{t("offline")}</span>
+                    ) : l.last?.ok && l.degraded ? (
+                      <span className="text-warn">{ts("degraded")}</span>
+                    ) : l.last ? (
+                      <OkText ok={l.last.ok} />
+                    ) : (
+                      <span className="text-muted-foreground">{t("waiting")}</span>
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className="text-right text-muted-foreground"
+                    title={l.last ? phaseTitle(l.last.timing, l.last.latency_ms, tp) : undefined}
+                  >
+                    {ms(l.last?.latency_ms)}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
           </TableBody>
         </Table>
       </Section>

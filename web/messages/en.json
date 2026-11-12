@@ -212,9 +212,7 @@
     "diagnostics": "diagnostics",
     "blockedBy": "blocked by <hl>{name}</hl> since {since}: it is down too, so this monitor sends no alerts of its own. once it is back, an alert goes out only if this one still fails.",
     "openIncident": "incident open since {since}",
-    "notAcked": "nobody has taken it yet: reminders and escalation run",
-    "whyDegraded": "degraded because",
-    "whyDown": "down because"
+    "notAcked": "nobody has taken it yet: reminders and escalation run"
   },
   "browserNotify": {
     "title": "desktop notifications in this browser",
