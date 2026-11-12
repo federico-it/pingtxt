@@ -600,6 +600,13 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	ls.lastMsg = r.Message
 	st.lastAt = time.Now()
 	if r.Diag != nil {
+		// Agents older than these fields leave them out.
+		if r.Diag.Type == "" {
+			r.Diag.Type = st.m.Type
+		}
+		if r.Diag.Check == "" {
+			r.Diag.Check = truncateUTF8(r.Message, 300)
+		}
 		ls.diag, ls.diagID, ls.diagAt = r.Diag, 0, time.Now()
 	}
 	if r.OK {

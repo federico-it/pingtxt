@@ -297,10 +297,31 @@ risultato fallito, così è pronta quando parte l'avviso:
   non vengono mai conservati;
 - **traceroute**: fino a 20 hop con i nomi inversi, come SYN TCP sulla porta del monitor (UDP per ping e DNS). Non
   serve root: su Linux legge gli errori ICMP come `tracepath`, quindi funziona nei container senza root. Gli altri
-  sistemi per ora lo saltano.
+  sistemi per ora lo saltano;
+- **saluto SMTP**: per i monitor SMTP, la prima riga che invia il server (es. `421 too many connections`).
+
+I monitor Docker e push non hanno diagnostica: non c'è un percorso di rete da esaminare.
+
+### Leggere la diagnosi
+
+L'hub legge i dati e mette in cima il risultato in parole semplici: la **diagnosi**, gli altri problemi trovati e
+l'errore del controllo. Per esempio:
+
+- il nome non esiste (NXDOMAIN), oppure il server DNS di un monitor DNS risponde diversamente dal resolver di sistema;
+- la porta rifiuta la connessione (nessun servizio in ascolto) o non risponde (un firewall o un host spento), con l'hop
+  dove si ferma il percorso; una porta che funziona in IPv4 ma non in IPv6;
+- il certificato è scaduto, non è valido per il nome o non è attendibile (autofirmato o senza certificato intermedio);
+- lo stato HTTP spiegato: 502/504 da un proxy senza niente dietro, gli errori 52x di Cloudflare (il problema è
+  sull'origine), 503 e 429 con il loro `Retry-After`, 401/403 accesso negato;
+- un host raggiungibile che non risponde al ping (ICMP bloccato), o un server di posta che saluta con un errore;
+- quando DNS, connessione e TLS funzionano, che il problema è nel servizio stesso.
+
+Sotto, ogni passaggio (DNS, connessione, TLS, risposta HTTP, percorso) ha una riga con ✓ o ✗; un clic sul passaggio
+mostra i dati grezzi (indirizzi, nomi del certificato, header della risposta, gli hop del traceroute). **Copia come
+testo** copia tutto, diagnosi compresa, per un ticket.
 
 Richiede al massimo 8 secondi e 16 KB, e parte al massimo una volta ogni 10 minuti per monitor e località. Il primo
-avviso di un incidente elenca una riga per ogni località in errore e rimanda alla diagnostica completa nella pagina
+avviso di un incidente elenca una riga per ogni località in errore, che inizia con la diagnosi, e rimanda alla diagnostica completa nella pagina
 incidenti; i webhook ricevono `diagnostics` e `diagnostics_url`, i promemoria solo il link. La diagnostica non compare
 mai nelle status page. È anche nell'API (`GET /api/incidents/{id}/diagnostics`) e nel tool MCP
 `get_incident_diagnostics`.

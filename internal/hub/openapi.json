@@ -13645,6 +13645,18 @@
           "port": {
             "type": "string"
           },
+          "type": {
+            "type": "string",
+            "description": "Monitor type. Left out on diagnostics of agents older than this field, unless the hub filled it in."
+          },
+          "check": {
+            "type": "string",
+            "description": "Error of the failing check."
+          },
+          "banner": {
+            "type": "string",
+            "description": "First line the server sent after connecting (SMTP greeting)."
+          },
           "dns": {
             "type": "array",
             "items": {
@@ -13846,6 +13858,54 @@
           },
           "data": {
             "$ref": "#/components/schemas/Diag"
+          },
+          "findings": {
+            "type": "array",
+            "description": "What the diagnostics point at, worked out by the hub when it reads them (also for older diagnostics), most telling first.",
+            "items": {
+              "$ref": "#/components/schemas/DiagFinding"
+            }
+          }
+        }
+      },
+      "DiagFinding": {
+        "type": "object",
+        "description": "One conclusion of the diagnostics, in plain words.",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "What was found, e.g. dns_nxdomain, tcp_refused, tcp_timeout, tls_expired, http_gateway, trace_stops, network_ok. New codes can be added: clients show text for codes they do not know."
+          },
+          "step": {
+            "type": "string",
+            "enum": [
+              "dns",
+              "tcp",
+              "tls",
+              "http",
+              "trace",
+              "check"
+            ],
+            "description": "The step it is about."
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "down",
+              "warn",
+              "ok"
+            ]
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Values for a translated sentence (port, host, status, date, hop, error...)."
+          },
+          "text": {
+            "type": "string",
+            "description": "The finding as an English sentence."
           }
         }
       },

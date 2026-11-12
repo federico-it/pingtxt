@@ -681,7 +681,7 @@ var mcpTools = []mcpTool{
 	},
 	{
 		name: "get_incident_diagnostics", title: "Get incident diagnostics",
-		description: "What the failing locations found at the start of an incident: DNS answers, TCP connections, TLS certificate, HTTP status and response headers (secrets redacted, no body) and a traceroute (hops with address, reverse name and RTT; reached=false means the path stops at the last hop that answered). list_incidents marks incidents that have some with diagnostics=true.",
+		description: "What the failing locations found at the start of an incident: DNS answers, TCP connections, TLS certificate, HTTP status and response headers (secrets redacted, no body) and a traceroute (hops with address, reverse name and RTT; reached=false means the path stops at the last hop that answered), plus findings: the diagnosis in plain words, most telling first. list_incidents marks incidents that have some with diagnostics=true.",
 		schema: object(map[string]any{
 			"incident_id": prop("integer", "Incident id from list_incidents"),
 		}, "incident_id"),

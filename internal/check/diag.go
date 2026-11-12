@@ -38,6 +38,13 @@ type Diag struct {
 	At   int64  `json:"at"` // unix milliseconds
 	Host string `json:"host,omitempty"`
 	Port string `json:"port,omitempty"`
+	// Type is the monitor type. Agents older than it leave it out and the
+	// hub fills it in.
+	Type string `json:"type,omitempty"`
+	// Check is the error of the failing check, filled in by the hub.
+	Check string `json:"check,omitempty"`
+	// Banner is the first line the server sent (SMTP greeting).
+	Banner string `json:"banner,omitempty"`
 
 	DNS   []DiagDNS  `json:"dns,omitempty"`
 	TCP   []DiagConn `json:"tcp,omitempty"`
@@ -214,7 +221,7 @@ func Diagnose(ctx context.Context, j Job, r Result) *Diag {
 	ctx, cancel := context.WithTimeout(ctx, DiagBudget)
 	defer cancel()
 	start := time.Now()
-	d := &Diag{HTTP: r.http}
+	d := &Diag{HTTP: r.http, Type: j.Type, Check: truncate(r.Message, 300)}
 	t := targetFor(j)
 	d.Host, d.Port, d.Note = t.host, t.port, t.note
 
@@ -254,6 +261,14 @@ func Diagnose(ctx context.Context, j Job, r Result) *Diag {
 		go func() {
 			defer wg.Done()
 			d.TCP = diagConnect(ctx, ips, t.port)
+			if j.Type == TypeSMTP {
+				for _, c := range d.TCP {
+					if c.OK {
+						d.Banner = diagBanner(ctx, c.Addr, t.tlsName, t.tls)
+						break
+					}
+				}
+			}
 			if t.tls {
 				for _, c := range d.TCP {
 					if c.OK {
@@ -278,6 +293,33 @@ func Diagnose(ctx context.Context, j Job, r Result) *Diag {
 	d.At = time.Now().UnixMilli()
 	d.shrink()
 	return d
+}
+
+// diagBanner reads the first line a server sends after connecting, such
+// as the SMTP greeting.
+func diagBanner(ctx context.Context, addr, name string, useTLS bool) string {
+	cctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	var c net.Conn
+	var err error
+	if useTLS {
+		dl := tls.Dialer{Config: &tls.Config{ServerName: name, InsecureSkipVerify: true}}
+		c, err = dl.DialContext(cctx, "tcp", addr)
+	} else {
+		var dl net.Dialer
+		c, err = dl.DialContext(cctx, "tcp", addr)
+	}
+	if err != nil {
+		return ""
+	}
+	defer c.Close()
+	if dl, ok := cctx.Deadline(); ok {
+		_ = c.SetReadDeadline(dl)
+	}
+	buf := make([]byte, 512)
+	n, _ := c.Read(buf)
+	line, _, _ := strings.Cut(string(buf[:n]), "\n")
+	return truncate(strings.TrimSpace(strings.ToValidUTF8(line, "")), 200)
 }
 
 func filterFamily(ips []net.IP, fam int) []net.IP {
@@ -520,6 +562,9 @@ func (d *Diag) Summary() string {
 		return ""
 	}
 	var parts []string
+	if f := d.Findings(); len(f) > 0 && f[0].Level != FindOK {
+		parts = append(parts, f[0].Text)
+	}
 	for _, q := range d.DNS {
 		if q.Resolver != "system" || !strings.HasPrefix(q.Query, "A/AAAA") {
 			continue

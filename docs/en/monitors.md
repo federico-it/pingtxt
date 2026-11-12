@@ -286,10 +286,31 @@ failed result, so they are ready when the alert goes out:
   never kept;
 - **traceroute**: up to 20 hops with reverse names, as TCP SYNs to the monitor's port (UDP for ping and DNS). It
   needs no root: on Linux it reads the ICMP errors like `tracepath`, so it works in the non-root containers. Other
-  systems skip it for now.
+  systems skip it for now;
+- **SMTP greeting**: for SMTP monitors, the first line the server sends (e.g. `421 too many connections`).
+
+Docker and push monitors get no diagnostics: there is no network path to look at.
+
+### Reading the diagnosis
+
+The hub reads the data and puts the result in plain words at the top: the **diagnosis**, the other problems it found
+and the error of the check. For example:
+
+- the name does not exist (NXDOMAIN), or the DNS server of a DNS monitor answers differently from the system resolver;
+- the port refuses the connection (nothing listens there) or does not answer (a firewall or a host that is off), with
+  the hop where the route stops; a port that works over IPv4 but not over IPv6;
+- the certificate expired, is not valid for the name, or is not trusted (self-signed or missing intermediate);
+- the HTTP status explained: 502/504 from a proxy with nothing behind it, the 52x errors of Cloudflare (the origin is
+  the problem), 503 and 429 with their `Retry-After`, 401/403 access denied;
+- a host that is reachable but does not answer the ping (ICMP blocked), or a mail server that greets with an error;
+- when DNS, connection and TLS all work, that the problem is in the service itself.
+
+Below it, every step (DNS, connection, TLS, HTTP response, route) has one line with ✓ or ✗; click a step for its raw
+data (addresses, certificate names, response headers, the hops of the traceroute). **Copy as text** copies all of it,
+diagnosis included, for a ticket.
 
 It takes at most 8 seconds and 16 KB, and runs at most once every 10 minutes per monitor and location. The first
-alert of an incident lists one line per failing location and links to the full diagnostics on the incidents page;
+alert of an incident lists one line per failing location, starting with the diagnosis, and links to the full diagnostics on the incidents page;
 webhooks get `diagnostics` and `diagnostics_url`, reminders only the link. Diagnostics are never shown on status
 pages. They are also in the API (`GET /api/incidents/{id}/diagnostics`) and the MCP tool
 `get_incident_diagnostics`.
