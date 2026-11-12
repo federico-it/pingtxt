@@ -128,6 +128,7 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/monitors", auth(h.listMonitors))
 	mux.HandleFunc("POST /api/monitors", auth(h.createMonitor))
 	mux.HandleFunc("POST /api/monitors/test", auth(h.testDraftMonitor))
+	mux.HandleFunc("POST /api/monitors/statuspage", auth(h.detectStatuspage))
 	mux.HandleFunc("POST /api/monitors/bulk", auth(h.bulkMonitors))
 	mux.HandleFunc("GET /api/monitors/{id}", auth(h.getMonitor))
 	mux.HandleFunc("PUT /api/monitors/{id}", auth(h.updateMonitor))
@@ -585,7 +586,7 @@ func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.Us
 var validTypes = []string{
 	check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush,
 	check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo, check.TypeDocker, check.TypeGRPC, check.TypeSMTP, check.TypeMCP,
-	check.TypeUDP, check.TypeWS,
+	check.TypeUDP, check.TypeWS, check.TypeStatuspage,
 }
 
 // urlSchemes lists the accepted target URL schemes of URL-based types.
@@ -608,7 +609,7 @@ var errIPv6Brackets = errors.New("put IPv6 addresses in brackets before the port
 func checkIPv6Brackets(m *store.Monitor) error {
 	t := m.Target
 	switch m.Type {
-	case check.TypeHTTP, check.TypeKeyword, check.TypeMCP, check.TypeWS, check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo:
+	case check.TypeHTTP, check.TypeKeyword, check.TypeMCP, check.TypeWS, check.TypeStatuspage, check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo:
 	case check.TypeGRPC:
 		if !strings.Contains(t, "://") {
 			t = "grpc://" + t
@@ -775,6 +776,10 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 		if err := validateMCP(m); err != nil {
 			return err
 		}
+	case check.TypeStatuspage:
+		if err := validateStatuspage(m); err != nil {
+			return err
+		}
 	case check.TypeSMTP:
 		t := m.Target
 		if !strings.Contains(t, "://") {
@@ -891,6 +896,34 @@ func validateMCP(m *store.Monitor) error {
 			m.ExpectedStatus = ""
 		}
 	}
+	return nil
+}
+
+// statuspageIDRe matches a Statuspage component id.
+var statuspageIDRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// validateStatuspage normalizes an Atlassian Statuspage monitor: target is
+// the address of the page and keyword the ids of the components to follow
+// (empty = the whole page). The HTTP fields do not apply.
+func validateStatuspage(m *store.Monitor) error {
+	base, err := check.StatuspageBase(m.Target)
+	if err != nil {
+		return err
+	}
+	m.Target = base
+	ids := check.StatuspageIDs(m.Keyword)
+	if len(ids) > 100 {
+		return errors.New("at most 100 components")
+	}
+	for _, id := range ids {
+		if !statuspageIDRe.MatchString(id) {
+			return fmt.Errorf("invalid component id %q", id)
+		}
+	}
+	slices.Sort(ids)
+	m.Keyword = strings.Join(slices.Compact(ids), ", ")
+	m.Method, m.ExpectedStatus, m.Body, m.KeywordInvert = "", "", "", false
+	m.Headers = map[string]string{}
 	return nil
 }
 
@@ -1099,6 +1132,9 @@ type locationStatus struct {
 	SlowMs float64 `json:"slow_ms"`
 	// Country of the location (ISO 3166-1 alpha-2), "" when not set.
 	Country string `json:"country"`
+	// Degraded is set while the location's last check passed but reported
+	// a partial problem (a status page with a minor incident).
+	Degraded bool `json:"degraded,omitempty"`
 }
 
 func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, u *store.User) {
@@ -1137,8 +1173,10 @@ func (h *Hub) getMonitor(w http.ResponseWriter, r *http.Request, u *store.User) 
 	names := h.locationNames()
 	countries := h.locationCountries()
 	slow := h.SlowLimits(id)
+	degraded := h.DegradedLocations(id)
 	for _, l := range h.locationsOf(m) {
-		d.Locations = append(d.Locations, locationStatus{ID: l, Name: nameOr(names, l), Online: h.locationOnline(l), Last: byLoc[l], SlowMs: slow[l], Country: countries[l]})
+		d.Locations = append(d.Locations, locationStatus{ID: l, Name: nameOr(names, l), Online: h.locationOnline(l), Last: byLoc[l], SlowMs: slow[l], Country: countries[l],
+			Degraded: degraded[l]})
 	}
 	writeJSON(w, 200, d)
 }

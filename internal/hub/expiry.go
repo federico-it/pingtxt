@@ -47,7 +47,9 @@ type expiryTarget struct {
 // expiryTargets lists the expiry checks that apply to a monitor.
 func expiryTargets(m *store.Monitor) []expiryTarget {
 	host, port := expiry.Host(m.Target)
-	if host == "" {
+	// A status page belongs to the provider it reports on: its certificate
+	// and domain are not the user's to watch.
+	if host == "" || m.Type == check.TypeStatuspage {
 		return nil
 	}
 	var out []expiryTarget

@@ -423,6 +423,8 @@ function View() {
                 <TableCell>
                   {!l.online ? (
                     <span className="text-muted-foreground">{t("offline")}</span>
+                  ) : l.last?.ok && l.degraded ? (
+                    <StatusText status="degraded" />
                   ) : l.last ? (
                     <OkText ok={l.last.ok} />
                   ) : (

@@ -183,6 +183,7 @@ var auditRoutes = map[string]auditSpec{
 	// monitors
 	"POST /api/monitors":                 {action: "monitor.create", typ: "monitor", load: loadMonitor},
 	"POST /api/monitors/test":            skipAudit,
+	"POST /api/monitors/statuspage":      skipAudit, // reads a public page, changes nothing
 	"POST /api/monitors/bulk":            {action: "monitor.bulk", typ: "monitor"},
 	"PUT /api/monitors/{id}":             {action: "monitor.update", typ: "monitor", load: loadMonitor},
 	"DELETE /api/monitors/{id}":          {action: "monitor.delete", typ: "monitor", load: loadMonitor},

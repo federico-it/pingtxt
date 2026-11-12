@@ -35,6 +35,9 @@ const (
 	TypeMCP      = "mcp"
 	TypeUDP      = "udp"
 	TypeWS       = "websocket"
+	// TypeStatuspage reads an Atlassian Statuspage page (status.example.com)
+	// and maps its state: minor problems are degraded, major ones down.
+	TypeStatuspage = "statuspage"
 	// TypePush is a heartbeat monitor: the monitored job calls the hub, so
 	// it is never probed and Run does not handle it.
 	TypePush = "push"
@@ -109,6 +112,10 @@ type Result struct {
 	// Steps is how many steps of the job ran (the failed one included).
 	// Agents older than steps never set it.
 	Steps int `json:"steps,omitempty"`
+	// Degraded marks an OK result that reports a partial problem, e.g. a
+	// status page with a minor incident: the location counts toward the
+	// monitor being degraded, never down.
+	Degraded bool `json:"degraded,omitempty"`
 }
 
 // Timing is the time spent in each phase of an HTTP request, in ms. With
@@ -126,7 +133,9 @@ type Timing struct {
 // Run executes the job and always returns a Result.
 func Run(ctx context.Context, j Job) Result {
 	r := runJob(ctx, j)
-	if j.Diagnose && !r.OK && j.Type != TypePush {
+	// A status page reports on someone else's service: the incident in the
+	// message says more than probing the page's own server would.
+	if j.Diagnose && !r.OK && j.Type != TypePush && j.Type != TypeStatuspage {
 		r.Diag = Diagnose(ctx, j, r)
 	}
 	r.http = nil
@@ -175,6 +184,8 @@ func runJob(ctx context.Context, j Job) Result {
 		r = runUDP(ctx, j)
 	case TypeWS:
 		r = runWebSocket(ctx, j, timeout)
+	case TypeStatuspage:
+		r = runStatuspage(ctx, j, timeout)
 	default:
 		r = Result{Message: "unknown monitor type: " + j.Type}
 	}

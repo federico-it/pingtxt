@@ -12,6 +12,11 @@ import { covers, LinkRow, linkState } from "@/components/channel-links"
 import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
 import { RequestSteps } from "@/components/request-steps"
+import {
+  StatuspageComponents,
+  StatuspageSuggest,
+  useStatuspage,
+} from "@/components/statuspage"
 import { ResponseRules } from "@/components/response-rules"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -47,7 +52,14 @@ const types: {
   value: MonitorType
   placeholder: string
   /** Label of the target field (monitorForm.target.<key>); defaults to "host". */
-  target?: "url" | "container" | "address" | "server" | "endpoint" | "hostPort"
+  target?:
+    | "url"
+    | "container"
+    | "address"
+    | "server"
+    | "endpoint"
+    | "hostPort"
+    | "page"
 }[] = [
   {
     value: "http",
@@ -119,6 +131,11 @@ const types: {
     value: "websocket",
     placeholder: "wss://example.com/socket",
     target: "url",
+  },
+  {
+    value: "statuspage",
+    placeholder: "https://status.example.com",
+    target: "page",
   },
   {
     value: "push",
@@ -316,6 +333,10 @@ export function MonitorForm({
   const isMCP = m.type === "mcp"
   const isUDP = m.type === "udp"
   const isWS = m.type === "websocket"
+  const isSP = m.type === "statuspage"
+  // Looks up Atlassian Statuspage pages: on http(s) monitors to suggest the
+  // statuspage type, on statuspage monitors to list the components.
+  const sp = useStatuspage(m.target, m.ignore_tls, isHTTP || isSP)
   const lowerTarget = m.target.trim().toLowerCase()
   const isHTTPS =
     ((isHTTP || isMCP) && lowerTarget.startsWith("https://")) ||
@@ -333,6 +354,7 @@ export function MonitorForm({
     "smtp",
     "mcp",
     "websocket",
+    "statuspage",
   ].includes(m.type)
   const ivList = isPush
     ? withValue(pushIntervals, m.interval_sec)
@@ -350,10 +372,11 @@ export function MonitorForm({
       const next = { ...p, type }
       if (
         (type === "mcp") !== (p.type === "mcp") ||
-        (type === "udp") !== (p.type === "udp")
+        (type === "udp") !== (p.type === "udp") ||
+        (type === "statuspage") !== (p.type === "statuspage")
       ) {
-        // mcp and udp reuse method, keyword and expected_status for their
-        // own settings
+        // mcp, udp and statuspage reuse method, keyword and expected_status
+        // for their own settings
         next.method = type === "mcp" ? "auto" : type === "udp" ? "text" : "GET"
         next.keyword = ""
         next.expected_status = ""
@@ -544,6 +567,31 @@ export function MonitorForm({
                 <p className="text-[11px] text-muted-foreground">{tr("curlHint")}</p>
               )}
             </Field>
+          )}
+          {isHTTP && (
+            <StatuspageSuggest
+              info={sp.info}
+              onUse={() => {
+                setType("statuspage")
+                setM((p) => ({
+                  ...p,
+                  type: "statuspage",
+                  target: sp.info?.url ?? p.target,
+                  assertions: [],
+                  steps: [],
+                  name: p.name || sp.info?.name || "",
+                }))
+                setHeaders("")
+              }}
+            />
+          )}
+          {isSP && (
+            <StatuspageComponents
+              info={sp.info}
+              loading={sp.loading}
+              value={m.keyword}
+              onChange={(v) => set("keyword", v)}
+            />
           )}
           {m.type === "docker" && (
             <p className="text-xs text-muted-foreground sm:col-span-2">
@@ -1055,7 +1103,7 @@ export function MonitorForm({
                 </Select>
               </Field>
             )}
-            {m.type !== "push" && (
+            {m.type !== "push" && !isSP && (
               <Field label={tr("diagnostics.label")} hint={tr("diagnostics.hint")}>
                 <Select
                   items={diagModes.map((v) => ({
@@ -1230,7 +1278,7 @@ export function MonitorForm({
         </Section>
       )}
 
-      {!isPush && (
+      {!isPush && !isSP && (
         <Section title={tr("sections.expiry")}>
           <p className="mb-3 text-xs text-muted-foreground">
             {tr("expiryHint")}
