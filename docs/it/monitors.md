@@ -120,6 +120,10 @@ Un monitor è **degradato** quando alcune delle sue località falliscono, ma non
 imposta in **impostazioni → monitor** (35% di default) e si può cambiare per monitor, fino al 50%. Degradato non apre
 incidenti e conta come up per l'uptime; i canali possono riceverlo come evento (spento di default).
 
+Finché un monitor è degradato o down, la sua pagina dice perché in alto, e la riga nella dashboard mostra il motivo al
+posto del target. Le località che riportano lo stesso problema sono elencate insieme, su una riga: vale anche per la
+causa di incidenti e avvisi (`agent-1, agent-2: HTTP 503`). Nell'API i motivi sono in `reasons` di ogni monitor.
+
 Un monitor può diventare degradato anche quando risponde **troppo lentamente**. Imposta la **soglia di lentezza**:
 
 - **spenta** (predefinito);

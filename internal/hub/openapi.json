@@ -11375,10 +11375,41 @@
                   }
                 ],
                 "description": "The open incident of the monitor (its down alert was sent), with who acknowledged it. null when there is none."
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Reason"
+                },
+                "description": "Why the monitor is down or degraded right now, one entry per problem with the locations that report it (locations with the same message are grouped). Empty while it is up, paused or in maintenance. Older hubs leave it out."
               }
             }
           }
         ]
+      },
+      "Reason": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "down",
+              "degraded",
+              "slow"
+            ],
+            "description": "down: the check fails there. degraded: it passes but reports a partial problem (a status page with a minor incident). slow: above the slow threshold."
+          },
+          "message": {
+            "type": "string"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Location names (\"agent · place\")."
+          }
+        }
       },
       "MonitorDetail": {
         "allOf": [

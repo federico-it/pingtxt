@@ -3,6 +3,7 @@
 package hub
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -625,32 +626,12 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	ls.slow = ls.slowLimit > 0 && ls.median() > ls.slowLimit
 	// Evaluate over locations that are currently reachable. A failing
 	// location is not also counted as slow.
-	n, down, slow := 0, 0, 0
-	var causes []string
-	for l, s := range st.locs {
-		if l != LocalLocation {
-			if id, ok := parseAgentLocation(l); ok && h.agents[id] == nil {
-				continue
-			}
-		}
-		n++
-		switch {
-		case s.down:
-			down++
-			causes = append(causes, h.locationNameLocked(l)+": "+s.lastMsg)
-		case s.degraded:
-			slow++
-			causes = append(causes, h.locationNameLocked(l)+": "+s.lastMsg)
-		case s.slow && m.SlowMs != 0:
-			slow++
-			causes = append(causes, h.locationNameLocked(l)+": "+slowCause(s.median(), s.slowLimit))
-		}
-	}
-	slices.Sort(causes)
+	n, down, slow, reasons := h.locationStatesLocked(st)
+	cause := joinReasons(reasons)
 	status := classify(n, down, slow, pct)
 	st.real = status
 	if status == StatusDown && st.alerts != nil {
-		st.alerts.cause = strings.Join(causes, "; ") // reminders carry the latest cause
+		st.alerts.cause = cause // reminders carry the latest cause
 	}
 	// Uptime is computed from the status kept with each result. Locations
 	// that have not answered yet since the start count as not failing, so a
@@ -706,11 +687,11 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	if r.Diag != nil && !r.OK {
 		h.storeDiag(m, loc, r)
 	}
-	h.raise(m, alert, strings.Join(causes, "; "), r.At)
+	h.raise(m, alert, cause, r.At)
 	if degraded != "" {
 		ev := Event{Kind: KindDegraded, MonitorID: m.ID, Monitor: name, Target: eventTarget(m), Status: degraded, At: r.At}
 		if degraded == StatusDegraded {
-			ev.Cause = strings.Join(causes, "; ")
+			ev.Cause = cause
 		}
 		h.sendEvent(ev, m)
 	}
@@ -772,6 +753,89 @@ func classify(n, down, slow, pct int) string {
 		return StatusDegraded
 	}
 	return StatusUp
+}
+
+// Reason is one problem the monitor has right now and the locations that
+// report it: locations with the same message are listed together, so ten
+// agents reading the same status page give one line, not ten.
+type Reason struct {
+	// Kind is "down" (the check fails there), "degraded" (it passes but
+	// reports a partial problem) or "slow" (above the slow threshold).
+	Kind      string   `json:"kind"`
+	Message   string   `json:"message"`
+	Locations []string `json:"locations"`
+}
+
+// locationStatesLocked counts the reachable locations of a monitor, those
+// failing (down) and those degraded or slow, and groups what they report.
+// A failing location is not also counted as slow. h.mu must be held.
+func (h *Hub) locationStatesLocked(st *monState) (n, down, slow int, reasons []Reason) {
+	type item struct{ kind, loc, msg string }
+	var items []item
+	for l, s := range st.locs {
+		if l != LocalLocation {
+			if id, ok := parseAgentLocation(l); ok && h.agents[id] == nil {
+				continue
+			}
+		}
+		n++
+		switch {
+		case s.down:
+			down++
+			items = append(items, item{"down", h.locationNameLocked(l), s.lastMsg})
+		case s.degraded:
+			slow++
+			items = append(items, item{"degraded", h.locationNameLocked(l), s.lastMsg})
+		case s.slow && st.m.SlowMs != 0:
+			slow++
+			items = append(items, item{"slow", h.locationNameLocked(l), slowCause(s.median(), s.slowLimit)})
+		}
+	}
+	slices.SortFunc(items, func(a, b item) int {
+		return cmp.Or(strings.Compare(a.loc, b.loc), strings.Compare(a.msg, b.msg))
+	})
+	return n, down, slow, groupReasons(items, func(i item) (string, string, string) { return i.kind, i.loc, i.msg })
+}
+
+// groupReasons merges the locations that report the same problem, in the
+// order of their first location. Failures come before degraded and slow.
+func groupReasons[T any](items []T, get func(T) (kind, loc, msg string)) []Reason {
+	var out []Reason
+	at := map[[2]string]int{}
+	for _, it := range items {
+		kind, loc, msg := get(it)
+		k := [2]string{kind, msg}
+		if i, ok := at[k]; ok {
+			out[i].Locations = append(out[i].Locations, loc)
+			continue
+		}
+		at[k] = len(out)
+		out = append(out, Reason{Kind: kind, Message: msg, Locations: []string{loc}})
+	}
+	slices.SortStableFunc(out, func(a, b Reason) int {
+		return cmp.Compare(kindRank(a.Kind), kindRank(b.Kind))
+	})
+	return out
+}
+
+func kindRank(kind string) int {
+	switch kind {
+	case "down":
+		return 0
+	case "degraded":
+		return 1
+	}
+	return 2
+}
+
+// joinReasons writes reasons as the one-line cause of incidents and
+// notifications: "loc1, loc2: message; loc3: other message".
+func joinReasons(reasons []Reason) string {
+	parts := make([]string, len(reasons))
+	for i, r := range reasons {
+		parts[i] = strings.Join(r.Locations, ", ") + ": " + r.Message
+	}
+	return strings.Join(parts, "; ")
 }
 
 // slowCause describes a slow location for the degraded notifications.

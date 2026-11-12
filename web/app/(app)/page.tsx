@@ -14,6 +14,7 @@ import { ExpiryBadges } from "@/components/expiry"
 import { TagList, TagToggle, useLabels } from "@/components/labels"
 import { Empty, PageHeader } from "@/components/page-header"
 import { StatusGlyph, StatusText } from "@/components/status"
+import { useReasonLine } from "@/components/reasons"
 import { UptimeBars } from "@/components/uptime-bars"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -130,6 +131,7 @@ function Monitors() {
   const { data, isLoading, mutate } = useApi<MonitorSummary[]>("/api/monitors")
   const isAdmin = useIsAdmin()
   const ackName = useAckName()
+  const reasonLine = useReasonLine()
   const t = useTranslations("dashboard")
   const ts = useTranslations("status")
   const { q, filter, group, tag, sort, setQ, setFilter, setGroup, setTag, setSort } =
@@ -509,6 +511,15 @@ function Monitors() {
                           className="hidden shrink-0 sm:inline-flex"
                         />
                       </div>
+                      {!m.paused && (m.status === "degraded" || m.status === "down") && (m.reasons?.length ?? 0) > 0 ? (
+                      <div
+                        className={cn("truncate text-xs", m.status === "down" ? "text-down" : "text-warn")}
+                        title={m.reasons!.map((r) => `${r.message} — ${r.locations.join(", ")}`).join("\n")}
+                      >
+                        {reasonLine(m.reasons!)}
+                        <ExpiryBadges checks={m.expiry} now={now} />
+                      </div>
+                      ) : (
                       <div className="truncate text-xs text-muted-foreground">
                         {m.type === "push"
                           ? t("heartbeatLine", { every: interval(m.interval_sec) })
@@ -516,6 +527,7 @@ function Monitors() {
                         {m.locations.length > 1 && ` · ${t("locations", { count: m.locations.length })}`}
                         <ExpiryBadges checks={m.expiry} now={now} />
                       </div>
+                      )}
                     </div>
                   </div>
                   <UptimeBars
