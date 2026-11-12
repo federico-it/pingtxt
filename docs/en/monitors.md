@@ -118,6 +118,10 @@ A monitor is **degraded** when some of its locations fail, but not more than hal
 **settings → monitors** (35% by default) and can be changed per monitor, up to 50%. Degraded opens no incident and
 counts as up for uptime; channels can get it as an event (off by default).
 
+While a monitor is degraded or down, its page says why at the top, and the dashboard row shows the reason in place of
+the target. Locations that report the same problem are listed together, on one line: the same goes for the cause of
+incidents and alerts (`agent-1, agent-2: HTTP 503`). The API has the reasons in `reasons` of every monitor.
+
 A monitor can also turn degraded when it answers **too slowly**. Set the **slow threshold**:
 
 - **off** (default);

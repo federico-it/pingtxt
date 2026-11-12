@@ -22,6 +22,7 @@ var openAPISchemaFields = []struct {
 }{
 	{"Monitor", store.Monitor{}, nil},
 	{"MonitorSummary", monitorSummary{}, nil},
+	{"Reason", Reason{}, nil},
 	{"MonitorInput", store.Monitor{}, []string{"id", "push_token", "paused", "status", "status_since", "created_at"}},
 	{"Assertion", check.Assertion{}, nil},
 	{"Step", check.Step{}, nil},

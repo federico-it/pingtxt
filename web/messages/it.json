@@ -212,7 +212,9 @@
     "diagnostics": "diagnostica",
     "blockedBy": "bloccato da <hl>{name}</hl> dal {since}: è giù anche quello, quindi questo monitor non manda avvisi propri. quando torna su, arriva un avviso solo se questo continua a fallire.",
     "openIncident": "incidente aperto dal {since}",
-    "notAcked": "nessuno l'ha ancora preso in carico: promemoria ed escalation sono attivi"
+    "notAcked": "nessuno l'ha ancora preso in carico: promemoria ed escalation sono attivi",
+    "whyDegraded": "degradato perché",
+    "whyDown": "down perché"
   },
   "browserNotify": {
     "title": "notifiche desktop in questo browser",
@@ -1991,5 +1993,11 @@
     "saveEvents": "salva eventi",
     "saved": "webhook salvato",
     "error": "qualcosa è andato storto"
+  },
+  "reasons": {
+    "allLocations": "tutte le località",
+    "locations": "{count} località",
+    "noMessage": "nessun messaggio",
+    "andMore": "{first} (+{count} altri)"
   }
 }

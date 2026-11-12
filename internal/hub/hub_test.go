@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -639,5 +640,28 @@ func TestSlowAuto(t *testing.T) {
 	}
 	if got := status(t, st, m.ID); got != StatusDegraded {
 		t.Fatalf("400 ms: want degraded, got %s", got)
+	}
+}
+
+func TestGroupReasons(t *testing.T) {
+	type it struct{ kind, loc, msg string }
+	items := []it{
+		{"degraded", "a", "minor incident"},
+		{"down", "b", "timeout"},
+		{"degraded", "c", "minor incident"},
+		{"slow", "d", "slow, 900 ms (threshold 500 ms)"},
+		{"down", "e", "timeout"},
+	}
+	got := groupReasons(items, func(i it) (string, string, string) { return i.kind, i.loc, i.msg })
+	want := []Reason{
+		{Kind: "down", Message: "timeout", Locations: []string{"b", "e"}},
+		{Kind: "degraded", Message: "minor incident", Locations: []string{"a", "c"}},
+		{Kind: "slow", Message: "slow, 900 ms (threshold 500 ms)", Locations: []string{"d"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v", got)
+	}
+	if s := joinReasons(got); s != "b, e: timeout; a, c: minor incident; d: slow, 900 ms (threshold 500 ms)" {
+		t.Fatalf("joined %q", s)
 	}
 }

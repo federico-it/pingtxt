@@ -176,6 +176,15 @@ export interface MonitorSummary extends Monitor {
   blocked_by?: { id: number; name: string; since: number } | null
   /** Open incident (down alert sent), with who acknowledged it. */
   incident?: { id: number; started_at: number; acked_at: number; acked_by: string } | null
+  /** Why the monitor is down or degraded right now, one entry per problem. */
+  reasons?: Reason[]
+}
+
+/** One problem of a monitor and the locations that report it. */
+export interface Reason {
+  kind: "down" | "degraded" | "slow"
+  message: string
+  locations: string[]
 }
 
 export interface LocationStatus {

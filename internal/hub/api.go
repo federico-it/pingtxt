@@ -963,6 +963,10 @@ type monitorSummary struct {
 	// Incident is the open incident (down alert sent), if any, with who
 	// acknowledged it.
 	Incident *openIncident `json:"incident"`
+	// Reasons say why the monitor is down or degraded right now, with the
+	// locations that report each problem. Empty while it is up, paused or
+	// in maintenance.
+	Reasons []Reason `json:"reasons"`
 }
 
 type activeMaint struct {
@@ -1002,10 +1006,17 @@ func (h *Hub) summary(m *store.Monitor, expiry []*store.ExpiryCheck) *monitorSum
 	if st != nil && st.stats != nil {
 		s.Bars, s.Uptime24h, s.AvgMs24h = st.stats.bars(time.Now().UnixMilli())
 		s.Last = st.stats.last
-	} else {
+	}
+	if st != nil && !m.Paused && (m.Status == StatusDown || m.Status == StatusDegraded) {
+		_, _, _, s.Reasons = h.locationStatesLocked(st)
+	}
+	if st == nil || st.stats == nil {
 		s.Bars, s.Uptime24h, s.AvgMs24h = (&monStats{}).bars(time.Now().UnixMilli())
 	}
 	h.mu.Unlock()
+	if s.Reasons == nil {
+		s.Reasons = []Reason{}
+	}
 	return s
 }
 

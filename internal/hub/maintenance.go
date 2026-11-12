@@ -104,14 +104,15 @@ func (h *Hub) maintTick(now time.Time) {
 }
 
 func (h *Hub) causesLocked(st *monState) string {
-	var causes []string
+	type item struct{ loc, msg string }
+	var items []item
 	for l, s := range st.locs {
 		if s.down {
-			causes = append(causes, h.locationNameLocked(l)+": "+s.lastMsg)
+			items = append(items, item{h.locationNameLocked(l), s.lastMsg})
 		}
 	}
-	slices.Sort(causes)
-	return strings.Join(causes, "; ")
+	slices.SortFunc(items, func(a, b item) int { return strings.Compare(a.loc, b.loc) })
+	return joinReasons(groupReasons(items, func(i item) (string, string, string) { return "down", i.loc, i.msg }))
 }
 
 // ---------- API ----------

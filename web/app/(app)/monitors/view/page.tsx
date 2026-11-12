@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Fragment, Suspense, useState } from "react"
+import { Suspense, useState } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
@@ -21,6 +21,7 @@ import { OkText, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
 import { ResultsLog, type TimeWindow } from "@/components/results-log"
 import { IncidentDiagnostics } from "@/components/diagnostics"
+import { ReasonList, parseCause } from "@/components/reasons"
 import { AckButton, AckNote } from "@/components/incident-ack"
 import { TestResults, type TestResult } from "@/components/test-results"
 import { Button } from "@/components/ui/button"
@@ -45,6 +46,7 @@ import { deleteWithUndo } from "@/lib/pending-delete"
 import { usePins } from "@/lib/pins"
 import { ago, datetime, displayTarget, duration, interval, ms, pct } from "@/lib/format"
 import { segment } from "@/components/ui/control"
+import { cn } from "@/lib/utils"
 
 const ranges = ["1h", "6h", "24h", "7d", "30d"] as const
 type Range = (typeof ranges)[number]
@@ -288,6 +290,20 @@ function View() {
         </div>
       )}
 
+      {!d.paused && (d.status === "degraded" || d.status === "down") && (d.reasons?.length ?? 0) > 0 && (
+        <div
+          className={cn(
+            "mb-4 border border-dashed px-3 py-2 text-xs",
+            d.status === "down" ? "border-down/60" : "border-warn/60"
+          )}
+        >
+          <div className={cn("mb-1", d.status === "down" ? "text-down" : "text-warn")}>
+            {d.status === "down" ? t("whyDown") : t("whyDegraded")}
+          </div>
+          <ReasonList reasons={d.reasons!} total={d.location_status.length} />
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 border-y border-dashed py-4 sm:grid-cols-3 lg:grid-cols-6">
         <KV k={t("kv.status")} v={<StatusText status={d.status} />} />
         <KV
@@ -409,7 +425,7 @@ function View() {
               <TableHead>{d.type === "push" ? t("cols.source") : t("cols.location")}</TableHead>
               <TableHead>{t("cols.state")}</TableHead>
               <TableHead className="text-right">{t("cols.latency")}</TableHead>
-              <TableHead>{t("cols.message")}</TableHead>
+              <TableHead className="hidden md:table-cell">{t("cols.message")}</TableHead>
               <TableHead className="text-right">{t("cols.checked")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -419,6 +435,11 @@ function View() {
                 <TableCell>
                   <CountryFlag code={l.country} />
                   {l.name}
+                  {l.last?.message && (
+                    <div className="mt-1 max-w-[60vw] whitespace-normal text-xs text-muted-foreground [overflow-wrap:anywhere] md:hidden">
+                      {l.last.message}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell>
                   {!l.online ? (
@@ -437,7 +458,7 @@ function View() {
                 >
                   {ms(l.last?.latency_ms)}
                 </TableCell>
-                <TableCell className="max-w-72 truncate text-muted-foreground">
+                <TableCell className="hidden min-w-56 max-w-md whitespace-normal text-muted-foreground [overflow-wrap:anywhere] md:table-cell">
                   {l.last?.message}
                 </TableCell>
                 <TableCell
@@ -454,43 +475,41 @@ function View() {
 
       <Section title={t("incidents")}>
         {incidents.data?.length ? (
-          <div className="grid gap-1">
+          <div className="grid text-xs">
             {incidents.data.slice(0, 10).map((i) => (
-              <Fragment key={i.id}>
-              <div className="flex flex-wrap items-center gap-x-3 text-xs">
-                <span
-                  className={
-                    i.resolved_at ? "text-muted-foreground" : "text-down"
-                  }
-                >
-                  {i.resolved_at ? `[${t("resolved")}]` : `[${t("ongoing")}] `}
-                </span>
-                {!i.resolved_at && !!i.acked_at && (
-                  <AckNote incident={{ id: i.id, acked_at: i.acked_at, acked_by: i.acked_by ?? "" }} />
-                )}
-                <span>{datetime(i.started_at)}</span>
-                <span className="text-muted-foreground">
-                  {duration((i.resolved_at || now) - i.started_at)}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                  {i.cause}
-                </span>
-                {i.diagnostics && (
-                  <button
-                    onClick={() => setOpenDiag(openDiag === i.id ? 0 : i.id)}
-                    className={segment({ active: openDiag === i.id, size: "xs" })}
-                    aria-expanded={openDiag === i.id}
-                  >
-                    {t("diagnostics")}
-                  </button>
+              <div key={i.id} className="min-w-0 border-b border-dashed py-2.5 first:pt-0 last:border-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className={i.resolved_at ? "text-muted-foreground" : "text-down"}>
+                    [{i.resolved_at ? t("resolved") : t("ongoing")}]
+                  </span>
+                  {!i.resolved_at && !!i.acked_at && (
+                    <AckNote incident={{ id: i.id, acked_at: i.acked_at, acked_by: i.acked_by ?? "" }} />
+                  )}
+                  <span>{datetime(i.started_at)}</span>
+                  <span className="text-muted-foreground">
+                    {duration((i.resolved_at || now) - i.started_at)}
+                  </span>
+                  {i.diagnostics && (
+                    <button
+                      onClick={() => setOpenDiag(openDiag === i.id ? 0 : i.id)}
+                      className={segment({ active: openDiag === i.id, size: "xs", className: "ml-auto" })}
+                      aria-expanded={openDiag === i.id}
+                    >
+                      {t("diagnostics")}
+                    </button>
+                  )}
+                </div>
+                <ReasonList
+                  reasons={parseCause(i.cause)}
+                  total={d.locations.length}
+                  className="mt-1.5 pl-3 text-muted-foreground"
+                />
+                {openDiag === i.id && (
+                  <div className="mt-2 border border-dashed p-3">
+                    <IncidentDiagnostics incident={i.id} />
+                  </div>
                 )}
               </div>
-              {openDiag === i.id && (
-                <div className="my-2 border border-dashed p-3">
-                  <IncidentDiagnostics incident={i.id} />
-                </div>
-              )}
-              </Fragment>
             ))}
           </div>
         ) : (

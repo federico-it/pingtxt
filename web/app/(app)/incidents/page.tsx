@@ -13,6 +13,7 @@ import { useApi, type Incident, type MonitorSummary } from "@/lib/api"
 import { useMinute, useNow } from "@/hooks/use-now"
 import { datetime, duration } from "@/lib/format"
 import { segment } from "@/components/ui/control"
+import { ReasonList, parseCause, useReasonLine } from "@/components/reasons"
 import { IncidentDiagnostics } from "@/components/diagnostics"
 import { AckButton, AckNote } from "@/components/incident-ack"
 
@@ -45,6 +46,7 @@ function Incidents() {
   const minute = useMinute()
   const now = useNow()
   const t = useTranslations("incidents")
+  const reasonLine = useReasonLine()
   // ?diag=<id> (the link of an alert) opens the diagnostics of an incident.
   const diagParam = Number(params.get("diag")) || 0
   const [open, setOpen] = useState<number>(diagParam)
@@ -165,6 +167,11 @@ function Incidents() {
                     <Link href={`/monitors/view/?id=${i.monitor_id}`} className="underline-offset-4 hover:underline">
                       {i.monitor_name}
                     </Link>
+                    {i.cause && (
+                      <div className="max-w-56 truncate text-xs text-muted-foreground md:hidden" title={i.cause}>
+                        {reasonLine(parseCause(i.cause))}
+                      </div>
+                    )}
                     {i.diagnostics && (
                       <button
                         onClick={() => setOpen(open === i.id ? 0 : i.id)}
@@ -188,8 +195,8 @@ function Incidents() {
                   <TableCell title={i.resolved_at ? datetime(i.resolved_at) : undefined}>
                     {duration((i.resolved_at || now) - i.started_at)}
                   </TableCell>
-                  <TableCell className="hidden max-w-md truncate text-muted-foreground md:table-cell" title={i.cause}>
-                    {i.cause}
+                  <TableCell className="hidden min-w-64 max-w-lg whitespace-normal text-xs text-muted-foreground md:table-cell">
+                    <ReasonList reasons={parseCause(i.cause)} compact />
                   </TableCell>
                   <TableCell className="hidden text-right md:table-cell">
                     {i.diagnostics && (
