@@ -24,7 +24,7 @@ export function privacyMeta(lang: Lang): Metadata {
 // Who answers for this policy. Change it here only.
 const OWNER = "Federico Mengascini"
 const CONTACT = "privacy@pingtxt.com"
-const UPDATED = { en: "November 12, 2026", it: "12 novembre 2026" }
+const UPDATED = { en: "November 13, 2026", it: "13 novembre 2026" }
 
 const RELAY_REPO = "https://github.com/federico-it/pingtxt-push-relay"
 // The app asks this server whether a newer version exists.
@@ -460,7 +460,11 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
                 <A href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">
                   GitHub privacy statement
                 </A>
-                . The site sets no cookies and has no analytics. Your theme and language choices are kept in your browser&apos;s local
+                . The site sets no cookies. To count visits it uses <A href="https://rybbit.com">Rybbit</A>, a cookieless
+                analytics tool served from <C>rybbit.js.lc</C>: each page view sends the page address, the referring page,
+                the browser language, screen size, browser, operating system and device type, and the country derived from
+                your IP address. Rybbit does not store the IP address and does not follow you across sites; we use it only
+                to see which pages are read. Your theme and language choices are kept in your browser&apos;s local
                 storage. The page loads the public status of <C>status.pingtxt.com</C> and the public usage totals from{" "}
                 <C>telemetry.pingtxt.com</C>; these requests carry no identifier.
               </>,
@@ -470,7 +474,12 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
                 <A href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">
                   GitHub privacy statement
                 </A>
-                . Il sito non imposta cookie e non ha analytics. Il tema e la lingua che scegli sono conservati nel local
+                . Il sito non imposta cookie. Per contare le visite usa <A href="https://rybbit.com">Rybbit</A>, uno
+                strumento di analytics senza cookie servito da <C>rybbit.js.lc</C>: ogni pagina visitata invia
+                l&apos;indirizzo della pagina, la pagina di provenienza, la lingua del browser, le dimensioni dello schermo,
+                browser, sistema operativo e tipo di dispositivo, e il paese ricavato dal tuo indirizzo IP. Rybbit non
+                conserva l&apos;indirizzo IP e non ti segue tra siti diversi; lo usiamo solo per sapere quali pagine
+                vengono lette. Il tema e la lingua che scegli sono conservati nel local
                 storage del tuo browser. La pagina carica lo stato pubblico di <C>status.pingtxt.com</C> e i totali
                 pubblici d&apos;uso da <C>telemetry.pingtxt.com</C>; queste richieste non portano alcun identificativo.
               </>,
