@@ -40,6 +40,7 @@ Incolla un comando `curl` nel campo URL di un monitor HTTP per compilare metodo,
 | server mcp | `https://mcp.example.com/mcp` | l'handshake MCP e i suoi tool, vedi [server MCP](#server-mcp) |
 | udp | `host:porta` | un datagramma riceve risposta, eventualmente con un testo o dei byte, vedi [UDP](#udp) |
 | websocket | `wss://example.com/socket` | la connessione si apre; se vuoi un messaggio riceve la risposta attesa, vedi [WebSocket](#websocket) |
+| status page (atlassian) | `https://status.example.com` | lo stato di una pagina Atlassian Statuspage o di alcuni suoi componenti; i problemi minori sono degradato, vedi [Status page di altri servizi](#status-page-di-altri-servizi) |
 | heartbeat (push) | nessuna: pingtxt ti dà un URL | il tuo job chiama l'URL; down quando le chiamate smettono, vedi [heartbeat](#monitor-heartbeat-cron-job) |
 
 I monitor HTTP accettano anche metodo, header e body della richiesta, i codici di stato accettati e se ignorare gli
@@ -218,6 +219,36 @@ HTTP, per esempio `unexpected status 401 (no WebSocket upgrade)`.
   chiede dei sottoprotocolli; quello scelto dal server compare nel risultato, per esempio `connected (chat)`.
 
 Gli endpoint `wss://` ricevono gli avvisi di scadenza del certificato.
+
+## Status page di altri servizi
+
+Molti servizi pubblicano il loro stato su una pagina **Atlassian Statuspage**, per esempio `status.claude.com`,
+`www.githubstatus.com` o `www.cloudflarestatus.com`. Un monitor **status page (atlassian)** legge la sua API pubblica
+(`/api/v2/summary.json`) e segue quello che riporta il fornitore:
+
+| stato della pagina o del componente | monitor |
+| --- | --- |
+| tutto operativo | su |
+| problema minore: prestazioni ridotte o interruzione parziale | degradato |
+| problema grave o critico: interruzione totale | giù |
+| manutenzione in corso | su, con la manutenzione nel messaggio |
+
+Il messaggio del controllo riporta gli incidenti aperti, per esempio `Minor Service Outage · Incident: Elevated
+errors on Claude Opus (identified)`, e lo stesso fanno gli avvisi. Degradato invia l'evento **degradato** dei canali,
+non un avviso di monitor giù.
+
+- **destinazione**: l'indirizzo della pagina. Va bene qualsiasi URL del sito:
+  `https://status.claude.com/api/v2/status.json` viene salvato come `https://status.claude.com`.
+- **componenti da seguire** (API `keyword`, id dei componenti separati da virgole): il form elenca i componenti della
+  pagina da spuntare. Se non ne scegli nessuno conta lo stato generale della pagina; se ne scegli alcuni contano solo
+  il loro stato e i loro incidenti, così un problema di claude.ai non tocca un monitor che segue la Claude API.
+
+Quando scrivi l'URL di una pagina di questo tipo in un monitor **http(s)** o **parola chiave**, il form propone di
+passare a questo tipo con un clic. Prima si usava una regola JSON come `status.indicator` uguale a `none`, che manda
+il monitor giù al primo incidente minore.
+
+Per questo tipo non ci sono diagnostica né avvisi di scadenza del certificato o del dominio: la pagina è del
+fornitore.
 
 ## Monitor heartbeat (cron job)
 

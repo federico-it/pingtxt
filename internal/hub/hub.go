@@ -62,6 +62,9 @@ type locState struct {
 	lat       []float64
 	slow      bool
 	slowLimit float64 // threshold the slow test used (ms)
+	// degraded is set while the location's last check was OK but reported
+	// a partial problem (a status page with a minor incident).
+	degraded bool
 
 	diagAt time.Time   // when the location last sent diagnostics
 	diag   *check.Diag // diagnostics of the current failure, if any
@@ -609,6 +612,7 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	if r.OK {
 		ls.fails = 0
 		ls.down = false
+		ls.degraded = r.Degraded
 		ls.addLatency(r.LatencyMs)
 		ls.diag, ls.diagID = nil, 0
 	} else {
@@ -633,6 +637,9 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 		switch {
 		case s.down:
 			down++
+			causes = append(causes, h.locationNameLocked(l)+": "+s.lastMsg)
+		case s.degraded:
+			slow++
 			causes = append(causes, h.locationNameLocked(l)+": "+s.lastMsg)
 		case s.slow && m.SlowMs != 0:
 			slow++
@@ -840,6 +847,22 @@ func (h *Hub) updateSlowLimits(now time.Time) {
 		}
 		st.autoSlow = lim
 	}
+}
+
+// DegradedLocations lists the locations of a monitor whose last check
+// passed but reported a partial problem.
+func (h *Hub) DegradedLocations(id int64) map[string]bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := map[string]bool{}
+	if st := h.monitors[id]; st != nil {
+		for l, ls := range st.locs {
+			if ls.degraded && !ls.down {
+				out[l] = true
+			}
+		}
+	}
+	return out
 }
 
 // SlowLimits gives the slow threshold (ms) in use at each location of a

@@ -40,6 +40,7 @@ Paste a `curl` command in the URL field of an HTTP monitor to fill in the method
 | mcp server | `https://mcp.example.com/mcp` | the MCP handshake and its tools, see [MCP servers](#mcp-servers) |
 | udp | `host:port` | a datagram gets a reply, optionally containing a text or bytes, see [UDP](#udp) |
 | websocket | `wss://example.com/socket` | the connection opens; optionally a message gets the expected reply, see [WebSocket](#websocket) |
+| status page (atlassian) | `https://status.example.com` | the state of an Atlassian Statuspage page or of some of its components; minor problems are degraded, see [Status pages of other services](#status-pages-of-other-services) |
 | heartbeat (push) | none: pingtxt gives you a URL | your job calls the URL; down when the calls stop, see [heartbeat](#heartbeat-monitors-cron-jobs) |
 
 HTTP monitors also take a method, request headers and body, the accepted status codes and whether to skip TLS
@@ -211,6 +212,34 @@ A **websocket** monitor opens a `ws://` or `wss://` connection; a refused upgrad
   asks for subprotocols; the one the server picks shows in the result, e.g. `connected (chat)`.
 
 `wss://` endpoints get certificate expiry alerts.
+
+## Status pages of other services
+
+Many services publish their state on an **Atlassian Statuspage** page, e.g. `status.claude.com`,
+`www.githubstatus.com` or `www.cloudflarestatus.com`. A **status page (atlassian)** monitor reads its public API
+(`/api/v2/summary.json`) and follows what the provider reports:
+
+| page or component state | monitor |
+| --- | --- |
+| all systems operational | up |
+| minor problem: degraded performance or partial outage | degraded |
+| major or critical problem: major outage | down |
+| maintenance in progress | up, with the maintenance in the message |
+
+The check message names the open incidents, e.g. `Minor Service Outage · Incident: Elevated errors on Claude Opus
+(identified)`, and so do the alerts. Degraded sends the **degraded** channel event, not a down alert.
+
+- **target**: the address of the page. Any URL of the site works: `https://status.claude.com/api/v2/status.json` is
+  saved as `https://status.claude.com`.
+- **components to follow** (API `keyword`, comma-separated component ids): the form lists the components of the page
+  to tick. With none chosen the overall state of the page counts; with some, only their state and their incidents
+  do, so a problem with claude.ai does not touch a monitor that follows the Claude API.
+
+When you type the URL of such a page in an **http(s)** or **keyword** monitor, the form offers to switch to this type
+with one click. Before it, the usual way was a JSON rule such as `status.indicator` equals `none`, which turns the
+monitor down at the first minor incident.
+
+There are no diagnostics and no certificate or domain expiry alerts for this type: the page belongs to the provider.
 
 ## Heartbeat monitors (cron jobs)
 

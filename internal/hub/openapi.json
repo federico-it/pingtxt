@@ -3187,6 +3187,121 @@
         }
       }
     },
+    "/api/monitors/statuspage": {
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Look up an Atlassian Statuspage page",
+        "operationId": "detectStatuspage",
+        "description": "Tells whether a URL belongs to an Atlassian Statuspage page (it reads /api/v2/summary.json of the site) and lists its components, for statuspage monitors. A URL that is not such a page answers 200 with statuspage false and the reason in error. Lookups are cached for 5 minutes. A statuspage monitor is up when the page (or the chosen components) is operational, degraded on a minor problem (indicator minor, degraded performance or partial outage) and down on a major or critical one (major outage).\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "target"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "description": "The page or any URL on its site, e.g. https://status.example.com/api/v2/status.json"
+                  },
+                  "ignore_tls": {
+                    "type": "boolean",
+                    "description": "Skip certificate verification"
+                  }
+                }
+              },
+              "example": {
+                "target": "https://status.example.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What the page is.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statuspage": {
+                      "type": "boolean",
+                      "description": "true when the site is an Atlassian Statuspage page"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Address of the page, to use as the monitor target"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Name of the page"
+                    },
+                    "indicator": {
+                      "type": "string",
+                      "description": "Overall state: none, minor, major, critical or maintenance"
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Overall state in words, e.g. All Systems Operational"
+                    },
+                    "components": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Id to put in keyword"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "string",
+                            "description": "Name of the group the component is in, if any"
+                          },
+                          "status": {
+                            "type": "string",
+                            "description": "operational, degraded_performance, partial_outage, major_outage or under_maintenance"
+                          }
+                        }
+                      }
+                    },
+                    "error": {
+                      "type": "string",
+                      "description": "Why the URL is not a Statuspage page"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/api/monitors/bulk": {
       "post": {
         "tags": [
@@ -10794,12 +10909,13 @@
               "smtp",
               "mcp",
               "udp",
-              "websocket"
+              "websocket",
+              "statuspage"
             ]
           },
           "target": {
             "type": "string",
-            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp; http and keyword can use {{variables}} set by steps), host:port (tcp, udp, IPv6 in brackets: [2001:db8::1]:443), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port], a ws:// or wss:// URL (websocket). Empty for push.",
+            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp; http and keyword can use {{variables}} set by steps), host:port (tcp, udp, IPv6 in brackets: [2001:db8::1]:443), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port], a ws:// or wss:// URL (websocket), the address of an Atlassian Statuspage page such as https://status.example.com (statuspage; API URLs like /api/v2/status.json are trimmed to it). Empty for push.",
             "examples": [
               "https://example.com/health"
             ]
@@ -10826,7 +10942,7 @@
           },
           "keyword": {
             "type": "string",
-            "description": "keyword: text that must appear in the body. mcp: comma separated tool names that must be listed. udp: bytes the reply must contain (text or hex, see method). websocket: text the first message from the server must contain."
+            "description": "keyword: text that must appear in the body. mcp: comma separated tool names that must be listed. udp: bytes the reply must contain (text or hex, see method). websocket: text the first message from the server must contain. statuspage: comma separated ids of the components to follow (empty = the overall state of the page); see POST /api/monitors/statuspage."
           },
           "keyword_invert": {
             "type": "boolean",
@@ -11311,6 +11427,10 @@
                     "country": {
                       "type": "string",
                       "description": "Country of the location (ISO 3166-1 alpha-2), \"\" when not set."
+                    },
+                    "degraded": {
+                      "type": "boolean",
+                      "description": "Set while the location's last check passed but reported a partial problem, e.g. a status page with a minor incident. Left out otherwise."
                     }
                   }
                 }

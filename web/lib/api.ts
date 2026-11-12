@@ -19,6 +19,7 @@ export type MonitorType =
   | "mcp"
   | "udp"
   | "websocket"
+  | "statuspage"
 
 export type AssertionOp =
   | "eq"
@@ -186,6 +187,8 @@ export interface LocationStatus {
   slow_ms: number
   /** ISO 3166-1 alpha-2 country of the location, "" = not set */
   country?: string
+  /** last check passed but reported a partial problem (status page) */
+  degraded?: boolean
 }
 
 export interface MonitorDetail extends MonitorSummary {

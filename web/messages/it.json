@@ -315,6 +315,10 @@
         "label": "websocket",
         "hint": "apre una connessione ws:// o wss://, se vuoi invia un messaggio e controlla la risposta"
       },
+      "statuspage": {
+        "label": "status page (atlassian)",
+        "hint": "legge una status page Atlassian Statuspage (status.example.com): i problemi minori sono degradato, quelli gravi giù"
+      },
       "push": {
         "label": "heartbeat (push)",
         "hint": "il tuo cron job o servizio chiama un URL; down quando le chiamate si fermano"
@@ -327,7 +331,8 @@
       "container": "nome o id del container",
       "address": "indirizzo",
       "server": "server",
-      "endpoint": "url dell'endpoint"
+      "endpoint": "url dell'endpoint",
+      "page": "url della status page"
     },
     "sections": {
       "target": "destinazione",
@@ -509,6 +514,27 @@
       },
       "removeValue": "rimuovi valore",
       "addValue": "salva un valore"
+    }
+  },
+  "statuspage": {
+    "suggest": "questa è la status page Atlassian di {name}. Usa il tipo status page: un incidente minore rende il monitor degradato invece che giù, e il check riporta il nome dell'incidente.",
+    "use": "usa status page",
+    "mapping": "tutto operativo = su · problema minore, prestazioni ridotte o interruzione parziale = degradato · problema grave o critico, interruzione totale = giù. Gli incidenti aperti compaiono nel messaggio del check.",
+    "loading": "lettura della pagina...",
+    "notPage": "non è una status page Atlassian Statuspage",
+    "components": "componenti da seguire",
+    "wholePage": "segui tutta la pagina",
+    "componentsNone": "nessuno scelto: conta lo stato generale della pagina. Scegli dei componenti per ignorare i problemi degli altri.",
+    "componentsSome": "{count, plural, one {# componente scelto} other {# componenti scelti}}: contano solo il loro stato e i loro incidenti.",
+    "unknown": "non più presenti sulla pagina: {ids}.",
+    "removeUnknown": "rimuovi",
+    "states": {
+      "operational": "operativo",
+      "degraded_performance": "degradato",
+      "partial_outage": "interruzione parziale",
+      "major_outage": "interruzione totale",
+      "under_maintenance": "manutenzione",
+      "other": "sconosciuto"
     }
   },
   "testCheck": {
