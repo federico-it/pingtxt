@@ -24,11 +24,11 @@ export function privacyMeta(lang: Lang): Metadata {
 // Who answers for this policy. Change it here only.
 const OWNER = "Federico Mengascini"
 const CONTACT = "privacy@pingtxt.com"
-const UPDATED = { en: "November 1, 2026", it: "1 novembre 2026" }
+const UPDATED = { en: "November 12, 2026", it: "12 novembre 2026" }
 
 const RELAY_REPO = "https://github.com/federico-it/pingtxt-push-relay"
 // The app asks this server whether a newer version exists.
-const UPDATES_HOST = "federicomengascini.com"
+const UPDATES_HOST = "app-control.srvly.it"
 
 const toc: [string, string, string][] = [
   ["summary", "summary", "in breve"],
@@ -189,8 +189,8 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
             </li>
             <li>
               {t(
-                "The addresses of hubs you used, a few preferences, the random installation id of the update check and its last answer are kept in the app's settings (UserDefaults), and the latest hub status is shared with the pingtxt widgets through an App Group on the device.",
-                "Gli indirizzi degli hub che hai usato, alcune preferenze, l'id di installazione casuale del controllo aggiornamenti e la sua ultima risposta sono conservati nelle impostazioni dell'app (UserDefaults), e l'ultimo stato dell'hub è condiviso con i widget di pingtxt tramite un App Group sul dispositivo.",
+                "The addresses of hubs you used, a few preferences, the random installation id of the update check, its short label and its last answer are kept in the app's settings (UserDefaults), and the latest hub status is shared with the pingtxt widgets through an App Group on the device.",
+                "Gli indirizzi degli hub che hai usato, alcune preferenze, l'id di installazione casuale del controllo aggiornamenti, la sua etichetta breve e la sua ultima risposta sono conservati nelle impostazioni dell'app (UserDefaults), e l'ultimo stato dell'hub è condiviso con i widget di pingtxt tramite un App Group sul dispositivo.",
               )}
             </li>
             <li>
@@ -276,8 +276,20 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
           <ul>
             <li>
               {t(
-                "the installed app version, the iOS version (for example 26.1) and the platform (ios);",
-                "la versione dell'app installata, la versione di iOS (per esempio 26.1) e la piattaforma (ios);",
+                "the installed app version and build, the iOS version (for example 26.1), the platform (ios) and the language of the app;",
+                "la versione e la build dell'app installata, la versione di iOS (per esempio 26.1), la piattaforma (ios) e la lingua dell'app;",
+              )}
+            </li>
+            <li>
+              {t(
+                "the device model as a hardware identifier shared by every device of that model (for example iPhone16,1): not the device name, its serial number or anything that tells one phone from another;",
+                "il modello del dispositivo come identificativo hardware comune a tutti i dispositivi di quel modello (per esempio iPhone16,1): non il nome del dispositivo, il numero di serie né altro che distingua un telefono dall'altro;",
+              )}
+            </li>
+            <li>
+              {t(
+                "the version of the update-check library built into the app (for example swift/0.4.0);",
+                "la versione della libreria di controllo aggiornamenti inclusa nell'app (per esempio swift/0.4.0);",
               )}
             </li>
             <li>
@@ -301,8 +313,8 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
           </ul>
           <p>
             {t(
-              "The server answers with the latest version and whether yours is still supported. The installation id is stored only as a one-way hash, to roll out new versions gradually and to count active installations and versions. Nothing about your hubs, monitors or account is sent. The request is skipped if the server cannot be reached; the app works the same.",
-              "Il server risponde con l'ultima versione e se la tua è ancora supportata. L'id di installazione viene conservato solo come hash non reversibile, per distribuire le nuove versioni in modo graduale e contare installazioni attive e versioni. Non viene inviato nulla sui tuoi hub, monitor o account. Se il server non è raggiungibile la richiesta viene saltata e l'app funziona lo stesso.",
+              "The server answers with the latest version, whether yours is still supported and any planned maintenance. The installation id is stored only as a one-way hash, to roll out new versions gradually and to count active installations, versions, iOS versions, languages and device models. The device model and the library version never change the answer. Nothing about your hubs, monitors or account is sent. The request is skipped if the server cannot be reached; the app works the same.",
+              "Il server risponde con l'ultima versione, se la tua è ancora supportata e con eventuali manutenzioni programmate. L'id di installazione viene conservato solo come hash non reversibile, per distribuire le nuove versioni in modo graduale e contare installazioni attive, versioni, versioni di iOS, lingue e modelli di dispositivo. Il modello del dispositivo e la versione della libreria non cambiano mai la risposta. Non viene inviato nulla sui tuoi hub, monitor o account. Se il server non è raggiungibile la richiesta viene saltata e l'app funziona lo stesso.",
             )}
           </p>
         </Section>
@@ -390,8 +402,8 @@ export function PrivacyPage({ lang }: { lang: Lang }) {
             </li>
             <li>
               {t(
-                "The update check keeps only the hashed installation id with the app and iOS version it last reported, and the daily counts made from them. It keeps no IP addresses.",
-                "Il controllo aggiornamenti conserva solo l'hash dell'id di installazione con l'ultima versione dell'app e di iOS che ha inviato, e i conteggi giornalieri che ne derivano. Non conserva indirizzi IP.",
+                "The update check keeps only the hashed installation id with the app version, iOS version, language, device model and library version it last reported, and the daily counts made from them. It keeps no IP addresses.",
+                "Il controllo aggiornamenti conserva solo l'hash dell'id di installazione con l'ultima versione dell'app e di iOS, la lingua, il modello del dispositivo e la versione della libreria che ha inviato, e i conteggi giornalieri che ne derivano. Non conserva indirizzi IP.",
               )}
             </li>
             <li>
