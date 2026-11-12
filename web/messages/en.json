@@ -315,6 +315,10 @@
         "label": "websocket",
         "hint": "opens a ws:// or wss:// connection, optionally sends a message and checks the reply"
       },
+      "statuspage": {
+        "label": "status page (atlassian)",
+        "hint": "reads an Atlassian Statuspage page (status.example.com): minor problems are degraded, major ones down"
+      },
       "push": {
         "label": "heartbeat (push)",
         "hint": "your cron job or service calls a URL; down when the calls stop"
@@ -327,7 +331,8 @@
       "container": "container name or id",
       "address": "address",
       "server": "server",
-      "endpoint": "endpoint url"
+      "endpoint": "endpoint url",
+      "page": "status page url"
     },
     "sections": {
       "target": "target",
@@ -509,6 +514,27 @@
       },
       "removeValue": "remove value",
       "addValue": "save a value"
+    }
+  },
+  "statuspage": {
+    "suggest": "this is the Atlassian status page of {name}. Use the status page type: a minor incident makes the monitor degraded instead of down, and the check names the incident.",
+    "use": "use status page",
+    "mapping": "all operational = up · minor problem, degraded performance or partial outage = degraded · major or critical problem, major outage = down. Open incidents are shown in the check message.",
+    "loading": "reading the page...",
+    "notPage": "not an Atlassian Statuspage page",
+    "components": "components to follow",
+    "wholePage": "follow the whole page",
+    "componentsNone": "none chosen: the overall state of the page counts. Pick components to ignore problems with the others.",
+    "componentsSome": "{count, plural, one {# component chosen} other {# components chosen}}: only {count, plural, one {its} other {their}} state and incidents count.",
+    "unknown": "not on the page any more: {ids}.",
+    "removeUnknown": "remove",
+    "states": {
+      "operational": "operational",
+      "degraded_performance": "degraded",
+      "partial_outage": "partial outage",
+      "major_outage": "major outage",
+      "under_maintenance": "maintenance",
+      "other": "unknown"
     }
   },
   "testCheck": {
