@@ -37,7 +37,8 @@ non lo azzera mai.
 
 L'hub è anche un server [MCP](https://modelcontextprotocol.io) su `/mcp` (Streamable HTTP), così un assistente AI come
 Claude può rispondere a "cosa è down adesso?", guardare incidenti, tempi di risposta e diagnostica, o creare per te un
-monitor o una finestra di manutenzione. (Per *controllare* un server MCP, invece, vedi
+monitor o una finestra di manutenzione. **Impostazioni → mcp** mostra l'indirizzo del server, come collegarsi e gli
+assistenti collegati. (Per *controllare* un server MCP, invece, vedi
 [server MCP](monitors.md#server-mcp).)
 
 ### Collegarsi con OAuth
@@ -49,8 +50,8 @@ Niente da copiare: aggiungi `https://status.example.com/mcp` come connettore.
 
 L'assistente apre pingtxt nel browser, accedi come sempre e scegli **sola lettura** o **lettura + scrittura** (solo
 admin). L'hub supporta discovery (RFC 9728 / RFC 8414), registrazione dinamica dei client, PKCE (S256) e refresh token
-a rotazione. Gli access token durano un'ora e valgono su `/mcp` e sulla REST API. Le app collegate sono elencate in
-**impostazioni → token**, da dove puoi scollegarle. Dietro un proxy, imposta l'URL pubblico in
+a rotazione. Gli access token durano un'ora e valgono su `/mcp` e sulla REST API. Gli assistenti collegati sono elencati in
+**impostazioni → mcp**, da dove puoi scollegarli. Dietro un proxy, imposta l'URL pubblico in
 **impostazioni → generali** perché i redirect OAuth puntino all'indirizzo giusto.
 
 ### Collegarsi con un token API

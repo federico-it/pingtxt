@@ -25,22 +25,12 @@ import {
   type ApiToken,
   type TokenScope,
 } from "@/lib/api"
+import { settingsHref } from "@/lib/settings-nav"
 import { cn } from "@/lib/utils"
 
 // Labels are in apiTokens.scopes.<scope> and apiTokens.expiries.<days>.
 const scopes: TokenScope[] = ["read", "write"]
 const expiries = ["30", "90", "365", "0"] as const
-
-// An AI assistant connected through OAuth to the MCP server.
-type OAuthGrant = {
-  id: number
-  client_name: string
-  scope: TokenScope
-  created_at: number
-  last_used_at: number
-  /** Phone that gets push notifications through this sign-in. */
-  push_device?: string
-}
 
 function date(ms: number) {
   return new Date(ms).toLocaleDateString()
@@ -50,10 +40,6 @@ export function ApiTokens() {
   const { data, mutate } = useApi<ApiToken[]>("/api/tokens", {
     refreshInterval: 0,
   })
-  const { data: grants, mutate: mutateGrants } = useApi<OAuthGrant[]>(
-    "/api/oauth/grants",
-    { refreshInterval: 0 }
-  )
   const [name, setName] = useState("")
   const [scope, setScope] = useState<TokenScope>("read")
   // A token never has more rights than its owner.
@@ -93,16 +79,6 @@ export function ApiTokens() {
     }
   }
 
-  async function disconnect(g: OAuthGrant) {
-    try {
-      await api(`/api/oauth/grants/${g.id}`, { method: "DELETE" })
-      toast.success(tt("disconnected", { name: g.client_name }))
-      mutateGrants()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : tt("error"))
-    }
-  }
-
   const origin = typeof window === "undefined" ? "" : window.location.origin
   const now = useNow()
 
@@ -110,9 +86,12 @@ export function ApiTokens() {
     <div className="grid gap-4">
       <p className="text-xs text-muted-foreground">
         {tt("intro")}{" "}
-        {tt.rich("mcpIntro", {
-          url: origin + "/mcp",
-          b: (c) => <span className="text-foreground">{c}</span>,
+        {tt.rich("mcpLink", {
+          mcp: (c) => (
+            <Link href={settingsHref("mcp")} className="text-foreground underline underline-offset-4">
+              {c}
+            </Link>
+          ),
         })}
       </p>
       <p className="text-xs text-muted-foreground">
@@ -253,49 +232,6 @@ export function ApiTokens() {
               </div>
             )
           })}
-        </div>
-      )}
-      {grants && grants.length > 0 && (
-        <div className="grid gap-2">
-          <p className="text-xs text-muted-foreground">{tt("connectedApps")}</p>
-          <div className="divide-y divide-dashed border border-dashed">
-            {grants.map((g) => (
-              <div
-                key={g.id}
-                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs"
-              >
-                <div className="min-w-0">
-                  <span className="text-foreground">{g.client_name}</span>{" "}
-                  <span
-                    className={cn(
-                      "text-muted-foreground",
-                      g.scope === "write" && "text-warn"
-                    )}
-                  >
-                    [{tt(`scopes.${g.scope}`)}]
-                  </span>
-                  <span className="block text-[11px] text-muted-foreground">
-                    {tt("connectedOn", { date: date(g.created_at) })} ·{" "}
-                    {g.last_used_at
-                      ? tt("lastUsed", { date: date(g.last_used_at) })
-                      : tt("neverUsed")}
-                    {g.push_device && <> · {tt("pushDevice", { name: g.push_device })}</>}
-                  </span>
-                </div>
-                <Confirm
-                  trigger={
-                    <Button size="xs" variant="ghost">
-                      {tt("disconnect")}
-                    </Button>
-                  }
-                  title={tt("disconnectTitle", { name: g.client_name })}
-                  description={tt("disconnectText")}
-                  action={tt("disconnect")}
-                  onConfirm={() => disconnect(g)}
-                />
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </div>
