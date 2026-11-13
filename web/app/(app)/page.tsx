@@ -39,7 +39,7 @@ import { usePins } from "@/lib/pins"
 import { PinButton } from "@/components/pin-button"
 import { TreeGuides } from "@/components/tree-guides"
 import { segment } from "@/components/ui/control"
-import type { GroupNode } from "@/lib/groups"
+import { shortGroupName } from "@/lib/groups"
 import { cn } from "@/lib/utils"
 
 const order: Record<Status, number> = {
@@ -91,19 +91,6 @@ function problemRank(list: MonitorSummary[]) {
   for (const m of list) if (m.status === "down") return 0
   else if (m.status === "degraded") r = 1
   return r
-}
-
-/** Name of a subgroup without its parent's name in front, where it repeats
- * it ("Infrastructure DNS" in "Infrastructure" shows as "DNS"). */
-function shortGroupName(g: GroupNode, byId: Map<number, GroupNode>) {
-  const parent = g.ancestors.length ? byId.get(g.ancestors[0]) : undefined
-  if (!parent) return g.name
-  const p = parent.name.trim()
-  if (!p || !g.name.toLowerCase().startsWith(p.toLowerCase())) return g.name
-  const after = g.name.slice(p.length)
-  // only at a word boundary: "Infra" does not shorten "Infrastructure"
-  if (!/^[\s\-–—:/·›»]/.test(after)) return g.name
-  return after.replace(/^[\s\-–—:/·›»]+/, "") || g.name
 }
 
 /** Dashboard filters, kept in the URL so they survive back and reload. */
