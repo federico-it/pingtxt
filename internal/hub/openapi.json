@@ -1199,6 +1199,10 @@
                     },
                     "recovery_codes_left": {
                       "type": "integer"
+                    },
+                    "phone_alerts": {
+                      "type": "boolean",
+                      "description": "A Twilio channel exists, so on-call SMS and calls can reach people. Until then clients can hide the phone number setting."
                     }
                   }
                 },
@@ -1213,7 +1217,8 @@
                     "identities": []
                   },
                   "version": "v0.1.0",
-                  "recovery_codes_left": 10
+                  "recovery_codes_left": 10,
+                  "phone_alerts": false
                 }
               }
             }

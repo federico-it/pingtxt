@@ -431,6 +431,8 @@ export default function NotificationsPage() {
             <div className="grid grid-cols-2 gap-4">
               {kind?.fields
                 .filter((f) => !f.when || f.when(draft?.config ?? {}))
+                // No Twilio channel yet: nothing to text or call from.
+                .filter((f) => f.source !== "twilioChannels" || sources.twilioChannels.length > 1 || hasTwilio(draft?.config ?? {}))
                 .map((f) => (
                   <NotifierField key={`${draft?.type}-${f.key}`} field={f} config={draft?.config ?? {}} onChange={setConfig} sources={sources} />
                 ))}

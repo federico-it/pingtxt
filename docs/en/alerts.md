@@ -95,7 +95,8 @@ A **whoever is on call** channel sends its alerts to the person on call when the
 - by email, through an email channel you pick: same server and sender, but to the email of the person on call;
 - by SMS, call or both, through a Twilio channel you pick: same account and sender, but to the phone number of the
   person on call. Everyone sets their own number in **settings → account**; members without one get only app and
-  email alerts, and the oncall page marks them.
+  email alerts, and the oncall page marks them. Until the hub has a Twilio channel, the phone number setting, the
+  Twilio choice of this channel and these marks are hidden.
 
 Events, scope, **send after** and **repeat every** work as for any channel. To escalate, add a second **whoever is on
 call** channel for a backup schedule with **send after** set to 15 or 30 minutes: if nobody

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { api, useApi, useIsAdmin, type OnCallShift, type Schedule, type ScheduleView, type User } from "@/lib/api"
+import { api, useApi, useIsAdmin, type OnCallShift, type Schedule, type Me, type ScheduleView, type User } from "@/lib/api"
 import { datetime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
@@ -340,8 +340,11 @@ export default function OnCallPage() {
   )
 }
 
+/** Missing phone number, shown only once a Twilio channel can text or call. */
 function NoPhone() {
   const t = useTranslations("oncall")
+  const me = useApi<Me>("/api/auth/me", { refreshInterval: 60_000 })
+  if (!me.data?.phone_alerts) return null
   return (
     <span title={t("noPhone")} className="text-warn">
       <PhoneOffIcon className="size-3" />
