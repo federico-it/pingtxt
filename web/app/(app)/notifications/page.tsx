@@ -29,6 +29,7 @@ import {
   type NotifierType,
   type NotifyEvent,
   type PushSettings,
+  type ScheduleView,
 } from "@/lib/api"
 import type en from "@/messages/en.json"
 
@@ -58,11 +59,22 @@ type Field = {
     | "matrixRoom"
     | "twilioFrom"
     | "phoneNumbers"
+    | "twilioMode"
+    | "oncallSchedule"
+    | "oncallEmail"
+    | "oncallTwilio"
+  /** Options read from the hub: schedules or channels of a type (ids). */
+  source?: Source
   /** Shown only when this returns true for the current config. */
   when?: (config: Record<string, string>) => boolean
 }
 
+type Source = "schedules" | "emailChannels" | "twilioChannels"
+type Option = { value: string; label: string }
+
 const isResend = (c: Record<string, string>) => c.provider === "resend"
+const callsOn = (c: Record<string, string>) => !!c.mode && c.mode !== "sms"
+const hasTwilio = (c: Record<string, string>) => !!c.twilio_channel && c.twilio_channel !== "0"
 const isSMTP = (c: Record<string, string>) => !isResend(c)
 
 // Kind labels are in notifications.kinds.<type>.
@@ -123,6 +135,18 @@ const kinds: Record<NotifierType, { fields: Field[] }> = {
       { key: "auth_token", label: "authToken", secret: true, required: true, half: true },
       { key: "from", label: "smsFrom", placeholder: "+15550001111", required: true, hint: "twilioFrom" },
       { key: "to", label: "phoneNumbers", placeholder: "+393331234567, +393337654321", required: true, hint: "phoneNumbers" },
+      { key: "mode", label: "twilioMode", options: ["sms", "call", "both"], half: true, hint: "twilioMode" },
+      { key: "language", label: "callLanguage", options: ["en", "it"], half: true, when: callsOn },
+    ],
+  },
+  // Whoever is on call in a schedule, see /oncall.
+  oncall: {
+    fields: [
+      { key: "schedule_id", label: "schedule", source: "schedules", required: true, hint: "oncallSchedule" },
+      { key: "app", label: "oncallApp", options: ["on", "off"] },
+      { key: "email_channel", label: "emailChannel", source: "emailChannels", half: true, hint: "oncallEmail" },
+      { key: "twilio_channel", label: "twilioChannel", source: "twilioChannels", half: true, hint: "oncallTwilio" },
+      { key: "twilio_mode", label: "twilioMode", options: ["sms", "call", "both"], when: hasTwilio },
     ],
   },
   email: {
@@ -196,6 +220,14 @@ export default function NotificationsPage() {
   // App channels need push on in Settings (admins only can read it).
   const { data: push } = useApi<PushSettings>(isAdmin ? "/api/settings/push" : null, { refreshInterval: 0 })
   const pushOff = !!push && !(push.enabled && push.registered)
+  const { data: schedules } = useApi<ScheduleView[]>(isAdmin ? "/api/oncall" : null, { refreshInterval: 0 })
+  const none: Option = { value: "0", label: t("noneChannel") }
+  const channelsOf = (type: NotifierType) => [none, ...(data ?? []).filter((n) => n.type === type).map((n) => ({ value: String(n.id), label: n.name }))]
+  const sources: Record<Source, Option[]> = {
+    schedules: (schedules ?? []).map((sc) => ({ value: String(sc.id), label: sc.name })),
+    emailChannels: channelsOf("email"),
+    twilioChannels: channelsOf("twilio"),
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -309,6 +341,8 @@ export default function NotificationsPage() {
                   {[
                     kinds[n.type] ? t(`kinds.${n.type}`) : n.type,
                     n.type === "email" && (isResend(n.config) ? "resend" : "smtp"),
+                    n.type === "oncall" && sources.schedules.find((o) => o.value === n.config.schedule_id)?.label,
+                    n.type === "twilio" && callsOn(n.config) && t(`options.${n.config.mode as "call"}`),
                     n.delay_min > 0 && t("afterDown", { min: n.delay_min }),
                     n.repeat_min > 0 && t("everyMin", { min: n.repeat_min }),
                   ]
@@ -361,7 +395,20 @@ export default function NotificationsPage() {
                 items={(Object.keys(kinds) as NotifierType[]).map((value) => ({ value, label: t(`kinds.${value}`) }))}
                 value={draft?.type}
                 onValueChange={(v) =>
-                  v && setDraft((p) => p && { ...p, type: v as NotifierType, config: v === "email" ? { security: "starttls", port: "587" } : ({} as Record<string, string>) })
+                  v &&
+                  setDraft(
+                    (p) =>
+                      p && {
+                        ...p,
+                        type: v as NotifierType,
+                        config:
+                          v === "email"
+                            ? { security: "starttls", port: "587" }
+                            : v === "oncall"
+                              ? { schedule_id: sources.schedules[0]?.value ?? "", app: "on" }
+                              : ({} as Record<string, string>),
+                      }
+                  )
                 }
               >
                 <SelectTrigger className="w-full">
@@ -385,7 +432,7 @@ export default function NotificationsPage() {
               {kind?.fields
                 .filter((f) => !f.when || f.when(draft?.config ?? {}))
                 .map((f) => (
-                  <NotifierField key={`${draft?.type}-${f.key}`} field={f} config={draft?.config ?? {}} onChange={setConfig} />
+                  <NotifierField key={`${draft?.type}-${f.key}`} field={f} config={draft?.config ?? {}} onChange={setConfig} sources={sources} />
                 ))}
             </div>
             <div className="grid grid-cols-2 gap-4 border-t border-dashed pt-4">
@@ -483,19 +530,39 @@ function PushOffNote({ box }: { box?: boolean }) {
   )
 }
 
-function NotifierField({ field: f, config, onChange }: { field: Field; config: Record<string, string>; onChange: (patch: Record<string, string>) => void }) {
+function NotifierField({
+  field: f,
+  config,
+  onChange,
+  sources,
+}: {
+  field: Field
+  config: Record<string, string>
+  onChange: (patch: Record<string, string>) => void
+  sources: Record<Source, Option[]>
+}) {
   const id = `n-${f.key}`
   const saved = f.writeOnly && config[`${f.key}_set`] === "true"
   const t = useTranslations("notifications")
-  const options = f.options?.map((o) => ({ value: o, label: t(`options.${o as "tls"}`) }))
+  const options = f.source ? sources[f.source] : f.options?.map((o) => ({ value: o, label: t(`options.${o as "tls"}`) }))
   return (
     <div className={`grid gap-1.5 ${f.half ? "col-span-2 sm:col-span-1" : "col-span-2"}`}>
       <Label htmlFor={id}>
         {t(`fields.${f.label}`)}
         {saved && <span className="font-normal text-muted-foreground">{t("savedKeep")}</span>}
       </Label>
-      {options ? (
-        <Select items={options} value={config[f.key] ?? options[0].value} onValueChange={(v) => v && onChange({ [f.key]: v })}>
+      {options && f.source === "schedules" && options.length === 0 ? (
+        <p className="border border-dashed p-2 text-xs text-warn">
+          {t.rich("noSchedules", {
+            link: (chunks) => (
+              <Link href="/oncall/" className="underline underline-offset-2">
+                {chunks}
+              </Link>
+            ),
+          })}
+        </p>
+      ) : options ? (
+        <Select items={options} value={config[f.key] ?? options[0]?.value ?? null} onValueChange={(v) => v && onChange({ [f.key]: v })}>
           <SelectTrigger id={id} className="w-full">
             <SelectValue />
           </SelectTrigger>

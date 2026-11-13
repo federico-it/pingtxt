@@ -45,7 +45,8 @@
       "agents": "agent",
       "notifications": "notifiche",
       "statusPages": "status",
-      "settings": "impostazioni"
+      "settings": "impostazioni",
+      "oncall": "turni"
     },
     "down": "{count} down",
     "allGood": "tutto funziona",
@@ -997,7 +998,8 @@
       "pushover": "pushover",
       "gotify": "gotify",
       "matrix": "matrix",
-      "twilio": "sms (twilio)"
+      "twilio": "sms e chiamate (twilio)",
+      "oncall": "chi è reperibile"
     },
     "fields": {
       "url": "url",
@@ -1029,7 +1031,13 @@
       "accountSid": "account sid",
       "authToken": "auth token",
       "smsFrom": "mittente",
-      "phoneNumbers": "numeri di telefono"
+      "phoneNumbers": "numeri di telefono",
+      "twilioMode": "invia come",
+      "callLanguage": "lingua delle chiamate",
+      "schedule": "turno di reperibilità",
+      "oncallApp": "app pingtxt sui suoi telefoni",
+      "emailChannel": "email tramite",
+      "twilioChannel": "sms o chiamata tramite"
     },
     "options": {
       "smtp": "server smtp",
@@ -1038,7 +1046,14 @@
       "tls": "tls (465)",
       "none": "nessuna (25, relay locale)",
       "us": "usa",
-      "eu": "ue"
+      "eu": "ue",
+      "sms": "sms",
+      "call": "chiamata",
+      "both": "sms e chiamata",
+      "on": "sì",
+      "off": "no",
+      "en": "inglese",
+      "it": "italiano"
     },
     "pushOff": "Le notifiche push all'app mobile sono disattivate: attivale in <settings>Impostazioni, app mobile</settings> per abilitare questo canale.",
     "hints": {
@@ -1052,8 +1067,14 @@
       "gotifyToken": "Crea un'applicazione in Gotify e incolla il suo token.",
       "matrixRoom": "Id della stanza (!abc:server) o alias (#stanza:server). Invita l'account bot nella stanza e accetta l'invito con quell'account.",
       "twilioFrom": "Un numero Twilio, o il SID di un messaging service (MG...).",
-      "phoneNumbers": "Formato internazionale (+39...), separati da virgola. Ogni avviso è un SMS per ogni numero, pagato sul tuo account Twilio."
-    }
+      "phoneNumbers": "Formato internazionale (+39...), separati da virgola. SMS e chiamate sono pagati sul tuo account Twilio.",
+      "twilioMode": "Le chiamate partono solo per le cattive notizie (down, scadenze, agent offline) e leggono l'avviso ad alta voce. Con un URL pubblico impostato, chi risponde può premere 1 per prendere in carico l'incidente, se il numero è nell'account di un admin.",
+      "oncallSchedule": "Gli avvisi vanno a chi è reperibile in questo turno nel momento in cui arrivano.",
+      "oncallEmail": "Un canale email da cui inviare, all'email di chi è reperibile.",
+      "oncallTwilio": "Un canale Twilio da cui inviare sms o chiamare, al numero di telefono di chi è reperibile (Impostazioni, Account)."
+    },
+    "noneChannel": "nessuno",
+    "noSchedules": "Non ci sono ancora turni di reperibilità: <link>creane uno</link> prima."
   },
   "reports": {
     "title": "report periodici",
@@ -1402,7 +1423,8 @@
     "discard": "scarta",
     "save": "salva",
     "unsavedLeave": "Hai modifiche non salvate nelle impostazioni. Uscire senza salvare?",
-    "activity": "attività recente"
+    "activity": "attività recente",
+    "phone": "telefono per la reperibilità"
   },
   "generalSettings": {
     "saved": "impostazioni salvate",
@@ -2238,5 +2260,63 @@
       "mem_pct": "ram",
       "disk_pct": "disco più pieno"
     }
+  },
+  "oncall": {
+    "title": "reperibilità",
+    "add": "nuovo turno",
+    "intro": "Chi risponde agli avvisi, e quando. I membri si danno il cambio, un turno a testa; le sostituzioni mettono qualcun altro in reperibilità per un periodo. Un canale <channels>chi è reperibile</channels> manda gli avvisi a chi è di turno via app, email, sms o chiamata; aggiungine un secondo con \"invia dopo\" per passare a un turno di riserva.",
+    "empty": "Non ci sono ancora turni di reperibilità.",
+    "saved": "turno salvato",
+    "overrideSaved": "sostituzione aggiunta",
+    "error": "qualcosa è andato storto",
+    "editTitle": "modifica turno",
+    "dialogText": "I membri si danno il cambio in quest'ordine, un turno a testa, a partire dall'inizio.",
+    "name": "nome",
+    "namePlaceholder": "backend",
+    "description": "descrizione",
+    "members": "rotazione",
+    "up": "sposta su",
+    "down": "sposta giù",
+    "removeMember": "rimuovi",
+    "noMembers": "ancora nessuno",
+    "addMember": "aggiungi un membro…",
+    "membersHint": "Una persona può comparire più volte. Chi non ha un numero di telefono riceve solo gli avvisi via app ed email.",
+    "shift": "ogni turno dura",
+    "unit": "unità",
+    "units": {
+      "hours": "ore",
+      "days": "giorni",
+      "weeks": "settimane"
+    },
+    "start": "primo turno (ora tua)",
+    "timezone": "fuso orario dei cambi turno",
+    "startHint": "I turni giornalieri e settimanali cambiano alla stessa ora locale di questo fuso tutto l'anno, anche con l'ora legale.",
+    "save": "salva",
+    "overrideTitle": "sostituzione in {name}",
+    "overrideText": "Mette qualcuno in reperibilità per un periodo, qualunque cosa dica la rotazione: uno scambio, un giorno libero. Dove si sovrappongono vince la sostituzione più recente.",
+    "who": "chi è reperibile",
+    "from": "dal (ora tua)",
+    "until": "al (ora tua)",
+    "noPhone": "nessun numero di telefono: niente sms né chiamate",
+    "every": "{unit, select, hours {{count, plural, one {turni di un'ora} other {turni di # ore}}} days {{count, plural, one {turni giornalieri} other {turni di # giorni}}} other {{count, plural, one {turni settimanali} other {turni di # settimane}}}}",
+    "addOverride": "sostituzione",
+    "edit": "modifica",
+    "deleteTitle": "Eliminare il turno {name}?",
+    "rm": "rm",
+    "now": "reperibile ora",
+    "nobody": "nessuno",
+    "override": "sostituzione",
+    "untilTime": "fino al {time}",
+    "next": "poi",
+    "fromTime": "dal {time}",
+    "rotation": "rotazione",
+    "upcoming": "prossimi turni",
+    "overrides": "sostituzioni",
+    "alertedBy": "Avvisato da: {channels}.",
+    "noChannel": "Nessun canale avvisa ancora questo turno: aggiungi un canale \"chi è reperibile\" in <link>notifiche</link>.",
+    "phone": "numero di telefono",
+    "phoneSaved": "numero di telefono salvato",
+    "phoneRemoved": "numero di telefono rimosso",
+    "phoneHint": "In formato internazionale. Quando sei <link>reperibile</link>, sms e chiamate arrivano a questo numero, e un admin può prendere in carico un incidente premendo 1 durante la chiamata."
   }
 }

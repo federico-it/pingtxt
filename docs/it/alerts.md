@@ -17,9 +17,10 @@ monitor ed eventi riceve, e può aspettare o ripetere. **invia test** prova un c
 | Pushover | la tua chiave utente (o di gruppo) e il token di un'applicazione Pushover; facoltativo un solo dispositivo. I problemi partono con priorità alta |
 | PagerDuty | l'integration key Events API v2 di un servizio, e la regione (USA o UE). Un down apre un incidente, i promemoria si uniscono a quello e il ripristino lo risolve; lo stesso per degradato, scadenze e agent. Con l'evento `ack`, la presa in carico in pingtxt fa l'acknowledge anche dell'incidente PagerDuty |
 | Opsgenie | la chiave di un'integrazione API, e la regione (USA o UE). Gli avvisi hanno P1 (down, agent offline), P2 (scaduto) o P3 (in scadenza, degradato) e si chiudono da soli al ripristino. Con l'evento `ack`, la presa in carico in pingtxt fa l'acknowledge anche dell'avviso |
-| SMS (Twilio) | account SID e auth token, il mittente (un numero Twilio o il SID di un messaging service `MG...`) e i numeri in formato internazionale (`+39...`). Ogni avviso è un SMS breve per numero, pagato sul tuo account Twilio |
+| SMS e chiamate (Twilio) | account SID e auth token, il mittente (un numero Twilio o il SID di un messaging service `MG...`) e i numeri in formato internazionale (`+39...`). **invia come** sceglie SMS, chiamata o entrambi: ogni avviso è un SMS breve per numero, le chiamate partono solo per le cattive notizie (down, scadenze, agent offline) e leggono l'avviso ad alta voce in inglese o italiano. Le chiamate richiedono un numero Twilio come mittente. Vedi [chiamate vocali](#chiamate-vocali). Pagato sul tuo account Twilio |
 | email | un server SMTP (STARTTLS sulla 587, TLS sulla 465, o nessuno per un relay locale sulla 25), oppure l'API di [Resend](https://resend.com) con una chiave di un dominio verificato; poi mittente e destinatari |
 | app pingtxt (push) | le notifiche push attive in **impostazioni → integrazioni → app mobile**; gli utenti (email) i cui telefoni ricevono gli avvisi, vuoto per tutti. Vedi [App iOS](ios-app.md) |
+| chi è reperibile | un [turno di reperibilità](#turni-di-reperibilità), e come raggiungere chi è di turno: l'app pingtxt, un canale email da cui inviare e un canale Twilio da cui mandare SMS o chiamare |
 
 I link negli avvisi (Teams, Pushover, Gotify, Matrix, PagerDuty, Opsgenie) portano alla diagnostica, o al monitor
 quando l'URL pubblico è impostato nelle **impostazioni**. Un test inviato a PagerDuty o Opsgenie apre un incidente e lo
@@ -78,6 +79,45 @@ Il ripristino va comunque a tutti i canali che hanno ricevuto l'avviso. **rilasc
 promemoria ed escalation ripartono da dove si erano fermati. Un altro admin può **subentrare** in un incidente preso
 in carico da qualcun altro. Gli utenti in sola lettura vedono chi se ne occupa ma non possono prenderlo in carico.
 API: `POST` e `DELETE /api/incidents/{id}/ack`; le prese in carico finiscono nel [registro attività](security.md#registro-attività).
+
+## Turni di reperibilità
+
+La pagina **turni** dice chi risponde agli avvisi, e quando. Un turno ha dei membri in ordine di rotazione e una durata
+(qualche ora, giorno o settimana): dall'inizio del primo turno, ogni membro è reperibile per un turno, poi tocca al
+successivo, e così via. I turni giornalieri e settimanali cambiano alla stessa ora locale del fuso orario del turno
+tutto l'anno, anche con l'ora legale. Una persona può comparire più volte nella lista.
+
+Una **sostituzione** mette qualcun altro in reperibilità per un periodo, qualunque cosa dica la rotazione: uno
+scambio, un giorno libero, le ferie. Dove le sostituzioni si sovrappongono vince la più recente. Ogni turno mostra chi
+è reperibile ora e fino a quando, chi viene dopo, i prossimi turni e le sostituzioni in arrivo. Solo gli admin
+modificano i turni; tutti li vedono.
+
+Un canale **chi è reperibile** manda i suoi avvisi a chi è di turno nel momento in cui partono:
+
+- sui suoi telefoni, con l'app pingtxt (valgono comunque le sue preferenze di notifica);
+- via email, tramite un canale email che scegli: stesso server e mittente, ma all'email di chi è di turno;
+- via SMS, chiamata o entrambi, tramite un canale Twilio che scegli: stesso account e mittente, ma al numero di
+  telefono di chi è di turno. Ognuno imposta il proprio numero in **impostazioni → account**; chi non ce l'ha riceve
+  solo gli avvisi via app ed email, e la pagina dei turni lo segnala.
+
+Eventi, monitor, **invia dopo** e **ripeti ogni** funzionano come per qualsiasi canale. Per l'escalation aggiungi un
+secondo canale **chi è reperibile** per un turno di riserva con **invia dopo** a 15 o 30 minuti: se nessuno
+[prende in carico](#prendere-in-carico-gli-incidenti) l'incidente entro quel tempo, viene avvisata anche la riserva.
+Un turno o un canale usato da un canale di reperibilità non si può eliminare finché quel canale lo usa. I turni non
+fanno parte dell'[esportazione della configurazione](administration.md#export-e-import-della-configurazione). API: `/api/oncall`; strumento MCP `list_oncall`.
+
+## Chiamate vocali
+
+Un canale Twilio impostato su **chiamata** o **sms e chiamata** chiama ogni numero per gli avvisi di down, scadenza e
+agent offline e legge l'avviso ad alta voce due volte, in inglese o italiano. Ripristini, prese in carico e avvisi di
+degrado vanno solo via SMS (o per niente con **chiamata**).
+
+Quando l'hub ha un URL pubblico (**impostazioni → generali**) e la chiamata riguarda un monitor down, la chiamata
+finisce con "premi 1 per prendere in carico". Premendo 1 l'incidente viene
+[preso in carico](#prendere-in-carico-gli-incidenti) dall'admin il cui account ha il numero chiamato
+(**impostazioni → account**); gli altri numeri si sentono dire che non possono. Twilio invia il tasto a
+`/api/voice/...` firmato con l'auth token dell'account, e l'hub controlla la firma, quindi l'URL pubblico deve essere
+quello che Twilio raggiunge.
 
 ## Posticipare gli incidenti
 

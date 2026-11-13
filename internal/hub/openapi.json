@@ -46,6 +46,10 @@
       "description": "Alert channels: webhook, Discord, Slack, Microsoft Teams, Telegram, ntfy, Pushover, Gotify, Matrix, PagerDuty, Opsgenie, SMS (Twilio), email and the pingtxt app."
     },
     {
+      "name": "On-call",
+      "description": "Schedules of who is on call, with rotations and overrides; oncall channels alert them."
+    },
+    {
       "name": "Reports",
       "description": "Periodic email reports: uptime and incidents of the last week or month, per monitor group."
     },
@@ -11378,6 +11382,623 @@
           }
         }
       }
+    },
+    "/api/account/phone": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Set my phone number",
+        "operationId": "putAccountPhone",
+        "description": "Sets the phone number of the calling user, where on-call channels send SMS and calls. Spaces, dashes, dots and brackets are dropped; the number must then be in E.164 format. An empty phone removes it.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: the number is personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "phone": "+393331234567"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/oncall": {
+      "get": {
+        "tags": [
+          "On-call"
+        ],
+        "summary": "List on-call schedules",
+        "operationId": "listSchedules",
+        "description": "Every schedule with who is on call now and next, and its upcoming overrides.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Schedules by name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduleView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "On-call"
+        ],
+        "summary": "Create an on-call schedule",
+        "operationId": "createSchedule",
+        "description": "Members take turns, one shift each, from start_at (default now).\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Schedule"
+              },
+              "example": {
+                "name": "Backend",
+                "timezone": "Europe/Rome",
+                "members": [
+                  1,
+                  4,
+                  7
+                ],
+                "shift_len": 1,
+                "shift_unit": "weeks",
+                "start_at": 1794870000000
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/oncall/{id}": {
+      "get": {
+        "tags": [
+          "On-call"
+        ],
+        "summary": "Get an on-call schedule",
+        "operationId": "getSchedule",
+        "description": "**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the schedule."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The schedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "On-call"
+        ],
+        "summary": "Update an on-call schedule",
+        "operationId": "updateSchedule",
+        "description": "Fields left out keep their value.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the schedule."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Schedule"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The schedule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "On-call"
+        ],
+        "summary": "Delete an on-call schedule",
+        "operationId": "deleteSchedule",
+        "description": "Deletes the schedule and its overrides. 409 while an oncall channel uses it.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the schedule."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/api/oncall/{id}/shifts": {
+      "get": {
+        "tags": [
+          "On-call"
+        ],
+        "summary": "Who is on call when",
+        "operationId": "scheduleShifts",
+        "description": "Who is on call from `from` to `to`, rotation and overrides together, merged where the same person goes on. Default: the next 14 days; at most 92 days.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the schedule."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Unix ms, default now."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Unix ms, default from + 14 days."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shifts in order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OnCallShift"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/oncall/{id}/overrides": {
+      "post": {
+        "tags": [
+          "On-call"
+        ],
+        "summary": "Add an override",
+        "operationId": "createOverride",
+        "description": "Puts a user on call from start_at to end_at, whatever the rotation says (a swap, a day off).\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the schedule."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "user_id",
+                  "start_at",
+                  "end_at"
+                ],
+                "properties": {
+                  "user_id": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "start_at": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "end_at": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              },
+              "example": {
+                "user_id": 4,
+                "start_at": 1794870000000,
+                "end_at": 1794956400000
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleOverride"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/oncall/{id}/overrides/{override}": {
+      "delete": {
+        "tags": [
+          "On-call"
+        ],
+        "summary": "Delete an override",
+        "operationId": "deleteOverride",
+        "description": "**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the schedule."
+          },
+          {
+            "name": "override",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the override."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/voice/{channel}/{incident}": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Key pressed during an alert call",
+        "operationId": "voiceCallback",
+        "description": "Called by Twilio when the callee of an alert call presses a key (TwiML Gather). The request must carry a valid X-Twilio-Signature made with the auth token of the channel's Twilio account and the hub's public URL. Digits=1 acknowledges the incident for the admin whose account has the called number (To). Answers TwiML.\n\n**Access:** No authentication: the Twilio signature.",
+        "x-pingtxt-access": "public",
+        "security": [],
+        "parameters": [
+          {
+            "name": "channel",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the twilio or oncall channel that called."
+          },
+          {
+            "name": "incident",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the incident."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Digits": {
+                    "type": "string"
+                  },
+                  "To": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML to say.",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11576,6 +12197,10 @@
             "items": {
               "$ref": "#/components/schemas/Identity"
             }
+          },
+          "phone": {
+            "type": "string",
+            "description": "Phone number in E.164 format (+391234567890), \"\" = none. On-call channels send SMS and calls to it; a call can be acknowledged (press 1) only from the number of an admin."
           }
         }
       },
@@ -12892,7 +13517,8 @@
               "pushover",
               "gotify",
               "matrix",
-              "twilio"
+              "twilio",
+              "oncall"
             ]
           },
           "config": {
@@ -12900,7 +13526,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "webhook, discord, slack, ntfy: {url}. telegram: {bot_token, chat_id}. email: {host, port, security (starttls|tls|none), username, password, from, to}. app: {users}, emails of the users whose phones get the alerts, comma separated (empty = every user). teams: {url} (incoming webhook of a Workflows flow or connector). pagerduty: {routing_key, region (us|eu, default us)}. opsgenie: {api_key, region (us|eu)}. pushover: {app_token, user_key, device (optional)}. gotify: {url (server), token (application token)}. matrix: {url (homeserver), access_token, room_id (!id:server or #alias:server)}. twilio: {account_sid, auth_token, from (E.164 number or messaging service sid MG...), to (E.164 numbers, comma separated)}. The email password is write-only: responses carry password_set=\"true\" instead, and an empty password on update keeps the stored one. Read-only users see secrets as ********."
+            "description": "webhook, discord, slack, ntfy: {url}. telegram: {bot_token, chat_id}. email: {host, port, security (starttls|tls|none), username, password, from, to}. app: {users}, emails of the users whose phones get the alerts, comma separated (empty = every user). teams: {url} (incoming webhook of a Workflows flow or connector). pagerduty: {routing_key, region (us|eu, default us)}. opsgenie: {api_key, region (us|eu)}. pushover: {app_token, user_key, device (optional)}. gotify: {url (server), token (application token)}. matrix: {url (homeserver), access_token, room_id (!id:server or #alias:server)}. twilio: {account_sid, auth_token, from (E.164 number or messaging service sid MG...), to (E.164 numbers, comma separated), mode (sms|call|both, default sms; calls only for down, expiry and agent offline alerts and need a phone number as from), language (en|it, of calls, default en)}. oncall: {schedule_id, app (on|off, default on: the phones of whoever is on call), email_channel (id of an email channel to send through, to the on-call user's email; optional), twilio_channel (id of a Twilio channel to send through, to the on-call user's phone; optional), twilio_mode (sms|call|both)}. The email password is write-only: responses carry password_set=\"true\" instead, and an empty password on update keeps the stored one. Read-only users see secrets as ********."
           },
           "enabled": {
             "type": "boolean"
@@ -15842,6 +16468,184 @@
             }
           }
         }
+      },
+      "Schedule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone of the shift changes (Europe/Rome): daily and weekly shifts change at the same local time all year. Default UTC."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "User ids in rotation order (1 to 50). A user can appear more than once. Deleted users are skipped."
+          },
+          "shift_len": {
+            "type": "integer",
+            "description": "How long a shift lasts, in shift_unit (default 1; at most 744 hours, 92 days or 12 weeks)."
+          },
+          "shift_unit": {
+            "type": "string",
+            "enum": [
+              "hours",
+              "days",
+              "weeks"
+            ],
+            "description": "Default weeks."
+          },
+          "start_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When the first member's first shift starts (unix ms). Shifts follow one another from here; nobody is on call before it, except by override."
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix time in milliseconds."
+          }
+        }
+      },
+      "ScheduleOverride": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "schedule_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "user_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Who is on call instead."
+          },
+          "start_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix ms."
+          },
+          "end_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix ms, after start_at and in the future, at most one year after start_at."
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix ms. Where overrides overlap, the newest one wins."
+          }
+        }
+      },
+      "OnCallShift": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Who is on call, 0 = nobody."
+          },
+          "email": {
+            "type": "string"
+          },
+          "start": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix ms."
+          },
+          "end": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix ms."
+          },
+          "override": {
+            "type": "boolean",
+            "description": "An override put them on call."
+          }
+        }
+      },
+      "ScheduleView": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Schedule"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "overrides": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ScheduleOverride"
+                },
+                "description": "Overrides that are not over yet, by start."
+              },
+              "current": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OnCallShift"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Who is on call now and until when (user_id 0 = nobody)."
+              },
+              "next": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OnCallShift"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Who comes after, within 92 days."
+              },
+              "channels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Names of the oncall channels that alert this schedule."
+              },
+              "users": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "has_phone": {
+                      "type": "boolean",
+                      "description": "The user has a phone number for SMS and calls."
+                    }
+                  }
+                },
+                "description": "The members and the users of the overrides, with their emails."
+              }
+            }
+          }
+        ]
       }
     }
   }

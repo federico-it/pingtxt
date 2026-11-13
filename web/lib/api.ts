@@ -546,6 +546,7 @@ export type NotifierType =
   | "gotify"
   | "matrix"
   | "twilio"
+  | "oncall"
 
 /** What a channel can be sent. agent_offline is about agents, not monitors:
  * it ignores the channel's scope and monitor links cannot pick it. */
@@ -697,6 +698,52 @@ export interface User {
   has_password: boolean
   two_factor: boolean
   identities: Identity[]
+  /** phone number in E.164 format for on-call SMS and calls, "" = none */
+  phone?: string
+}
+
+/** An on-call rotation (see GET /api/oncall). */
+export interface Schedule {
+  id: number
+  name: string
+  description: string
+  /** IANA timezone of the shift changes */
+  timezone: string
+  /** user ids in rotation order */
+  members: number[]
+  shift_len: number
+  shift_unit: "hours" | "days" | "weeks"
+  /** when the first shift starts (unix ms) */
+  start_at: number
+  created_at: number
+}
+
+/** Someone on call instead of the rotation, from start_at to end_at. */
+export interface ScheduleOverride {
+  id: number
+  schedule_id: number
+  user_id: number
+  start_at: number
+  end_at: number
+  created_at: number
+}
+
+/** A stretch of time with the same person on call (user_id 0 = nobody). */
+export interface OnCallShift {
+  user_id: number
+  email: string
+  start: number
+  end: number
+  override: boolean
+}
+
+export interface ScheduleView extends Schedule {
+  overrides: ScheduleOverride[]
+  current: OnCallShift | null
+  next: OnCallShift | null
+  /** names of the on-call channels that alert this schedule */
+  channels: string[]
+  users: { id: number; email: string; has_phone: boolean }[]
 }
 
 export interface Me {

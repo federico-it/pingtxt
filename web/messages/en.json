@@ -45,7 +45,8 @@
       "agents": "agents",
       "notifications": "notify",
       "statusPages": "status",
-      "settings": "settings"
+      "settings": "settings",
+      "oncall": "oncall"
     },
     "down": "{count} down",
     "allGood": "all systems go",
@@ -997,7 +998,8 @@
       "pushover": "pushover",
       "gotify": "gotify",
       "matrix": "matrix",
-      "twilio": "sms (twilio)"
+      "twilio": "sms and calls (twilio)",
+      "oncall": "whoever is on call"
     },
     "fields": {
       "url": "url",
@@ -1029,7 +1031,13 @@
       "accountSid": "account sid",
       "authToken": "auth token",
       "smsFrom": "from",
-      "phoneNumbers": "phone numbers"
+      "phoneNumbers": "phone numbers",
+      "twilioMode": "send as",
+      "callLanguage": "language of calls",
+      "schedule": "on-call schedule",
+      "oncallApp": "pingtxt app on their phones",
+      "emailChannel": "email through",
+      "twilioChannel": "sms or call through"
     },
     "options": {
       "smtp": "smtp server",
@@ -1038,7 +1046,14 @@
       "tls": "tls (465)",
       "none": "none (25, local relay)",
       "us": "us",
-      "eu": "eu"
+      "eu": "eu",
+      "sms": "sms",
+      "call": "phone call",
+      "both": "sms and phone call",
+      "on": "yes",
+      "off": "no",
+      "en": "english",
+      "it": "italian"
     },
     "pushOff": "Push notifications to the mobile app are off: turn them on in <settings>Settings, mobile app</settings> to enable this channel.",
     "hints": {
@@ -1052,8 +1067,14 @@
       "gotifyToken": "Create an application in Gotify and paste its token.",
       "matrixRoom": "Room id (!abc:server) or alias (#room:server). Invite the bot account to the room and accept the invite with it first.",
       "twilioFrom": "A Twilio phone number, or the SID of a messaging service (MG...).",
-      "phoneNumbers": "International format (+39...), comma separated. Every alert is an SMS for each number, paid on your Twilio account."
-    }
+      "phoneNumbers": "International format (+39...), comma separated. SMS and calls are paid on your Twilio account.",
+      "twilioMode": "Calls are made only for bad news (down, expiry, agent offline) and read the alert out loud. With a public URL set, the callee can press 1 to acknowledge the incident if the number is on an admin's account.",
+      "oncallSchedule": "Alerts go to whoever is on call in this schedule when they happen.",
+      "oncallEmail": "An email channel to send from, to the email of whoever is on call.",
+      "oncallTwilio": "A Twilio channel to text or call from, to the phone number of whoever is on call (Settings, Account)."
+    },
+    "noneChannel": "none",
+    "noSchedules": "No on-call schedules yet: <link>create one</link> first."
   },
   "reports": {
     "title": "periodic reports",
@@ -1402,7 +1423,8 @@
     "discard": "discard",
     "save": "save",
     "unsavedLeave": "You have unsaved changes in the settings. Leave without saving?",
-    "activity": "recent activity"
+    "activity": "recent activity",
+    "phone": "phone for on-call"
   },
   "generalSettings": {
     "saved": "settings saved",
@@ -2238,5 +2260,63 @@
       "mem_pct": "ram",
       "disk_pct": "fullest disk"
     }
+  },
+  "oncall": {
+    "title": "on-call",
+    "add": "new schedule",
+    "intro": "Who answers alerts, and when. Members take turns, one shift each; overrides put someone else on call for a while. A <channels>whoever is on call</channels> channel sends alerts to the person on call by app, email, SMS or phone call; add a second one with \"send after\" to escalate to a backup schedule.",
+    "empty": "No on-call schedules yet.",
+    "saved": "schedule saved",
+    "overrideSaved": "override added",
+    "error": "something went wrong",
+    "editTitle": "edit schedule",
+    "dialogText": "Members take turns in this order, one shift each, from the start on.",
+    "name": "name",
+    "namePlaceholder": "backend",
+    "description": "description",
+    "members": "rotation",
+    "up": "move up",
+    "down": "move down",
+    "removeMember": "remove",
+    "noMembers": "nobody yet",
+    "addMember": "add a member…",
+    "membersHint": "Someone can be in the list more than once. Members without a phone number get only app and email alerts.",
+    "shift": "each shift lasts",
+    "unit": "unit",
+    "units": {
+      "hours": "hours",
+      "days": "days",
+      "weeks": "weeks"
+    },
+    "start": "first shift (your time)",
+    "timezone": "time zone of shift changes",
+    "startHint": "Daily and weekly shifts change at the same local time of this time zone all year, also across daylight saving time.",
+    "save": "save",
+    "overrideTitle": "override in {name}",
+    "overrideText": "Puts someone on call for a while, whatever the rotation says: a swap, a day off. The newest override wins where they overlap.",
+    "who": "who is on call",
+    "from": "from (your time)",
+    "until": "until (your time)",
+    "noPhone": "no phone number: no SMS or calls",
+    "every": "{unit, select, hours {{count, plural, one {hourly shifts} other {shifts of # hours}}} days {{count, plural, one {daily shifts} other {shifts of # days}}} other {{count, plural, one {weekly shifts} other {shifts of # weeks}}}}",
+    "addOverride": "override",
+    "edit": "edit",
+    "deleteTitle": "Delete the schedule {name}?",
+    "rm": "rm",
+    "now": "on call now",
+    "nobody": "nobody",
+    "override": "override",
+    "untilTime": "until {time}",
+    "next": "next",
+    "fromTime": "from {time}",
+    "rotation": "rotation",
+    "upcoming": "next shifts",
+    "overrides": "overrides",
+    "alertedBy": "Alerted by: {channels}.",
+    "noChannel": "No channel alerts this schedule yet: add a \"whoever is on call\" channel in <link>notifications</link>.",
+    "phone": "phone number",
+    "phoneSaved": "phone number saved",
+    "phoneRemoved": "phone number removed",
+    "phoneHint": "In international format. While you are <link>on call</link>, SMS and phone calls go to this number, and an admin can acknowledge an incident by pressing 1 during the call."
   }
 }

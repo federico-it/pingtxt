@@ -34,6 +34,7 @@ const nav: {
   { href: "/groups/", key: "groups" },
   { href: "/agents/", key: "agents" },
   { href: "/notifications/", key: "notifications" },
+  { href: "/oncall/", key: "oncall" },
   { href: "/status-pages/", key: "statusPages" },
   { href: "/settings/", key: "settings" },
 ]
@@ -146,8 +147,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   aria-hidden
                 />
                 <span aria-hidden>
-                  {down > 0 && <span className="text-down">{down}↓ · </span>}
-                  <span className={cn((ov.data.agents_lost?.length ?? 0) > 0 && "text-down")}>
+                  {down > 0 && <span className="text-down">{down}↓</span>}
+                  {/* No room for it next to the full menu below xl. */}
+                  <span className={cn("lg:max-xl:hidden", (ov.data.agents_lost?.length ?? 0) > 0 && "text-down")}>
+                    {down > 0 && <span className="text-down"> · </span>}
                     {t("agents", {
                       online: ov.data.agents_online,
                       total: ov.data.agents,

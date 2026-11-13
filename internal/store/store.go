@@ -894,6 +894,78 @@ var laterMigrations = []migration{
 		FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 45: on-call schedules. A schedule rotates its members (user ids, in
+	// order) every shift_len shift_unit (hours, days or weeks) from
+	// start_at (unix ms) in its timezone; overrides put someone else on
+	// call from start_at to end_at. users.phone (E.164) is where on-call
+	// SMS and calls go.
+	{
+		sqlite: `ALTER TABLE users ADD COLUMN phone TEXT NOT NULL DEFAULT '';
+	CREATE TABLE oncall_schedules (
+		id INTEGER PRIMARY KEY,
+		name TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		timezone TEXT NOT NULL DEFAULT 'UTC',
+		members TEXT NOT NULL DEFAULT '[]',
+		shift_len INTEGER NOT NULL DEFAULT 1,
+		shift_unit TEXT NOT NULL DEFAULT 'weeks',
+		start_at INTEGER NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+	CREATE TABLE oncall_overrides (
+		id INTEGER PRIMARY KEY,
+		schedule_id INTEGER NOT NULL REFERENCES oncall_schedules(id) ON DELETE CASCADE,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		start_at INTEGER NOT NULL,
+		end_at INTEGER NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+	CREATE INDEX oncall_overrides_schedule ON oncall_overrides(schedule_id, end_at);`,
+		postgres: `ALTER TABLE users ADD COLUMN phone TEXT NOT NULL DEFAULT '';
+	CREATE TABLE oncall_schedules (
+		id BIGSERIAL PRIMARY KEY,
+		name TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		timezone TEXT NOT NULL DEFAULT 'UTC',
+		members TEXT NOT NULL DEFAULT '[]',
+		shift_len INTEGER NOT NULL DEFAULT 1,
+		shift_unit TEXT NOT NULL DEFAULT 'weeks',
+		start_at BIGINT NOT NULL,
+		created_at BIGINT NOT NULL
+	);
+	CREATE TABLE oncall_overrides (
+		id BIGSERIAL PRIMARY KEY,
+		schedule_id BIGINT NOT NULL REFERENCES oncall_schedules(id) ON DELETE CASCADE,
+		user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		start_at BIGINT NOT NULL,
+		end_at BIGINT NOT NULL,
+		created_at BIGINT NOT NULL
+	);
+	CREATE INDEX oncall_overrides_schedule ON oncall_overrides(schedule_id, end_at);`,
+		mysql: `ALTER TABLE users ADD COLUMN phone VARCHAR(32) NOT NULL DEFAULT '';
+	CREATE TABLE oncall_schedules (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		description TEXT NOT NULL,
+		timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+		members MEDIUMTEXT NOT NULL,
+		shift_len INT NOT NULL DEFAULT 1,
+		shift_unit VARCHAR(16) NOT NULL DEFAULT 'weeks',
+		start_at BIGINT NOT NULL,
+		created_at BIGINT NOT NULL
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+	CREATE TABLE oncall_overrides (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		schedule_id BIGINT NOT NULL,
+		user_id BIGINT NOT NULL,
+		start_at BIGINT NOT NULL,
+		end_at BIGINT NOT NULL,
+		created_at BIGINT NOT NULL,
+		INDEX oncall_overrides_schedule (schedule_id, end_at),
+		FOREIGN KEY (schedule_id) REFERENCES oncall_schedules(id) ON DELETE CASCADE,
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

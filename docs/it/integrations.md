@@ -95,6 +95,7 @@ Cursor, Windsurf e altri client che accettano un URL e degli header:
 | `get_monitor`, `get_monitor_results` | impostazioni, uptime 24h/7g/30g, stato per località, scadenze; ultimi risultati dei controlli |
 | `list_incidents`, `get_incident_diagnostics` | incidenti (solo aperti, per monitor); cosa ha visto ogni località al primo errore |
 | `list_maintenances` | finestre di manutenzione con la prossima occorrenza |
+| `list_oncall` | turni di reperibilità: chi è reperibile ora e dopo, sostituzioni |
 | `list_groups`, `list_tags`, `list_agents`, `list_status_pages` | tutto il resto che serve a un modello per trovare gli id |
 | `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | solo token di scrittura di un admin |
 | `pin_monitor` | fissa o toglie dai fissati un monitor per l'utente del token; qualsiasi token, anche di sola lettura, perché i fissati sono personali |
