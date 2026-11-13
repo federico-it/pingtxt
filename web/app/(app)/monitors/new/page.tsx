@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
 import { useTranslations } from "use-intl"
@@ -7,6 +8,7 @@ import { useTranslations } from "use-intl"
 import { AdminOnly } from "@/components/admin-only"
 import { emptyMonitor, MonitorForm, type MonitorInput } from "@/components/monitor-form"
 import { PageHeader } from "@/components/page-header"
+import { Button } from "@/components/ui/button"
 import { useApi, type MonitorDetail, type Settings } from "@/lib/api"
 
 export default function NewMonitorPage() {
@@ -37,6 +39,7 @@ function NewMonitor() {
   })
   const defaults = settings.data?.general.monitor_defaults
   const t = useTranslations("monitorForm")
+  const tp = useTranslations("presets")
   if (from && source.error) return <div className="text-down">! {source.error.message}</div>
   const ready = from ? !!source.data : !!(settings.data || settings.error)
   return (
@@ -44,7 +47,13 @@ function NewMonitor() {
       <PageHeader
         cmd={from ? `pingtxt monitors cp ${from}` : "pingtxt monitors add"}
         title={source.data ? t("copyTitle", { name: source.data.name }) : t("newTitle")}
-      />
+      >
+        {!from && (
+          <Button variant="outline" render={<Link href="/monitors/presets/" />} nativeButton={false}>
+            {tp("link")}
+          </Button>
+        )}
+      </PageHeader>
       {ready && (
         <MonitorForm
           key={from}

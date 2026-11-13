@@ -134,6 +134,8 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("POST /api/monitors/test", auth(h.testDraftMonitor))
 	mux.HandleFunc("POST /api/monitors/statuspage", auth(h.detectStatuspage))
 	mux.HandleFunc("POST /api/monitors/bulk", auth(h.bulkMonitors))
+	mux.HandleFunc("GET /api/monitors/presets", auth(h.listPresets)) // popular services, see presets.go
+	mux.HandleFunc("POST /api/monitors/presets", auth(h.addPresets))
 	mux.HandleFunc("GET /api/monitors/{id}", auth(h.getMonitor))
 	mux.HandleFunc("PUT /api/monitors/{id}", auth(h.updateMonitor))
 	mux.HandleFunc("DELETE /api/monitors/{id}", auth(h.deleteMonitor))

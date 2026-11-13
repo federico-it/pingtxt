@@ -67,7 +67,8 @@
     "empty": "nothing found",
     "newMonitor": "new monitor",
     "newStatusPage": "new status page",
-    "keys": "<kbd>↑↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close · elsewhere: <kbd>/</kbd> search <kbd>n</kbd> new monitor <kbd>d</kbd> theme"
+    "keys": "<kbd>↑↓</kbd> move <kbd>enter</kbd> open <kbd>esc</kbd> close · elsewhere: <kbd>/</kbd> search <kbd>n</kbd> new monitor <kbd>d</kbd> theme",
+    "presets": "follow popular services"
   },
   "notFound": {
     "message": "404: no such file or directory"
@@ -96,7 +97,7 @@
     "ungrouped": "ungrouped",
     "fetching": "fetching",
     "noMatch": "no monitors match",
-    "emptyState": "no monitors yet. <link>create the first one</link>",
+    "emptyState": "no monitors yet. <link>create the first one</link> or <services>follow popular services</services> like Claude, OpenAI or GitHub",
     "pinned": "pinned",
     "others": "everything else",
     "pin": "pin {name} to the top",
@@ -149,7 +150,8 @@
     "foldAll": "fold all",
     "unfoldAll": "unfold all",
     "tagFilter": "show monitors with any of the selected tags",
-    "clearTags": "show all tags"
+    "clearTags": "show all tags",
+    "services": "services"
   },
   "monitor": {
     "resumed": "monitor resumed",
@@ -2028,5 +2030,39 @@
     "locations": "{count} locations",
     "noMessage": "no message",
     "andMore": "{first} (+{count} more)"
+  },
+  "presets": {
+    "title": "popular services",
+    "search": "search services...",
+    "custom": "custom monitor",
+    "intro": "Follow the public status page of the services you depend on. Each one you pick becomes a status page monitor checked from the hub: a minor incident turns it degraded, an outage turns it down. To follow only some components (say the API and not the website), edit the monitor afterwards.",
+    "all": "all",
+    "loading": "loading services",
+    "noMatch": "no service matches. any Atlassian Statuspage page works with a custom monitor of type status page.",
+    "error": "error",
+    "cats": {
+      "ai": "ai",
+      "dev": "developer tools",
+      "cloud": "cloud & hosting",
+      "observability": "observability",
+      "comms": "email & messaging",
+      "productivity": "productivity",
+      "commerce": "commerce & web",
+      "social": "social & gaming"
+    },
+    "following": "✓ following",
+    "followingHint": "a monitor already follows {name}: open it",
+    "selected": "{count, plural, one {# service selected} other {# services selected}}",
+    "every": "every",
+    "minutes": "{count}m",
+    "group": "group",
+    "noGroup": "no group",
+    "newGroup": "new group",
+    "groupName": "name of the new group",
+    "defaultGroup": "services",
+    "clear": "clear",
+    "add": "{count, plural, one {add # monitor} other {add # monitors}}",
+    "added": "{count, plural, =0 {nothing new: every service is already followed} one {# monitor added} other {# monitors added}}",
+    "link": "popular services"
   }
 }
