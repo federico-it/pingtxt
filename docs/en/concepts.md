@@ -71,3 +71,16 @@ maintenance windows and channels can pick monitors by group or tag. See
 - Select several monitors on the dashboard to pause, resume, move or delete them together.
 - **test** in the monitor form runs the check once from the selected locations, without saving.
 - Pin monitors to keep them at the top of the dashboard. Pins are saved on your account, so they follow you to every browser and are in the API (`/api/account/pins`); each user has their own, read-only users included.
+
+### TV mode
+
+**tv** on the dashboard opens `/tv/`, a full screen view for a wall display or a spare monitor: no menus, large text,
+an overall line at the top (*all systems up* or how many monitors are down), the monitors that are down, degraded or in
+maintenance as large tiles with the reason and how long it has been, and every other monitor as a small tile with its
+uptime over the last 24 hours, by group. It keeps the group and tag filter of the dashboard (`/tv/?group=3&tag=2`),
+leaves paused monitors out (add `&paused=1` to show them), refreshes by itself every 10 seconds, keeps the screen awake
+where the browser allows it and hides the mouse pointer when it does not move. The button at the top right switches to
+full screen.
+
+For a screen nobody uses, log in with a [read-only user](security.md#users-and-roles): it sees every monitor and cannot
+change anything. Sessions last 30 days, then the screen shows the login page again.

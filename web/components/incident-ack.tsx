@@ -1,11 +1,17 @@
 "use client"
 
 import { useState } from "react"
-import { UserCheckIcon } from "lucide-react"
+import { AlarmClockOffIcon, BellRingIcon, UserCheckIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
 import { segment } from "@/components/ui/control"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { api, useApi, useIsAdmin, type Me } from "@/lib/api"
 import { ago, datetime } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -15,6 +21,9 @@ export interface AckState {
   id: number
   acked_at: number
   acked_by: string
+  /** when the snooze ends (unix ms), 0 or past = not snoozed */
+  snoozed_until?: number
+  snoozed_by?: string
 }
 
 /** Who acknowledged an incident: "you" or the email. */
@@ -70,5 +79,86 @@ export function AckButton({ incident, onChange }: { incident: AckState; onChange
       {!mine && <UserCheckIcon className="mr-1 size-3" />}
       {label}
     </button>
+  )
+}
+
+/** Snooze lengths offered, in minutes. */
+const snoozeMinutes = [15, 30, 60, 120, 240, 480, 1440]
+
+/** Whether the incident is snoozed right now. */
+export function isSnoozed(incident: AckState) {
+  return (incident.snoozed_until ?? 0) > Date.now()
+}
+
+/** "until 14:30" (today) or "until 2026-11-14 09:00". */
+function untilText(ts: number) {
+  const full = datetime(ts)
+  return full.slice(0, 10) === datetime(Date.now()).slice(0, 10) ? full.slice(11, 16) : full.slice(0, 16)
+}
+
+/** "snoozed until 14:30 by a@b.c", or nothing when the incident is not snoozed. */
+export function SnoozeNote({ incident, className }: { incident: AckState; className?: string }) {
+  const t = useTranslations("ack")
+  const name = useAckName()
+  if (!isSnoozed(incident)) return null
+  return (
+    <span className={cn("inline-flex min-w-0 items-center gap-1 text-muted-foreground", className)} title={datetime(incident.snoozed_until!)}>
+      <AlarmClockOffIcon className="size-3 shrink-0" />
+      <span className="truncate">{t("snoozedUntil", { until: untilText(incident.snoozed_until!), name: name(incident.snoozed_by ?? "") })}</span>
+    </span>
+  )
+}
+
+/**
+ * Snooze an open incident (admins only): a menu of lengths, or "wake up"
+ * while it is snoozed.
+ */
+export function SnoozeButton({ incident, onChange }: { incident: AckState; onChange?: () => void }) {
+  const t = useTranslations("ack")
+  const isAdmin = useIsAdmin()
+  const [busy, setBusy] = useState(false)
+  if (!isAdmin) return null
+  const snoozed = isSnoozed(incident)
+
+  async function run(minutes: number) {
+    setBusy(true)
+    try {
+      await api(`/api/incidents/${incident.id}/snooze`, minutes ? { method: "POST", body: { minutes } } : { method: "DELETE" })
+      toast.success(minutes ? t("snoozed") : t("woken"))
+      onChange?.()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("error"))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (snoozed) {
+    return (
+      <button onClick={() => run(0)} disabled={busy} title={t("wakeHint")} className={segment({ size: "xs" })}>
+        <BellRingIcon className="mr-1 size-3" />
+        {t("wake")}
+      </button>
+    )
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        disabled={busy}
+        render={
+          <button title={t("snoozeHint")} className={segment({ size: "xs" })}>
+            <AlarmClockOffIcon className="mr-1 size-3" />
+            {t("snooze")}
+          </button>
+        }
+      />
+      <DropdownMenuContent align="end" className="min-w-32">
+        {snoozeMinutes.map((m) => (
+          <DropdownMenuItem key={m} onClick={() => run(m)}>
+            {m < 60 ? t("minutes", { count: m }) : t("hours", { count: m / 60 })}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

@@ -149,8 +149,11 @@
     "clearGroup": "show all groups",
     "foldAll": "fold all",
     "unfoldAll": "unfold all",
-    "inGroup": "in {name}",
-    "services": "services"
+    "tagFilter": "show monitors with any of the selected tags",
+    "clearTags": "show all tags",
+    "services": "services",
+    "tv": "tv",
+    "tvHint": "TV mode: full screen view for a wall display, with the same group and tag filter"
   },
   "monitor": {
     "resumed": "monitor resumed",
@@ -2013,7 +2016,16 @@
     "released": "incident released",
     "onIt": "{name} on it · {ago}",
     "you": "you",
-    "error": "could not change the incident"
+    "error": "could not change the incident",
+    "snooze": "snooze",
+    "snoozeHint": "Not now: no reminders and no escalation for a while, then every channel that got the alert is reminded.",
+    "snoozed": "incident snoozed",
+    "wake": "wake up",
+    "wakeHint": "End the snooze now: reminders and escalation run again.",
+    "woken": "snooze ended",
+    "snoozedUntil": "snoozed until {until} by {name}",
+    "minutes": "{count} minutes",
+    "hours": "{count, plural, one {# hour} other {# hours}}"
   },
   "pageHooks": {
     "feedsTitle": "rss and atom feeds",
@@ -2100,5 +2112,18 @@
     "add": "{count, plural, one {add # monitor} other {add # monitors}}",
     "added": "{count, plural, =0 {nothing new: every service is already followed} one {# monitor added} other {# monitors added}}",
     "link": "popular services"
+  },
+  "tv": {
+    "allUp": "all systems up",
+    "down": "{count, plural, one {# monitor down} other {# monitors down}}",
+    "degraded": "{count, plural, one {# monitor degraded} other {# monitors degraded}}",
+    "agents": "agents {online}/{total}",
+    "ungrouped": "no group",
+    "empty": "no monitors to show",
+    "blockedBy": "waiting for {name}",
+    "acked": "taken by {name}",
+    "fullscreen": "full screen",
+    "exitFullscreen": "exit full screen",
+    "exit": "back to the dashboard"
   }
 }

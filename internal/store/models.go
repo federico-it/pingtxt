@@ -1138,13 +1138,18 @@ type Incident struct {
 	AckedAt   int64  `json:"acked_at"`
 	AckedBy   string `json:"acked_by"`
 	AckedByID int64  `json:"-"`
+	// SnoozedUntil is when the snooze of the incident ends (unix ms, 0 =
+	// never snoozed; a past time means the snooze is over), SnoozedBy the
+	// email of who snoozed it: until then no reminders and no escalation.
+	SnoozedUntil int64  `json:"snoozed_until"`
+	SnoozedBy    string `json:"snoozed_by"`
 }
 
-const incidentCols = `i.id, i.monitor_id, m.name, i.started_at, i.resolved_at, i.cause, i.acked_at, i.acked_by, i.acked_by_email`
+const incidentCols = `i.id, i.monitor_id, m.name, i.started_at, i.resolved_at, i.cause, i.acked_at, i.acked_by, i.acked_by_email, i.snoozed_until, i.snoozed_by_email`
 
 func scanIncident(sc interface{ Scan(...any) error }) (*Incident, error) {
 	i := &Incident{}
-	err := sc.Scan(&i.ID, &i.MonitorID, &i.MonitorName, &i.StartedAt, &i.ResolvedAt, &i.Cause, &i.AckedAt, &i.AckedByID, &i.AckedBy)
+	err := sc.Scan(&i.ID, &i.MonitorID, &i.MonitorName, &i.StartedAt, &i.ResolvedAt, &i.Cause, &i.AckedAt, &i.AckedByID, &i.AckedBy, &i.SnoozedUntil, &i.SnoozedBy)
 	return i, err
 }
 
@@ -1172,6 +1177,20 @@ func (s *Store) AckIncident(id, userID int64, email string, at int64) (bool, err
 	return n > 0, err
 }
 
+// SnoozeIncident snoozes an open incident until a time (unix ms; 0 and ""
+// end the snooze). It reports false when the incident is not open.
+func (s *Store) SnoozeIncident(id, until int64, email string) (bool, error) {
+	if until == 0 {
+		email = ""
+	}
+	res, err := s.db.Exec(`UPDATE incidents SET snoozed_until = ?, snoozed_by_email = ? WHERE id = ? AND resolved_at = 0`, until, email, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
 // OpenIncident starts an incident and returns its id.
 func (s *Store) OpenIncident(monitorID int64, at int64, cause string) (int64, error) {
 	return s.db.insert(s.db, `INSERT INTO incidents (monitor_id, started_at, cause) VALUES (?, ?, ?)`, monitorID, at, cause)
@@ -1180,7 +1199,7 @@ func (s *Store) OpenIncident(monitorID int64, at int64, cause string) (int64, er
 // OpenIncidentAlerts returns the unresolved incidents with the alerts sent
 // for each of them so far, keyed by monitor id (the latest incident wins).
 func (s *Store) OpenIncidentAlerts() (map[int64]*IncidentAlerts, error) {
-	rows, err := s.db.Query(`SELECT id, monitor_id, started_at, cause, acked_at, acked_by_email FROM incidents WHERE resolved_at = 0 ORDER BY started_at`)
+	rows, err := s.db.Query(`SELECT id, monitor_id, started_at, cause, acked_at, acked_by_email, snoozed_until, snoozed_by_email FROM incidents WHERE resolved_at = 0 ORDER BY started_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -1188,7 +1207,7 @@ func (s *Store) OpenIncidentAlerts() (map[int64]*IncidentAlerts, error) {
 	byID := map[int64]*IncidentAlerts{}
 	for rows.Next() {
 		a := &IncidentAlerts{Sent: map[int64]AlertSent{}}
-		if err := rows.Scan(&a.IncidentID, &a.MonitorID, &a.StartedAt, &a.Cause, &a.AckedAt, &a.AckedBy); err != nil {
+		if err := rows.Scan(&a.IncidentID, &a.MonitorID, &a.StartedAt, &a.Cause, &a.AckedAt, &a.AckedBy, &a.SnoozedUntil, &a.SnoozedBy); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -1223,9 +1242,12 @@ type IncidentAlerts struct {
 	MonitorID  int64
 	StartedAt  int64
 	Cause      string
-	AckedAt    int64               // unix ms, 0 = not acknowledged
-	AckedBy    string              // email
-	Sent       map[int64]AlertSent // by notifier id
+	AckedAt    int64  // unix ms, 0 = not acknowledged
+	AckedBy    string // email
+	// SnoozedUntil is when the snooze ends (unix ms, 0 = not snoozed).
+	SnoozedUntil int64
+	SnoozedBy    string              // email
+	Sent         map[int64]AlertSent // by notifier id
 }
 
 // AlertSent is the last alert a channel received for an incident.

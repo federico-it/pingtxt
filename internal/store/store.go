@@ -829,7 +829,16 @@ var laterMigrations = []migration{
 	// JSON list of ids in pin order ("" = none).
 	{sqlite: `ALTER TABLE users ADD COLUMN pinned_monitors TEXT NOT NULL DEFAULT ''`,
 		mysql: `ALTER TABLE users ADD COLUMN pinned_monitors MEDIUMTEXT NOT NULL DEFAULT ('')`},
-	// 42: client certificate and private key (PEM) for mutual TLS on
+	// 42: an incident snoozed until a time (unix ms, 0 = never): no
+	// reminders and no escalation until then, then a reminder. The email
+	// of who snoozed it stays when the user is deleted.
+	{sqlite: `ALTER TABLE incidents ADD COLUMN snoozed_until INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE incidents ADD COLUMN snoozed_by_email TEXT NOT NULL DEFAULT '';`,
+		postgres: `ALTER TABLE incidents ADD COLUMN snoozed_until BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE incidents ADD COLUMN snoozed_by_email TEXT NOT NULL DEFAULT '';`,
+		mysql: `ALTER TABLE incidents ADD COLUMN snoozed_until BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE incidents ADD COLUMN snoozed_by_email VARCHAR(254) NOT NULL DEFAULT '';`},
+	// 43: client certificate and private key (PEM) for mutual TLS on
 	// http/keyword/websocket/grpc/mcp monitors ("" = none).
 	{sqlite: `ALTER TABLE monitors ADD COLUMN client_cert TEXT NOT NULL DEFAULT '';
 	ALTER TABLE monitors ADD COLUMN client_key TEXT NOT NULL DEFAULT ''`,

@@ -151,6 +151,8 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/incidents/{id}/diagnostics", auth(h.incidentDiagnostics))
 	mux.HandleFunc("POST /api/incidents/{id}/ack", auth(h.ackIncident))
 	mux.HandleFunc("DELETE /api/incidents/{id}/ack", auth(h.unackIncident))
+	mux.HandleFunc("POST /api/incidents/{id}/snooze", auth(h.snoozeIncident)) // see snooze.go
+	mux.HandleFunc("DELETE /api/incidents/{id}/snooze", auth(h.unsnoozeIncident))
 	mux.HandleFunc("GET /api/monitors/{id}/diagnostics", auth(h.monitorDiagnostics))
 	mux.HandleFunc("GET /api/maintenances", auth(h.listMaintenances))
 	mux.HandleFunc("POST /api/maintenances", auth(h.createMaintenance))
@@ -1040,6 +1042,11 @@ type monitorSummary struct {
 	// locations that report each problem. Empty while it is up, paused or
 	// in maintenance.
 	Reasons []Reason `json:"reasons"`
+	// ShortReason is Reasons in one short line, set where that line is
+	// shorter than the reasons themselves: on a status page monitor, the
+	// worst component and the first incident with the count of the others
+	// (as in push notifications and the Live Activity).
+	ShortReason string `json:"short_reason,omitempty"`
 }
 
 type activeMaint struct {
@@ -1089,6 +1096,11 @@ func (h *Hub) summary(m *store.Monitor, expiry []*store.ExpiryCheck) *monitorSum
 	h.mu.Unlock()
 	if s.Reasons == nil {
 		s.Reasons = []Reason{}
+	}
+	if len(s.Reasons) > 0 && m.Type == check.TypeStatuspage {
+		if short := shortStatuspage(s.Reasons[0].Message); short != s.Reasons[0].Message || len(s.Reasons) > 1 {
+			s.ShortReason = short
+		}
 	}
 	return s
 }

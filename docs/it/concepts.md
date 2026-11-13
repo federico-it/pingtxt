@@ -74,3 +74,16 @@ finestre di manutenzione e canali possono scegliere i monitor per gruppo o tag. 
 - Seleziona più monitor nella dashboard per metterli in pausa, riattivarli, spostarli o eliminarli insieme.
 - **prova** nel modulo del monitor esegue il controllo una volta dalle località scelte, senza salvare.
 - Fissa i monitor in cima alla dashboard. I monitor fissati sono salvati sul tuo account, quindi li ritrovi in ogni browser e nell'API (`/api/account/pins`); ogni utente ha i suoi, anche gli utenti in sola lettura.
+
+### Modalità TV
+
+**tv** nella dashboard apre `/tv/`, una vista a schermo intero per un monitor a parete o uno schermo libero: niente
+menu, testo grande, una riga generale in alto (*tutto funziona* o quanti monitor sono giù), i monitor giù, degradati o in
+manutenzione come riquadri grandi con il motivo e da quanto tempo, e tutti gli altri come riquadri piccoli con l'uptime
+delle ultime 24 ore, divisi per gruppo. Tiene il filtro di gruppo e tag della dashboard (`/tv/?group=3&tag=2`), lascia
+fuori i monitor in pausa (aggiungi `&paused=1` per mostrarli), si aggiorna da sola ogni 10 secondi, tiene acceso lo
+schermo dove il browser lo permette e nasconde il puntatore quando non si muove. Il pulsante in alto a destra passa a
+schermo intero.
+
+Per uno schermo che nessuno usa, entra con un [utente in sola lettura](security.md#utenti-e-ruoli): vede tutti i
+monitor e non può cambiare niente. Le sessioni durano 30 giorni, poi lo schermo torna alla pagina di accesso.

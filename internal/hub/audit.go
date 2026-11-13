@@ -195,6 +195,8 @@ var auditRoutes = map[string]auditSpec{
 	"POST /api/monitors/{id}/check":      skipAudit, // runs the checks now, changes nothing
 	"POST /api/incidents/{id}/ack":       {action: "incident.ack", typ: "incident", load: loadIncident},
 	"DELETE /api/incidents/{id}/ack":     {action: "incident.unack", typ: "incident", load: loadIncident},
+	"POST /api/incidents/{id}/snooze":    {action: "incident.snooze", typ: "incident", load: loadIncident},
+	"DELETE /api/incidents/{id}/snooze":  {action: "incident.unsnooze", typ: "incident", load: loadIncident},
 	"POST /api/maintenances":             {action: "maintenance.create", typ: "maintenance", load: loadMaintenance},
 	"PUT /api/maintenances/{id}":         {action: "maintenance.update", typ: "maintenance", load: loadMaintenance},
 	"DELETE /api/maintenances/{id}":      {action: "maintenance.delete", typ: "maintenance", load: loadMaintenance},
@@ -259,7 +261,7 @@ func loadIncident(h *Hub, _ *http.Request, _ *store.User, id int64) (string, any
 	if err != nil {
 		return "", nil, false
 	}
-	return i.MonitorName, map[string]any{"acked_by": i.AckedBy, "acked_at": i.AckedAt}, true
+	return i.MonitorName, map[string]any{"acked_by": i.AckedBy, "acked_at": i.AckedAt, "snoozed_by": i.SnoozedBy, "snoozed_until": i.SnoozedUntil}, true
 }
 
 func loadMaintenance(h *Hub, _ *http.Request, _ *store.User, id int64) (string, any, bool) {

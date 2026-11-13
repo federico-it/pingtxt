@@ -79,6 +79,23 @@ promemoria ed escalation ripartono da dove si erano fermati. Un altro admin può
 in carico da qualcun altro. Gli utenti in sola lettura vedono chi se ne occupa ma non possono prenderlo in carico.
 API: `POST` e `DELETE /api/incidents/{id}/ack`; le prese in carico finiscono nel [registro attività](security.md#registro-attività).
 
+## Posticipare gli incidenti
+
+Quando non puoi guardare subito un disservizio ma non vuoi perderlo di vista, un admin preme **posticipa** nella pagina
+del monitor o nella pagina incidenti e sceglie 15 minuti, 30 minuti, 1, 2, 4, 8 o 24 ore:
+
+- l'incidente mostra **posticipato fino a** e chi l'ha posticipato;
+- i promemoria `STILL DOWN` si fermano, e così gli avvisi dei canali che stanno ancora aspettando il loro tempo di
+  **invia dopo**;
+- quando il tempo finisce e il monitor è ancora down, tutti i canali che hanno ricevuto l'avviso ricevono un promemoria
+  `STILL DOWN`, anche quelli senza **ripeti ogni**, e l'escalation riparte da dove si era fermata. Un canale il cui
+  tempo di **invia dopo** è passato durante la pausa riceve allora il primo avviso.
+
+**riattiva** termina prima la pausa: promemoria ed escalation ripartono subito, senza il promemoria in più. Posticipare
+di nuovo sostituisce la pausa. Un incidente preso in carico resta silenzioso anche dopo la fine della pausa. Gli utenti
+in sola lettura vedono la pausa ma non possono cambiarla. API: `POST /api/incidents/{id}/snooze` con `{"minutes": 30}`
+(da 5 a 1440) e `DELETE` per terminarla; le pause finiscono nel [registro attività](security.md#registro-attività).
+
 ## Finestre di manutenzione
 
 Nella pagina **manut** pianifica le finestre in cui gli avvisi devono tacere: singole o ricorrenti (ogni giorno,

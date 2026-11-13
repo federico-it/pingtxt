@@ -149,8 +149,11 @@
     "clearGroup": "mostra tutti i gruppi",
     "foldAll": "comprimi tutti",
     "unfoldAll": "espandi tutti",
-    "inGroup": "in {name}",
-    "services": "servizi"
+    "tagFilter": "mostra i monitor con almeno uno dei tag scelti",
+    "clearTags": "mostra tutti i tag",
+    "services": "servizi",
+    "tv": "tv",
+    "tvHint": "modalità TV: vista a schermo intero per un monitor a parete, con lo stesso filtro di gruppo e tag"
   },
   "monitor": {
     "resumed": "monitor ripreso",
@@ -2013,7 +2016,16 @@
     "released": "incidente rilasciato",
     "onIt": "{name} se ne occupa · {ago}",
     "you": "tu",
-    "error": "impossibile modificare l'incidente"
+    "error": "impossibile modificare l'incidente",
+    "snooze": "posticipa",
+    "snoozeHint": "Non ora: niente promemoria né escalation per un po', poi tutti i canali che hanno ricevuto l'avviso vengono avvisati di nuovo.",
+    "snoozed": "incidente posticipato",
+    "wake": "riattiva",
+    "wakeHint": "Termina subito la pausa: promemoria ed escalation ripartono.",
+    "woken": "pausa terminata",
+    "snoozedUntil": "posticipato fino alle {until} da {name}",
+    "minutes": "{count} minuti",
+    "hours": "{count, plural, one {# ora} other {# ore}}"
   },
   "pageHooks": {
     "feedsTitle": "feed rss e atom",
@@ -2100,5 +2112,18 @@
     "add": "{count, plural, one {aggiungi # monitor} other {aggiungi # monitor}}",
     "added": "{count, plural, =0 {niente di nuovo: tutti i servizi sono già seguiti} one {# monitor aggiunto} other {# monitor aggiunti}}",
     "link": "servizi popolari"
+  },
+  "tv": {
+    "allUp": "tutto funziona",
+    "down": "{count, plural, one {# monitor giù} other {# monitor giù}}",
+    "degraded": "{count, plural, one {# monitor degradato} other {# monitor degradati}}",
+    "agents": "agent {online}/{total}",
+    "ungrouped": "senza gruppo",
+    "empty": "nessun monitor da mostrare",
+    "blockedBy": "in attesa di {name}",
+    "acked": "preso in carico da {name}",
+    "fullscreen": "schermo intero",
+    "exitFullscreen": "esci dallo schermo intero",
+    "exit": "torna alla dashboard"
   }
 }

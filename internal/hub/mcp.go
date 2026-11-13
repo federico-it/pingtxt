@@ -713,7 +713,7 @@ var mcpTools = []mcpTool{
 	},
 	{
 		name: "list_incidents", title: "List incidents",
-		description: "Downtime incidents, newest first (up to 100). An incident with resolved_at null is still open; acked_by is who acknowledged it (reminders and escalation stopped).",
+		description: "Downtime incidents, newest first (up to 100). An incident with resolved_at null is still open; acked_by is who acknowledged it (reminders and escalation stopped); snoozed_until in the future means it is snoozed until then.",
 		schema: object(map[string]any{
 			"monitor_id": prop("integer", "Only incidents of this monitor"),
 			"open_only":  prop("boolean", "Only incidents still open"),
@@ -920,6 +920,25 @@ var mcpTools = []mcpTool{
 				method = "DELETE"
 			}
 			return c.do(method, fmt.Sprintf("/api/incidents/%d/ack", id), nil)
+		},
+	},
+	{
+		name: "snooze_incident", title: "Snooze incident", write: true, idempotent: true,
+		description: "Snooze an open incident for some minutes (5 to 1440): no reminders and no escalation until then; afterwards, if the monitor is still down and nobody acknowledged it, every channel that got the alert is reminded. minutes=0 ends the snooze now.",
+		schema: object(map[string]any{
+			"incident_id": prop("integer", "Incident id from list_incidents (or incident.id of a monitor)"),
+			"minutes":     prop("integer", "How long to snooze (5 to 1440), or 0 to end the snooze"),
+		}, "incident_id", "minutes"),
+		run: func(c *mcpCall) (any, error) {
+			id, err := c.id("incident_id")
+			if err != nil {
+				return nil, err
+			}
+			path := fmt.Sprintf("/api/incidents/%d/snooze", id)
+			if min, _ := c.optInt("minutes"); min > 0 {
+				return c.do("POST", path, map[string]int64{"minutes": min})
+			}
+			return c.do("DELETE", path, nil)
 		},
 	},
 	{
