@@ -209,6 +209,27 @@ func targetFor(j Job) diagTarget {
 		}
 		h, p, _ := net.SplitHostPort(addr)
 		return diagTarget{host: h, port: p, tls: secure, tlsName: h}
+	case TypeSSH:
+		addr, err := SSHTarget(j.Target)
+		if err != nil {
+			return diagTarget{note: err.Error()}
+		}
+		h, p, _ := net.SplitHostPort(addr)
+		return diagTarget{host: h, port: p}
+	case TypeIMAP, TypePOP3:
+		mt, err := ParseMailboxTarget(j.Type, j.Target)
+		if err != nil {
+			return diagTarget{note: err.Error()}
+		}
+		return diagTarget{host: mt.host, port: mt.port, tls: mt.implicitTLS, tlsName: mt.host}
+	case TypeNTP:
+		// UDP: DNS and the route to the host.
+		addr, err := NTPTarget(j.Target)
+		if err != nil {
+			return diagTarget{note: err.Error()}
+		}
+		h, _, _ := net.SplitHostPort(addr)
+		return diagTarget{host: h}
 	case TypeDocker:
 		return diagTarget{note: "docker checks use the local Docker socket: no network diagnostics"}
 	}
@@ -261,7 +282,7 @@ func Diagnose(ctx context.Context, j Job, r Result) *Diag {
 		go func() {
 			defer wg.Done()
 			d.TCP = diagConnect(ctx, ips, t.port)
-			if j.Type == TypeSMTP {
+			if j.Type == TypeSMTP || j.Type == TypeSSH || j.Type == TypeIMAP || j.Type == TypePOP3 {
 				for _, c := range d.TCP {
 					if c.OK {
 						d.Banner = diagBanner(ctx, c.Addr, t.tlsName, t.tls)

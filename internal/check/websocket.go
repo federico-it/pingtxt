@@ -2,7 +2,6 @@ package check
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,9 +18,13 @@ import (
 // contain Keyword. Headers go with the handshake; Sec-WebSocket-Protocol
 // lists the subprotocols to ask for.
 func runWebSocket(ctx context.Context, j Job, timeout time.Duration) Result {
+	tlsCfg, tlsErr := j.tlsConfig()
+	if tlsErr != nil {
+		return Result{Message: tlsErr.Error()}
+	}
 	tr := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: j.IgnoreTLS},
+		TLSClientConfig:     tlsCfg,
 		DisableKeepAlives:   true,
 		TLSHandshakeTimeout: timeout,
 		DialContext:         j.dialContext,

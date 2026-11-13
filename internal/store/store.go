@@ -838,6 +838,12 @@ var laterMigrations = []migration{
 	ALTER TABLE incidents ADD COLUMN snoozed_by_email TEXT NOT NULL DEFAULT '';`,
 		mysql: `ALTER TABLE incidents ADD COLUMN snoozed_until BIGINT NOT NULL DEFAULT 0;
 	ALTER TABLE incidents ADD COLUMN snoozed_by_email VARCHAR(254) NOT NULL DEFAULT '';`},
+	// 43: client certificate and private key (PEM) for mutual TLS on
+	// http/keyword/websocket/grpc/mcp monitors ("" = none).
+	{sqlite: `ALTER TABLE monitors ADD COLUMN client_cert TEXT NOT NULL DEFAULT '';
+	ALTER TABLE monitors ADD COLUMN client_key TEXT NOT NULL DEFAULT ''`,
+		mysql: `ALTER TABLE monitors ADD COLUMN client_cert MEDIUMTEXT NOT NULL DEFAULT ('');
+	ALTER TABLE monitors ADD COLUMN client_key MEDIUMTEXT NOT NULL DEFAULT ('')`},
 }
 
 func sqliteOnly(list []string) []migration {

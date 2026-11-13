@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,9 +67,13 @@ func runMCP(ctx context.Context, j Job, timeout time.Duration) (r Result) {
 			return Result{Message: "minimum tools must be a number"}
 		}
 	}
+	tlsCfg, tlsErr := j.tlsConfig()
+	if tlsErr != nil {
+		return Result{Message: tlsErr.Error()}
+	}
 	tr := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: j.IgnoreTLS}, //nolint:gosec // user opt-in
+		TLSClientConfig:     tlsCfg,
 		TLSHandshakeTimeout: timeout,
 		DialContext:         j.dialContext,
 	}

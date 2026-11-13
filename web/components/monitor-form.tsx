@@ -60,6 +60,7 @@ const types: {
     | "endpoint"
     | "hostPort"
     | "page"
+    | "ipOrDomain"
 }[] = [
   {
     value: "http",
@@ -138,6 +139,29 @@ const types: {
     target: "page",
   },
   {
+    value: "ssh",
+    placeholder: "server.example.com:22",
+  },
+  {
+    value: "imap",
+    placeholder: "imaps://user:password@mail.example.com",
+    target: "server",
+  },
+  {
+    value: "pop3",
+    placeholder: "pop3s://mail.example.com",
+    target: "server",
+  },
+  {
+    value: "ntp",
+    placeholder: "pool.ntp.org",
+  },
+  {
+    value: "rbl",
+    placeholder: "example.com",
+    target: "ipOrDomain",
+  },
+  {
     value: "push",
     placeholder: "",
   },
@@ -208,6 +232,18 @@ const ipFamilyKey = {
 } as const
 // Labels are in messages: monitorForm.mcpTransports.<value>.
 const mcpTransports = ["auto", "streamable", "sse"] as const
+// Types that store their own settings in method, keyword or
+// expected_status: switching to or from them clears those fields.
+const ownSettings: MonitorType[] = [
+  "mcp",
+  "udp",
+  "statuspage",
+  "ssh",
+  "ntp",
+  "rbl",
+  "imap",
+  "pop3",
+]
 // Labels are in messages: monitorForm.udpEncodings.<value>.
 const udpEncodings = ["text", "hex"] as const
 
@@ -355,6 +391,15 @@ export function MonitorForm({
     "mcp",
     "websocket",
     "statuspage",
+    "imap",
+    "pop3",
+  ].includes(m.type)
+  const hasClientCert = [
+    "http",
+    "keyword",
+    "websocket",
+    "grpc",
+    "mcp",
   ].includes(m.type)
   const ivList = isPush
     ? withValue(pushIntervals, m.interval_sec)
@@ -371,12 +416,11 @@ export function MonitorForm({
     setM((p) => {
       const next = { ...p, type }
       if (
-        (type === "mcp") !== (p.type === "mcp") ||
-        (type === "udp") !== (p.type === "udp") ||
-        (type === "statuspage") !== (p.type === "statuspage")
+        type !== p.type &&
+        (ownSettings.includes(type) || ownSettings.includes(p.type))
       ) {
-        // mcp, udp and statuspage reuse method, keyword and expected_status
-        // for their own settings
+        // these types reuse method, keyword and expected_status for their
+        // own settings
         next.method = type === "mcp" ? "auto" : type === "udp" ? "text" : "GET"
         next.keyword = ""
         next.expected_status = ""
@@ -754,6 +798,61 @@ export function MonitorForm({
               </Field>
             </>
           )}
+          {m.type === "ssh" && (
+            <Field
+              label={tr("sshExpect")}
+              hint={tr("sshExpectHint")}
+              className="sm:col-span-2"
+            >
+              <Input
+                className="font-mono"
+                value={m.keyword}
+                onChange={(e) => set("keyword", e.target.value)}
+                placeholder="OpenSSH · SHA256:…"
+              />
+            </Field>
+          )}
+          {(m.type === "imap" || m.type === "pop3") && (
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              {tr("mailboxHint")}
+            </p>
+          )}
+          {m.type === "ntp" && (
+            <Field label={tr("ntpMaxOffset")} hint={tr("ntpMaxOffsetHint")}>
+              <Input
+                type="number"
+                min={1}
+                max={3600000}
+                value={m.expected_status}
+                onChange={(e) => set("expected_status", e.target.value)}
+                placeholder="1000"
+              />
+            </Field>
+          )}
+          {m.type === "rbl" && (
+            <>
+              <Field
+                label={tr("rblLists")}
+                hint={tr("rblListsHint")}
+                className="sm:col-span-2"
+              >
+                <Textarea
+                  rows={2}
+                  className="font-mono"
+                  value={m.keyword}
+                  onChange={(e) => set("keyword", e.target.value)}
+                  placeholder="zen.spamhaus.org, bl.spamcop.net"
+                />
+              </Field>
+              <Field label={tr("resolver")} hint={tr("rblResolverHint")}>
+                <Input
+                  value={m.dns_server}
+                  onChange={(e) => set("dns_server", e.target.value)}
+                  placeholder="9.9.9.10"
+                />
+              </Field>
+            </>
+          )}
           {isSQL && (
             <>
               <Field
@@ -789,6 +888,15 @@ export function MonitorForm({
               />
               {tr("ignoreTls")}
             </label>
+          )}
+          {hasClientCert && !isHTTP && (
+            <ClientCertFields
+              cert={m.client_cert ?? ""}
+              keyPEM={m.client_key ?? ""}
+              onChange={(cert, key) =>
+                setM((p) => ({ ...p, client_cert: cert, client_key: key }))
+              }
+            />
           )}
           {m.type === "keyword" && (
             <>
@@ -1265,6 +1373,13 @@ export function MonitorForm({
               />
               {tr("ignoreTls")}
             </label>
+            <ClientCertFields
+              cert={m.client_cert ?? ""}
+              keyPEM={m.client_key ?? ""}
+              onChange={(cert, key) =>
+                setM((p) => ({ ...p, client_cert: cert, client_key: key }))
+              }
+            />
           </div>
         </Section>
       )}
@@ -1418,4 +1533,74 @@ export function MonitorForm({
 /** Shortest timeout (ms) for count echo requests sent 300 ms apart, as the hub checks it. */
 function pingTimeout(count: number) {
   return (Math.max(count, 1) - 1) * 300 + 500
+}
+
+/** Client certificate and key for mutual TLS, folded until opened or set. */
+function ClientCertFields({
+  cert,
+  keyPEM,
+  onChange,
+}: {
+  cert: string
+  keyPEM: string
+  onChange: (cert: string, key: string) => void
+}) {
+  const tr = useTranslations("monitorForm")
+  const [open, setOpen] = useState(cert !== "" || keyPEM !== "")
+  if (!open)
+    return (
+      <div className="sm:col-span-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          onClick={() => setOpen(true)}
+        >
+          {tr("clientCert.add")}
+        </Button>
+      </div>
+    )
+  return (
+    <>
+      <Field
+        label={tr("clientCert.cert")}
+        hint={tr("clientCert.certHint")}
+        className="sm:col-span-2"
+      >
+        <Textarea
+          rows={3}
+          className="font-mono text-xs"
+          value={cert}
+          onChange={(e) => onChange(e.target.value, keyPEM)}
+          placeholder="-----BEGIN CERTIFICATE-----"
+        />
+      </Field>
+      <Field
+        label={tr("clientCert.key")}
+        hint={tr("clientCert.keyHint")}
+        className="sm:col-span-2"
+      >
+        <Textarea
+          rows={3}
+          className="font-mono text-xs"
+          value={keyPEM}
+          onChange={(e) => onChange(cert, e.target.value)}
+          placeholder="-----BEGIN PRIVATE KEY-----"
+        />
+      </Field>
+      <div className="sm:col-span-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          onClick={() => {
+            onChange("", "")
+            setOpen(false)
+          }}
+        >
+          {tr("clientCert.remove")}
+        </Button>
+      </div>
+    </>
+  )
 }

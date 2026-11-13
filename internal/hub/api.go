@@ -597,6 +597,7 @@ var validTypes = []string{
 	check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush,
 	check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo, check.TypeDocker, check.TypeGRPC, check.TypeSMTP, check.TypeMCP,
 	check.TypeUDP, check.TypeWS, check.TypeStatuspage,
+	check.TypeSSH, check.TypeIMAP, check.TypePOP3, check.TypeNTP, check.TypeRBL,
 }
 
 // urlSchemes lists the accepted target URL schemes of URL-based types.
@@ -790,6 +791,54 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 		if err := validateStatuspage(m); err != nil {
 			return err
 		}
+	case check.TypeSSH:
+		addr, err := check.SSHTarget(m.Target)
+		if err != nil {
+			return err
+		}
+		m.Target = strings.TrimSuffix(addr, ":22")
+		m.Keyword = strings.TrimSpace(m.Keyword)
+		m.Method, m.ExpectedStatus, m.Body, m.KeywordInvert = "", "", "", false
+	case check.TypeIMAP, check.TypePOP3:
+		if _, err := check.ParseMailboxTarget(m.Type, m.Target); err != nil {
+			return err
+		}
+		m.Method, m.ExpectedStatus, m.Body, m.Keyword, m.KeywordInvert = "", "", "", "", false
+	case check.TypeNTP:
+		addr, err := check.NTPTarget(m.Target)
+		if err != nil {
+			return err
+		}
+		m.Target = strings.TrimSuffix(addr, ":123")
+		off, err := check.NTPMaxOffset(m.ExpectedStatus)
+		if err != nil {
+			return err
+		}
+		m.ExpectedStatus = ""
+		if off != check.DefaultNTPMaxOffsetMs {
+			m.ExpectedStatus = strconv.Itoa(off)
+		}
+		m.Method, m.Body, m.Keyword, m.KeywordInvert = "", "", "", false
+	case check.TypeRBL:
+		ip, domain, err := check.RBLTarget(m.Target)
+		if err != nil {
+			return err
+		}
+		if ip != nil {
+			m.Target = ip.String()
+		} else {
+			m.Target = domain
+		}
+		lists, err := check.ParseBlacklists(m.Keyword)
+		if err != nil {
+			return err
+		}
+		m.Keyword = strings.Join(lists, ", ")
+		m.Method, m.ExpectedStatus, m.Body, m.KeywordInvert = "", "", "", false
+		// A blacklist entry is not something a new TLS certificate or domain
+		// renewal fixes, and the domain is the user's own: keep the domain
+		// alert, there is no certificate.
+		m.CertExpiryAlert = false
 	case check.TypeSMTP:
 		t := m.Target
 		if !strings.Contains(t, "://") {
@@ -802,6 +851,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 
 	if err := checkIPv6Brackets(m); err != nil {
+		return err
+	}
+	if err := checkClientCert(m); err != nil {
 		return err
 	}
 
@@ -907,6 +959,21 @@ func validateMCP(m *store.Monitor) error {
 		}
 	}
 	return nil
+}
+
+// checkClientCert drops the client certificate of types that cannot use
+// it and checks that the certificate and the key go together.
+func checkClientCert(m *store.Monitor) error {
+	m.ClientCert, m.ClientKey = strings.TrimSpace(m.ClientCert), strings.TrimSpace(m.ClientKey)
+	if !slices.Contains(check.ClientCertTypes, m.Type) || m.ClientCert == "" && m.ClientKey == "" {
+		m.ClientCert, m.ClientKey = "", ""
+		return nil
+	}
+	if len(m.ClientCert) > 64<<10 || len(m.ClientKey) > 64<<10 {
+		return errors.New("client certificate: longer than 64 KB")
+	}
+	_, _, err := check.ParseClientCert(m.ClientCert, m.ClientKey)
+	return err
 }
 
 // statuspageIDRe matches a Statuspage component id.

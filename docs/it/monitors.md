@@ -41,6 +41,10 @@ Incolla un comando `curl` nel campo URL di un monitor HTTP per compilare metodo,
 | udp | `host:porta` | un datagramma riceve risposta, eventualmente con un testo o dei byte, vedi [UDP](#udp) |
 | websocket | `wss://example.com/socket` | la connessione si apre; se vuoi un messaggio riceve la risposta attesa, vedi [WebSocket](#websocket) |
 | status page (atlassian) | `https://status.example.com` | lo stato di una pagina Atlassian Statuspage o di alcuni suoi componenti; i problemi minori sono degradato, vedi [Status page di altri servizi](#status-page-di-altri-servizi) |
+| ssh | `host` o `host:porta` | il banner SSH e la chiave host, eventualmente fissata, vedi [SSH](#ssh) |
+| imap, pop3 | `imaps://host`, `pop3s://host`, `imap://utente:pass@host` | saluto, `STARTTLS`/`STLS` quando disponibile, login facoltativo, vedi [Server di posta](#server-di-posta-imap-pop3) |
+| ntp | `host` o `host:porta` | il server risponde, è sincronizzato e il suo orologio è vicino a quello della posizione, vedi [NTP](#ntp) |
+| blacklist (rbl) | indirizzo IP o dominio di posta | non è nelle blacklist DNS, vedi [Blacklist](#blacklist-rbl) |
 | heartbeat (push) | nessuna: pingtxt ti dà un URL | il tuo job chiama l'URL; down quando le chiamate smettono, vedi [heartbeat](#monitor-heartbeat-cron-job) |
 
 I monitor HTTP accettano anche metodo, header e body della richiesta, i codici di stato accettati e se ignorare gli
@@ -223,6 +227,76 @@ HTTP, per esempio `unexpected status 401 (no WebSocket upgrade)`.
   chiede dei sottoprotocolli; quello scelto dal server compare nel risultato, per esempio `connected (chat)`.
 
 Gli endpoint `wss://` ricevono gli avvisi di scadenza del certificato.
+
+## SSH
+
+Un monitor **ssh** si collega a `host` (porta 22) o `host:porta`, legge il banner di versione del server e fa lo
+scambio di chiavi fino alla chiave host del server. Non fa mai login, quindi non serve un account. Il risultato
+mostra il banner e la chiave host, per esempio `SSH-2.0-OpenSSH_9.6p1, ssh-ed25519 SHA256:…`.
+
+**banner o chiave host attesi** (API `keyword`) è facoltativo:
+
+- un testo, per esempio `OpenSSH`: il banner deve contenerlo;
+- l'impronta di una chiave host `SHA256:…`, come la stampa `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` o la
+  mostra un controllo riuscito: il controllo fallisce con `host key changed` quando nessuna chiave del server ce
+  l'ha. Fissare la chiave ti avvisa quando un server è stato reinstallato, o quando al suo indirizzo risponde
+  qualcos'altro.
+
+## Server di posta (IMAP, POP3)
+
+I monitor **imap** e **pop3** controllano un server di caselle di posta come **smtp** controlla un server di invio:
+
+- `imaps://host` (993) e `pop3s://host` (995) usano TLS da subito; `imap://host` (143) e `pop3://host` (110)
+  leggono il saluto e passano a TLS con `STARTTLS` (`STLS` per POP3) quando il server lo offre. Un semplice
+  `host[:porta]` usa lo schema senza TLS. Il certificato viene verificato, a meno che **ignora gli errori del
+  certificato TLS** sia attivo.
+- Con utente e password nell'URL, per esempio `imaps://monitor%40example.com:segreta@mail.example.com`, il controllo
+  fa anche login (`LOGIN`, oppure `USER`/`PASS`) e fallisce con una password sbagliata o un account bloccato. Non
+  invia mai la password senza TLS. Usa una casella creata per il monitoraggio: gli admin vedono la password, gli
+  utenti in sola lettura no.
+
+Il risultato è per esempio `tls, logged in, * OK Dovecot ready.`.
+
+## NTP
+
+Un monitor **ntp** chiede l'ora a un server NTP (SNTP) su `host` (porta 123) o `host:porta`. Fallisce quando il
+server non risponde, risponde di non essere sincronizzato (stratum 16 o indicatore di allarme), rifiuta la richiesta
+(un "kiss-o'-death", per esempio `RATE`), oppure quando il suo orologio si discosta da quello della posizione che fa
+il controllo più dello **sfasamento massimo** (API `expected_status`, in ms, predefinito 1000). Il risultato è per
+esempio `stratum 2, offset +1.3 ms`, e il tempo di risposta è il viaggio di andata e ritorno in rete.
+
+Lo sfasamento si misura rispetto all'orologio della posizione: tieni sincronizzati gli orologi dell'hub e degli
+agent, oppure alza il limite.
+
+## Blacklist (RBL)
+
+Un monitor **blacklist (rbl)** cerca una destinazione nelle blacklist DNS, le liste che i server di posta usano per
+rifiutare lo spam. È giù finché la destinazione è in lista, e il messaggio nomina le liste, per esempio
+`listed: 203.0.113.7 on zen.spamhaus.org (127.0.0.2)`.
+
+- Un **indirizzo IP** (IPv4 o IPv6) viene controllato nelle liste di IP.
+- Un **dominio di posta** viene controllato nelle liste di domini, e gli indirizzi dei suoi server MX (o del dominio
+  stesso se non ha record MX) nelle liste di IP. Con una famiglia IP impostata si controllano solo gli indirizzi di
+  quella famiglia.
+- **blacklist** (API `keyword`): le zone da interrogare, separate da virgole. Vuoto usa quelle predefinite:
+  Spamhaus ZEN, SpamCop, Barracuda, Mailspike, PSBL, Manitu, DroneBL e s5h per gli indirizzi, Spamhaus DBL, SURBL e
+  URIBL per i domini. Le zone note per elencare domini vanno ai controlli dei domini, tutte le altre a quelli degli
+  indirizzi.
+- **resolver** (API `dns_server`): il server DNS da interrogare. Le blacklist rifiutano le richieste dai grandi
+  resolver pubblici come 8.8.8.8 o 1.1.1.1; quando nessuna lista risponde il controllo fallisce con
+  `no blacklist answered`. Fai il controllo da una posizione con un resolver suo, o imposta quello del provider. Le
+  risposte che significano "richiesta rifiutata" (127.0.0.1, 127.255.255.x) non contano mai come presenza in lista.
+
+Controlla ogni ora o meno spesso: le liste cambiano lentamente e alcune limitano le richieste gratuite.
+
+## Certificati client (mutual TLS)
+
+I monitor **http**, **parola chiave**, **websocket**, **grpc** e **mcp** possono presentare un certificato client ai
+server che lo chiedono (mutual TLS). Clicca **aggiungi certificato client (mTLS)** e incolla il certificato (PEM, può
+seguire la catena) e la sua chiave privata (PEM, non cifrata); l'hub controlla che corrispondano prima di salvare (API
+`client_cert` e `client_key`). Un certificato scaduto fa fallire il controllo con la sua data. La chiave è nascosta
+agli utenti in sola lettura; gli altri tipi ignorano il certificato. Gli agent più vecchi di questa impostazione
+falliscono il controllo con "this agent cannot send client certificates: update it".
 
 ## Status page di altri servizi
 

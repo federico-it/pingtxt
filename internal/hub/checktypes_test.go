@@ -1,7 +1,16 @@
 package hub
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/federico-it/pingtxt/internal/check"
 	"github.com/federico-it/pingtxt/internal/store"
@@ -195,5 +204,134 @@ func TestRedactSteps(t *testing.T) {
 	}
 	if stored.Headers["X-Key"] != "k" {
 		t.Fatal("redaction changed the stored headers")
+	}
+}
+
+func TestValidateChecks2(t *testing.T) {
+	h, _ := newTestHub(t)
+	cases := []struct {
+		typ, target, want string // want "" = rejected
+	}{
+		{check.TypeSSH, "ssh://srv.example.com:22", "srv.example.com"},
+		{check.TypeSSH, "srv.example.com:2222", "srv.example.com:2222"},
+		{check.TypeSSH, "root@srv", ""},
+		{check.TypeIMAP, "imaps://u:p@mail.example.com", "imaps://u:p@mail.example.com"},
+		{check.TypeIMAP, "pop3://mail.example.com", ""},
+		{check.TypePOP3, "mail.example.com:995", "mail.example.com:995"},
+		{check.TypeNTP, "pool.ntp.org:123", "pool.ntp.org"},
+		{check.TypeNTP, "[2001:db8::1]:1123", "[2001:db8::1]:1123"},
+		{check.TypeRBL, "203.0.113.7", "203.0.113.7"},
+		{check.TypeRBL, "Example.COM.", "example.com"},
+		{check.TypeRBL, "https://example.com", ""},
+	}
+	for _, c := range cases {
+		m := &store.Monitor{Name: "x", Type: c.typ, Target: c.target}
+		err := h.validateMonitor(m)
+		if c.want == "" {
+			if err == nil {
+				t.Errorf("%s %q accepted", c.typ, c.target)
+			}
+			continue
+		}
+		if err != nil || m.Target != c.want {
+			t.Errorf("%s %q: %q %v", c.typ, c.target, m.Target, err)
+		}
+	}
+	m := &store.Monitor{Name: "x", Type: check.TypeNTP, Target: "ntp", ExpectedStatus: "1000"}
+	if err := h.validateMonitor(m); err != nil || m.ExpectedStatus != "" {
+		t.Errorf("default offset: %q %v", m.ExpectedStatus, err)
+	}
+	m = &store.Monitor{Name: "x", Type: check.TypeNTP, Target: "ntp", ExpectedStatus: "-5"}
+	if err := h.validateMonitor(m); err == nil {
+		t.Error("negative offset accepted")
+	}
+	m = &store.Monitor{Name: "x", Type: check.TypeRBL, Target: "1.2.3.4", Keyword: "zen.spamhaus.org\nbl.spamcop.net,zen.spamhaus.org", CertExpiryAlert: true}
+	if err := h.validateMonitor(m); err != nil || m.Keyword != "zen.spamhaus.org, bl.spamcop.net" || m.CertExpiryAlert {
+		t.Errorf("rbl lists: %q %v", m.Keyword, err)
+	}
+}
+
+// testPair makes a throwaway client certificate and key, so no key sits in
+// the repository.
+func testPair(t *testing.T) (string, string) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "client"},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour)}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kder, _ := x509.MarshalECPrivateKey(key)
+	// Trimmed as the hub stores them.
+	return strings.TrimSpace(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))),
+		strings.TrimSpace(string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: kder})))
+}
+
+func TestValidateClientCert(t *testing.T) {
+	h, _ := newTestHub(t)
+	testCert, testKey := testPair(t)
+	m := &store.Monitor{Name: "x", Type: check.TypeHTTP, Target: "https://x", ClientCert: testCert, ClientKey: testKey}
+	if err := h.validateMonitor(m); err != nil || m.ClientKey == "" {
+		t.Fatalf("valid pair: %v", err)
+	}
+	m = &store.Monitor{Name: "x", Type: check.TypeHTTP, Target: "https://x", ClientCert: testCert}
+	if err := h.validateMonitor(m); err == nil {
+		t.Error("cert without key accepted")
+	}
+	m = &store.Monitor{Name: "x", Type: check.TypeTCP, Target: "x:1", ClientCert: testCert, ClientKey: testKey}
+	if err := h.validateMonitor(m); err != nil || m.ClientCert != "" || m.ClientKey != "" {
+		t.Errorf("tcp keeps the cert: %v", err)
+	}
+	redactMonitor(&store.Monitor{})
+	r := &store.Monitor{ClientCert: testCert, ClientKey: testKey}
+	redactMonitor(r)
+	if r.ClientKey != redacted || r.ClientCert != testCert {
+		t.Error("key not redacted")
+	}
+	withCert := &store.Monitor{Type: check.TypeHTTP, ClientCert: testCert}
+	if got := oldAgentError(withCert, "agent:1", check.Result{OK: true}); got != "this agent cannot send client certificates: update it" {
+		t.Errorf("old agent: %q", got)
+	}
+	if got := oldAgentError(withCert, "agent:1", check.Result{OK: true, ClientCert: true}); got != "" {
+		t.Errorf("new agent: %q", got)
+	}
+}
+
+func TestClientKeyExport(t *testing.T) {
+	h, st := newTestHub(t)
+	testCert, testKey := testPair(t)
+	m := &store.Monitor{Name: "mtls", Type: check.TypeHTTP, Target: "https://x", ClientCert: testCert, ClientKey: testKey}
+	if err := h.validateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.CreateMonitor(m); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := h.ExportConfig(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.Monitors[0].ClientKey != redactedValue || doc.Monitors[0].ClientCert != testCert {
+		t.Fatalf("key exported: %q", doc.Monitors[0].ClientKey)
+	}
+	// Same hub: the stored key is kept.
+	if _, err := h.ImportConfig(doc, ImportOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.Monitor(m.ID); got.ClientKey != testKey || got.Paused {
+		t.Fatalf("key lost on re-import: paused=%v", got.Paused)
+	}
+	// Another hub: no key, so no certificate, and the monitor is paused.
+	h2, st2 := newTestHub(t)
+	if _, err := h2.ImportConfig(doc, ImportOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	ms, _ := st2.ListMonitors()
+	if len(ms) != 1 || ms[0].ClientCert != "" || ms[0].ClientKey != "" || !ms[0].Paused {
+		t.Fatalf("imported: %+v", ms)
 	}
 }
