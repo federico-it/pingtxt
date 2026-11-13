@@ -40,6 +40,8 @@ lette solo poche variabili d'ambiente:
 | `PINGTXT_IPV6` | | `on` o `off` salta la verifica della raggiungibilità IPv6, vedi [IPv6](#ipv6) |
 | `PINGTXT_UNPRIVILEGED_PING` | | `1` o `0` forza il socket ICMP senza privilegi o quello raw, vedi [senza Docker](#senza-docker) |
 | `PINGTXT_AGENT_DIR` | | cartella dei binari degli agent, quando non sono accanto all'hub |
+| `PINGTXT_CONFIG_FILE` | | file YAML applicato all'avvio e a ogni modifica, vedi [configurazione come codice](administration.md#da-un-file-accanto-allhub) |
+| `PINGTXT_CONFIG_PRUNE` | | `true`: con `PINGTXT_CONFIG_FILE`, elimina quello che il file non elenca |
 
 `PINGTXT_PUBLIC_URL`, `PINGTXT_RETENTION_DAYS`, `PINGTXT_LOCAL_NAME` e `PINGTXT_DISABLE_LOCAL` funzionano ancora, ma
 compilano le impostazioni solo al primo avvio. Dopo, si cambiano dall'interfaccia.

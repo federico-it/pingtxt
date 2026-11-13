@@ -11079,6 +11079,305 @@
           }
         }
       }
+    },
+    "/api/config/code": {
+      "get": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Export the configuration as code",
+        "operationId": "getConfigCode",
+        "description": "The monitors, groups, tags, notification channels, maintenance windows and status pages as YAML, with references by name and default values left out. Applying it to the same hub changes nothing. Agents are not in it: monitors name them in `locations`.\n\n**Access:** An admin's browser session or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "secrets",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ]
+            },
+            "description": "Include passwords, tokens and secret webhook URLs. Browser session only: API tokens get 403."
+          },
+          {
+            "name": "settings",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ]
+            },
+            "description": "Include the instance settings (general, agent updates, backups)."
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Serve it as a pingtxt.yaml download."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "YAML.",
+            "content": {
+              "application/yaml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/config/code/plan": {
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Plan a configuration as code",
+        "operationId": "planConfigCode",
+        "description": "What applying the body would create, update and delete, and the errors that would stop it. Changes nothing, so read-only tokens of admins can call it (for a CI check on a pull request).\n\n**Access:** An admin's browser session or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "prune",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ]
+            },
+            "description": "Delete the objects of the sections in the file that the file does not list. Without it, objects the file leaves out are kept."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "The configuration as code (YAML or JSON, up to 16 MB).",
+          "content": {
+            "application/yaml": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeDocument"
+              },
+              "example": "version: 1\nmonitors:\n  - name: website\n    type: http\n    target: https://example.com\n    group: production\n"
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodePlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/config/code/apply": {
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Apply a configuration as code",
+        "operationId": "applyConfigCode",
+        "description": "Makes the hub match the body: objects are matched by name (monitors and channels by type and name, status pages by slug), only the sections in the body are touched, and secrets the body leaves out keep their stored value. A database backup is taken first (SQLite). When the plan has errors nothing is changed and the answer is 422. Login settings (`settings.auth`) need a browser session. 409 when the hub is managed by its configuration file (`PINGTXT_CONFIG_FILE`).\n\n**Access:** An admin's browser session or API token with write scope.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "prune",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ]
+            },
+            "description": "Delete the objects of the sections in the file that the file does not list. Without it, objects the file leaves out are kept."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "The configuration as code (YAML or JSON, up to 16 MB).",
+          "content": {
+            "application/yaml": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeDocument"
+              },
+              "example": "version: 1\nmonitors:\n  - name: website\n    type: http\n    target: https://example.com\n    group: production\n"
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Applied (or nothing to change).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeApplyResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "description": "The file has errors, nothing was changed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeApplyResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config/code/sync": {
+      "get": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "State of the configuration file",
+        "operationId": "getConfigCodeSync",
+        "description": "Whether the hub applies a configuration file (`PINGTXT_CONFIG_FILE`), when it last did and the last error.\n\n**Access:** An admin's browser session or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "State.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSyncStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Backups"
+        ],
+        "summary": "Apply the configuration file now",
+        "operationId": "syncConfigCode",
+        "description": "Applies the configuration file now, also when it did not change: undoes changes made in the UI. 409 without a configuration file.\n\n**Access:** An admin's browser session or API token with write scope.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "State after the apply.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSyncStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -15173,6 +15472,180 @@
             "items": {
               "$ref": "#/components/schemas/OnboardingStep"
             }
+          }
+        }
+      },
+      "CodeDocument": {
+        "type": "object",
+        "description": "Configuration as code. Each object has the fields of its API object (Monitor, Notifier, Maintenance, StatusPage, Group, Tag) without ids and state; references are names: monitors have `group`, `tags`, `depends_on`, `locations` (\"local\" or agent names) and `channels` (names, or `{channel, events}`); channels `groups` and `tags`; maintenance windows `monitors`, `groups`, `tags`; status pages `monitors`, `groups`, `subscribe_channel`; groups `parent`. Fields left out take their default.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "settings": {
+            "type": "object",
+            "description": "Sections general, agent_updates, backups and auth; keys left out keep their value.",
+            "additionalProperties": true
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "monitors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "maintenances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "status_pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "CodeChange": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "groups, tags, channels, monitors, maintenances, status_pages or settings."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name; monitors and channels \"name (type)\", status pages their slug."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "update",
+              "delete"
+            ]
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Updates: the fields that change."
+          }
+        }
+      },
+      "CodePlan": {
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodeChange"
+            }
+          },
+          "unchanged": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Objects already as in the file, by kind."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Problems that stop an apply (unknown names, invalid fields)."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CodeApplyResult": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/CodePlan"
+          },
+          "applied": {
+            "type": "boolean",
+            "description": "Changes were made."
+          },
+          "import": {
+            "$ref": "#/components/schemas/ImportResult"
+          },
+          "deleted": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "Objects deleted by prune, by kind."
+          }
+        }
+      },
+      "CodeSyncStatus": {
+        "type": "object",
+        "properties": {
+          "managed": {
+            "type": "boolean",
+            "description": "The hub applies a configuration file."
+          },
+          "file": {
+            "type": "string"
+          },
+          "prune": {
+            "type": "boolean",
+            "description": "PINGTXT_CONFIG_PRUNE: what the file does not list is deleted."
+          },
+          "applied_at": {
+            "type": "integer",
+            "description": "Last successful apply, unix ms."
+          },
+          "checked_at": {
+            "type": "integer",
+            "description": "Last time the file was read, unix ms."
+          },
+          "error": {
+            "type": "string",
+            "description": "Why the last apply failed, if it did."
+          },
+          "plan": {
+            "$ref": "#/components/schemas/CodePlan"
           }
         }
       },

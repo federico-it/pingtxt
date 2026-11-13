@@ -124,6 +124,12 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/audit/users", h.requireAdminAny(h.auditUsers))
 	mux.HandleFunc("GET /api/audit/export", h.requireAdminAny(h.exportAudit))
 	mux.HandleFunc("POST /api/config/import", admin(h.importConfig))
+	// Configuration as code (YAML), see configcode.go: admins, also with API tokens.
+	mux.HandleFunc("GET /api/config/code", h.requireAdminAny(h.getCode))
+	mux.HandleFunc("POST /api/config/code/plan", h.requireAdminRead(h.planCodeAPI))
+	mux.HandleFunc("POST /api/config/code/apply", h.requireAdminAny(h.applyCodeAPI))
+	mux.HandleFunc("GET /api/config/code/sync", h.requireAdminAny(h.getCodeSync))
+	mux.HandleFunc("POST /api/config/code/sync", h.requireAdminAny(h.postCodeSync))
 	mux.HandleFunc("POST /api/import/uptime-kuma", admin(h.importKuma))
 
 	mux.HandleFunc("GET /api/overview", auth(h.overview))
@@ -307,7 +313,10 @@ func securityHeaders(next http.Handler) http.Handler {
 			// CORS "simple" type either, so a cross-site form cannot send it.
 			upload := (r.URL.Path == "/api/backups/upload" || (strings.HasPrefix(r.URL.Path, "/api/status-pages/") &&
 				strings.HasSuffix(r.URL.Path, "/logo"))) && strings.HasPrefix(ctype, "application/octet-stream")
-			if r.ContentLength != 0 && !strings.HasPrefix(ctype, "application/json") && !upload {
+			// Configuration as code takes YAML; none of its types is a "simple" one either.
+			yamlBody := strings.HasPrefix(r.URL.Path, "/api/config/code/") && (strings.HasPrefix(ctype, "application/yaml") ||
+				strings.HasPrefix(ctype, "application/x-yaml") || strings.HasPrefix(ctype, "text/yaml"))
+			if r.ContentLength != 0 && !strings.HasPrefix(ctype, "application/json") && !upload && !yamlBody {
 				writeErr(w, http.StatusUnsupportedMediaType, "content-type must be application/json")
 				return
 			}

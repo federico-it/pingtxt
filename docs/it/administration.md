@@ -99,6 +99,113 @@ pingtxt -import-config pingtxt.json [-import-mode replace]   # poi riavvia l'hub
 
 Arrivi da Uptime Kuma? Vedi [importare da Uptime Kuma](monitors.md#importare-da-uptime-kuma).
 
+## Configurazione come codice
+
+Tieni monitor, gruppi, tag, canali di notifica, finestre di manutenzione e status page in un file YAML, in git, e
+lascia che l'hub lo segua. A differenza dell'[export](#export-e-import-della-configurazione), il file è pensato per
+essere scritto a mano: gli oggetti si richiamano per nome, i valori predefiniti sono omessi, e applicarlo rende l'hub
+uguale al file. **impostazioni → dati → configurazione come codice** scarica la configurazione attuale come
+`pingtxt.yaml`, un buon punto di partenza, e ha un editor per pianificare e applicare un file.
+
+```yaml
+version: 1
+groups:
+  - name: production
+  - name: api
+    parent: production
+tags:
+  - {name: critical, color: red}
+channels:
+  - name: ops
+    type: slack
+    config: {url: "${SLACK_WEBHOOK}"}   # vedi sotto: dall'ambiente dell'hub
+    groups: [production]
+monitors:
+  - name: website
+    type: http
+    target: https://example.com
+    group: production
+    tags: [critical]
+    locations: [local, frankfurt]       # "local" è l'hub, gli altri nomi di agent
+  - name: api health
+    type: keyword
+    target: https://api.example.com/health
+    keyword: ok
+    interval_sec: 30
+    group: api
+    depends_on: [website]
+    channels:
+      - {channel: ops, events: [down, up]}
+  - name: nightly backup
+    type: push
+    interval_sec: 86400
+maintenances:
+  - name: sunday window
+    kind: weekly
+    weekdays: [0]
+    start_time: "03:00"
+    duration_min: 60
+    groups: [production]
+status_pages:
+  - slug: status
+    title: Example status
+    groups: [production]
+```
+
+Ogni oggetto accetta i campi del suo oggetto della [REST API](integrations.md#rest-api) (`Monitor`, `Notifier`,
+`Maintenance`, `StatusPage`) senza id; un campo omesso prende il valore predefinito, e per i monitor questo include i
+**valori predefiniti dei nuovi monitor** dell'hub. I riferimenti sono nomi: i monitor hanno `group`, `tags`,
+`depends_on`, `locations` e `channels` (un nome, oppure `channel` con `events`), i canali `groups` e `tags`, le finestre
+di manutenzione `monitors`, `groups` e `tags`, le status page `monitors`, `groups` e `subscribe_channel`, i gruppi
+`parent`. Un errore di battitura in un campo o un nome sconosciuto è un errore, e un file con errori non cambia niente.
+
+Come viene applicato un file:
+
+- Gli oggetti vengono abbinati per nome: monitor e canali per tipo e nome, status page per slug. Rinominarne uno crea
+  un nuovo oggetto (e, con prune, elimina il vecchio con il suo storico).
+- Vengono toccate solo le sezioni presenti nel file: un file con solo `monitors:` lascia stare canali e status page.
+- Con **prune** gli oggetti di quelle sezioni che il file non elenca vengono eliminati. Senza, restano.
+- I segreti omessi da un canale (URL di Slack e Discord, token, password) mantengono il valore salvato nell'hub, quindi
+  non serve metterli in git. Un canale nuovo senza il suo segreto è un errore.
+- URL degli heartbeat, token degli agent, password delle status page e storico non sono mai nel file e non cambiano.
+- Gli agent non sono nel file: hanno dei token. Aggiungili dall'interfaccia e richiamali per nome in `locations`.
+- La sezione facoltativa `settings:` accetta `general`, `agent_updates`, `backups` e `auth` (impostazioni di accesso);
+  le chiavi omesse mantengono il loro valore. Le impostazioni di accesso non si possono cambiare con un token API.
+- Con SQLite, prima di ogni applicazione che cambia qualcosa viene fatto un backup del database.
+
+### Dalla CI
+
+Pianifica e applica tramite l'API con un [token API](integrations.md#token-api) di un admin. Il piano non cambia
+niente, quindi per controllare una pull request basta un token in sola lettura; per applicare serve un token di
+scrittura.
+
+```sh
+# cosa cambierebbe (gli errori sono in "errors")
+curl -sf -H "Authorization: Bearer $PINGTXT_TOKEN" -H "Content-Type: application/yaml" --data-binary @pingtxt.yaml \
+  "https://status.example.com/api/config/code/plan?prune=1"
+# applicalo: 422 con il piano quando il file ha errori
+curl -sf -H "Authorization: Bearer $PINGTXT_TOKEN" -H "Content-Type: application/yaml" --data-binary @pingtxt.yaml \
+  "https://status.example.com/api/config/code/apply?prune=1"
+# la configurazione attuale (senza segreti con un token)
+curl -sf -H "Authorization: Bearer $PINGTXT_TOKEN" https://status.example.com/api/config/code > pingtxt.yaml
+```
+
+Metti i segreti nell'archivio segreti della CI e inseriscili prima dell'invio, per esempio con
+`envsubst < pingtxt.yaml`. Il server MCP offre lo stesso con `get_configuration_code`, `plan_configuration_code` e
+`apply_configuration_code`.
+
+### Da un file accanto all'hub
+
+Imposta `PINGTXT_CONFIG_FILE` su un file YAML (montato nel container, per esempio da un checkout git) e l'hub lo
+applica all'avvio ed entro 30 secondi da ogni modifica. `${NOME}` nel file viene sostituito dalla variabile d'ambiente
+`NOME` dell'hub, così i segreti possono restare fuori dal file; una variabile non impostata blocca l'applicazione. Con
+`PINGTXT_CONFIG_PRUNE=true` quello che il file non elenca viene eliminato.
+
+Finché un file gestisce l'hub, **impostazioni → dati** lo dice, con l'ora dell'ultima applicazione e l'ultimo errore,
+e applicare un altro file dall'interfaccia o dall'API viene rifiutato. Le modifiche fatte dall'interfaccia restano fino
+alla prossima modifica del file; **applica il file ora** riporta subito l'hub com'è nel file. Ogni applicazione che
+cambia qualcosa è nel [registro attività](security.md#registro-attività).
+
 ## Statistiche d'uso
 
 Dopo l'installazione, agli admin viene chiesto una volta se l'hub può inviare statistiche d'uso anonime. Non viene

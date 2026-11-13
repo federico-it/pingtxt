@@ -1,6 +1,7 @@
 "use client"
 
 import { ConfigTransfer, DatabaseBackups } from "@/components/settings/backups"
+import { ConfigCode } from "@/components/settings/config-code"
 import { KumaImport } from "@/components/settings/kuma-import"
 import { AdminOnly } from "@/components/settings/save-bar"
 import { useApi, type AuthOptions, type Settings } from "@/lib/api"
@@ -22,6 +23,12 @@ function DataSettings() {
     <>
       <ConfigTransfer
         onImported={() => {
+          settings.mutate()
+          options.mutate()
+        }}
+      />
+      <ConfigCode
+        onApplied={() => {
           settings.mutate()
           options.mutate()
         }}
