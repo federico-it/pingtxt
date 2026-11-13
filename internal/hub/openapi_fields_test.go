@@ -70,6 +70,10 @@ var openAPISchemaFields = []struct {
 	{"PushPrefs", deviceBody{}, nil},
 	{"MonitorMute", store.MonitorMute{}, nil},
 	{"AccountPushPrefs", store.AccountPushPrefs{}, nil},
+	{"Schedule", store.Schedule{}, nil},
+	{"ScheduleOverride", store.Override{}, nil},
+	{"OnCallShift", onCallShift{}, nil},
+	{"ScheduleView", scheduleView{}, nil},
 }
 
 // Every JSON field of the Go types above must be documented in the schema.

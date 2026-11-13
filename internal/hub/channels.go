@@ -17,7 +17,7 @@ import (
 )
 
 // Channels that talk to a service API: Microsoft Teams, PagerDuty,
-// Opsgenie, Pushover, Gotify, Matrix and Twilio (SMS).
+// Opsgenie, Pushover, Gotify, Matrix and Twilio (SMS and calls).
 
 // Default API addresses of the hosted services. Notifier.endpoints
 // overrides them in tests.
@@ -377,17 +377,30 @@ func txnID() string {
 	return "pingtxt" + strconv.FormatInt(time.Now().UnixMilli(), 10) + hex.EncodeToString(b)
 }
 
-// ---------- Twilio (SMS) ----------
+// ---------- Twilio (SMS and calls) ----------
 
-// sendTwilio texts the event to each number with the Twilio Messages API.
-// from is a phone number or a messaging service SID (MG...).
-func (n *Notifier) sendTwilio(ctx context.Context, c map[string]string, e Event) error {
+// sendTwilio texts the event to each number with the Twilio Messages API,
+// or calls them (mode call or both, bad news only: see voice.go). from is a
+// phone number or, for SMS only, a messaging service SID (MG...).
+// notifierID is the channel a call can acknowledge through.
+func (n *Notifier) sendTwilio(ctx context.Context, c map[string]string, e Event, notifierID int64) error {
+	mode := twilioMode(c)
+	sms := mode != "call"
+	call := mode != "sms" && e.Alert()
 	sid := c["account_sid"]
 	u := n.endpoint("twilio") + "/2010-04-01/Accounts/" + url.PathEscape(sid) + "/Messages.json"
 	auth := "Basic " + basicAuth(sid, c["auth_token"])
 	body := e.shortText(300)
 	var errs []error
 	for _, to := range splitList(c["to"]) {
+		if call {
+			if err := n.callTwilio(ctx, c, e, notifierID, to); err != nil {
+				errs = append(errs, fmt.Errorf("call %s: %w", to, err))
+			}
+		}
+		if !sms {
+			continue
+		}
 		f := url.Values{"To": {to}, "Body": {body}}
 		if from := c["from"]; strings.HasPrefix(from, "MG") {
 			f.Set("MessagingServiceSid", from)
@@ -471,9 +484,32 @@ func validateServiceConfig(typ string, c map[string]string) (bool, error) {
 		if f := c["from"]; !strings.HasPrefix(f, "MG") && !phoneRe.MatchString(f) {
 			return true, errors.New("from must be a phone number in E.164 format or a messaging service sid (MG...)")
 		}
-		return true, nil
+		return true, validateTwilioVoice(c)
 	}
 	return false, nil
+}
+
+// validateTwilioVoice checks the call settings of a Twilio channel: mode
+// (sms, call or both) and language (en or it).
+func validateTwilioVoice(c map[string]string) error {
+	switch c["mode"] {
+	case "", "sms":
+		delete(c, "mode")
+	case "call", "both":
+		if !phoneRe.MatchString(c["from"]) {
+			return errors.New("calls need a phone number as from, not a messaging service")
+		}
+	default:
+		return errors.New("mode must be sms, call or both")
+	}
+	switch c["language"] {
+	case "", "en":
+		delete(c, "language")
+	case "it":
+	default:
+		return errors.New("language must be en or it")
+	}
+	return nil
 }
 
 // phoneRe is a phone number in E.164 format.

@@ -19,7 +19,7 @@ import (
 
 // Notifier types.
 var NotifierTypes = []string{"webhook", "discord", "slack", "telegram", "ntfy", "email", "app",
-	"teams", "pagerduty", "opsgenie", "pushover", "gotify", "matrix", "twilio"}
+	"teams", "pagerduty", "opsgenie", "pushover", "gotify", "matrix", "twilio", "oncall"}
 
 // Event kinds. Status events have an empty kind for compatibility.
 const (
@@ -300,7 +300,9 @@ func (n *Notifier) Deliver(ctx context.Context, nt *store.Notifier, e Event) err
 	case "matrix":
 		return n.sendMatrix(ctx, c, e)
 	case "twilio":
-		return n.sendTwilio(ctx, c, e)
+		return n.sendTwilio(ctx, c, e, nt.ID)
+	case "oncall":
+		return n.sendOnCall(ctx, nt, e)
 	case "email":
 		return n.sendEmail(ctx, c, e)
 	case "app":

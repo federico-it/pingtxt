@@ -75,6 +75,7 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("PUT /api/account/pins", personal(h.putPins))
 	mux.HandleFunc("POST /api/account/pins/{id}", personal(h.pinMonitor))
 	mux.HandleFunc("DELETE /api/account/pins/{id}", personal(h.unpinMonitor))
+	mux.HandleFunc("PUT /api/account/phone", personal(h.putAccountPhone)) // for on-call SMS and calls, see oncall.go
 	mux.HandleFunc("GET /api/tokens", session(h.listTokens))
 	mux.HandleFunc("POST /api/tokens", session(h.createToken))
 	mux.HandleFunc("DELETE /api/tokens/{id}", session(h.deleteToken))
@@ -196,6 +197,16 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("DELETE /api/notifiers/{id}", auth(h.deleteNotifier))
 	mux.HandleFunc("POST /api/notifiers/test", auth(h.testDraftNotifier))
 	mux.HandleFunc("POST /api/notifiers/{id}/test", auth(h.testNotifier))
+	// On-call schedules, see oncall.go; calls press 1 to acknowledge, see voice.go.
+	mux.HandleFunc("GET /api/oncall", auth(h.listSchedules))
+	mux.HandleFunc("POST /api/oncall", auth(h.createSchedule))
+	mux.HandleFunc("GET /api/oncall/{id}", auth(h.getSchedule))
+	mux.HandleFunc("PUT /api/oncall/{id}", auth(h.updateSchedule))
+	mux.HandleFunc("DELETE /api/oncall/{id}", auth(h.deleteSchedule))
+	mux.HandleFunc("GET /api/oncall/{id}/shifts", auth(h.scheduleShifts))
+	mux.HandleFunc("POST /api/oncall/{id}/overrides", auth(h.createOverride))
+	mux.HandleFunc("DELETE /api/oncall/{id}/overrides/{override}", auth(h.deleteOverride))
+	mux.HandleFunc("POST /api/voice/{channel}/{incident}", h.voiceCallback)
 	mux.HandleFunc("GET /api/reports", auth(h.getReports))
 	mux.HandleFunc("PUT /api/reports", auth(h.putReports))
 	mux.HandleFunc("GET /api/reports/preview", auth(h.previewReport))
@@ -305,9 +316,10 @@ func securityHeaders(next http.Handler) http.Handler {
 		// Heartbeats are exempt: they are authenticated by the URL token, not
 		// by the session cookie, and any client must be able to send them.
 		// So are subscription links, which mail clients post as forms for
-		// one-click unsubscribe (RFC 8058).
+		// one-click unsubscribe (RFC 8058), and the keys pressed in alert
+		// calls, which Twilio posts as signed forms (see voice.go).
 		if strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/api/push/") &&
-			!strings.HasPrefix(r.URL.Path, "/api/public/subscriptions/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+			!strings.HasPrefix(r.URL.Path, "/api/public/subscriptions/") && !strings.HasPrefix(r.URL.Path, "/api/voice/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
 			ctype := r.Header.Get("Content-Type")
 			// Backup and status page logo uploads are raw files. application/octet-stream is not a
 			// CORS "simple" type either, so a cross-site form cannot send it.
@@ -1974,6 +1986,9 @@ func validateNotifier(n *store.Notifier) error {
 	if n.Type == "app" {
 		return validateAppConfig(n.Config)
 	}
+	if n.Type == "oncall" {
+		return validateOnCallConfig(n.Config)
+	}
 	if ok, err := validateServiceConfig(n.Type, n.Config); ok {
 		return err
 	}
@@ -2060,6 +2075,9 @@ func (h *Hub) createNotifier(w http.ResponseWriter, r *http.Request, _ *store.Us
 	if err == nil {
 		err = h.validateScope(n)
 	}
+	if err == nil {
+		err = h.checkOnCallRefs(n)
+	}
 	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
@@ -2113,6 +2131,12 @@ func (h *Hub) updateNotifier(w http.ResponseWriter, r *http.Request, _ *store.Us
 	if err == nil {
 		err = h.validateScope(n)
 	}
+	if err == nil {
+		err = h.checkOnCallRefs(n)
+	}
+	if err == nil && cur.Type != n.Type {
+		err = h.channelInUse(id)
+	}
 	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
@@ -2132,6 +2156,10 @@ func (h *Hub) deleteNotifier(w http.ResponseWriter, r *http.Request, _ *store.Us
 	id, ok := pathID(r)
 	if !ok {
 		writeErr(w, 400, "invalid id")
+		return
+	}
+	if err := h.channelInUse(id); err != nil {
+		writeErr(w, 409, err.Error())
 		return
 	}
 	if err := h.store.DeleteNotifier(id); err != nil {
@@ -2167,7 +2195,11 @@ func (h *Hub) testDraftNotifier(w http.ResponseWriter, r *http.Request, _ *store
 	if n.Name == "" {
 		n.Name = "test"
 	}
-	if err := validateNotifier(&n); err != nil {
+	err := validateNotifier(&n)
+	if err == nil {
+		err = h.checkOnCallRefs(&n)
+	}
+	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
 	}

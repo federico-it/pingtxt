@@ -787,6 +787,12 @@ var mcpTools = []mcpTool{
 		run:         func(c *mcpCall) (any, error) { return c.do("GET", "/api/maintenances", nil) },
 	},
 	{
+		name: "list_oncall", title: "Who is on call",
+		description: "On-call schedules with who is on call now (current, user_id 0 = nobody) and until when, who comes next, upcoming overrides and the channels that alert each schedule.",
+		schema:      object(map[string]any{}),
+		run:         func(c *mcpCall) (any, error) { return c.do("GET", "/api/oncall", nil) },
+	},
+	{
 		name: "list_groups", title: "List groups",
 		description: fmt.Sprintf("Monitor groups with the number of monitors in each. A group can sit inside another one (parent_id, 0 = top level), up to %d levels. Give parent_id to list only the subgroups of one group.", store.MaxGroupDepth),
 		schema: object(map[string]any{

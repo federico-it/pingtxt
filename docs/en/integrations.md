@@ -93,6 +93,7 @@ Cursor, Windsurf and other clients that take a URL and headers:
 | `get_monitor`, `get_monitor_results` | settings, uptime 24h/7d/30d, status per location, expiry; latest check results |
 | `list_incidents`, `get_incident_diagnostics` | incidents (open only, per monitor); what each location saw at the first failure |
 | `list_maintenances` | maintenance windows with their next occurrence |
+| `list_oncall` | on-call schedules: who is on call now and next, overrides |
 | `list_groups`, `list_tags`, `list_agents`, `list_status_pages` | everything else a model needs to find ids |
 | `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | write token of an admin only |
 | `pin_monitor` | pin or unpin a monitor for the token's user; any token, read-only ones too, since pins are personal |

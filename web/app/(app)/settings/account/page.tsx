@@ -7,6 +7,7 @@ import { useTranslations } from "use-intl"
 import { Section } from "@/components/page-header"
 import { Account } from "@/components/settings/account"
 import { AccountActivity } from "@/components/settings/audit-log"
+import { PhoneNumber } from "@/components/settings/phone"
 import { TwoFactor } from "@/components/settings/two-factor"
 import { useApi, type AuthOptions, type Me } from "@/lib/api"
 
@@ -40,6 +41,9 @@ export default function AccountSettings() {
             options.mutate()
           }}
         />
+      </Section>
+      <Section title={t("phone")}>
+        <PhoneNumber me={me.data} onChange={() => me.mutate()} />
       </Section>
       <Section title={t("twoFactor")}>
         <TwoFactor me={me.data} onChange={() => me.mutate()} />

@@ -17,9 +17,10 @@ events it gets, and can wait or repeat. **send test** checks a channel before yo
 | Pushover | your user (or group) key and the token of a Pushover application; optionally one device. Problems are sent with high priority |
 | PagerDuty | the Events API v2 integration key of a service, and the region (US or EU). A down opens an incident, its reminders join it and the recovery resolves it; the same for degraded, expiry and agent alerts. With the `ack` event, acknowledging in pingtxt acknowledges the PagerDuty incident |
 | Opsgenie | the key of an API integration, and the region (US or EU). Alerts get P1 (down, agent offline), P2 (expired) or P3 (expiring, degraded) and close by themselves on recovery. With the `ack` event, acknowledging in pingtxt acknowledges the alert |
-| SMS (Twilio) | the account SID and auth token, the sender (a Twilio number or a messaging service SID `MG...`) and the numbers in international format (`+39...`). Each alert is one short SMS per number, paid on your Twilio account |
+| SMS and calls (Twilio) | the account SID and auth token, the sender (a Twilio number or a messaging service SID `MG...`) and the numbers in international format (`+39...`). **send as** picks SMS, a phone call or both: each alert is one short SMS per number, calls are made only for bad news (down, expiry, agent offline) and read the alert out loud in English or Italian. Calls need a Twilio number as sender. See [voice calls](#voice-calls). Paid on your Twilio account |
 | email | an SMTP server (STARTTLS on 587, TLS on 465, or none for a local relay on 25), or the [Resend](https://resend.com) API with a key from a verified domain; then the sender and the recipients |
 | pingtxt app (push) | push turned on in **settings → integrations → mobile app**; the users (emails) whose phones get the alerts, empty for everyone. See [iOS app](ios-app.md) |
+| whoever is on call | an [on-call schedule](#on-call-schedules), and how to reach the person on call: the pingtxt app, an email channel to send through and a Twilio channel to text or call through |
 
 Links in alerts (Teams, Pushover, Gotify, Matrix, PagerDuty, Opsgenie) point to the diagnostics, or to the monitor
 when the public URL is set in **settings**. A test sent to PagerDuty or Opsgenie opens an incident and resolves it
@@ -76,6 +77,43 @@ The recovery still goes to every channel that got the alert. **release** takes t
 and escalation run again from where they stopped. Another admin can **take over** an incident someone else
 acknowledged. Read-only users see who is on it but cannot acknowledge. API: `POST` and `DELETE
 /api/incidents/{id}/ack`; acknowledgements are in the [audit log](security.md#audit-log).
+
+## On-call schedules
+
+The **oncall** page lists who answers alerts, and when. A schedule has members in rotation order and a shift length
+(some hours, days or weeks): from the start of the first shift, each member is on call for one shift, then the next one
+takes over, and so on. Daily and weekly shifts change at the same local time of the schedule's time zone all year,
+also across daylight saving time. A member can be in the list more than once.
+
+An **override** puts someone else on call for a while, whatever the rotation says: a swap, a day off, a holiday. Where
+overrides overlap the newest one wins. Each schedule shows who is on call now and until when, who comes next, the
+next shifts and the upcoming overrides. Only admins change schedules; everyone sees them.
+
+A **whoever is on call** channel sends its alerts to the person on call when the alert goes out:
+
+- on their phones, with the pingtxt app (their own notification preferences still apply);
+- by email, through an email channel you pick: same server and sender, but to the email of the person on call;
+- by SMS, call or both, through a Twilio channel you pick: same account and sender, but to the phone number of the
+  person on call. Everyone sets their own number in **settings → account**; members without one get only app and
+  email alerts, and the oncall page marks them.
+
+Events, scope, **send after** and **repeat every** work as for any channel. To escalate, add a second **whoever is on
+call** channel for a backup schedule with **send after** set to 15 or 30 minutes: if nobody
+[acknowledges](#acknowledging-incidents) the incident by then, the backup is alerted too. A schedule or a channel
+that an on-call channel uses cannot be deleted until the on-call channel stops using it. On-call schedules are not part
+of the [configuration export](administration.md#configuration-export-and-import). API: `/api/oncall`; MCP tool `list_oncall`.
+
+## Voice calls
+
+A Twilio channel set to **phone call** or **SMS and phone call** calls each number for down, expiry and agent offline
+alerts and reads the alert out loud twice, in English or Italian. Recoveries, acknowledgements and degraded alerts are
+sent as SMS only (or not at all with **phone call**).
+
+When the hub has a public URL (**settings → general**) and the call is about a down monitor, the call ends with
+"press 1 to acknowledge". Pressing 1 [acknowledges](#acknowledging-incidents) the incident for the admin whose account
+has the called number (**settings → account**); other numbers hear that they cannot. Twilio sends the key to
+`/api/voice/...` signed with the account's auth token, and the hub checks the signature, so the public URL must be the
+one Twilio reaches.
 
 ## Snoozing incidents
 

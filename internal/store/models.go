@@ -23,6 +23,9 @@ type User struct {
 	PasswordHash string `json:"-"`
 	Role         string `json:"role"` // RoleAdmin or RoleViewer
 	CreatedAt    int64  `json:"created_at"`
+	// Phone is the user's phone number in E.164 format ("" = none), for
+	// SMS and calls to whoever is on call.
+	Phone string `json:"phone"`
 }
 
 // User roles: admins change everything, viewers only read.
@@ -58,7 +61,7 @@ func (s *Store) CreateUser(email, hash, role string) (*User, error) {
 
 func (s *Store) scanUser(row *sql.Row) (*User, error) {
 	u := &User{}
-	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.Phone)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -66,11 +69,11 @@ func (s *Store) scanUser(row *sql.Row) (*User, error) {
 }
 
 func (s *Store) UserByEmail(email string) (*User, error) {
-	return s.scanUser(s.db.QueryRow(`SELECT id, email, password_hash, role, created_at FROM users WHERE email = ?`, email))
+	return s.scanUser(s.db.QueryRow(`SELECT id, email, password_hash, role, created_at, phone FROM users WHERE email = ?`, email))
 }
 
 func (s *Store) UserByID(id int64) (*User, error) {
-	return s.scanUser(s.db.QueryRow(`SELECT id, email, password_hash, role, created_at FROM users WHERE id = ?`, id))
+	return s.scanUser(s.db.QueryRow(`SELECT id, email, password_hash, role, created_at, phone FROM users WHERE id = ?`, id))
 }
 
 // SetUserRole changes the role of a user.
@@ -88,6 +91,20 @@ func (s *Store) SetUserRole(id int64, role string) error {
 	return nil
 }
 
+// UserByPhone returns the user with this phone number (E.164).
+func (s *Store) UserByPhone(phone string) (*User, error) {
+	if phone == "" {
+		return nil, ErrNotFound
+	}
+	return s.scanUser(s.db.QueryRow(`SELECT id, email, password_hash, role, created_at, phone FROM users WHERE phone = ? ORDER BY id LIMIT 1`, phone))
+}
+
+// SetUserPhone changes the phone number of a user ("" = none).
+func (s *Store) SetUserPhone(id int64, phone string) error {
+	_, err := s.db.Exec(`UPDATE users SET phone = ? WHERE id = ?`, phone, id)
+	return err
+}
+
 func (s *Store) UpdatePassword(id int64, hash string) error {
 	_, err := s.db.Exec(`UPDATE users SET password_hash = ? WHERE id = ?`, hash, id)
 	return err
@@ -99,7 +116,7 @@ func (s *Store) CreateSession(tokenHash string, userID int64, expires time.Time)
 }
 
 func (s *Store) SessionUser(tokenHash string) (*User, error) {
-	return s.scanUser(s.db.QueryRow(`SELECT u.id, u.email, u.password_hash, u.role, u.created_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?`, tokenHash, now()))
+	return s.scanUser(s.db.QueryRow(`SELECT u.id, u.email, u.password_hash, u.role, u.created_at, u.phone FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?`, tokenHash, now()))
 }
 
 func (s *Store) DeleteSession(tokenHash string) error {

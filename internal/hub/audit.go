@@ -186,32 +186,37 @@ var auditRoutes = map[string]auditSpec{
 	"POST /api/import/uptime-kuma":     {action: "config.import_kuma", typ: "config", response: true},
 	"GET /api/audit/export":            {action: "audit.export", typ: "audit"},
 	// monitors
-	"POST /api/monitors":                 {action: "monitor.create", typ: "monitor", load: loadMonitor},
-	"POST /api/monitors/test":            skipAudit,
-	"POST /api/monitors/statuspage":      skipAudit, // reads a public page, changes nothing
-	"POST /api/monitors/bulk":            {action: "monitor.bulk", typ: "monitor"},
-	"POST /api/monitors/presets":         {action: "monitor.create", typ: "monitor"}, // one entry per monitor
-	"PUT /api/monitors/{id}":             {action: "monitor.update", typ: "monitor", load: loadMonitor},
-	"DELETE /api/monitors/{id}":          {action: "monitor.delete", typ: "monitor", load: loadMonitor},
-	"POST /api/monitors/{id}/pause":      {action: "monitor.pause", typ: "monitor", load: loadMonitor},
-	"POST /api/monitors/{id}/test":       skipAudit,
-	"POST /api/monitors/{id}/push-token": {action: "monitor.push_token_rotate", typ: "monitor", load: loadMonitor},
-	"POST /api/monitors/{id}/expiry":     skipAudit, // runs a check, changes nothing
-	"POST /api/monitors/{id}/check":      skipAudit, // runs the checks now, changes nothing
-	"POST /api/incidents/{id}/ack":       {action: "incident.ack", typ: "incident", load: loadIncident},
-	"DELETE /api/incidents/{id}/ack":     {action: "incident.unack", typ: "incident", load: loadIncident},
-	"POST /api/incidents/{id}/snooze":    {action: "incident.snooze", typ: "incident", load: loadIncident},
-	"DELETE /api/incidents/{id}/snooze":  {action: "incident.unsnooze", typ: "incident", load: loadIncident},
-	"POST /api/maintenances":             {action: "maintenance.create", typ: "maintenance", load: loadMaintenance},
-	"PUT /api/maintenances/{id}":         {action: "maintenance.update", typ: "maintenance", load: loadMaintenance},
-	"DELETE /api/maintenances/{id}":      {action: "maintenance.delete", typ: "maintenance", load: loadMaintenance},
-	"POST /api/groups":                   {action: "group.create", typ: "group", load: loadGroup},
-	"PUT /api/groups/{id}":               {action: "group.update", typ: "group", load: loadGroup},
-	"DELETE /api/groups/{id}":            {action: "group.delete", typ: "group", load: loadGroup},
-	"PUT /api/groups/{id}/monitors":      {action: "group.set_monitors", typ: "group", load: loadGroupMonitors},
-	"POST /api/tags":                     {action: "tag.create", typ: "tag", load: loadTag},
-	"PUT /api/tags/{id}":                 {action: "tag.update", typ: "tag", load: loadTag},
-	"DELETE /api/tags/{id}":              {action: "tag.delete", typ: "tag", load: loadTag},
+	"POST /api/monitors":                           {action: "monitor.create", typ: "monitor", load: loadMonitor},
+	"POST /api/monitors/test":                      skipAudit,
+	"POST /api/monitors/statuspage":                skipAudit, // reads a public page, changes nothing
+	"POST /api/monitors/bulk":                      {action: "monitor.bulk", typ: "monitor"},
+	"POST /api/monitors/presets":                   {action: "monitor.create", typ: "monitor"}, // one entry per monitor
+	"PUT /api/monitors/{id}":                       {action: "monitor.update", typ: "monitor", load: loadMonitor},
+	"DELETE /api/monitors/{id}":                    {action: "monitor.delete", typ: "monitor", load: loadMonitor},
+	"POST /api/monitors/{id}/pause":                {action: "monitor.pause", typ: "monitor", load: loadMonitor},
+	"POST /api/monitors/{id}/test":                 skipAudit,
+	"POST /api/monitors/{id}/push-token":           {action: "monitor.push_token_rotate", typ: "monitor", load: loadMonitor},
+	"POST /api/monitors/{id}/expiry":               skipAudit, // runs a check, changes nothing
+	"POST /api/monitors/{id}/check":                skipAudit, // runs the checks now, changes nothing
+	"POST /api/incidents/{id}/ack":                 {action: "incident.ack", typ: "incident", load: loadIncident},
+	"DELETE /api/incidents/{id}/ack":               {action: "incident.unack", typ: "incident", load: loadIncident},
+	"POST /api/oncall":                             {action: "oncall.create", typ: "oncall", load: loadSchedule},
+	"PUT /api/oncall/{id}":                         {action: "oncall.update", typ: "oncall", load: loadSchedule},
+	"DELETE /api/oncall/{id}":                      {action: "oncall.delete", typ: "oncall", load: loadSchedule},
+	"POST /api/oncall/{id}/overrides":              {action: "oncall.override_create", typ: "oncall", load: loadSchedule, response: true},
+	"DELETE /api/oncall/{id}/overrides/{override}": {action: "oncall.override_delete", typ: "oncall", load: loadSchedule},
+	"POST /api/incidents/{id}/snooze":              {action: "incident.snooze", typ: "incident", load: loadIncident},
+	"DELETE /api/incidents/{id}/snooze":            {action: "incident.unsnooze", typ: "incident", load: loadIncident},
+	"POST /api/maintenances":                       {action: "maintenance.create", typ: "maintenance", load: loadMaintenance},
+	"PUT /api/maintenances/{id}":                   {action: "maintenance.update", typ: "maintenance", load: loadMaintenance},
+	"DELETE /api/maintenances/{id}":                {action: "maintenance.delete", typ: "maintenance", load: loadMaintenance},
+	"POST /api/groups":                             {action: "group.create", typ: "group", load: loadGroup},
+	"PUT /api/groups/{id}":                         {action: "group.update", typ: "group", load: loadGroup},
+	"DELETE /api/groups/{id}":                      {action: "group.delete", typ: "group", load: loadGroup},
+	"PUT /api/groups/{id}/monitors":                {action: "group.set_monitors", typ: "group", load: loadGroupMonitors},
+	"POST /api/tags":                               {action: "tag.create", typ: "tag", load: loadTag},
+	"PUT /api/tags/{id}":                           {action: "tag.update", typ: "tag", load: loadTag},
+	"DELETE /api/tags/{id}":                        {action: "tag.delete", typ: "tag", load: loadTag},
 	// agents
 	"POST /api/agents":     {action: "agent.create", typ: "agent", load: loadAgent},
 	"PUT /api/agents/{id}": {action: "agent.update", typ: "agent", load: loadAgent},
@@ -259,6 +264,14 @@ func loadMonitor(h *Hub, _ *http.Request, _ *store.User, id int64) (string, any,
 		return "", nil, false
 	}
 	return m.Name, m, true
+}
+
+func loadSchedule(h *Hub, _ *http.Request, _ *store.User, id int64) (string, any, bool) {
+	sc, err := h.store.Schedule(id)
+	if err != nil {
+		return "", nil, false
+	}
+	return sc.Name, sc, true
 }
 
 func loadIncident(h *Hub, _ *http.Request, _ *store.User, id int64) (string, any, bool) {
