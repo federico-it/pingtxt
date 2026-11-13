@@ -22,7 +22,7 @@ import { UptimeBars } from "@/components/uptime-bars"
 import { ResultsLog, type TimeWindow } from "@/components/results-log"
 import { IncidentDiagnostics } from "@/components/diagnostics"
 import { ReasonList, parseCause } from "@/components/reasons"
-import { AckButton, AckNote, SnoozeButton, SnoozeNote } from "@/components/incident-ack"
+import { AckButton, AckNote, isSnoozed, SnoozeButton, SnoozeNote } from "@/components/incident-ack"
 import { TestResults, type TestResult } from "@/components/test-results"
 import { Button } from "@/components/ui/button"
 import {
@@ -290,7 +290,7 @@ function View() {
           </span>
           {d.incident.acked_at ? (
             <AckNote incident={d.incident} />
-          ) : (
+          ) : isSnoozed(d.incident) ? null : (
             <span className="text-muted-foreground">{t("notAcked")}</span>
           )}
           <SnoozeNote incident={d.incident} />
