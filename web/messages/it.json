@@ -1977,7 +1977,16 @@
     "released": "incidente rilasciato",
     "onIt": "{name} se ne occupa · {ago}",
     "you": "tu",
-    "error": "impossibile modificare l'incidente"
+    "error": "impossibile modificare l'incidente",
+    "snooze": "posticipa",
+    "snoozeHint": "Non ora: niente promemoria né escalation per un po', poi tutti i canali che hanno ricevuto l'avviso vengono avvisati di nuovo.",
+    "snoozed": "incidente posticipato",
+    "wake": "riattiva",
+    "wakeHint": "Termina subito la pausa: promemoria ed escalation ripartono.",
+    "woken": "pausa terminata",
+    "snoozedUntil": "posticipato fino alle {until} da {name}",
+    "minutes": "{count} minuti",
+    "hours": "{count, plural, one {# ora} other {# ore}}"
   },
   "pageHooks": {
     "feedsTitle": "feed rss e atom",

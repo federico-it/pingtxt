@@ -114,7 +114,11 @@ func (h *Hub) openIncidentOf(id int64) *openIncident {
 		return nil
 	}
 	a := st.alerts
-	return &openIncident{ID: a.incident, StartedAt: a.started, AckedAt: a.ackAt, AckedBy: a.ackBy}
+	o := &openIncident{ID: a.incident, StartedAt: a.started, AckedAt: a.ackAt, AckedBy: a.ackBy}
+	if a.snoozeUntil > time.Now().UnixMilli() {
+		o.SnoozedUntil, o.SnoozedBy = a.snoozeUntil, a.snoozeBy
+	}
+	return o
 }
 
 // openIncident is the open incident of a monitor in its summary.
@@ -123,6 +127,9 @@ type openIncident struct {
 	StartedAt int64  `json:"started_at"`
 	AckedAt   int64  `json:"acked_at"`
 	AckedBy   string `json:"acked_by"`
+	// SnoozedUntil is when the snooze ends (unix ms, 0 = not snoozed).
+	SnoozedUntil int64  `json:"snoozed_until"`
+	SnoozedBy    string `json:"snoozed_by"`
 }
 
 // ---------- API ----------

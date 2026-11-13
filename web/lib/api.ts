@@ -175,7 +175,15 @@ export interface MonitorSummary extends Monitor {
   /** Monitor it depends on that is down while this one fails too (no alerts of its own). */
   blocked_by?: { id: number; name: string; since: number } | null
   /** Open incident (down alert sent), with who acknowledged it. */
-  incident?: { id: number; started_at: number; acked_at: number; acked_by: string } | null
+  incident?: {
+    id: number
+    started_at: number
+    acked_at: number
+    acked_by: string
+    /** when its snooze ends (unix ms), 0 = not snoozed */
+    snoozed_until?: number
+    snoozed_by?: string
+  } | null
   /** Why the monitor is down or degraded right now, one entry per problem. */
   reasons?: Reason[]
   /** reasons in one short line (status page monitors: worst component +N); older hubs leave it out */
@@ -255,6 +263,10 @@ export interface Incident {
   acked_at?: number
   /** email of who acknowledged it, "" = nobody */
   acked_by?: string
+  /** when its snooze ends (unix ms; 0 or past = not snoozed): no reminders and no escalation until then */
+  snoozed_until?: number
+  /** email of who snoozed it */
+  snoozed_by?: string
 }
 
 /** What a location found out about a failing check (see GET /api/incidents/{id}/diagnostics). */

@@ -1977,7 +1977,16 @@
     "released": "incident released",
     "onIt": "{name} on it · {ago}",
     "you": "you",
-    "error": "could not change the incident"
+    "error": "could not change the incident",
+    "snooze": "snooze",
+    "snoozeHint": "Not now: no reminders and no escalation for a while, then every channel that got the alert is reminded.",
+    "snoozed": "incident snoozed",
+    "wake": "wake up",
+    "wakeHint": "End the snooze now: reminders and escalation run again.",
+    "woken": "snooze ended",
+    "snoozedUntil": "snoozed until {until} by {name}",
+    "minutes": "{count} minutes",
+    "hours": "{count, plural, one {# hour} other {# hours}}"
   },
   "pageHooks": {
     "feedsTitle": "rss and atom feeds",

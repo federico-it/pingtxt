@@ -151,6 +151,8 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/incidents/{id}/diagnostics", auth(h.incidentDiagnostics))
 	mux.HandleFunc("POST /api/incidents/{id}/ack", auth(h.ackIncident))
 	mux.HandleFunc("DELETE /api/incidents/{id}/ack", auth(h.unackIncident))
+	mux.HandleFunc("POST /api/incidents/{id}/snooze", auth(h.snoozeIncident)) // see snooze.go
+	mux.HandleFunc("DELETE /api/incidents/{id}/snooze", auth(h.unsnoozeIncident))
 	mux.HandleFunc("GET /api/monitors/{id}/diagnostics", auth(h.monitorDiagnostics))
 	mux.HandleFunc("GET /api/maintenances", auth(h.listMaintenances))
 	mux.HandleFunc("POST /api/maintenances", auth(h.createMaintenance))

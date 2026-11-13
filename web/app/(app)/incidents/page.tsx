@@ -15,7 +15,7 @@ import { datetime, duration } from "@/lib/format"
 import { segment } from "@/components/ui/control"
 import { ReasonList, parseCause, useReasonLine } from "@/components/reasons"
 import { IncidentDiagnostics } from "@/components/diagnostics"
-import { AckButton, AckNote } from "@/components/incident-ack"
+import { AckButton, AckNote, SnoozeButton, SnoozeNote } from "@/components/incident-ack"
 
 const states = ["all", "open", "resolved"] as const
 const periods = ["24h", "7d", "30d", "all"] as const
@@ -157,10 +157,14 @@ function Incidents() {
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="animate-pulse text-down">{t("ongoing")}</span>
                         <AckButton incident={{ id: i.id, acked_at: i.acked_at ?? 0, acked_by: i.acked_by ?? "" }} onChange={() => mutate()} />
+                        <SnoozeButton incident={{ id: i.id, acked_at: i.acked_at ?? 0, acked_by: i.acked_by ?? "", snoozed_until: i.snoozed_until, snoozed_by: i.snoozed_by }} onChange={() => mutate()} />
                       </div>
                     )}
                     {!i.resolved_at && !!i.acked_at && (
                       <AckNote incident={{ id: i.id, acked_at: i.acked_at, acked_by: i.acked_by ?? "" }} className="mt-1 flex max-w-72 text-xs" />
+                    )}
+                    {!i.resolved_at && (
+                      <SnoozeNote incident={{ id: i.id, acked_at: i.acked_at ?? 0, acked_by: i.acked_by ?? "", snoozed_until: i.snoozed_until, snoozed_by: i.snoozed_by }} className="mt-1 flex max-w-72 text-xs" />
                     )}
                   </TableCell>
                   <TableCell>
