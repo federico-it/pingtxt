@@ -80,7 +80,9 @@ finestre di manutenzione e canali possono scegliere i monitor per gruppo o tag. 
 **tv** nella dashboard apre `/tv/`, una vista a schermo intero per un monitor a parete o uno schermo libero: niente
 menu, testo grande, una riga generale in alto (*tutto funziona* o quanti monitor sono giù), i monitor giù, degradati o in
 manutenzione come riquadri grandi con il motivo e da quanto tempo, e tutti gli altri come riquadri piccoli con l'uptime
-delle ultime 24 ore, divisi per gruppo. Tiene il filtro di gruppo e tag della dashboard (`/tv/?group=3&tag=2`), lascia
+delle ultime 24 ore, divisi per gruppo. Non c'è niente da scorrere: i riquadri riempiono lo schermo in colonne, grandi
+quanto possono esserlo perché ci stia tutto, e quando sono troppi anche alla dimensione più piccola vengono divisi in
+pagine che cambiano ogni 15 secondi (i punti in basso a destra indicano quale è sullo schermo). Tiene il filtro di gruppo e tag della dashboard (`/tv/?group=3&tag=2`), lascia
 fuori i monitor in pausa (aggiungi `&paused=1` per mostrarli), si aggiorna da sola ogni 10 secondi, tiene acceso lo
 schermo dove il browser lo permette e nasconde il puntatore quando non si muove. Il pulsante in alto a destra passa a
 schermo intero.

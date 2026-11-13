@@ -95,3 +95,10 @@ export function shortGroupName(g: GroupNode, byId: Map<number, GroupNode>) {
   if (!/^[\s\-–—:/·›»]/.test(after)) return g.name
   return after.replace(/^[\s\-–—:/·›»]+/, "") || g.name
 }
+
+/** Path of a group with short names ("Infrastructure › DNS", not
+ * "Infrastructure › Infrastructure DNS"). */
+export function shortGroupPath(g: GroupNode, byId: Map<number, GroupNode>) {
+  const chain = [...g.ancestors].reverse().map((id) => byId.get(id)).filter((x): x is GroupNode => !!x)
+  return [...chain, g].map((n) => shortGroupName(n, byId)).join(" › ")
+}
