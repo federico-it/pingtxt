@@ -67,7 +67,8 @@
     "empty": "nessun risultato",
     "newMonitor": "nuovo monitor",
     "newStatusPage": "nuova status page",
-    "keys": "<kbd>↑↓</kbd> sposta <kbd>invio</kbd> apri <kbd>esc</kbd> chiudi · altrove: <kbd>/</kbd> cerca <kbd>n</kbd> nuovo monitor <kbd>d</kbd> tema"
+    "keys": "<kbd>↑↓</kbd> sposta <kbd>invio</kbd> apri <kbd>esc</kbd> chiudi · altrove: <kbd>/</kbd> cerca <kbd>n</kbd> nuovo monitor <kbd>d</kbd> tema",
+    "presets": "segui servizi popolari"
   },
   "notFound": {
     "message": "404: file o cartella inesistente"
@@ -96,7 +97,7 @@
     "ungrouped": "senza gruppo",
     "fetching": "caricamento",
     "noMatch": "nessun monitor corrisponde",
-    "emptyState": "ancora nessun monitor. <link>crea il primo</link>",
+    "emptyState": "ancora nessun monitor. <link>crea il primo</link> o <services>segui i servizi popolari</services> come Claude, OpenAI o GitHub",
     "pinned": "fissati",
     "others": "tutto il resto",
     "pin": "fissa {name} in alto",
@@ -148,7 +149,8 @@
     "clearGroup": "mostra tutti i gruppi",
     "foldAll": "comprimi tutti",
     "unfoldAll": "espandi tutti",
-    "inGroup": "in {name}"
+    "inGroup": "in {name}",
+    "services": "servizi"
   },
   "monitor": {
     "resumed": "monitor ripreso",
@@ -2027,5 +2029,39 @@
     "locations": "{count} località",
     "noMessage": "nessun messaggio",
     "andMore": "{first} (+{count} altri)"
+  },
+  "presets": {
+    "title": "servizi popolari",
+    "search": "cerca servizi...",
+    "custom": "monitor personalizzato",
+    "intro": "Segui la status page pubblica dei servizi da cui dipendi. Ogni servizio scelto diventa un monitor di tipo status page controllato dall'hub: un incidente minore lo rende degradato, un'interruzione lo manda down. Per seguire solo alcuni componenti (per esempio l'API e non il sito) modifica il monitor dopo averlo aggiunto.",
+    "all": "tutti",
+    "loading": "caricamento servizi",
+    "noMatch": "nessun servizio corrisponde. qualunque pagina Atlassian Statuspage funziona con un monitor personalizzato di tipo status page.",
+    "error": "errore",
+    "cats": {
+      "ai": "ai",
+      "dev": "strumenti per sviluppatori",
+      "cloud": "cloud e hosting",
+      "observability": "osservabilità",
+      "comms": "email e messaggi",
+      "productivity": "produttività",
+      "commerce": "commercio e web",
+      "social": "social e giochi"
+    },
+    "following": "✓ già seguito",
+    "followingHint": "un monitor segue già {name}: aprilo",
+    "selected": "{count, plural, one {# servizio selezionato} other {# servizi selezionati}}",
+    "every": "ogni",
+    "minutes": "{count}m",
+    "group": "gruppo",
+    "noGroup": "nessun gruppo",
+    "newGroup": "nuovo gruppo",
+    "groupName": "nome del nuovo gruppo",
+    "defaultGroup": "servizi",
+    "clear": "annulla",
+    "add": "{count, plural, one {aggiungi # monitor} other {aggiungi # monitor}}",
+    "added": "{count, plural, =0 {niente di nuovo: tutti i servizi sono già seguiti} one {# monitor aggiunto} other {# monitor aggiunti}}",
+    "link": "servizi popolari"
   }
 }

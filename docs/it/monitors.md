@@ -256,6 +256,24 @@ il monitor giù al primo incidente minore.
 Per questo tipo non ci sono diagnostica né avvisi di scadenza del certificato o del dominio: la pagina è del
 fornitore.
 
+### Servizi popolari
+
+**monitor → servizi** elenca circa 70 servizi popolari che pubblicano una pagina di questo tipo, per categoria: AI
+(Claude, OpenAI, Mistral...), strumenti per sviluppatori (GitHub, npm, Docker Hub...), cloud e hosting (Cloudflare,
+Vercel, DigitalOcean...), osservabilità, email e messaggi, produttività, commercio e social. Cerca per nome o prodotto
+(`chatgpt`, `copilot`), spunta quelli da cui dipendi e premi **aggiungi**: ognuno diventa un monitor status page con il
+nome del servizio, controllato dall'hub ogni 2 minuti (1 o 5 se lo scegli), nel gruppo che scegli (di base un nuovo
+gruppo chiamato **servizi**). I servizi già seguiti da un monitor status page mostrano **già seguito** e portano al
+monitor.
+
+Viene seguita l'intera pagina. Per seguire solo alcuni componenti modifica il monitor dopo averlo aggiunto. Un servizio
+che non è nell'elenco funziona allo stesso modo con un monitor personalizzato di questo tipo, se ha una pagina
+Atlassian Statuspage.
+
+API: `GET /api/monitors/presets` (il catalogo, con `monitor_id` del monitor che segue già ogni servizio) e
+`POST /api/monitors/presets` con `{"ids": ["claude", "github"], "group_name": "servizi"}`. MCP:
+`list_service_presets` e `add_service_presets`.
+
 ## Monitor heartbeat (cron job)
 
 Per i job che girano a orari fissi (backup, cron, code), crea un monitor di tipo **heartbeat (push)**. Riceve un URL

@@ -803,7 +803,44 @@ var mcpTools = []mcpTool{
 		run:         func(c *mcpCall) (any, error) { return c.do("GET", "/api/status-pages", nil) },
 	},
 
+	{
+		name: "list_service_presets", title: "List popular services",
+		description: "Catalog of popular services (Claude, OpenAI, GitHub, Cloudflare...) whose public status page can be followed with add_service_presets. Each has an id, category, status page url and monitor_id when a monitor already follows it. Filter with q (name, product or keyword) or category.",
+		schema: object(map[string]any{
+			"q":        prop("string", "Search: part of the name, a product (chatgpt, copilot) or a keyword"),
+			"category": prop("string", "ai, dev, cloud, observability, comms, productivity, commerce or social"),
+		}),
+		run: func(c *mcpCall) (any, error) {
+			v := url.Values{}
+			if q := c.str("q"); q != "" {
+				v.Set("q", q)
+			}
+			if cat := c.str("category"); cat != "" {
+				v.Set("category", cat)
+			}
+			path := "/api/monitors/presets"
+			if len(v) > 0 {
+				path += "?" + v.Encode()
+			}
+			return c.do("GET", path, nil)
+		},
+	},
+
 	// ---------- changes ----------
+	{
+		name: "add_service_presets", title: "Follow popular services", write: true, idempotent: true,
+		description: "Add a status page monitor for each service id from list_service_presets, checked from the hub every 2 minutes unless told otherwise. Services that a monitor already follows are skipped. group_name puts them in that group, created when missing. Returns created and skipped.",
+		schema: object(map[string]any{
+			"ids":          map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Service ids from list_service_presets"},
+			"group_id":     prop("integer", "Existing group for the new monitors, from list_groups"),
+			"group_name":   prop("string", "Group by name, created when missing (instead of group_id)"),
+			"interval_sec": prop("integer", "Seconds between checks, default 120"),
+			"tag_ids":      intList("Tag ids from list_tags"),
+		}, "ids"),
+		run: func(c *mcpCall) (any, error) {
+			return c.do("POST", "/api/monitors/presets", c.args)
+		},
+	},
 	{
 		name: "create_monitor", title: "Create monitor", write: true,
 		description: "Create a monitor. Only name, type and target are required (no target for push). Returns the new monitor.",
