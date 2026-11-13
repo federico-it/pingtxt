@@ -426,3 +426,26 @@ func TestMCPOAuth(t *testing.T) {
 		t.Fatalf("viewer scope: %+v", tok)
 	}
 }
+
+func TestHumanTimesUnits(t *testing.T) {
+	in := map[string]any{
+		"ts":          float64(1767225600000), // unix ms
+		"cert_expiry": float64(1766707200),    // unix seconds
+		"diagnostics": []any{map[string]any{"tls": map[string]any{"not_after": float64(1766707200)}}},
+		"expires_at":  float64(0),
+	}
+	out := humanTimes(in).(map[string]any)
+	if got := out["ts"]; got != "2026-01-01T00:00:00Z" {
+		t.Errorf("ts = %v", got)
+	}
+	if got := out["cert_expiry"]; got != "2025-12-26T00:00:00Z" {
+		t.Errorf("cert_expiry = %v, want 2025-12-26T00:00:00Z", got)
+	}
+	tls := out["diagnostics"].([]any)[0].(map[string]any)["tls"].(map[string]any)
+	if got := tls["not_after"]; got != "2025-12-26T00:00:00Z" {
+		t.Errorf("not_after = %v", got)
+	}
+	if out["expires_at"] != nil {
+		t.Errorf("expires_at = %v, want nil", out["expires_at"])
+	}
+}

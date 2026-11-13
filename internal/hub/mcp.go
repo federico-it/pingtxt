@@ -331,15 +331,22 @@ func (c *mcpCall) raw(method, path string, body any) (any, error) {
 var timeFields = map[string]bool{
 	"ts": true, "started_at": true, "resolved_at": true, "status_since": true, "created_at": true,
 	"start_at": true, "end_at": true, "active_end": true, "next_start": true, "next_end": true,
-	"last_seen": true, "cert_expiry": true, "expires_at": true, "checked_at": true,
+	"last_seen": true, "expires_at": true, "checked_at": true,
 	"last_used_at": true, "from": true, "to": true,
 }
+
+// Fields holding unix seconds (TLS certificate expiry of check results and
+// diagnostics), shown to the model as ISO 8601 too.
+var secondFields = map[string]bool{"cert_expiry": true, "not_after": true}
 
 func humanTimes(v any) any {
 	switch t := v.(type) {
 	case map[string]any:
 		for k, x := range t {
-			if n, ok := x.(float64); ok && timeFields[k] {
+			if n, ok := x.(float64); ok && (timeFields[k] || secondFields[k]) {
+				if secondFields[k] {
+					n *= 1000
+				}
 				if n <= 0 {
 					t[k] = nil
 				} else {
