@@ -73,4 +73,4 @@ finestre di manutenzione e canali possono scegliere i monitor per gruppo o tag. 
 - Premi <kbd>ctrl k</kbd> per saltare a qualsiasi monitor o pagina, <kbd>d</kbd> per passare da chiaro a scuro.
 - Seleziona più monitor nella dashboard per metterli in pausa, riattivarli, spostarli o eliminarli insieme.
 - **prova** nel modulo del monitor esegue il controllo una volta dalle località scelte, senza salvare.
-- Fissa i monitor in cima alla dashboard; i monitor fissati restano salvati nel tuo browser.
+- Fissa i monitor in cima alla dashboard. I monitor fissati sono salvati sul tuo account, quindi li ritrovi in ogni browser e nell'API (`/api/account/pins`); ogni utente ha i suoi, anche gli utenti in sola lettura.

@@ -89,12 +89,13 @@ Cursor, Windsurf and other clients that take a URL and headers:
 | tool | does |
 | --- | --- |
 | `get_overview` | monitors by status, agents online, open incidents |
-| `list_monitors` | status, 24h uptime, response time and last check; filter by status, group, tag or name |
+| `list_monitors` | status, 24h uptime, response time, last check and whether you pinned it (pinned first); filter by status, group, tag, name or pins |
 | `get_monitor`, `get_monitor_results` | settings, uptime 24h/7d/30d, status per location, expiry; latest check results |
 | `list_incidents`, `get_incident_diagnostics` | incidents (open only, per monitor); what each location saw at the first failure |
 | `list_maintenances` | maintenance windows with their next occurrence |
 | `list_groups`, `list_tags`, `list_agents`, `list_status_pages` | everything else a model needs to find ids |
 | `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | write token of an admin only |
+| `pin_monitor` | pin or unpin a monitor for the token's user; any token, read-only ones too, since pins are personal |
 | `acknowledge_incident` | write token of an admin only; the incident is acknowledged by the token's user |
 | `create_maintenance`, `delete_maintenance` | write token of an admin only; times in ISO 8601 |
 | `create_group`, `update_group`, `delete_group` | write token of an admin only; `parent_id` makes a subgroup or moves a group, `list_groups` with `parent_id` lists the subgroups of a group |

@@ -99,7 +99,7 @@
     "emptyState": "no monitors yet. <link>create the first one</link>",
     "pinned": "pinned",
     "others": "everything else",
-    "pin": "pin {name} to the top (in this browser)",
+    "pin": "pin {name} to the top",
     "unpin": "unpin {name}",
     "cols": {
       "name": "name",

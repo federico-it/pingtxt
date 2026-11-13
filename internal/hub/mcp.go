@@ -42,7 +42,8 @@ var mcpVersions = []string{"2025-11-25", "2025-06-18", "2025-03-26"}
 
 const mcpInstructions = `Pingtxt is an uptime monitor. Start with get_overview, then list_monitors to find monitor ids.
 Monitor status is one of up, degraded, down, pending, paused or maintenance. Uptime is a percentage, -1 when there is no data yet.
-Times in results are ISO 8601 in UTC. Changes need a write token of an admin: tools that change data are listed only then.
+Times in results are ISO 8601 in UTC. Changes need a write token of an admin: tools that change data are listed only then
+(pin_monitor is the exception: pins are personal, so anyone can change their own).
 Ask the user before deleting a monitor, a maintenance window, a group or a tag.`
 
 type rpcRequest struct {
@@ -437,6 +438,7 @@ type mcpTool struct {
 	description string
 	schema      map[string]any
 	write       bool // changes data: admins with a write token only
+	personal    bool // changes only the caller's own data: anyone
 	destructive bool
 	idempotent  bool
 	run         func(*mcpCall) (any, error)
@@ -450,9 +452,9 @@ func (t *mcpTool) describe() map[string]any {
 		"inputSchema": t.schema,
 		"annotations": map[string]any{
 			"title":           t.title,
-			"readOnlyHint":    !t.write,
+			"readOnlyHint":    !t.write && !t.personal,
 			"destructiveHint": t.destructive,
-			"idempotentHint":  !t.write || t.idempotent,
+			"idempotentHint":  (!t.write && !t.personal) || t.idempotent,
 			"openWorldHint":   false,
 		},
 	}
@@ -569,6 +571,29 @@ func compactMonitor(v any) any {
 	return out
 }
 
+// pins returns the position (from 1) of each monitor the caller pinned.
+func (c *mcpCall) pins() (map[int64]int, error) {
+	res, err := c.raw("GET", "/api/account/pins", nil)
+	if err != nil {
+		return nil, err
+	}
+	out := map[int64]int{}
+	m, _ := res.(map[string]any)
+	ids, _ := m["monitor_ids"].([]any)
+	for i, x := range ids {
+		if f, ok := x.(float64); ok {
+			out[int64(f)] = i + 1
+		}
+	}
+	return out, nil
+}
+
+func pinID(v any) int64 {
+	m, _ := v.(map[string]any)
+	f, _ := m["id"].(float64)
+	return int64(f)
+}
+
 var mcpTools = []mcpTool{
 	{
 		name: "get_overview", title: "Overview",
@@ -578,8 +603,9 @@ var mcpTools = []mcpTool{
 	},
 	{
 		name: "list_monitors", title: "List monitors",
-		description: "Monitors with status, 24h uptime, average response time and last check. Filter by status, group, tag or name.",
+		description: "Monitors with status, 24h uptime, average response time and last check, and whether the user pinned them (pinned monitors first). Filter by status, group, tag, name or pins.",
 		schema: object(map[string]any{
+			"pinned":   prop("boolean", "true: only the monitors the user pinned; false: only the others"),
 			"status":   map[string]any{"type": "string", "enum": []string{StatusUp, StatusDegraded, StatusDown, StatusPending, StatusPaused, StatusMaintenance}, "description": "Only monitors with this status"},
 			"group_id": prop("integer", "Only monitors of this group (0 = monitors without a group)"),
 			"tag_id":   prop("integer", "Only monitors with this tag"),
@@ -606,10 +632,20 @@ var mcpTools = []mcpTool{
 				return nil, err
 			}
 			list, _ := res.([]any)
+			pins, err := c.pins()
+			if err != nil {
+				return nil, err
+			}
+			pinnedOnly, filterPins := c.boolean("pinned")
 			status, query := c.str("status"), strings.ToLower(c.str("query"))
 			out := []any{}
 			for _, x := range list {
 				m, _ := x.(map[string]any)
+				id, _ := m["id"].(float64)
+				pinned := pins[int64(id)] > 0
+				if filterPins && pinned != pinnedOnly {
+					continue
+				}
 				if status != "" && m["status"] != status {
 					continue
 				}
@@ -620,8 +656,23 @@ var mcpTools = []mcpTool{
 						continue
 					}
 				}
-				out = append(out, compactMonitor(m))
+				cm := compactMonitor(m).(map[string]any)
+				cm["pinned"] = pinned
+				out = append(out, cm)
 			}
+			// Pinned monitors first, in pin order; the rest keep the API order.
+			slices.SortStableFunc(out, func(a, b any) int {
+				pa, pb := pins[pinID(a)], pins[pinID(b)]
+				switch {
+				case pa > 0 && pb > 0:
+					return pa - pb
+				case pa > 0:
+					return -1
+				case pb > 0:
+					return 1
+				}
+				return 0
+			})
 			return map[string]any{"count": len(out), "monitors": out}, nil
 		},
 	},
@@ -829,6 +880,25 @@ var mcpTools = []mcpTool{
 				method = "DELETE"
 			}
 			return c.do(method, fmt.Sprintf("/api/incidents/%d/ack", id), nil)
+		},
+	},
+	{
+		name: "pin_monitor", title: "Pin monitor", personal: true, idempotent: true,
+		description: "Pin a monitor to the top of the user's monitor list (web UI and app), or unpin it with pinned=false. Pins are personal: this works with any token, also read-only ones, and changes nothing for other users.",
+		schema: object(map[string]any{
+			"id":     prop("integer", "Monitor id, from list_monitors"),
+			"pinned": prop("boolean", "false to unpin (default true)"),
+		}, "id"),
+		run: func(c *mcpCall) (any, error) {
+			id, err := c.id("id")
+			if err != nil {
+				return nil, err
+			}
+			method := "POST"
+			if p, ok := c.boolean("pinned"); ok && !p {
+				method = "DELETE"
+			}
+			return c.do(method, fmt.Sprintf("/api/account/pins/%d", id), nil)
 		},
 	},
 	{
