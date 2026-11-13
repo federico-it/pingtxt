@@ -583,7 +583,22 @@ func (h *Hub) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Hub) me(w http.ResponseWriter, r *http.Request, u *store.User) {
-	writeJSON(w, 200, map[string]any{"user": h.userView(u), "version": h.cfg.Version, "recovery_codes_left": h.store.RecoveryCodesLeft(u.ID)})
+	writeJSON(w, 200, map[string]any{"user": h.userView(u), "version": h.cfg.Version, "recovery_codes_left": h.store.RecoveryCodesLeft(u.ID), "phone_alerts": h.phoneAlerts()})
+}
+
+// phoneAlerts tells whether the hub can text or call people: a Twilio
+// channel exists. Until then the interface hides phone numbers.
+func (h *Hub) phoneAlerts() bool {
+	list, err := h.store.ListNotifiers()
+	if err != nil {
+		return false
+	}
+	for _, n := range list {
+		if n.Type == "twilio" {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Hub) changePassword(w http.ResponseWriter, r *http.Request, u *store.User) {

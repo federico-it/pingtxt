@@ -98,7 +98,8 @@ Un canale **chi è reperibile** manda i suoi avvisi a chi è di turno nel moment
 - via email, tramite un canale email che scegli: stesso server e mittente, ma all'email di chi è di turno;
 - via SMS, chiamata o entrambi, tramite un canale Twilio che scegli: stesso account e mittente, ma al numero di
   telefono di chi è di turno. Ognuno imposta il proprio numero in **impostazioni → account**; chi non ce l'ha riceve
-  solo gli avvisi via app ed email, e la pagina dei turni lo segnala.
+  solo gli avvisi via app ed email, e la pagina dei turni lo segnala. Finché nell'hub non c'è un canale Twilio, il
+  numero di telefono, la scelta del canale Twilio qui e queste segnalazioni restano nascosti.
 
 Eventi, monitor, **invia dopo** e **ripeti ogni** funzionano come per qualsiasi canale. Per l'escalation aggiungi un
 secondo canale **chi è reperibile** per un turno di riserva con **invia dopo** a 15 o 30 minuti: se nessuno

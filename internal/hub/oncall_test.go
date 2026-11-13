@@ -301,3 +301,20 @@ func TestTwilioVoiceValidation(t *testing.T) {
 		t.Fatal("no way to reach anyone")
 	}
 }
+
+// /api/auth/me says whether phone numbers matter: only once a Twilio
+// channel exists.
+func TestPhoneAlertsFlag(t *testing.T) {
+	h, st := newTestHub(t)
+	c := newAPIClient(t, h, st)
+	var me struct {
+		PhoneAlerts bool `json:"phone_alerts"`
+	}
+	if code := c.json("GET", "/api/auth/me", "", &me); code != 200 || me.PhoneAlerts {
+		t.Fatalf("no twilio: %d %+v", code, me)
+	}
+	must(t, st.CreateNotifier(&store.Notifier{Name: "sms", Type: "twilio", Enabled: true, Config: map[string]string{"account_sid": "AC1", "auth_token": "x", "from": "+15550000000", "to": "+393330000000"}}))
+	if code := c.json("GET", "/api/auth/me", "", &me); code != 200 || !me.PhoneAlerts {
+		t.Fatalf("twilio: %d %+v", code, me)
+	}
+}
