@@ -98,6 +98,8 @@ Cursor, Windsurf e altri client che accettano un URL e degli header:
 | `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | solo token di scrittura di un admin |
 | `acknowledge_incident` | solo token di scrittura di un admin; l'incidente viene preso in carico dall'utente del token |
 | `create_maintenance`, `delete_maintenance` | solo token di scrittura di un admin; orari in ISO 8601 |
+| `create_group`, `update_group`, `delete_group` | solo token di scrittura di un admin; `parent_id` crea un sottogruppo o sposta un gruppo, `list_groups` con `parent_id` elenca i sottogruppi di un gruppo |
+| `create_tag`, `update_tag`, `delete_tag` | solo token di scrittura di un admin |
 
 Ruoli, validazione e segreti nascosti sono esattamente quelli della REST API, e ogni scrittura finisce nel
 [registro attività](security.md#registro-attività). Gli orari nei risultati sono in ISO 8601 (UTC). Il server è senza

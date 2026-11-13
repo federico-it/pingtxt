@@ -43,7 +43,7 @@ var mcpVersions = []string{"2025-11-25", "2025-06-18", "2025-03-26"}
 const mcpInstructions = `Pingtxt is an uptime monitor. Start with get_overview, then list_monitors to find monitor ids.
 Monitor status is one of up, degraded, down, pending, paused or maintenance. Uptime is a percentage, -1 when there is no data yet.
 Times in results are ISO 8601 in UTC. Changes need a write token of an admin: tools that change data are listed only then.
-Ask the user before deleting a monitor or a maintenance window.`
+Ask the user before deleting a monitor, a maintenance window, a group or a tag.`
 
 type rpcRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -701,9 +701,30 @@ var mcpTools = []mcpTool{
 	},
 	{
 		name: "list_groups", title: "List groups",
-		description: "Monitor groups with the number of monitors in each.",
-		schema:      object(map[string]any{}),
-		run:         func(c *mcpCall) (any, error) { return c.do("GET", "/api/groups", nil) },
+		description: fmt.Sprintf("Monitor groups with the number of monitors in each. A group can sit inside another one (parent_id, 0 = top level), up to %d levels. Give parent_id to list only the subgroups of one group.", store.MaxGroupDepth),
+		schema: object(map[string]any{
+			"parent_id": prop("integer", "Only the direct subgroups of this group (0 = top-level groups)"),
+		}),
+		run: func(c *mcpCall) (any, error) {
+			out, err := c.do("GET", "/api/groups", nil)
+			if err != nil {
+				return nil, err
+			}
+			parent, ok := c.optInt("parent_id")
+			if !ok {
+				return out, nil
+			}
+			list, _ := out.([]any)
+			sub := []any{}
+			for _, g := range list {
+				if m, ok := g.(map[string]any); ok {
+					if p, _ := toInt(m["parent_id"]); p == parent {
+						sub = append(sub, g)
+					}
+				}
+			}
+			return sub, nil
+		},
 	},
 	{
 		name: "list_tags", title: "List tags",
@@ -816,6 +837,78 @@ var mcpTools = []mcpTool{
 		},
 	},
 	{
+		name: "create_group", title: "Create group", write: true,
+		description: "Create a monitor group, or a subgroup when parent_id is given. Put monitors in it with update_monitor (group_id). Returns the new group.",
+		schema:      object(groupFields(), "name"),
+		run: func(c *mcpCall) (any, error) {
+			return c.do("POST", "/api/groups", c.args)
+		},
+	},
+	{
+		name: "update_group", title: "Update or move group", write: true, idempotent: true,
+		description: "Rename a group, change its description or move it under another parent (parent_id, 0 = top level); its subgroups and monitors move with it. Fields not given keep their value.",
+		schema: func() map[string]any {
+			p := groupFields()
+			p["id"] = prop("integer", "Group id, from list_groups")
+			return object(p, "id")
+		}(),
+		run: func(c *mcpCall) (any, error) {
+			id, err := c.id("id")
+			if err != nil {
+				return nil, err
+			}
+			return c.do("PUT", fmt.Sprintf("/api/groups/%d", id), withoutID(c.args))
+		},
+	},
+	{
+		name: "delete_group", title: "Delete group", write: true, destructive: true, idempotent: true,
+		description: "Delete a group. Its monitors stay but no longer have a group, its subgroups move up to its parent, and maintenance windows stop covering it. Confirm with the user first.",
+		schema:      object(map[string]any{"id": prop("integer", "Group id, from list_groups")}, "id"),
+		run: func(c *mcpCall) (any, error) {
+			id, err := c.id("id")
+			if err != nil {
+				return nil, err
+			}
+			return c.do("DELETE", fmt.Sprintf("/api/groups/%d", id), nil)
+		},
+	},
+	{
+		name: "create_tag", title: "Create tag", write: true,
+		description: "Create a tag. Add it to monitors with update_monitor (tag_ids). Returns the new tag.",
+		schema:      object(tagFields(), "name"),
+		run: func(c *mcpCall) (any, error) {
+			return c.do("POST", "/api/tags", c.args)
+		},
+	},
+	{
+		name: "update_tag", title: "Update tag", write: true, idempotent: true,
+		description: "Rename a tag or change its color. Fields not given keep their value.",
+		schema: func() map[string]any {
+			p := tagFields()
+			p["id"] = prop("integer", "Tag id, from list_tags")
+			return object(p, "id")
+		}(),
+		run: func(c *mcpCall) (any, error) {
+			id, err := c.id("id")
+			if err != nil {
+				return nil, err
+			}
+			return c.do("PUT", fmt.Sprintf("/api/tags/%d", id), withoutID(c.args))
+		},
+	},
+	{
+		name: "delete_tag", title: "Delete tag", write: true, destructive: true, idempotent: true,
+		description: "Delete a tag and remove it from every monitor. Confirm with the user first.",
+		schema:      object(map[string]any{"id": prop("integer", "Tag id, from list_tags")}, "id"),
+		run: func(c *mcpCall) (any, error) {
+			id, err := c.id("id")
+			if err != nil {
+				return nil, err
+			}
+			return c.do("DELETE", fmt.Sprintf("/api/tags/%d", id), nil)
+		},
+	},
+	{
 		name: "create_maintenance", title: "Create maintenance window", write: true,
 		description: "Schedule a maintenance window: covered monitors show 'maintenance' and send no alerts. " +
 			"For a one-off window give start (default now) and end or duration_min. " +
@@ -860,6 +953,34 @@ var mcpTools = []mcpTool{
 			return c.do("DELETE", fmt.Sprintf("/api/maintenances/%d", id), nil)
 		},
 	},
+}
+
+// groupFields describes the fields of create_group and update_group.
+func groupFields() map[string]any {
+	return map[string]any{
+		"name":        prop("string", "Group name (up to 64 characters, unique)"),
+		"description": prop("string", "Optional description"),
+		"parent_id":   prop("integer", fmt.Sprintf("Parent group id from list_groups to make this a subgroup, 0 = top level. Groups nest at most %d levels.", store.MaxGroupDepth)),
+	}
+}
+
+// tagFields describes the fields of create_tag and update_tag.
+func tagFields() map[string]any {
+	return map[string]any{
+		"name":  prop("string", "Tag name (up to 32 characters, no commas, unique)"),
+		"color": map[string]any{"type": "string", "enum": tagColors, "description": "Color, empty for the default"},
+	}
+}
+
+// withoutID copies tool arguments without the id of the record they change.
+func withoutID(args map[string]any) map[string]any {
+	out := make(map[string]any, len(args))
+	for k, v := range args {
+		if k != "id" {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // maintenanceBody turns tool arguments into the API body of a maintenance window.
