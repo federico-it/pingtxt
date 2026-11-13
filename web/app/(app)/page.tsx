@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
-import { PlusIcon, UserCheckIcon } from "lucide-react"
+import { LayoutGridIcon, PlusIcon, UserCheckIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
@@ -355,6 +355,11 @@ function Monitors() {
           </DropdownMenuContent>
         </DropdownMenu>
         {isAdmin && (
+          <Button variant="outline" render={<Link href="/monitors/presets/" />} nativeButton={false}>
+            <LayoutGridIcon /> {t("services")}
+          </Button>
+        )}
+        {isAdmin && (
           <Button render={<Link href="/monitors/new/" />} nativeButton={false}>
             <PlusIcon /> {t("new")}
           </Button>
@@ -465,6 +470,11 @@ function Monitors() {
               {t.rich("emptyState", {
                 link: (c) => (
                   <Link href="/monitors/new/" className="text-primary underline underline-offset-4">
+                    {c}
+                  </Link>
+                ),
+                services: (c) => (
+                  <Link href="/monitors/presets/" className="text-primary underline underline-offset-4">
                     {c}
                   </Link>
                 ),

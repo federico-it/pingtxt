@@ -255,6 +255,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           isAdmin
             ? [
                 { href: "/monitors/new/", label: tk("newMonitor") },
+                { href: "/monitors/presets/", label: tk("presets") },
                 { href: "/status-pages/edit/", label: tk("newStatusPage") },
               ]
             : []

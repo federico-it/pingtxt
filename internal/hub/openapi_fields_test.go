@@ -22,6 +22,11 @@ var openAPISchemaFields = []struct {
 }{
 	{"Monitor", store.Monitor{}, nil},
 	{"MonitorPins", MonitorPins{}, nil},
+	{"ServicePreset", ServicePreset{}, nil},
+	{"PresetCategory", PresetCategory{}, nil},
+	{"PresetCatalog", presetCatalog{}, nil},
+	{"PresetRequest", presetRequest{}, nil},
+	{"PresetResult", presetResult{}, nil},
 	{"MonitorSummary", monitorSummary{}, nil},
 	{"Reason", Reason{}, nil},
 	{"MonitorInput", store.Monitor{}, []string{"id", "push_token", "paused", "status", "status_since", "created_at"}},

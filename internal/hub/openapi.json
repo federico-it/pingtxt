@@ -3302,6 +3302,116 @@
         }
       }
     },
+    "/api/monitors/presets": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "List popular services",
+        "operationId": "listPresets",
+        "description": "Catalog of popular services (Claude, OpenAI, GitHub, Cloudflare...) whose public Atlassian Statuspage page can be followed with one click. The catalog ships with the hub: listing it makes no outside request. monitor_id is the statuspage monitor that already follows a service, 0 when none.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search the name, id, status page address and keywords (products such as chatgpt or copilot)."
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only one category, e.g. ai."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The catalog.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetCatalog"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Follow popular services",
+        "operationId": "addPresets",
+        "description": "Creates one statuspage monitor per service id of the catalog, named after the service and checked from the hub only every 120 seconds unless interval_sec or locations say otherwise. Services that a statuspage monitor already follows are skipped (listed in skipped), so the call can be repeated. group_name puts the new monitors in the group with that name (any case), created at the top level when missing; group_id uses an existing group. Every new monitor is in the audit log as monitor.create.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetRequest"
+              },
+              "example": {
+                "ids": [
+                  "claude",
+                  "openai",
+                  "github"
+                ],
+                "group_name": "Services"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "What was created and skipped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
     "/api/monitors/bulk": {
       "post": {
         "tags": [
@@ -14535,6 +14645,156 @@
         "required": [
           "monitor_ids"
         ]
+      },
+      "ServicePreset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Id to pass to POST /api/monitors/presets, e.g. claude."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the service, also the name of the monitor."
+          },
+          "category": {
+            "type": "string",
+            "description": "Id of its category."
+          },
+          "url": {
+            "type": "string",
+            "description": "Status page address, the monitor target."
+          },
+          "color": {
+            "type": "string",
+            "description": "Brand color, #rrggbb."
+          },
+          "icon": {
+            "type": "string",
+            "description": "Path of the service's logo (SVG) on the hub, e.g. /services/claude.svg; empty when there is none (draw the initial on color)."
+          },
+          "icon_dark": {
+            "type": "string",
+            "description": "Variant of the logo for dark backgrounds; empty when icon works on both."
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Other names the search finds it by."
+          },
+          "monitor_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Statuspage monitor that already follows the page, 0 = none."
+          }
+        }
+      },
+      "PresetCategory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "English name; clients may translate by id."
+          }
+        }
+      },
+      "PresetCatalog": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PresetCategory"
+            }
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServicePreset"
+            }
+          }
+        }
+      },
+      "PresetRequest": {
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Service ids from the catalog."
+          },
+          "group_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Existing group for the new monitors, 0 = none."
+          },
+          "group_name": {
+            "type": "string",
+            "description": "Group by name (any case), created when missing. Not together with group_id."
+          },
+          "interval_sec": {
+            "type": "integer",
+            "description": "Seconds between checks, default 120."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Where to check from, default [\"local\"]: a status page answers the same everywhere."
+          },
+          "tag_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Tags for the new monitors."
+          }
+        }
+      },
+      "PresetResult": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Monitor"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "monitor_id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "exists: a monitor already follows it."
+                }
+              }
+            }
+          },
+          "group": {
+            "$ref": "#/components/schemas/Group"
+          }
+        }
       }
     }
   }

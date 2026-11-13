@@ -247,6 +247,23 @@ monitor down at the first minor incident.
 
 There are no diagnostics and no certificate or domain expiry alerts for this type: the page belongs to the provider.
 
+### Popular services
+
+**monitors → services** lists about 70 popular services that publish such a page, by category: AI (Claude, OpenAI,
+Mistral...), developer tools (GitHub, npm, Docker Hub...), cloud and hosting (Cloudflare, Vercel, DigitalOcean...),
+observability, email and messaging, productivity, commerce and social. Search by name or product (`chatgpt`,
+`copilot`), tick the ones you depend on and press **add**: each becomes a status page monitor named after the service,
+checked from the hub every 2 minutes (1 or 5 if you pick so), in the group you choose (by default a new group called
+**services**). Services that a status page monitor already follows show **following** and link to it. Logos come
+from [Dashboard Icons](https://dashboardicons.com) and ship with the hub, so the page loads nothing from outside.
+
+The whole page is followed. To follow only some components, edit the monitor afterwards. A service missing from the
+list works the same way with a custom monitor of this type, if it has an Atlassian Statuspage page.
+
+API: `GET /api/monitors/presets` (the catalog, with `monitor_id` of the monitor that already follows each service) and
+`POST /api/monitors/presets` with `{"ids": ["claude", "github"], "group_name": "services"}`. MCP:
+`list_service_presets` and `add_service_presets`.
+
 ## Heartbeat monitors (cron jobs)
 
 For jobs that run on a schedule (backups, cron, queues), create a monitor of type **heartbeat (push)**. It gets a
