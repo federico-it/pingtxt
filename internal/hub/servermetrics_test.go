@@ -40,7 +40,9 @@ func TestServerMonitor(t *testing.T) {
 		t.Fatalf("tcp: %+v %v", other.ServerLimits, err)
 	}
 
-	now := time.Now().UnixMilli()
+	// A second in the past: a sample at the very millisecond of the request
+	// below would start a new 12 s bucket of the 1 hour history.
+	now := time.Now().UnixMilli() - 1000
 	metrics := &check.ServerMetrics{CPUPct: 12, Cores: 2, Load5: 0.5, MemTotal: 100, MemUsed: 40,
 		Disks: []check.DiskUsage{{Mount: "/", Used: 30, Free: 70}, {Mount: "/data", Used: 80, Free: 20}}}
 	h.HandleResult(LocalLocation, check.Result{MonitorID: m.ID, OK: true, At: now - 1000, Server: metrics})
