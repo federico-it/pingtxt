@@ -2167,5 +2167,41 @@
         "hint": "una copia del database ogni giorno, tenuta nella cartella dei dati."
       }
     }
+  },
+  "configCode": {
+    "title": "configurazione come codice",
+    "intro": "monitor, gruppi, tag, canali, finestre di manutenzione e status page come file YAML da tenere in git: riferimenti per nome, valori predefiniti omessi. il piano mostra cosa cambierebbe applicandolo. <docs>come funziona</docs>",
+    "managed": "questo hub applica il file di configurazione <hl>{file}</hl> all'avvio e ogni volta che cambia. modifica il file, non l'hub: quello che cambi qui torna com'era alla prossima modifica del file.",
+    "managedPrune": "quello che il file non elenca viene eliminato",
+    "managedNoApply": "questo hub è gestito dal suo file di configurazione: modifica il file per applicarlo.",
+    "lastApplied": "applicato {when}",
+    "neverApplied": "non ancora applicato",
+    "lastChecked": "controllato {when}",
+    "syncNow": "applica il file ora",
+    "withSettings": "includi le impostazioni dell'istanza",
+    "download": "scarica pingtxt.yaml",
+    "loadCurrent": "carica la configurazione attuale",
+    "openFile": "apri un file…",
+    "editor": "configurazione come codice (YAML)",
+    "prune": "elimina quello che il file non elenca",
+    "pruneOnHint": "gli oggetti delle sezioni presenti nel file (monitor, gruppi…) che il file non elenca vengono eliminati. le sezioni assenti dal file restano come sono.",
+    "pruneOffHint": "gli oggetti che il file non elenca restano. le sezioni assenti dal file restano come sono.",
+    "plan": "piano",
+    "apply": "{count, plural, one {applica # modifica} other {applica # modifiche}}",
+    "deleteTitle": "{count, plural, one {eliminare # oggetto?} other {eliminare # oggetti?}}",
+    "deleteText": "il piano elimina oggetti che non sono nel file. un monitor eliminato perde lo storico. prima viene fatto un backup del database (SQLite).",
+    "noChanges": "niente da cambiare: l'hub corrisponde già al file.",
+    "unchanged": "{count, plural, one {# oggetto già come nel file} other {# oggetti già come nel file}}",
+    "applied": "configurazione applicata",
+    "backup": "backup prima di applicare: {name}",
+    "kinds": {
+      "groups": "gruppo",
+      "tags": "tag",
+      "channels": "canale",
+      "monitors": "monitor",
+      "maintenances": "manutenzione",
+      "status_pages": "status page",
+      "settings": "impostazioni"
+    }
   }
 }

@@ -2167,5 +2167,41 @@
         "hint": "a copy of the database every day, kept in the data folder."
       }
     }
+  },
+  "configCode": {
+    "title": "configuration as code",
+    "intro": "the monitors, groups, tags, channels, maintenance windows and status pages as a YAML file you can keep in git: references by name, defaults left out. plan shows what applying it would change. <docs>how it works</docs>",
+    "managed": "this hub applies the configuration file <hl>{file}</hl> at start and whenever it changes. change the file rather than the hub: what you change here is put back at the next change of the file.",
+    "managedPrune": "what the file does not list is deleted",
+    "managedNoApply": "this hub is managed by its configuration file: change the file to apply this.",
+    "lastApplied": "last applied {when}",
+    "neverApplied": "not applied yet",
+    "lastChecked": "checked {when}",
+    "syncNow": "apply the file now",
+    "withSettings": "include instance settings",
+    "download": "download pingtxt.yaml",
+    "loadCurrent": "load current configuration",
+    "openFile": "open a file…",
+    "editor": "configuration as code (YAML)",
+    "prune": "delete what the file does not list",
+    "pruneOnHint": "objects of the sections in the file (monitors, groups…) that it does not list are deleted. sections not in the file are left alone.",
+    "pruneOffHint": "objects the file does not list are kept. sections not in the file are left alone.",
+    "plan": "plan",
+    "apply": "{count, plural, one {apply # change} other {apply # changes}}",
+    "deleteTitle": "{count, plural, one {delete # object?} other {delete # objects?}}",
+    "deleteText": "the plan deletes objects that are not in the file. a deleted monitor loses its history. a backup of the database is taken first (SQLite).",
+    "noChanges": "nothing to change: the hub already matches the file.",
+    "unchanged": "{count, plural, one {# object already as in the file} other {# objects already as in the file}}",
+    "applied": "configuration applied",
+    "backup": "backup before applying: {name}",
+    "kinds": {
+      "groups": "group",
+      "tags": "tag",
+      "channels": "channel",
+      "monitors": "monitor",
+      "maintenances": "maintenance",
+      "status_pages": "status page",
+      "settings": "settings"
+    }
   }
 }

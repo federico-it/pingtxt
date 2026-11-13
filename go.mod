@@ -15,6 +15,7 @@ require (
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sys v0.49.0
 	modernc.org/sqlite v1.61.0
+	sigs.k8s.io/yaml v1.4.0
 )
 
 require (

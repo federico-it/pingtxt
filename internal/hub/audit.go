@@ -179,6 +179,10 @@ var auditRoutes = map[string]auditSpec{
 	"POST /api/backups/{name}/restore": {action: "backup.restore", typ: "backup", nameParam: "name"},
 	"GET /api/config/export":           {action: "config.export", typ: "config"}, // logged only with secrets
 	"POST /api/config/import":          {action: "config.import", typ: "config", response: true},
+	"GET /api/config/code":             {action: "config.code_export", typ: "config"}, // logged only with secrets
+	"POST /api/config/code/plan":       skipAudit,                                     // changes nothing
+	"POST /api/config/code/apply":      {action: "config.code_apply", typ: "config", response: true},
+	"POST /api/config/code/sync":       {action: "config.code_sync", typ: "config", response: true},
 	"POST /api/import/uptime-kuma":     {action: "config.import_kuma", typ: "config", response: true},
 	"GET /api/audit/export":            {action: "audit.export", typ: "audit"},
 	// monitors

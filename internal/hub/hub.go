@@ -52,6 +52,10 @@ type Config struct {
 	DisableUpdateCheck bool
 	// DisableTelemetry turns the anonymous usage stats off for good.
 	DisableTelemetry bool
+	// ConfigFile is a configuration as code file (YAML) applied at start and
+	// whenever it changes; ConfigPrune deletes what it does not list.
+	ConfigFile  string
+	ConfigPrune bool
 }
 
 type locState struct {
@@ -174,6 +178,7 @@ type Hub struct {
 
 	backupMu sync.Mutex // one snapshot at a time
 	importMu sync.Mutex // one configuration import at a time
+	codeSync *codeSync  // the configuration file, see configcode_api.go
 	pushMu   sync.Mutex // one push relay registration at a time
 
 	la     liveActivities // Live Activity pushes, see liveactivity.go
@@ -204,6 +209,7 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 	}
 	h.ensureOAuthClients()
 	h.reloadPageDomains()
+	h.codeSync = &codeSync{path: cfg.ConfigFile, prune: cfg.ConfigPrune}
 	return h
 }
 
@@ -248,6 +254,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.agentOfflineLoop(ctx)
 	go h.liveActivityLoop(ctx)
 	go h.pageWatchLoop(ctx)
+	go h.codeSyncLoop(ctx)
 	go h.localIPv6.Run(ctx, 10*time.Minute)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
