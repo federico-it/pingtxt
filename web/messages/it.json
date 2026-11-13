@@ -151,7 +151,9 @@
     "unfoldAll": "espandi tutti",
     "tagFilter": "mostra i monitor con almeno uno dei tag scelti",
     "clearTags": "mostra tutti i tag",
-    "services": "servizi"
+    "services": "servizi",
+    "tv": "tv",
+    "tvHint": "modalità TV: vista a schermo intero per un monitor a parete, con lo stesso filtro di gruppo e tag"
   },
   "monitor": {
     "resumed": "monitor ripreso",
@@ -2064,5 +2066,18 @@
     "add": "{count, plural, one {aggiungi # monitor} other {aggiungi # monitor}}",
     "added": "{count, plural, =0 {niente di nuovo: tutti i servizi sono già seguiti} one {# monitor aggiunto} other {# monitor aggiunti}}",
     "link": "servizi popolari"
+  },
+  "tv": {
+    "allUp": "tutto funziona",
+    "down": "{count, plural, one {# monitor giù} other {# monitor giù}}",
+    "degraded": "{count, plural, one {# monitor degradato} other {# monitor degradati}}",
+    "agents": "agent {online}/{total}",
+    "ungrouped": "senza gruppo",
+    "empty": "nessun monitor da mostrare",
+    "blockedBy": "in attesa di {name}",
+    "acked": "preso in carico da {name}",
+    "fullscreen": "schermo intero",
+    "exitFullscreen": "esci dallo schermo intero",
+    "exit": "torna alla dashboard"
   }
 }
