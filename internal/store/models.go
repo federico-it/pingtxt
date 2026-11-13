@@ -1124,6 +1124,11 @@ type Incident struct {
 	// Diagnostics is true when locations sent diagnostics for it (set by
 	// the API, not stored).
 	Diagnostics bool `json:"diagnostics"`
+	// ShortCause is the cause as the phone shows it (no locations when they
+	// all agree, status pages shortened) and External is true on status page
+	// monitors. Set by the API, not stored; omitted when empty.
+	ShortCause string `json:"short_cause,omitempty"`
+	External   bool   `json:"external,omitempty"`
 	// AckedAt is when someone acknowledged the incident (unix ms, 0 = not
 	// acknowledged), AckedBy their email: reminders and escalation stop.
 	AckedAt   int64  `json:"acked_at"`

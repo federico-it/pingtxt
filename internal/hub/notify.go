@@ -52,8 +52,11 @@ type Event struct {
 	Target    string `json:"target"`
 	Status    string `json:"status"` // "down"/"up", "expiring"/"expired"/"renewed" for expiry events, "offline"/"online" for agent events
 	Cause     string `json:"cause,omitempty"`
-	At        int64  `json:"at"`
-	Test      bool   `json:"test,omitempty"`
+	// ShortCause is Cause for the phone (app push), see shortCause. Not
+	// sent to webhooks; empty means Cause.
+	ShortCause string `json:"-"`
+	At         int64  `json:"at"`
+	Test       bool   `json:"test,omitempty"`
 	// Status events of an incident: when the monitor went down (unix ms) and,
 	// for "down", the reminder number (0 = first alert).
 	DownSince int64 `json:"down_since,omitempty"`

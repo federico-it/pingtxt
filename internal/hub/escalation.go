@@ -75,7 +75,7 @@ func (h *Hub) dueAlertsLocked(st *monState, list []*store.Notifier, rt routing, 
 			nt: nt, incident: a.incident, sent: next,
 			ev: Event{
 				MonitorID: st.m.ID, Monitor: st.m.Name, Target: eventTarget(st.m), Status: StatusDown,
-				Cause: a.cause, At: now, DownSince: a.started, Reminder: prev.Count,
+				Cause: a.cause, ShortCause: monitorShortCause(a.cause, st.m), At: now, DownSince: a.started, Reminder: prev.Count,
 				DiagnosticsURL: a.diagURL, IncidentID: a.incident,
 			},
 		})

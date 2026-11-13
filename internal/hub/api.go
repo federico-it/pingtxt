@@ -1525,7 +1525,35 @@ func (h *Hub) listIncidents(w http.ResponseWriter, r *http.Request, _ *store.Use
 		return
 	}
 	h.markDiagnosed(list)
+	h.markShortCauses(list)
 	writeJSON(w, 200, list)
+}
+
+// markShortCauses fills short_cause and external of the incidents, so the
+// app shows the same cause as in its push notifications and Live Activity.
+func (h *Hub) markShortCauses(list []*store.Incident) {
+	if len(list) == 0 {
+		return
+	}
+	ms, err := h.store.ListMonitors()
+	if err != nil {
+		h.log.Error("list monitors", "err", err)
+		return
+	}
+	byID := make(map[int64]*store.Monitor, len(ms))
+	for _, m := range ms {
+		byID[m.ID] = m
+	}
+	for _, i := range list {
+		m := byID[i.MonitorID]
+		if m == nil {
+			continue
+		}
+		if s := monitorShortCause(i.Cause, m); s != i.Cause {
+			i.ShortCause = s
+		}
+		i.External = m.Type == check.TypeStatuspage
+	}
 }
 
 // ---------- agents ----------

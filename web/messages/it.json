@@ -415,6 +415,7 @@
     "retriesHint": "errori consecutivi prima che una località sia down",
     "locationsHint": "Il monitor è down quando fallisce più della metà delle località online, degradato quando fallisce almeno la soglia qui sotto.",
     "selectAllLocations": "seleziona tutte",
+    "statuspageLocationsHint": "Una status page dà la stessa risposta da ogni località: basta il hub, altre località ripetono solo la stessa richiesta.",
     "deselectAllLocations": "deseleziona tutte",
     "builtIn": "integrata",
     "online": "online",

@@ -381,6 +381,10 @@ export function MonitorForm({
         next.keyword = ""
         next.expected_status = ""
       }
+      // A status page reads the same from every location: a new monitor
+      // checks it from the hub only.
+      if (type === "statuspage" && p.type !== "statuspage" && id === undefined)
+        next.locations = ["local"]
       if (type === "push" && p.type !== "push") {
         next.interval_sec = 3600
         if (!p.grace_sec) next.grace_sec = 300
@@ -1054,6 +1058,11 @@ export function MonitorForm({
           <p className="mb-3 text-xs text-muted-foreground">
             {tr("locationsHint")}
           </p>
+          {isSP && (
+            <p className="mb-3 text-xs text-muted-foreground">
+              {tr("statuspageLocationsHint")}
+            </p>
+          )}
           <div className="mb-4 grid gap-4 sm:grid-cols-2">
             <Field label={tr("degradedPct")} hint={tr("degradedPctHint")}>
               <Input

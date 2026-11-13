@@ -238,6 +238,8 @@ The check message names the open incidents, e.g. `Minor Service Outage · Incide
 - **components to follow** (API `keyword`, comma-separated component ids): the form lists the components of the page
   to tick. With none chosen the overall state of the page counts; with some, only their state and their incidents
   do, so a problem with claude.ai does not touch a monitor that follows the Claude API.
+- **locations**: the page gives the same answer from everywhere, so a new monitor of this type checks it from the hub
+  only, and adding a new agent does not offer it. More locations only repeat the same request.
 
 When you type the URL of such a page in an **http(s)** or **keyword** monitor, the form offers to switch to this type
 with one click. Before it, the usual way was a JSON rule such as `status.indicator` equals `none`, which turns the

@@ -88,6 +88,9 @@ func (h *Hub) sendEvent(e Event, monitors ...*store.Monitor) {
 		return
 	}
 	name := e.notifyEvent()
+	if e.Cause != "" && e.ShortCause == "" && len(monitors) == 1 {
+		e.ShortCause = monitorShortCause(e.Cause, monitors[0])
+	}
 	for _, nt := range list {
 		if slices.ContainsFunc(monitors, func(m *store.Monitor) bool { return rt.wants(nt, m, name) }) {
 			h.notify.SendTo(nt, e)
