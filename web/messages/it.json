@@ -326,6 +326,26 @@
         "label": "status page (atlassian)",
         "hint": "legge una status page Atlassian Statuspage (status.example.com): i problemi minori sono degradato, quelli gravi giù"
       },
+      "ssh": {
+        "label": "ssh",
+        "hint": "legge il banner del server e la sua chiave host, senza fare login"
+      },
+      "imap": {
+        "label": "imap",
+        "hint": "legge il saluto, STARTTLS quando disponibile, e fa login quando l'URL ha utente e password"
+      },
+      "pop3": {
+        "label": "pop3",
+        "hint": "legge il saluto, STLS quando disponibile, e fa login quando l'URL ha utente e password"
+      },
+      "ntp": {
+        "label": "ntp",
+        "hint": "chiede l'ora al server: giù quando non risponde, non è sincronizzato o è troppo sfasato"
+      },
+      "rbl": {
+        "label": "blacklist (rbl)",
+        "hint": "controlla un indirizzo IP o un dominio di posta nelle blacklist DNS: giù quando è in lista"
+      },
       "push": {
         "label": "heartbeat (push)",
         "hint": "il tuo cron job o servizio chiama un URL; down quando le chiamate si fermano"
@@ -339,7 +359,8 @@
       "address": "indirizzo",
       "server": "server",
       "endpoint": "url dell'endpoint",
-      "page": "url della status page"
+      "page": "url della status page",
+      "ipOrDomain": "indirizzo IP o dominio di posta"
     },
     "sections": {
       "target": "destinazione",
@@ -389,6 +410,22 @@
     "queryHint": "facoltativa, predefinita SELECT 1",
     "expectedValue": "valore atteso",
     "expectedValueHint": "facoltativo: la prima colonna della prima riga deve essere uguale a questo",
+    "sshExpect": "banner o chiave host attesi",
+    "sshExpectHint": "facoltativo: testo che il banner deve contenere (es. OpenSSH), oppure l'impronta di una chiave host SHA256:… (da ssh-keygen -lf): giù quando il server non ha una chiave con quell'impronta. Un controllo riuscito mostra l'impronta.",
+    "mailboxHint": "imaps:// e pop3s:// usano TLS da subito (993, 995), imap:// e pop3:// passano a TLS con STARTTLS quando il server lo offre. Con utente:password@ nell'URL il controllo fa anche login, solo su TLS. Usa una casella creata per il monitoraggio: gli admin vedono la password.",
+    "ntpMaxOffset": "sfasamento massimo (ms)",
+    "ntpMaxOffsetHint": "giù quando l'orologio del server si discosta più di così da quello della posizione · vuoto = 1000",
+    "rblLists": "blacklist",
+    "rblListsHint": "facoltativo, zone separate da virgole. Vuoto: Spamhaus ZEN, SpamCop, Barracuda, Mailspike, PSBL, Manitu, DroneBL, s5h, e per i domini Spamhaus DBL, SURBL, URIBL. Un dominio viene controllato nelle liste di domini, e gli indirizzi dei suoi server MX nelle liste di IP.",
+    "rblResolverHint": "vuoto = resolver di sistema. Le blacklist rifiutano le richieste dai grandi resolver pubblici (8.8.8.8, 1.1.1.1): usa il tuo o quello del provider",
+    "clientCert": {
+      "add": "aggiungi certificato client (mTLS)",
+      "cert": "certificato client",
+      "certHint": "PEM, inviato quando il server lo chiede (mutual TLS). Puoi incollare anche la catena.",
+      "key": "chiave privata",
+      "keyHint": "chiave PEM del certificato, non cifrata. Nascosta agli utenti in sola lettura.",
+      "remove": "rimuovi certificato client"
+    },
     "ignoreTls": "ignora gli errori del certificato TLS",
     "keyword": "parola chiave",
     "keywordHint": "sottostringa della risposta, distingue maiuscole e minuscole",

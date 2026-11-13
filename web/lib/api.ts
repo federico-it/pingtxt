@@ -20,6 +20,11 @@ export type MonitorType =
   | "udp"
   | "websocket"
   | "statuspage"
+  | "ssh"
+  | "imap"
+  | "pop3"
+  | "ntp"
+  | "rbl"
 
 export type AssertionOp =
   | "eq"
@@ -78,6 +83,10 @@ export interface Monitor {
   dns_server: string
   dns_expected: string
   ignore_tls: boolean
+  /** mutual TLS (http, keyword, websocket, grpc, mcp): PEM client certificate, "" = none */
+  client_cert?: string
+  /** PEM private key of client_cert */
+  client_key?: string
   headers: Record<string, string>
   body: string
   assertions: Assertion[]

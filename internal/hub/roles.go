@@ -130,7 +130,8 @@ func redactTarget(t string) string {
 }
 
 // redactMonitor removes what a read-only user should not see: credentials in
-// the target, request headers and body, and the push token.
+// the target, request headers and body, the client certificate's private key
+// and the push token.
 func redactMonitor(m *store.Monitor) {
 	m.Target = redactTarget(m.Target)
 	for k := range m.Headers {
@@ -153,6 +154,9 @@ func redactMonitor(m *store.Monitor) {
 		steps[i] = st
 	}
 	m.Steps = steps
+	if m.ClientKey != "" {
+		m.ClientKey = redacted
+	}
 	m.PushToken = ""
 }
 

@@ -237,6 +237,9 @@ func (h *Hub) ExportConfig(secrets bool) (*ConfigDoc, error) {
 				hdr[k] = v
 			}
 			c.Headers = hdr
+			if c.ClientKey != "" {
+				c.ClientKey = redactedValue
+			}
 		}
 		doc.Monitors = append(doc.Monitors, c)
 	}
@@ -804,10 +807,19 @@ func (im *importer) importMonitors(old []*store.Monitor) error {
 				redacted = true
 			}
 		}
+		if m.ClientKey == redactedValue {
+			if prev != nil && prev.ClientKey != "" && prev.ClientCert == m.ClientCert {
+				m.ClientKey = prev.ClientKey
+			} else {
+				// Without its key the certificate is useless: drop both.
+				m.ClientCert, m.ClientKey = "", ""
+				redacted = true
+			}
+		}
 		paused := m.Paused
 		if redacted && !paused {
 			paused = true
-			im.res.warn("monitor %q paused: its password or credential header is not in the file. edit it and resume", m.Name)
+			im.res.warn("monitor %q paused: its password, credential header or client certificate key is not in the file. edit it and resume", m.Name)
 		}
 		if err := h.validateMonitor(&m); err != nil {
 			im.res.warn("monitor %q skipped: %v", x.Name, err)

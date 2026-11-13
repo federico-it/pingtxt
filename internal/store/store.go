@@ -829,6 +829,12 @@ var laterMigrations = []migration{
 	// JSON list of ids in pin order ("" = none).
 	{sqlite: `ALTER TABLE users ADD COLUMN pinned_monitors TEXT NOT NULL DEFAULT ''`,
 		mysql: `ALTER TABLE users ADD COLUMN pinned_monitors MEDIUMTEXT NOT NULL DEFAULT ('')`},
+	// 42: client certificate and private key (PEM) for mutual TLS on
+	// http/keyword/websocket/grpc/mcp monitors ("" = none).
+	{sqlite: `ALTER TABLE monitors ADD COLUMN client_cert TEXT NOT NULL DEFAULT '';
+	ALTER TABLE monitors ADD COLUMN client_key TEXT NOT NULL DEFAULT ''`,
+		mysql: `ALTER TABLE monitors ADD COLUMN client_cert MEDIUMTEXT NOT NULL DEFAULT ('');
+	ALTER TABLE monitors ADD COLUMN client_key MEDIUMTEXT NOT NULL DEFAULT ('')`},
 }
 
 func sqliteOnly(list []string) []migration {

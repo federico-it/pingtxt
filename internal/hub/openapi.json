@@ -11204,12 +11204,17 @@
               "mcp",
               "udp",
               "websocket",
-              "statuspage"
+              "statuspage",
+              "ssh",
+              "imap",
+              "pop3",
+              "ntp",
+              "rbl"
             ]
           },
           "target": {
             "type": "string",
-            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp; http and keyword can use {{variables}} set by steps), host:port (tcp, udp, IPv6 in brackets: [2001:db8::1]:443), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port], a ws:// or wss:// URL (websocket), the address of an Atlassian Statuspage page such as https://status.example.com (statuspage; API URLs like /api/v2/status.json are trimmed to it). Empty for push.",
+            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp; http and keyword can use {{variables}} set by steps), host:port (tcp, udp, IPv6 in brackets: [2001:db8::1]:443), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port], a ws:// or wss:// URL (websocket), the address of an Atlassian Statuspage page such as https://status.example.com (statuspage; API URLs like /api/v2/status.json are trimmed to it). host or host:port for ssh (port 22) and ntp (port 123), imap[s]://[user:password@]host[:port] (imap) and pop3[s]://[user:password@]host[:port] (pop3): with a user and password the check logs in, and only over TLS; an IPv4/IPv6 address or a mail domain (rbl: a domain is checked on domain blacklists and the addresses of its MX servers, or of the domain itself without MX, on IP blacklists). Empty for push.",
             "examples": [
               "https://example.com/health"
             ]
@@ -11232,11 +11237,11 @@
           },
           "expected_status": {
             "type": "string",
-            "description": "Accepted HTTP status codes, e.g. \"200-299\" or \"200,301\". For mcp: the minimum number of tools."
+            "description": "Accepted HTTP status codes, e.g. \"200-299\" or \"200,301\". For mcp: the minimum number of tools. For ntp: the largest accepted clock offset in ms between the server and the location running the check, 1 to 3600000 (empty = 1000)."
           },
           "keyword": {
             "type": "string",
-            "description": "keyword: text that must appear in the body. mcp: comma separated tool names that must be listed. udp: bytes the reply must contain (text or hex, see method). websocket: text the first message from the server must contain. statuspage: comma separated ids of the components to follow (empty = the overall state of the page); see POST /api/monitors/statuspage."
+            "description": "keyword: text that must appear in the body. mcp: comma separated tool names that must be listed. udp: bytes the reply must contain (text or hex, see method). websocket: text the first message from the server must contain. statuspage: comma separated ids of the components to follow (empty = the overall state of the page); see POST /api/monitors/statuspage. ssh: text the server's version banner must contain, or a host key fingerprint \"SHA256:...\" (as printed by ssh-keygen -lf): the check fails when none of the server's host keys has it. rbl: blacklist zones to check, comma separated (empty = the default lists: zen.spamhaus.org, bl.spamcop.net, b.barracudacentral.org, bl.mailspike.net, psbl.surriel.com, ix.dnsbl.manitu.net, dnsbl.dronebl.org, all.s5h.net, and for domains dbl.spamhaus.org, multi.surbl.org, multi.uribl.com); the hub saves them normalized."
           },
           "keyword_invert": {
             "type": "boolean",
@@ -11248,7 +11253,7 @@
           },
           "dns_server": {
             "type": "string",
-            "description": "dns: resolver to query, host[:port]. Empty = system resolver."
+            "description": "dns and rbl: resolver to query, host[:port]. Empty = system resolver. Blacklists refuse queries coming from big public resolvers (8.8.8.8, 1.1.1.1): the rbl check then fails with \"no blacklist answered\"."
           },
           "dns_expected": {
             "type": "string",
@@ -11257,6 +11262,14 @@
           "ignore_tls": {
             "type": "boolean",
             "description": "Accept invalid TLS certificates."
+          },
+          "client_cert": {
+            "type": "string",
+            "description": "Mutual TLS, for http, keyword, websocket, grpc and mcp: the client certificate to present, PEM (a chain is allowed). Set client_key with it; the hub checks that they match. Empty = none; cleared on other types. Agents older than this setting fail the check with \"update it\". Omitted in a PUT: kept."
+          },
+          "client_key": {
+            "type": "string",
+            "description": "PEM private key of client_cert. Hidden from read-only users. Omitted in a PUT: kept."
           },
           "ip_family": {
             "type": "integer",

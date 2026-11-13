@@ -3,7 +3,6 @@ package check
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -35,8 +34,12 @@ func runGRPC(ctx context.Context, j Job, timeout time.Duration) Result {
 	binary.BigEndian.PutUint32(frame[1:], uint32(len(msg)))
 	frame = append(frame, msg...)
 
+	tlsCfg, tlsErr := j.tlsConfig()
+	if tlsErr != nil {
+		return Result{Message: tlsErr.Error()}
+	}
 	tr := &http.Transport{
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: j.IgnoreTLS}, //nolint:gosec // user opt-in
+		TLSClientConfig:     tlsCfg,
 		DisableKeepAlives:   true,
 		TLSHandshakeTimeout: timeout,
 		Protocols:           new(http.Protocols),

@@ -370,6 +370,8 @@ func jobFor(m *store.Monitor) check.Job {
 		PingCount:      m.PingCount,
 		PingLossPct:    m.PingLossPct,
 		Steps:          m.Steps,
+		ClientCert:     m.ClientCert,
+		ClientKey:      m.ClientKey,
 	}
 }
 

@@ -326,6 +326,26 @@
         "label": "status page (atlassian)",
         "hint": "reads an Atlassian Statuspage page (status.example.com): minor problems are degraded, major ones down"
       },
+      "ssh": {
+        "label": "ssh",
+        "hint": "reads the server banner and its host key, without logging in"
+      },
+      "imap": {
+        "label": "imap",
+        "hint": "reads the greeting, STARTTLS when offered, and logs in when the URL has a user and password"
+      },
+      "pop3": {
+        "label": "pop3",
+        "hint": "reads the greeting, STLS when offered, and logs in when the URL has a user and password"
+      },
+      "ntp": {
+        "label": "ntp",
+        "hint": "asks the server for the time: down when it does not answer, is not synchronized or is too far off"
+      },
+      "rbl": {
+        "label": "blacklist (rbl)",
+        "hint": "checks an IP address or a mail domain on DNS blacklists: down when it is listed"
+      },
       "push": {
         "label": "heartbeat (push)",
         "hint": "your cron job or service calls a URL; down when the calls stop"
@@ -339,7 +359,8 @@
       "address": "address",
       "server": "server",
       "endpoint": "endpoint url",
-      "page": "status page url"
+      "page": "status page url",
+      "ipOrDomain": "ip address or mail domain"
     },
     "sections": {
       "target": "target",
@@ -389,6 +410,22 @@
     "queryHint": "optional, default SELECT 1",
     "expectedValue": "expected value",
     "expectedValueHint": "optional: first column of the first row must equal this",
+    "sshExpect": "expected banner or host key",
+    "sshExpectHint": "optional: text the banner must contain (e.g. OpenSSH), or a host key fingerprint SHA256:… (from ssh-keygen -lf): down when the server has no key with it. A successful check shows the fingerprint.",
+    "mailboxHint": "imaps:// and pop3s:// use TLS from the start (993, 995), imap:// and pop3:// upgrade with STARTTLS when the server offers it. With user:password@ in the URL the check also logs in, only over TLS. Use a mailbox made for monitoring: the password is visible to admins.",
+    "ntpMaxOffset": "maximum offset (ms)",
+    "ntpMaxOffsetHint": "down when the server's clock is further than this from the clock of the location · empty = 1000",
+    "rblLists": "blacklists",
+    "rblListsHint": "optional, comma-separated zones. Empty: Spamhaus ZEN, SpamCop, Barracuda, Mailspike, PSBL, Manitu, DroneBL, s5h, and for domains Spamhaus DBL, SURBL, URIBL. A domain is checked on the domain lists, and the addresses of its MX servers on the IP lists.",
+    "rblResolverHint": "empty = system resolver. Blacklists refuse queries from big public resolvers (8.8.8.8, 1.1.1.1): use your own or your provider's",
+    "clientCert": {
+      "add": "add client certificate (mTLS)",
+      "cert": "client certificate",
+      "certHint": "PEM, sent when the server asks for one (mutual TLS). You can paste the chain too.",
+      "key": "private key",
+      "keyHint": "PEM key of the certificate, not encrypted. Hidden from read-only users.",
+      "remove": "remove client certificate"
+    },
     "ignoreTls": "ignore TLS certificate errors",
     "keyword": "keyword",
     "keywordHint": "case-sensitive substring of the response body",

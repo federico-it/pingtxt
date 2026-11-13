@@ -231,6 +231,9 @@ func oldAgentError(m *store.Monitor, loc string, r check.Result) string {
 	if len(m.Steps) > 0 && r.Steps == 0 && (m.Type == check.TypeHTTP || m.Type == check.TypeKeyword) {
 		return "this agent cannot run request steps: update it"
 	}
+	if m.ClientCert != "" && !r.ClientCert && slices.Contains(check.ClientCertTypes, m.Type) {
+		return "this agent cannot send client certificates: update it"
+	}
 	return ""
 }
 

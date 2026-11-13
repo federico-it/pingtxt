@@ -41,6 +41,10 @@ Paste a `curl` command in the URL field of an HTTP monitor to fill in the method
 | udp | `host:port` | a datagram gets a reply, optionally containing a text or bytes, see [UDP](#udp) |
 | websocket | `wss://example.com/socket` | the connection opens; optionally a message gets the expected reply, see [WebSocket](#websocket) |
 | status page (atlassian) | `https://status.example.com` | the state of an Atlassian Statuspage page or of some of its components; minor problems are degraded, see [Status pages of other services](#status-pages-of-other-services) |
+| ssh | `host` or `host:port` | the SSH banner and host key, optionally pinned, see [SSH](#ssh) |
+| imap, pop3 | `imaps://host`, `pop3s://host`, `imap://user:pass@host` | greeting, `STARTTLS`/`STLS` when offered, optional login, see [Mail servers](#mail-servers-imap-pop3) |
+| ntp | `host` or `host:port` | the server answers, is synchronized and its clock is close to the location's, see [NTP](#ntp) |
+| blacklist (rbl) | IP address or mail domain | not listed on DNS blacklists, see [Blacklists](#blacklists-rbl) |
 | heartbeat (push) | none: pingtxt gives you a URL | your job calls the URL; down when the calls stop, see [heartbeat](#heartbeat-monitors-cron-jobs) |
 
 HTTP monitors also take a method, request headers and body, the accepted status codes and whether to skip TLS
@@ -216,6 +220,71 @@ A **websocket** monitor opens a `ws://` or `wss://` connection; a refused upgrad
   asks for subprotocols; the one the server picks shows in the result, e.g. `connected (chat)`.
 
 `wss://` endpoints get certificate expiry alerts.
+
+## SSH
+
+An **ssh** monitor connects to `host` (port 22) or `host:port`, reads the server's version banner and runs the key
+exchange up to the server's host key. It never logs in, so it needs no account. The result shows the banner and the
+host key, e.g. `SSH-2.0-OpenSSH_9.6p1, ssh-ed25519 SHA256:…`.
+
+**expected banner or host key** (API `keyword`) is optional:
+
+- a text, e.g. `OpenSSH`: the banner must contain it;
+- a host key fingerprint `SHA256:…`, as printed by `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` or shown by
+  a passing check: the check fails with `host key changed` when none of the server's keys has it. Pinning the key
+  tells you when a server was reinstalled, or when something else answers on its address.
+
+## Mail servers (IMAP, POP3)
+
+**imap** and **pop3** monitors check a mailbox server the way **smtp** checks a mail relay:
+
+- `imaps://host` (993) and `pop3s://host` (995) use TLS from the start; `imap://host` (143) and `pop3://host` (110)
+  read the greeting and upgrade with `STARTTLS` (`STLS` for POP3) when the server offers it. A bare `host[:port]`
+  is the plain scheme. The certificate is verified unless **ignore TLS certificate errors** is on.
+- With a user and password in the URL, e.g. `imaps://monitor%40example.com:secret@mail.example.com`, the check also
+  logs in (`LOGIN`, or `USER`/`PASS`) and fails on a wrong password or a locked account. It never sends the password
+  without TLS. Use a mailbox made for monitoring: admins can see the password, read-only users cannot.
+
+The result reads e.g. `tls, logged in, * OK Dovecot ready.`.
+
+## NTP
+
+An **ntp** monitor asks an NTP server for the time (SNTP) on `host` (port 123) or `host:port`. It fails when the
+server does not answer, answers that it is not synchronized (stratum 16 or the alarm leap indicator), refuses the
+request (a "kiss-o'-death", e.g. `RATE`), or when its clock is further from the clock of the location running the
+check than the **maximum offset** (API `expected_status`, in ms, default 1000). The result reads e.g.
+`stratum 2, offset +1.3 ms`, and the response time is the network round trip.
+
+The offset is measured against the location's own clock: keep the clocks of the hub and agents synchronized, or
+raise the limit.
+
+## Blacklists (RBL)
+
+A **blacklist (rbl)** monitor looks a target up in DNS blacklists, the lists mail servers use to refuse spam. It is
+down while the target is listed, and the message names the lists, e.g.
+`listed: 203.0.113.7 on zen.spamhaus.org (127.0.0.2)`.
+
+- An **IP address** (IPv4 or IPv6) is checked on the IP lists.
+- A **mail domain** is checked on the domain lists, and the addresses of its MX servers (or of the domain itself
+  when it has no MX record) on the IP lists. With an IP family set, only the addresses of that family are checked.
+- **blacklists** (API `keyword`): the zones to query, comma-separated. Empty uses the defaults: Spamhaus ZEN,
+  SpamCop, Barracuda, Mailspike, PSBL, Manitu, DroneBL and s5h for addresses, Spamhaus DBL, SURBL and URIBL for
+  domains. Zones known to list domains go to the domain checks, all others to the address checks.
+- **resolver** (API `dns_server`): the DNS server to ask. Blacklists refuse queries from big public resolvers such
+  as 8.8.8.8 or 1.1.1.1; when no list answers the check fails with `no blacklist answered`. Run the check from a
+  location with its own resolver, or set your provider's. Answers that mean "query refused" (127.0.0.1,
+  127.255.255.x) never count as a listing.
+
+Check every hour or less often: lists change slowly and some limit the number of free queries.
+
+## Client certificates (mutual TLS)
+
+**http**, **keyword**, **websocket**, **grpc** and **mcp** monitors can present a client certificate to servers
+that ask for one (mutual TLS). Click **add client certificate (mTLS)** and paste the certificate (PEM, the chain may
+follow it) and its private key (PEM, not encrypted); the hub checks that they match before saving (API
+`client_cert` and `client_key`). An expired certificate fails the check with its date. The key is hidden from
+read-only users; other types ignore the certificate. Agents older than this setting fail the check with "this agent
+cannot send client certificates: update it".
 
 ## Status pages of other services
 

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,6 +39,12 @@ const (
 	// TypeStatuspage reads an Atlassian Statuspage page (status.example.com)
 	// and maps its state: minor problems are degraded, major ones down.
 	TypeStatuspage = "statuspage"
+	TypeSSH        = "ssh"
+	TypeIMAP       = "imap"
+	TypePOP3       = "pop3"
+	TypeNTP        = "ntp"
+	// TypeRBL looks an IP address or a mail domain up in DNS blacklists.
+	TypeRBL = "rbl"
 	// TypePush is a heartbeat monitor: the monitored job calls the hub, so
 	// it is never probed and Run does not handle it.
 	TypePush = "push"
@@ -77,6 +84,11 @@ type Job struct {
 	// Steps are HTTP requests made before the http/keyword request, e.g. a
 	// login. Older agents ignore them.
 	Steps []Step `json:"steps,omitempty"`
+	// ClientCert and ClientKey (PEM) are presented to servers that ask for
+	// a client certificate (mutual TLS), on ClientCertTypes. Older agents
+	// ignore them.
+	ClientCert string `json:"client_cert,omitempty"`
+	ClientKey  string `json:"client_key,omitempty"`
 }
 
 // Result is the outcome of a Job.
@@ -116,6 +128,9 @@ type Result struct {
 	// status page with a minor incident: the location counts toward the
 	// monitor being degraded, never down.
 	Degraded bool `json:"degraded,omitempty"`
+	// ClientCert is set when the job had a client certificate and the
+	// check could present it. Agents older than mutual TLS never set it.
+	ClientCert bool `json:"client_cert,omitempty"`
 }
 
 // Timing is the time spent in each phase of an HTTP request, in ms. With
@@ -135,7 +150,7 @@ func Run(ctx context.Context, j Job) Result {
 	r := runJob(ctx, j)
 	// A status page reports on someone else's service: the incident in the
 	// message says more than probing the page's own server would.
-	if j.Diagnose && !r.OK && j.Type != TypePush && j.Type != TypeStatuspage {
+	if j.Diagnose && !r.OK && j.Type != TypePush && j.Type != TypeStatuspage && j.Type != TypeRBL {
 		r.Diag = Diagnose(ctx, j, r)
 	}
 	r.http = nil
@@ -186,11 +201,20 @@ func runJob(ctx context.Context, j Job) Result {
 		r = runWebSocket(ctx, j, timeout)
 	case TypeStatuspage:
 		r = runStatuspage(ctx, j, timeout)
+	case TypeSSH:
+		r = runSSH(ctx, j)
+	case TypeIMAP, TypePOP3:
+		r = runMailbox(ctx, j)
+	case TypeNTP:
+		r = runNTP(ctx, j)
+	case TypeRBL:
+		r = runRBL(ctx, j)
 	default:
 		r = Result{Message: "unknown monitor type: " + j.Type}
 	}
 	r.JobID = j.ID
 	r.MonitorID = j.MonitorID
+	r.ClientCert = j.ClientCert != "" && slices.Contains(ClientCertTypes, j.Type)
 	r.IPFamily = j.IPFamily
 	r.At = time.Now().UnixMilli()
 	r.Message = truncate(r.Message, 300)
@@ -206,9 +230,13 @@ func runHTTP(ctx context.Context, j Job, timeout time.Duration) Result {
 	if method == "" {
 		method = http.MethodGet
 	}
+	tlsCfg, err := j.tlsConfig()
+	if err != nil {
+		return Result{Message: err.Error()}
+	}
 	tr := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: j.IgnoreTLS},
+		TLSClientConfig:     tlsCfg,
 		DisableKeepAlives:   true,
 		TLSHandshakeTimeout: timeout,
 		DialContext:         j.dialContext,
