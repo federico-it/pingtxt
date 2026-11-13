@@ -54,3 +54,32 @@ func TestLiveActivityStatuspage(t *testing.T) {
 		t.Fatalf("%q", m.Body)
 	}
 }
+
+func TestIncidentsShortCause(t *testing.T) {
+	h, st := newTestHub(t)
+	sp := &store.Monitor{Name: "Claude", Type: "statuspage", Target: "https://status.claude.com", IntervalSec: 60, Locations: []string{LocalLocation, "agent:1"}}
+	api := &store.Monitor{Name: "api", Type: "http", Target: "http://x", IntervalSec: 60, Locations: []string{LocalLocation, "agent:1"}}
+	must(t, st.CreateMonitor(sp))
+	must(t, st.CreateMonitor(api))
+	_, err := st.OpenIncident(sp.ID, 1, "hub, a: claude.ai: major outage, Claude Code: partial outage")
+	must(t, err)
+	_, err = st.OpenIncident(api.ID, 2, "hub: HTTP 503")
+	must(t, err)
+	c := newAPIClient(t, h, st)
+	var list []store.Incident
+	if code := c.json("GET", "/api/incidents?state=open", "", &list); code != 200 || len(list) != 2 {
+		t.Fatalf("%d %+v", code, list)
+	}
+	for _, i := range list {
+		switch i.MonitorID {
+		case sp.ID:
+			if i.ShortCause != "claude.ai: major outage +1" || !i.External {
+				t.Fatalf("statuspage: %+v", i)
+			}
+		case api.ID:
+			if i.ShortCause != "" || i.External {
+				t.Fatalf("http: %+v", i)
+			}
+		}
+	}
+}

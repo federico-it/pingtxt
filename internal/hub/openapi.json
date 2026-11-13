@@ -11545,6 +11545,14 @@
             "type": "boolean",
             "description": "Locations sent diagnostics for this incident (see getIncidentDiagnostics)."
           },
+          "short_cause": {
+            "type": "string",
+            "description": "The cause as push notifications and the Live Activity show it: without the locations when all of them report the same problem; on status page monitors the worst component and the first incident. Omitted when it equals cause."
+          },
+          "external": {
+            "type": "boolean",
+            "description": "True on status page monitors: the outage is on a third party's page. Omitted when false."
+          },
           "acked_at": {
             "type": "integer",
             "format": "int64",
