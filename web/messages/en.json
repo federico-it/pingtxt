@@ -151,7 +151,9 @@
     "unfoldAll": "unfold all",
     "tagFilter": "show monitors with any of the selected tags",
     "clearTags": "show all tags",
-    "services": "services"
+    "services": "services",
+    "tv": "tv",
+    "tvHint": "TV mode: full screen view for a wall display, with the same group and tag filter"
   },
   "monitor": {
     "resumed": "monitor resumed",
@@ -2073,5 +2075,18 @@
     "add": "{count, plural, one {add # monitor} other {add # monitors}}",
     "added": "{count, plural, =0 {nothing new: every service is already followed} one {# monitor added} other {# monitors added}}",
     "link": "popular services"
+  },
+  "tv": {
+    "allUp": "all systems up",
+    "down": "{count, plural, one {# monitor down} other {# monitors down}}",
+    "degraded": "{count, plural, one {# monitor degraded} other {# monitors degraded}}",
+    "agents": "agents {online}/{total}",
+    "ungrouped": "no group",
+    "empty": "no monitors to show",
+    "blockedBy": "waiting for {name}",
+    "acked": "taken by {name}",
+    "fullscreen": "full screen",
+    "exitFullscreen": "exit full screen",
+    "exit": "back to the dashboard"
   }
 }

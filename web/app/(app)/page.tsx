@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
-import { LayoutGridIcon, PlusIcon, UserCheckIcon } from "lucide-react"
+import { LayoutGridIcon, PlusIcon, TvIcon, UserCheckIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
@@ -413,6 +413,15 @@ function Monitors() {
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
+        <Button
+          variant="outline"
+          render={<Link href={tvHref(group, tagFilter)} />}
+          nativeButton={false}
+          title={t("tvHint")}
+          aria-label={t("tvHint")}
+        >
+          <TvIcon /> <span className="hidden sm:inline">{t("tv")}</span>
+        </Button>
         {isAdmin && (
           <Button variant="outline" render={<Link href="/monitors/presets/" />} nativeButton={false}>
             <LayoutGridIcon /> {t("services")}
@@ -791,6 +800,14 @@ function Monitors() {
 }
 
 const collapsedKey = "pingtxt.collapsedGroups"
+
+/** TV mode with the dashboard's group and tag filter. */
+function tvHref(group: string, tags: number[]) {
+  const p = new URLSearchParams()
+  if (group !== "all") p.set("group", group)
+  if (tags.length) p.set("tag", tags.join(","))
+  return p.size ? `/tv/?${p}` : "/tv/"
+}
 
 /** A block of the monitor list: pinned, a group or the ungrouped ones. */
 type Section = {
