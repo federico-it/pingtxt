@@ -973,6 +973,11 @@ type monitorSummary struct {
 	// locations that report each problem. Empty while it is up, paused or
 	// in maintenance.
 	Reasons []Reason `json:"reasons"`
+	// ShortReason is Reasons in one short line, set where that line is
+	// shorter than the reasons themselves: on a status page monitor, the
+	// worst component and the first incident with the count of the others
+	// (as in push notifications and the Live Activity).
+	ShortReason string `json:"short_reason,omitempty"`
 }
 
 type activeMaint struct {
@@ -1022,6 +1027,11 @@ func (h *Hub) summary(m *store.Monitor, expiry []*store.ExpiryCheck) *monitorSum
 	h.mu.Unlock()
 	if s.Reasons == nil {
 		s.Reasons = []Reason{}
+	}
+	if len(s.Reasons) > 0 && m.Type == check.TypeStatuspage {
+		if short := shortStatuspage(s.Reasons[0].Message); short != s.Reasons[0].Message || len(s.Reasons) > 1 {
+			s.ShortReason = short
+		}
 	}
 	return s
 }

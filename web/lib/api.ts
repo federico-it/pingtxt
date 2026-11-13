@@ -178,6 +178,8 @@ export interface MonitorSummary extends Monitor {
   incident?: { id: number; started_at: number; acked_at: number; acked_by: string } | null
   /** Why the monitor is down or degraded right now, one entry per problem. */
   reasons?: Reason[]
+  /** reasons in one short line (status page monitors: worst component +N); older hubs leave it out */
+  short_reason?: string
 }
 
 /** One problem of a monitor and the locations that report it. */

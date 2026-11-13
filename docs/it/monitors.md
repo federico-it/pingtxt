@@ -249,6 +249,10 @@ non un avviso di monitor giù.
 - **località**: la pagina dà la stessa risposta ovunque, quindi un nuovo monitor di questo tipo la controlla solo dal
   hub, e quando aggiungi un agent non viene proposto. Altre località ripetono solo la stessa richiesta.
 
+Nella dashboard la riga di una pagina con problemi mostra il componente più grave e il primo incidente, con quanti
+altri ce ne sono (`Claude API: major outage +2 · Elevated errors +1`), come le notifiche push; passandoci sopra si
+vede il messaggio intero. Nell'API questa riga è in `short_reason`.
+
 Quando scrivi l'URL di una pagina di questo tipo in un monitor **http(s)** o **parola chiave**, il form propone di
 passare a questo tipo con un clic. Prima si usava una regola JSON come `status.indicator` uguale a `none`, che manda
 il monitor giù al primo incidente minore.
@@ -310,7 +314,11 @@ un report include i suoi sottogruppi. Eliminando un gruppo i suoi sottogruppi sa
 
 Nella dashboard una linea a sinistra collega ogni sottogruppo e i suoi monitor al gruppo sopra, e **comprimi tutti** /
 **espandi tutti** accanto al filtro dei gruppi chiude o apre tutte le sezioni. Il filtro **gruppo** è un menu con i
-gruppi ad albero e quanti monitor contiene ognuno; scegliendo un gruppo compaiono anche i suoi sottogruppi. Nella
+gruppi ad albero e quanti monitor contiene ognuno; scegliendo un gruppo compaiono anche i suoi sottogruppi. Un
+sottogruppo il cui nome inizia con quello del gruppo mostra solo il resto (*Infrastructure DNS* in *Infrastructure*
+diventa *DNS*). Anche il filtro **tag** è un menu: spunta uno o più tag per vedere i monitor che ne hanno almeno uno.
+Ordinando per **stato**, i gruppi con un monitor giù vengono per primi, poi quelli con uno degradato; gli altri
+restano nel loro ordine. Nella
 pagina dei gruppi **+ sottogruppo** crea un gruppo dentro quello, la freccia comprime i suoi sottogruppi, e il numero
 di monitor apre la dashboard filtrata su quel gruppo.
 

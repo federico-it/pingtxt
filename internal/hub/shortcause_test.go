@@ -2,6 +2,9 @@ package hub
 
 import (
 	"testing"
+	"time"
+
+	"github.com/federico-it/pingtxt/internal/check"
 
 	"github.com/federico-it/pingtxt/internal/store"
 )
@@ -81,5 +84,32 @@ func TestIncidentsShortCause(t *testing.T) {
 				t.Fatalf("http: %+v", i)
 			}
 		}
+	}
+}
+
+// The dashboard list gets the short line of a failing status page monitor.
+func TestSummaryShortReason(t *testing.T) {
+	h, st := newTestHub(t)
+	sp := &store.Monitor{Name: "Claude", Type: "statuspage", Target: "https://status.claude.com", IntervalSec: 60, Locations: []string{LocalLocation}}
+	api := &store.Monitor{Name: "api", Type: "http", Target: "http://x", IntervalSec: 60, Locations: []string{LocalLocation}}
+	must(t, st.CreateMonitor(sp))
+	must(t, st.CreateMonitor(api))
+	h.MonitorChanged(sp.ID)
+	h.MonitorChanged(api.ID)
+	msg := "claude.ai: partial outage, Claude API: major outage · Incident: Elevated errors (investigating); Login issues (identified)"
+	for range 3 {
+		h.HandleResult(LocalLocation, check.Result{MonitorID: sp.ID, Message: msg, LatencyMs: 1, At: time.Now().UnixMilli()})
+		h.HandleResult(LocalLocation, check.Result{MonitorID: api.ID, Message: "HTTP 503", LatencyMs: 1, At: time.Now().UnixMilli()})
+	}
+	m, err := st.Monitor(sp.ID)
+	must(t, err)
+	s := h.summary(m, nil)
+	if len(s.Reasons) != 1 || s.Reasons[0].Message != msg || s.ShortReason != "Claude API: major outage +1 · Elevated errors +1" {
+		t.Fatalf("statuspage: %+v %q", s.Reasons, s.ShortReason)
+	}
+	m, err = st.Monitor(api.ID)
+	must(t, err)
+	if s := h.summary(m, nil); len(s.Reasons) != 1 || s.ShortReason != "" {
+		t.Fatalf("http: %+v %q", s.Reasons, s.ShortReason)
 	}
 }

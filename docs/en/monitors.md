@@ -241,6 +241,10 @@ The check message names the open incidents, e.g. `Minor Service Outage · Incide
 - **locations**: the page gives the same answer from everywhere, so a new monitor of this type checks it from the hub
   only, and adding a new agent does not offer it. More locations only repeat the same request.
 
+On the dashboard the row of a failing page shows its worst component and first incident, with how many others there
+are (`Claude API: major outage +2 · Elevated errors +1`), as push notifications do; hovering it shows the whole
+message. The API has this line in `short_reason`.
+
 When you type the URL of such a page in an **http(s)** or **keyword** monitor, the form offers to switch to this type
 with one click. Before it, the usual way was a JSON rule such as `status.indicator` equals `none`, which turns the
 monitor down at the first minor incident.
@@ -297,7 +301,10 @@ subgroups up one level.
 
 On the dashboard a line on the left links each subgroup and its monitors to the group above, and **fold all** /
 **unfold all** next to the group filter closes or opens every section. The **group** filter is a menu with the
-groups as a tree and how many monitors each one holds; picking a group shows its subgroups too. On the groups page
+groups as a tree and how many monitors each one holds; picking a group shows its subgroups too. A subgroup whose name
+starts with its group's name shows only the rest (*Infrastructure DNS* in *Infrastructure* reads *DNS*). The **tag**
+filter is a menu too: tick one or more tags to see the monitors with any of them. Sorted by **status**, groups with
+a monitor down come first, then those with one degraded; the others keep their order. On the groups page
 **+ subgroup** creates a group inside that one, the arrow folds its subgroups, and the monitor count opens the
 dashboard filtered on that group.
 

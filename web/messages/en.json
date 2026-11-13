@@ -149,7 +149,8 @@
     "clearGroup": "show all groups",
     "foldAll": "fold all",
     "unfoldAll": "unfold all",
-    "inGroup": "in {name}",
+    "tagFilter": "show monitors with any of the selected tags",
+    "clearTags": "show all tags",
     "services": "services"
   },
   "monitor": {
