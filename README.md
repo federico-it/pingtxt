@@ -13,7 +13,8 @@ HetrixTools, but plain text, monospace, light and dark. Website and docs: [pingt
 - **Checks**: HTTP(S) with JSON rules, timing per phase, steps (log in, then check) and client certificates,
   keyword, TCP, UDP, WebSocket, ping, DNS, PostgreSQL, MySQL/MariaDB, Redis, MongoDB, Docker containers, gRPC, SMTP,
   IMAP, POP3, SSH (with host key pinning), NTP, DNS blacklists for IPs and mail domains, MCP servers, Atlassian
-  status pages of other services (minor incidents are degraded) and heartbeats for cron jobs. IPv6 everywhere.
+  status pages of other services (minor incidents are degraded), server metrics (CPU, RAM, disk, load) from the hub
+  and agents, and heartbeats for cron jobs. IPv6 everywhere.
 - **Status**: up, degraded (some locations fail or answer too slowly) or down; uptime that follows it; diagnostics
   (DNS, TCP, TLS, headers, traceroute) collected at the first failure.
 - **Alerts**: email (SMTP or Resend), Slack, Discord, Microsoft Teams, Telegram, Matrix, ntfy, Gotify, Pushover,

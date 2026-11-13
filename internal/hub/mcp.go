@@ -490,7 +490,7 @@ func monitorFields() map[string]any {
 	return map[string]any{
 		"name":            prop("string", "Display name"),
 		"type":            map[string]any{"type": "string", "enum": validTypes, "description": "Check type"},
-		"target":          prop("string", "What to check: URL for http/keyword, host:port for tcp ([2001:db8::1]:443 for IPv6), host or IP for ping/dns, connection URL for databases, container for docker, grpc://host:port, smtp://host, host:port for udp, ws(s):// URL for websocket, the Atlassian Statuspage page (https://status.example.com) for statuspage, host[:port] for ssh and ntp, imap(s)://[user:pass@]host[:port] for imap, pop3(s)://[user:pass@]host[:port] for pop3 (with a user and password the check logs in, over TLS only), an IP address or a mail domain for rbl (a domain checks its MX servers' addresses and the domain itself). Empty for push."),
+		"target":          prop("string", "What to check: URL for http/keyword, host:port for tcp ([2001:db8::1]:443 for IPv6), host or IP for ping/dns, connection URL for databases, container for docker, grpc://host:port, smtp://host, host:port for udp, ws(s):// URL for websocket, the Atlassian Statuspage page (https://status.example.com) for statuspage, host[:port] for ssh and ntp, imap(s)://[user:pass@]host[:port] for imap, pop3(s)://[user:pass@]host[:port] for pop3 (with a user and password the check logs in, over TLS only), an IP address or a mail domain for rbl (a domain checks its MX servers' addresses and the domain itself), for server the mount points to check comma-separated (empty = every disk). Empty for push."),
 		"interval_sec":    prop("integer", "Seconds between checks (10 to 86400, default 60). For push monitors: expected heartbeat period."),
 		"timeout_ms":      prop("integer", "Timeout in milliseconds (500 to 60000, default 10000)"),
 		"retries":         prop("integer", "Failed checks in a row before the monitor is down (1 to 10)"),
@@ -530,11 +530,18 @@ func monitorFields() map[string]any {
 			},
 			"required": []string{"url"},
 		}},
-		"dns_record":          prop("string", "DNS record type, e.g. A, AAAA, MX, TXT"),
-		"dns_expected":        prop("string", "Expected DNS answer"),
-		"dns_server":          prop("string", "dns and rbl: DNS server to ask (IP or host[:port]), empty = the system resolver. Blacklists refuse queries from big public resolvers"),
-		"client_cert":         prop("string", "http, keyword, websocket, grpc, mcp: PEM client certificate (chain allowed) for mutual TLS; set client_key with it, \"\" for none. Agents older than this setting fail the check with update it"),
-		"client_key":          prop("string", "PEM private key of client_cert"),
+		"dns_record":   prop("string", "DNS record type, e.g. A, AAAA, MX, TXT"),
+		"dns_expected": prop("string", "Expected DNS answer"),
+		"dns_server":   prop("string", "dns and rbl: DNS server to ask (IP or host[:port]), empty = the system resolver. Blacklists refuse queries from big public resolvers"),
+		"client_cert":  prop("string", "http, keyword, websocket, grpc, mcp: PEM client certificate (chain allowed) for mutual TLS; set client_key with it, \"\" for none. Agents older than this setting fail the check with update it"),
+		"client_key":   prop("string", "PEM private key of client_cert"),
+		"server_limits": map[string]any{"type": "object", "description": "server monitors (each location reports the machine it runs on, Linux only): limits, 0 = off; a check above one fails", "properties": map[string]any{
+			"cpu_pct":  prop("integer", "CPU use since the previous check, percent"),
+			"mem_pct":  prop("integer", "Memory in use, percent"),
+			"disk_pct": prop("integer", "Share in use of each checked disk, percent"),
+			"swap_pct": prop("integer", "Swap in use, percent"),
+			"load":     prop("number", "5 minute load average per CPU core"),
+		}},
 		"ignore_tls":          prop("boolean", "Ignore TLS certificate errors"),
 		"ip_family":           map[string]any{"type": "integer", "enum": []int{0, 1, 4, 6, 46}, "description": "0 instance default, 1 IPv4 or IPv6 (first to connect), 4 IPv4 only, 6 IPv6 only, 46 IPv4 and IPv6 (both must work). 6 and 46 are refused on locations without IPv6"},
 		"diagnostics":         map[string]any{"type": "integer", "enum": []int{0, 1, 2}, "description": "Diagnostics (DNS, TCP, TLS, response headers, traceroute) at the first failure: 0 instance default, 1 on, 2 off"},
@@ -709,6 +716,25 @@ var mcpTools = []mcpTool{
 			}
 			limit, _ := c.optInt("limit")
 			return c.do("GET", fmt.Sprintf("/api/monitors/%d/results?limit=%d", id, limit), nil)
+		},
+	},
+	{
+		name: "get_server_metrics", title: "Server metrics",
+		description: "Metrics of a server monitor (type server): latest CPU, memory, swap, load and disks of each location, and the history of CPU, memory, fullest disk, swap and load averaged into at most 300 points per location.",
+		schema: object(map[string]any{
+			"id":    idProp["id"],
+			"hours": prop("integer", "Length of the history ending now, 1 to 168 (default 24)"),
+		}, "id"),
+		run: func(c *mcpCall) (any, error) {
+			id, err := c.id("id")
+			if err != nil {
+				return nil, err
+			}
+			hours, _ := c.optInt("hours")
+			if hours <= 0 {
+				hours = 24
+			}
+			return c.do("GET", fmt.Sprintf("/api/monitors/%d/server?hours=%d", id, hours), nil)
 		},
 	},
 	{

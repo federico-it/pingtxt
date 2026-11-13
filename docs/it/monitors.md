@@ -45,6 +45,7 @@ Incolla un comando `curl` nel campo URL di un monitor HTTP per compilare metodo,
 | imap, pop3 | `imaps://host`, `pop3s://host`, `imap://utente:pass@host` | saluto, `STARTTLS`/`STLS` quando disponibile, login facoltativo, vedi [Server di posta](#server-di-posta-imap-pop3) |
 | ntp | `host` o `host:porta` | il server risponde, è sincronizzato e il suo orologio è vicino a quello della posizione, vedi [NTP](#ntp) |
 | blacklist (rbl) | indirizzo IP o dominio di posta | non è nelle blacklist DNS, vedi [Blacklist](#blacklist-rbl) |
+| server (cpu, ram, disco) | punti di montaggio, o vuoto per tutti i dischi | ogni posizione riporta la macchina su cui gira; giù sopra un limite, vedi [Metriche dei server](#metriche-dei-server-cpu-ram-disco) |
 | heartbeat (push) | nessuna: pingtxt ti dà un URL | il tuo job chiama l'URL; down quando le chiamate smettono, vedi [heartbeat](#monitor-heartbeat-cron-job) |
 
 I monitor HTTP accettano anche metodo, header e body della richiesta, i codici di stato accettati e se ignorare gli
@@ -297,6 +298,35 @@ seguire la catena) e la sua chiave privata (PEM, non cifrata); l'hub controlla c
 `client_cert` e `client_key`). Un certificato scaduto fa fallire il controllo con la sua data. La chiave è nascosta
 agli utenti in sola lettura; gli altri tipi ignorano il certificato. Gli agent più vecchi di questa impostazione
 falliscono il controllo con "this agent cannot send client certificates: update it".
+
+## Metriche dei server (CPU, RAM, disco)
+
+Un monitor **server** controlla le macchine su cui girano i tuoi controlli. Ogni posizione del monitor riporta la
+propria macchina: l'hub quella (o il container) in cui gira, un agent il suo host. Per controllare un server installa
+un agent su di esso e sceglilo come posizione del monitor; scegline diversi per controllare un gruppo di server con un
+solo monitor. Solo Linux; gli agent su altri sistemi falliscono con `server metrics are only available on Linux`.
+
+Ogni controllo legge:
+
+- **cpu**: la quota di tempo CPU usata su tutti i core dal controllo precedente del monitor;
+- **ram**: la memoria in uso, cioè il totale meno quella disponibile (la cache che il kernel può liberare non conta);
+- **swap**, il **load average** (1, 5 e 15 minuti) con il numero di core, e da quanto è acceso;
+- **dischi**: tutti i filesystem veri (non tmpfs, overlay, snap...) oppure, nella destinazione, i punti di montaggio
+  da controllare separati da virgole, per esempio `/, /data`. Un punto di montaggio indicato che manca fa fallire il
+  controllo.
+
+Imposta un **limite** per cpu, ram, disco, swap (percentuale) o load (media a 5 minuti per core, per esempio 1.5);
+vuoto lo spegne. Un controllo sopra un limite fallisce dicendo cosa lo supera, per esempio
+`disk /data 93% over 90%`, e partono i soliti avvisi. Il form parte con 90% per cpu, ram e disco. Con **tentativi** a
+3 e intervallo di 1 minuto, un breve picco di CPU non manda avvisi.
+
+La pagina del monitor mostra gli ultimi valori di ogni posizione e un grafico di cpu, ram e del disco più pieno nelle
+ultime 24 ore o 7 giorni (API `GET /api/monitors/{id}/server`, MCP `get_server_metrics`). Le metriche si tengono per
+la durata dei risultati grezzi, almeno 7 giorni.
+
+Un agent in Docker vede CPU, memoria e load dell'host, ma solo i dischi del suo container. Per controllare i dischi
+dell'host montali in sola lettura (`-v /:/hostfs:ro`) e imposta la destinazione a `/hostfs`. Gli agent più vecchi di
+questo tipo di monitor ne falliscono i controlli con "update it".
 
 ## Status page di altri servizi
 

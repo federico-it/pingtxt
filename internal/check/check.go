@@ -89,6 +89,8 @@ type Job struct {
 	// ignore them.
 	ClientCert string `json:"client_cert,omitempty"`
 	ClientKey  string `json:"client_key,omitempty"`
+	// ServerLimits are the thresholds of a server monitor.
+	ServerLimits *ServerLimits `json:"server_limits,omitempty"`
 }
 
 // Result is the outcome of a Job.
@@ -131,6 +133,9 @@ type Result struct {
 	// ClientCert is set when the job had a client certificate and the
 	// check could present it. Agents older than mutual TLS never set it.
 	ClientCert bool `json:"client_cert,omitempty"`
+	// Server holds the metrics read by a server check, also when it fails
+	// because of a limit.
+	Server *ServerMetrics `json:"server,omitempty"`
 }
 
 // Timing is the time spent in each phase of an HTTP request, in ms. With
@@ -150,7 +155,7 @@ func Run(ctx context.Context, j Job) Result {
 	r := runJob(ctx, j)
 	// A status page reports on someone else's service: the incident in the
 	// message says more than probing the page's own server would.
-	if j.Diagnose && !r.OK && j.Type != TypePush && j.Type != TypeStatuspage && j.Type != TypeRBL {
+	if j.Diagnose && !r.OK && j.Type != TypePush && j.Type != TypeStatuspage && j.Type != TypeRBL && j.Type != TypeServer {
 		r.Diag = Diagnose(ctx, j, r)
 	}
 	r.http = nil
@@ -209,6 +214,8 @@ func runJob(ctx context.Context, j Job) Result {
 		r = runNTP(ctx, j)
 	case TypeRBL:
 		r = runRBL(ctx, j)
+	case TypeServer:
+		r = runServer(ctx, j)
 	default:
 		r = Result{Message: "unknown monitor type: " + j.Type}
 	}

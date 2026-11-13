@@ -43,7 +43,7 @@ const featuresEn: Feature[] = [
   },
   {
     title: "lots of check types",
-    body: "HTTP(S) with multi-step requests, keyword, TCP, UDP, WebSocket, ICMP ping, DNS, PostgreSQL, MySQL, Redis, MongoDB, Docker, gRPC health, SMTP, IMAP, POP3, SSH, NTP, DNS blacklists, MCP servers, Atlassian status pages and heartbeat, with client certificates (mTLS).",
+    body: "HTTP(S) with multi-step requests, keyword, TCP, UDP, WebSocket, ICMP ping, DNS, PostgreSQL, MySQL, Redis, MongoDB, Docker, gRPC health, SMTP, IMAP, POP3, SSH, NTP, DNS blacklists, MCP servers, Atlassian status pages, server CPU/RAM/disk from the agents and heartbeat, with client certificates (mTLS).",
   },
   {
     title: "status pages",
@@ -94,7 +94,7 @@ const featuresIt: Feature[] = [
   },
   {
     title: "tanti tipi di controllo",
-    body: "HTTP(S) anche a più passaggi, parola chiave, TCP, UDP, WebSocket, ping ICMP, DNS, PostgreSQL, MySQL, Redis, MongoDB, Docker, gRPC health, SMTP, IMAP, POP3, SSH, NTP, blacklist DNS, server MCP, status page Atlassian e heartbeat, con certificati client (mTLS).",
+    body: "HTTP(S) anche a più passaggi, parola chiave, TCP, UDP, WebSocket, ping ICMP, DNS, PostgreSQL, MySQL, Redis, MongoDB, Docker, gRPC health, SMTP, IMAP, POP3, SSH, NTP, blacklist DNS, server MCP, status page Atlassian, CPU/RAM/disco dei server dagli agent e heartbeat, con certificati client (mTLS).",
   },
   {
     title: "status page",

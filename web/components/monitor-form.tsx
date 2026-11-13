@@ -61,6 +61,7 @@ const types: {
     | "hostPort"
     | "page"
     | "ipOrDomain"
+    | "mounts"
 }[] = [
   {
     value: "http",
@@ -162,6 +163,11 @@ const types: {
     target: "ipOrDomain",
   },
   {
+    value: "server",
+    placeholder: "/, /data",
+    target: "mounts",
+  },
+  {
     value: "push",
     placeholder: "",
   },
@@ -232,6 +238,14 @@ const ipFamilyKey = {
 } as const
 // Labels are in messages: monitorForm.mcpTransports.<value>.
 const mcpTransports = ["auto", "streamable", "sse"] as const
+const serverLimitKeys = [
+  "cpu_pct",
+  "mem_pct",
+  "disk_pct",
+  "swap_pct",
+  "load",
+] as const
+const noServerLimits = { cpu_pct: 0, mem_pct: 0, disk_pct: 0, swap_pct: 0, load: 0 }
 // Types that store their own settings in method, keyword or
 // expected_status: switching to or from them clears those fields.
 const ownSettings: MonitorType[] = [
@@ -243,6 +257,7 @@ const ownSettings: MonitorType[] = [
   "rbl",
   "imap",
   "pop3",
+  "server",
 ]
 // Labels are in messages: monitorForm.udpEncodings.<value>.
 const udpEncodings = ["text", "hex"] as const
@@ -429,6 +444,11 @@ export function MonitorForm({
       // checks it from the hub only.
       if (type === "statuspage" && p.type !== "statuspage" && id === undefined)
         next.locations = ["local"]
+      if (type === "server" && p.type !== "server") {
+        next.target = ""
+        next.server_limits = { cpu_pct: 90, mem_pct: 90, disk_pct: 90, swap_pct: 0, load: 0 }
+        next.timeout_ms = Math.max(p.timeout_ms, 3000)
+      }
       if (type === "push" && p.type !== "push") {
         next.interval_sec = 3600
         if (!p.grace_sec) next.grace_sec = 300
@@ -605,7 +625,7 @@ export function MonitorForm({
               className="sm:col-span-2"
             >
               <Input
-                required
+                required={m.type !== "server"}
                 value={m.target}
                 onChange={(e) => set("target", e.target.value)}
                 onPaste={pasteTarget}
@@ -796,6 +816,36 @@ export function MonitorForm({
                   placeholder="Authorization: Bearer ..."
                 />
               </Field>
+            </>
+          )}
+          {m.type === "server" && (
+            <>
+              <p className="text-xs text-muted-foreground sm:col-span-2">
+                {tr("serverHint")}
+              </p>
+              {serverLimitKeys.map((k) => (
+                <Field
+                  key={k}
+                  label={tr(`serverLimits.${k}`)}
+                  hint={k === "load" ? tr("serverLimits.loadHint") : undefined}
+                >
+                  <Input
+                    type="number"
+                    min={0}
+                    max={k === "load" ? 1000 : 100}
+                    step={k === "load" ? 0.1 : 1}
+                    placeholder={tr("serverLimits.off")}
+                    value={m.server_limits?.[k] || ""}
+                    onChange={(e) =>
+                      set("server_limits", {
+                        ...noServerLimits,
+                        ...m.server_limits,
+                        [k]: Math.max(Number(e.target.value) || 0, 0),
+                      })
+                    }
+                  />
+                </Field>
+              ))}
             </>
           )}
           {m.type === "ssh" && (
@@ -1187,7 +1237,7 @@ export function MonitorForm({
                 }
               />
             </Field>
-            {m.type !== "docker" && (
+            {m.type !== "docker" && m.type !== "server" && (
               <Field label={tr("ipFamily.label")} hint={tr("ipFamily.hint")}>
                 <Select
                   items={ipFamilies.map((f) => ({
@@ -1220,7 +1270,7 @@ export function MonitorForm({
                 </Select>
               </Field>
             )}
-            {m.type !== "push" && !isSP && (
+            {m.type !== "push" && !isSP && m.type !== "server" && (
               <Field label={tr("diagnostics.label")} hint={tr("diagnostics.hint")}>
                 <Select
                   items={diagModes.map((v) => ({
@@ -1402,7 +1452,7 @@ export function MonitorForm({
         </Section>
       )}
 
-      {!isPush && !isSP && (
+      {!isPush && !isSP && m.type !== "server" && (
         <Section title={tr("sections.expiry")}>
           <p className="mb-3 text-xs text-muted-foreground">
             {tr("expiryHint")}
@@ -1506,7 +1556,7 @@ export function MonitorForm({
           <Button
             type="button"
             variant="outline"
-            disabled={testing || !m.target.trim()}
+            disabled={testing || (!m.target.trim() && m.type !== "server")}
             onClick={runTest}
             title={tr("testHint")}
           >

@@ -349,6 +349,10 @@
         "label": "blacklist (rbl)",
         "hint": "controlla un indirizzo IP o un dominio di posta nelle blacklist DNS: giù quando è in lista"
       },
+      "server": {
+        "label": "server (cpu, ram, disco)",
+        "hint": "ogni posizione riporta la macchina su cui gira (hub o host dell'agent, Linux): giù sopra un limite"
+      },
       "push": {
         "label": "heartbeat (push)",
         "hint": "il tuo cron job o servizio chiama un URL; down quando le chiamate si fermano"
@@ -363,7 +367,8 @@
       "server": "server",
       "endpoint": "url dell'endpoint",
       "page": "url della status page",
-      "ipOrDomain": "indirizzo IP o dominio di posta"
+      "ipOrDomain": "indirizzo IP o dominio di posta",
+      "mounts": "dischi (punti di montaggio)"
     },
     "sections": {
       "target": "destinazione",
@@ -416,6 +421,16 @@
     "sshExpect": "banner o chiave host attesi",
     "sshExpectHint": "facoltativo: testo che il banner deve contenere (es. OpenSSH), oppure l'impronta di una chiave host SHA256:… (da ssh-keygen -lf): giù quando il server non ha una chiave con quell'impronta. Un controllo riuscito mostra l'impronta.",
     "mailboxHint": "imaps:// e pop3s:// usano TLS da subito (993, 995), imap:// e pop3:// passano a TLS con STARTTLS quando il server lo offre. Con utente:password@ nell'URL il controllo fa anche login, solo su TLS. Usa una casella creata per il monitoraggio: gli admin vedono la password.",
+    "serverHint": "Scegli qui sotto le posizioni da controllare: ognuna riporta la propria macchina (il container o l'host dell'hub, l'host di un agent). Dischi: punti di montaggio separati da virgole, vuoto = tutti i dischi. Lascia vuoto un limite per spegnerlo. Solo Linux.",
+    "serverLimits": {
+      "cpu_pct": "limite cpu (%)",
+      "mem_pct": "limite ram (%)",
+      "disk_pct": "limite disco (%)",
+      "swap_pct": "limite swap (%)",
+      "load": "limite load (per core)",
+      "loadHint": "load average a 5 minuti diviso per i core, es. 1.5",
+      "off": "spento"
+    },
     "ntpMaxOffset": "sfasamento massimo (ms)",
     "ntpMaxOffsetHint": "giù quando l'orologio del server si discosta più di così da quello della posizione · vuoto = 1000",
     "rblLists": "blacklist",
@@ -2166,6 +2181,26 @@
         "title": "pianifica i backup del database",
         "hint": "una copia del database ogni giorno, tenuta nella cartella dei dati."
       }
+    }
+  },
+  "serverMetrics": {
+    "title": "server",
+    "history": "cpu, ram e disco",
+    "cpu": "cpu",
+    "ram": "ram",
+    "swap": "swap",
+    "disk": "disco",
+    "load": "load {l1} · {l5} · {l15} ({cores} core)",
+    "uptime": "acceso da {time}",
+    "loading": "in attesa del primo controllo...",
+    "noData": "ancora nessun dato",
+    "noDataHint": "Ancora nessuna metrica da questa posizione: serve un agent Linux aggiornato a questa versione.",
+    "noHistory": "nessun dato in questo periodo",
+    "load5": "load (5 min)",
+    "lines": {
+      "cpu_pct": "cpu",
+      "mem_pct": "ram",
+      "disk_pct": "disco più pieno"
     }
   }
 }

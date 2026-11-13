@@ -844,6 +844,56 @@ var laterMigrations = []migration{
 	ALTER TABLE monitors ADD COLUMN client_key TEXT NOT NULL DEFAULT ''`,
 		mysql: `ALTER TABLE monitors ADD COLUMN client_cert MEDIUMTEXT NOT NULL DEFAULT ('');
 	ALTER TABLE monitors ADD COLUMN client_key MEDIUMTEXT NOT NULL DEFAULT ('')`},
+	// 44: server monitors: their limits (JSON) and the metrics each
+	// location reported (one row per check; data is the full snapshot).
+	{
+		sqlite: `ALTER TABLE monitors ADD COLUMN server_limits TEXT NOT NULL DEFAULT '{}';
+	CREATE TABLE server_metrics (
+		id INTEGER PRIMARY KEY,
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		location TEXT NOT NULL,
+		ts INTEGER NOT NULL,
+		cpu_pct REAL NOT NULL,
+		mem_pct REAL NOT NULL,
+		disk_pct REAL NOT NULL,
+		swap_pct REAL NOT NULL,
+		load5 REAL NOT NULL,
+		data TEXT NOT NULL
+	);
+	CREATE INDEX server_metrics_monitor ON server_metrics(monitor_id, ts);
+	CREATE INDEX server_metrics_ts ON server_metrics(ts);`,
+		postgres: `ALTER TABLE monitors ADD COLUMN server_limits TEXT NOT NULL DEFAULT '{}';
+	CREATE TABLE server_metrics (
+		id BIGSERIAL PRIMARY KEY,
+		monitor_id BIGINT NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		location TEXT NOT NULL,
+		ts BIGINT NOT NULL,
+		cpu_pct DOUBLE PRECISION NOT NULL,
+		mem_pct DOUBLE PRECISION NOT NULL,
+		disk_pct DOUBLE PRECISION NOT NULL,
+		swap_pct DOUBLE PRECISION NOT NULL,
+		load5 DOUBLE PRECISION NOT NULL,
+		data TEXT NOT NULL
+	);
+	CREATE INDEX server_metrics_monitor ON server_metrics(monitor_id, ts);
+	CREATE INDEX server_metrics_ts ON server_metrics(ts);`,
+		mysql: `ALTER TABLE monitors ADD COLUMN server_limits MEDIUMTEXT NOT NULL DEFAULT ('{}');
+	CREATE TABLE server_metrics (
+		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+		monitor_id BIGINT NOT NULL,
+		location VARCHAR(255) NOT NULL,
+		ts BIGINT NOT NULL,
+		cpu_pct DOUBLE NOT NULL,
+		mem_pct DOUBLE NOT NULL,
+		disk_pct DOUBLE NOT NULL,
+		swap_pct DOUBLE NOT NULL,
+		load5 DOUBLE NOT NULL,
+		data MEDIUMTEXT NOT NULL,
+		INDEX server_metrics_monitor (monitor_id, ts),
+		INDEX server_metrics_ts (ts),
+		FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {
