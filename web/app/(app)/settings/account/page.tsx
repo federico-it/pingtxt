@@ -42,9 +42,12 @@ export default function AccountSettings() {
           }}
         />
       </Section>
-      <Section title={t("phone")}>
-        <PhoneNumber me={me.data} onChange={() => me.mutate()} />
-      </Section>
+      {/* Phone numbers only matter once a Twilio channel can text or call. */}
+      {(me.data.phone_alerts || !!me.data.user.phone) && (
+        <Section title={t("phone")}>
+          <PhoneNumber me={me.data} onChange={() => me.mutate()} />
+        </Section>
+      )}
       <Section title={t("twoFactor")}>
         <TwoFactor me={me.data} onChange={() => me.mutate()} />
       </Section>

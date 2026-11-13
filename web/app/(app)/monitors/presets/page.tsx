@@ -12,7 +12,15 @@ import { Empty, PageHeader, Section } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { segment } from "@/components/ui/control"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { shortGroupName } from "@/lib/groups"
 import { api, useApi, type Monitor, type Group } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
@@ -86,11 +94,9 @@ function Presets() {
   // A group called like the default one is picked when it exists already.
   const existing = labels.tree.ordered.find((g) => g.name.toLowerCase() === t("defaultGroup").toLowerCase())
   const groupValue = group ?? (existing ? String(existing.id) : NEW_GROUP)
-  const groupItems = [
-    { value: "0", label: t("noGroup") },
-    { value: NEW_GROUP, label: t("newGroup") },
-    ...labels.tree.ordered.map((g) => ({ value: String(g.id), label: g.path })),
-  ]
+  const pickedGroup = labels.tree.byId.get(Number(groupValue))
+  const groupLabel =
+    groupValue === NEW_GROUP ? t("newGroup") : pickedGroup ? shortGroupName(pickedGroup, labels.tree.byId) : t("noGroup")
 
   function toggle(id: string) {
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))
@@ -187,18 +193,45 @@ function Presets() {
             ))}
           </div>
           <span className="text-muted-foreground">{t("group")}</span>
-          <Select items={groupItems} value={groupValue} onValueChange={(v) => setGroup(v ?? "0")}>
-            <SelectTrigger size="sm" className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {groupItems.map((g) => (
-                <SelectItem key={g.value} value={g.value}>
-                  {g.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button size="sm" variant="outline" className="max-w-56 justify-between gap-1" title={pickedGroup?.path}>
+                  <span className="truncate">{groupLabel}</span>
+                  <span aria-hidden className="text-muted-foreground">▾</span>
+                </Button>
+              }
+            />
+            <DropdownMenuContent
+              align="end"
+              side="top"
+              className="max-h-[min(28rem,70vh)] w-auto max-w-[min(24rem,calc(100vw-2rem))] min-w-56 overflow-y-auto"
+            >
+              <DropdownMenuRadioGroup value={groupValue} onValueChange={(v) => setGroup(String(v))}>
+                <DropdownMenuRadioItem value={NEW_GROUP} closeOnClick>
+                  {t("newGroup")}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="0" closeOnClick>
+                  {t("noGroup")}
+                </DropdownMenuRadioItem>
+                {labels.tree.ordered.length > 0 && <DropdownMenuSeparator />}
+                {labels.tree.ordered.map((g) => (
+                  <DropdownMenuRadioItem
+                    key={g.id}
+                    value={String(g.id)}
+                    closeOnClick
+                    style={{ paddingLeft: `${0.375 + g.depth * 1.125}rem` }}
+                  >
+                    {g.depth > 0 && <span aria-hidden className="text-muted-foreground">└</span>}
+                    <span className={cn("flex-1 truncate", g.depth === 0 && "font-medium")} title={g.path}>
+                      {shortGroupName(g, labels.tree.byId)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{g.monitors}</span>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
           {groupValue === NEW_GROUP && (
             <Input
               value={groupName}

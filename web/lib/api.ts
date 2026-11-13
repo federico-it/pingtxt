@@ -750,6 +750,8 @@ export interface Me {
   user: User
   version: string
   recovery_codes_left: number
+  /** A Twilio channel exists: phone numbers are useful (missing on older hubs). */
+  phone_alerts?: boolean
 }
 
 export type TokenScope = "read" | "write"
