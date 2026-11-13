@@ -357,7 +357,13 @@ func (h *Hub) locationsOf(m *store.Monitor) []string {
 }
 
 func jobFor(m *store.Monitor) check.Job {
+	var limits *check.ServerLimits
+	if m.Type == check.TypeServer {
+		l := m.ServerLimits
+		limits = &l
+	}
 	return check.Job{
+		ServerLimits:   limits,
 		ID:             fmt.Sprintf("%d-%d", m.ID, time.Now().UnixNano()),
 		MonitorID:      m.ID,
 		Type:           m.Type,
@@ -695,6 +701,11 @@ func (h *Hub) HandleResult(loc string, r check.Result) {
 	}
 	if r.Diag != nil && !r.OK {
 		h.storeDiag(m, loc, r)
+	}
+	if r.Server != nil && m.Type == check.TypeServer {
+		if err := h.store.InsertServerSample(m.ID, loc, r.At, r.Server); err != nil {
+			h.log.Error("insert server metrics", "err", err)
+		}
 	}
 	h.raise(m, alert, cause, r.At)
 	if degraded != "" {
@@ -1068,6 +1079,12 @@ func (h *Hub) compactResults(ctx context.Context, now time.Time) {
 		h.log.Error("prune rollups", "err", err)
 	} else if n > 0 {
 		h.log.Info("pruned hourly rollups", "rows", n)
+	}
+	// Server metrics feed charts up to a week long.
+	if n, err := h.store.PruneServerSamples(now.Add(-time.Duration(max(g.RawRetentionDays, 7)) * day).UnixMilli()); err != nil {
+		h.log.Error("prune server metrics", "err", err)
+	} else if n > 0 {
+		h.log.Info("pruned server metrics", "rows", n)
 	}
 	if n, err := h.store.PruneAudit(now.Add(-time.Duration(g.AuditRetentionDays) * day).UnixMilli()); err != nil {
 		h.log.Error("prune audit log", "err", err)

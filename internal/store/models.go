@@ -302,11 +302,14 @@ type Monitor struct {
 	PingLossPct int `json:"ping_loss_pct"`
 	// ClientCert and ClientKey (PEM) are the client certificate for mutual
 	// TLS on check.ClientCertTypes ("" = none).
-	ClientCert string   `json:"client_cert"`
-	ClientKey  string   `json:"client_key"`
-	Locations  []string `json:"locations"`
-	GroupID    int64    `json:"group_id"` // 0 = no group
-	TagIDs     []int64  `json:"tag_ids"`
+	ClientCert string `json:"client_cert"`
+	ClientKey  string `json:"client_key"`
+	// ServerLimits are the thresholds of a server monitor (zero on other
+	// types).
+	ServerLimits check.ServerLimits `json:"server_limits"`
+	Locations    []string           `json:"locations"`
+	GroupID      int64              `json:"group_id"` // 0 = no group
+	TagIDs       []int64            `json:"tag_ids"`
 	// DependsOn are the monitors this one depends on, e.g. the ping of the
 	// server it runs on. While one of them is down this monitor sends no
 	// alerts of its own.
@@ -328,13 +331,13 @@ type Monitor struct {
 // its own history.
 const SlowAuto = -1
 
-const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps, client_cert, client_key`
+const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps, client_cert, client_key, server_limits`
 
 func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	m := &Monitor{}
-	var headers, locations, assertions, steps string
+	var headers, locations, assertions, steps, limits string
 	var group sql.NullInt64
-	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group, &m.DegradedPct, &assertions, &m.IPFamily, &m.SlowMs, &m.Diagnostics, &m.PingCount, &m.PingLossPct, &steps, &m.ClientCert, &m.ClientKey)
+	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group, &m.DegradedPct, &assertions, &m.IPFamily, &m.SlowMs, &m.Diagnostics, &m.PingCount, &m.PingLossPct, &steps, &m.ClientCert, &m.ClientKey, &limits)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -351,6 +354,7 @@ func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 		m.Assertions = []check.Assertion{}
 	}
 	_ = json.Unmarshal([]byte(steps), &m.Steps)
+	_ = json.Unmarshal([]byte(limits), &m.ServerLimits)
 	if m.Steps == nil {
 		m.Steps = []check.Step{}
 	}
@@ -462,9 +466,9 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 		return err
 	}
 	defer tx.Rollback()
-	id, err := s.db.insert(tx, `INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps, client_cert, client_key)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt, nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, stepsJSON(m.Steps), m.ClientCert, m.ClientKey)
+	id, err := s.db.insert(tx, `INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps, client_cert, client_key, server_limits)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt, nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, stepsJSON(m.Steps), m.ClientCert, m.ClientKey, limitsJSON(m.ServerLimits))
 	if err != nil {
 		return err
 	}
@@ -491,8 +495,8 @@ func (s *Store) UpdateMonitor(m *Monitor) error {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ?, group_id = ?, degraded_pct = ?, assertions = ?, ip_family = ?, slow_ms = ?, diagnostics = ?, ping_count = ?, ping_loss_pct = ?, steps = ?, client_cert = ?, client_key = ? WHERE id = ?`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, stepsJSON(m.Steps), m.ClientCert, m.ClientKey, m.ID)
+	_, err = tx.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ?, group_id = ?, degraded_pct = ?, assertions = ?, ip_family = ?, slow_ms = ?, diagnostics = ?, ping_count = ?, ping_loss_pct = ?, steps = ?, client_cert = ?, client_key = ?, server_limits = ? WHERE id = ?`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, stepsJSON(m.Steps), m.ClientCert, m.ClientKey, limitsJSON(m.ServerLimits), m.ID)
 	if err != nil {
 		return err
 	}
@@ -515,6 +519,11 @@ func assertionsJSON(a []check.Assertion) string {
 		return "[]"
 	}
 	b, _ := json.Marshal(a)
+	return string(b)
+}
+
+func limitsJSON(l check.ServerLimits) string {
+	b, _ := json.Marshal(l)
 	return string(b)
 }
 

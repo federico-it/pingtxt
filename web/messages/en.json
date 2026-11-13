@@ -349,6 +349,10 @@
         "label": "blacklist (rbl)",
         "hint": "checks an IP address or a mail domain on DNS blacklists: down when it is listed"
       },
+      "server": {
+        "label": "server (cpu, ram, disk)",
+        "hint": "each location reports the machine it runs on (hub or agent host, Linux): down above a limit"
+      },
       "push": {
         "label": "heartbeat (push)",
         "hint": "your cron job or service calls a URL; down when the calls stop"
@@ -363,7 +367,8 @@
       "server": "server",
       "endpoint": "endpoint url",
       "page": "status page url",
-      "ipOrDomain": "ip address or mail domain"
+      "ipOrDomain": "ip address or mail domain",
+      "mounts": "disks (mount points)"
     },
     "sections": {
       "target": "target",
@@ -416,6 +421,16 @@
     "sshExpect": "expected banner or host key",
     "sshExpectHint": "optional: text the banner must contain (e.g. OpenSSH), or a host key fingerprint SHA256:… (from ssh-keygen -lf): down when the server has no key with it. A successful check shows the fingerprint.",
     "mailboxHint": "imaps:// and pop3s:// use TLS from the start (993, 995), imap:// and pop3:// upgrade with STARTTLS when the server offers it. With user:password@ in the URL the check also logs in, only over TLS. Use a mailbox made for monitoring: the password is visible to admins.",
+    "serverHint": "Pick the locations to watch below: each one reports its own machine (the hub's container or host, an agent's host). Disks: mount points separated by commas, empty = every disk. Leave a limit empty to turn it off. Linux only.",
+    "serverLimits": {
+      "cpu_pct": "cpu limit (%)",
+      "mem_pct": "ram limit (%)",
+      "disk_pct": "disk limit (%)",
+      "swap_pct": "swap limit (%)",
+      "load": "load limit (per core)",
+      "loadHint": "5 minute load average divided by the cores, e.g. 1.5",
+      "off": "off"
+    },
     "ntpMaxOffset": "maximum offset (ms)",
     "ntpMaxOffsetHint": "down when the server's clock is further than this from the clock of the location · empty = 1000",
     "rblLists": "blacklists",
@@ -2202,6 +2217,26 @@
       "maintenances": "maintenance",
       "status_pages": "status page",
       "settings": "settings"
+    }
+  },
+  "serverMetrics": {
+    "title": "server",
+    "history": "cpu, ram and disk",
+    "cpu": "cpu",
+    "ram": "ram",
+    "swap": "swap",
+    "disk": "disk",
+    "load": "load {l1} · {l5} · {l15} ({cores} cores)",
+    "uptime": "up for {time}",
+    "loading": "waiting for the first check...",
+    "noData": "no data yet",
+    "noDataHint": "No metrics from this location yet: it needs a Linux agent updated to this version.",
+    "noHistory": "no data in this period",
+    "load5": "load (5 min)",
+    "lines": {
+      "cpu_pct": "cpu",
+      "mem_pct": "ram",
+      "disk_pct": "fullest disk"
     }
   }
 }

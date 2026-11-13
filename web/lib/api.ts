@@ -25,6 +25,61 @@ export type MonitorType =
   | "pop3"
   | "ntp"
   | "rbl"
+  | "server"
+
+/** Thresholds of a server monitor, 0 = off. */
+export interface ServerLimits {
+  cpu_pct: number
+  mem_pct: number
+  disk_pct: number
+  swap_pct: number
+  /** 5 minute load average per core */
+  load: number
+}
+
+export interface DiskUsage {
+  mount: string
+  fs: string
+  total: number
+  used: number
+  free: number
+}
+
+export interface ServerMetrics {
+  cpu_pct: number
+  cores: number
+  load1: number
+  load5: number
+  load15: number
+  mem_total: number
+  mem_used: number
+  swap_total: number
+  swap_used: number
+  disks: DiskUsage[]
+  uptime_sec: number
+}
+
+export interface ServerSample {
+  location: string
+  ts: number
+  cpu_pct: number
+  mem_pct: number
+  disk_pct: number
+  swap_pct: number
+  load5: number
+}
+
+export interface ServerHistory {
+  from: number
+  to: number
+  locations: {
+    location: string
+    name: string
+    at: number
+    metrics: ServerMetrics | null
+  }[]
+  points: ServerSample[]
+}
 
 export type AssertionOp =
   | "eq"
@@ -87,6 +142,8 @@ export interface Monitor {
   client_cert?: string
   /** PEM private key of client_cert */
   client_key?: string
+  /** server: thresholds (missing on older hubs) */
+  server_limits?: ServerLimits
   headers: Record<string, string>
   body: string
   assertions: Assertion[]

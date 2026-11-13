@@ -19,6 +19,7 @@ import { TagList, useLabels } from "@/components/labels"
 import { KV, PageHeader, Section } from "@/components/page-header"
 import { OkText, StatusGlyph, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
+import { ServerPanel } from "@/components/server-metrics"
 import { ResultsLog, type TimeWindow } from "@/components/results-log"
 import { IncidentDiagnostics } from "@/components/diagnostics"
 import { ReasonList, parseCause } from "@/components/reasons"
@@ -330,6 +331,16 @@ function View() {
         <PushInfo id={id} url={d.push_url} onRotated={() => m.mutate()} />
       )}
 
+      {d.type === "server" && (
+        <ServerPanel
+          id={id}
+          limits={d.server_limits ?? noLimits}
+          countries={Object.fromEntries(
+            (d.location_status ?? []).map((l) => [l.id, l.country])
+          )}
+        />
+      )}
+
       <Section title={t("last24h")}>
         <UptimeBars
           bars={d.bars}
@@ -560,3 +571,5 @@ export default function MonitorPage() {
     </Suspense>
   )
 }
+
+const noLimits = { cpu_pct: 0, mem_pct: 0, disk_pct: 0, swap_pct: 0, load: 0 }

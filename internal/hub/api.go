@@ -162,6 +162,7 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("POST /api/incidents/{id}/snooze", auth(h.snoozeIncident)) // see snooze.go
 	mux.HandleFunc("DELETE /api/incidents/{id}/snooze", auth(h.unsnoozeIncident))
 	mux.HandleFunc("GET /api/monitors/{id}/diagnostics", auth(h.monitorDiagnostics))
+	mux.HandleFunc("GET /api/monitors/{id}/server", auth(h.monitorServer))
 	mux.HandleFunc("GET /api/maintenances", auth(h.listMaintenances))
 	mux.HandleFunc("POST /api/maintenances", auth(h.createMaintenance))
 	mux.HandleFunc("PUT /api/maintenances/{id}", auth(h.updateMaintenance))
@@ -606,7 +607,7 @@ var validTypes = []string{
 	check.TypeHTTP, check.TypeKeyword, check.TypeTCP, check.TypePing, check.TypeDNS, check.TypePush,
 	check.TypePostgres, check.TypeMySQL, check.TypeRedis, check.TypeMongo, check.TypeDocker, check.TypeGRPC, check.TypeSMTP, check.TypeMCP,
 	check.TypeUDP, check.TypeWS, check.TypeStatuspage,
-	check.TypeSSH, check.TypeIMAP, check.TypePOP3, check.TypeNTP, check.TypeRBL,
+	check.TypeSSH, check.TypeIMAP, check.TypePOP3, check.TypeNTP, check.TypeRBL, check.TypeServer,
 }
 
 // urlSchemes lists the accepted target URL schemes of URL-based types.
@@ -691,7 +692,7 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 		}
 	}
 	switch {
-	case m.Type == check.TypePush || m.Type == check.TypeDocker:
+	case m.Type == check.TypePush || m.Type == check.TypeDocker || m.Type == check.TypeServer:
 		m.IPFamily = ipDefault // no network check of their own
 	case !validFamily(m.IPFamily) && m.IPFamily != ipDefault:
 		return errors.New("ip_family must be 0 (instance default), 1 (IPv4 or IPv6), 4, 6 or 46 (IPv4 and IPv6)")
@@ -716,10 +717,25 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	if m.Type == check.TypePush {
 		return validatePush(m)
 	}
-	if m.Target == "" {
+	if m.Type != check.TypeServer {
+		m.ServerLimits = check.ServerLimits{}
+	}
+	if m.Target == "" && m.Type != check.TypeServer {
 		return errors.New("target is required")
 	}
 	switch m.Type {
+	case check.TypeServer:
+		mounts, err := check.ServerMounts(m.Target)
+		if err != nil {
+			return err
+		}
+		m.Target = strings.Join(mounts, ", ")
+		if err := check.ValidateServerLimits(m.ServerLimits); err != nil {
+			return err
+		}
+		m.Method, m.ExpectedStatus, m.Body, m.Keyword, m.KeywordInvert = "", "", "", "", false
+		m.CertExpiryAlert, m.DomainExpiryAlert = false, false
+		m.Diagnostics = diagOff // nothing on the network to probe
 	case check.TypeHTTP, check.TypeKeyword:
 		// With steps, variables can stand for parts of the URL.
 		u, err := url.Parse(stepVarRe.ReplaceAllString(m.Target, "x"))
@@ -876,6 +892,10 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 		m.TimeoutMs = 10000
 	}
 	m.TimeoutMs = min(max(m.TimeoutMs, 500), 60000)
+	if m.Type == check.TypeServer {
+		// The first CPU reading takes a second.
+		m.TimeoutMs = max(m.TimeoutMs, 3000)
+	}
 	m.Retries = min(max(m.Retries, 1), 10)
 	if m.DegradedPct < 0 || m.DegradedPct > maxDegradedPct {
 		return fmt.Errorf("degraded threshold must be between 1%% and %d%% (0 = instance default)", maxDegradedPct)

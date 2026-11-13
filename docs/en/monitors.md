@@ -45,6 +45,7 @@ Paste a `curl` command in the URL field of an HTTP monitor to fill in the method
 | imap, pop3 | `imaps://host`, `pop3s://host`, `imap://user:pass@host` | greeting, `STARTTLS`/`STLS` when offered, optional login, see [Mail servers](#mail-servers-imap-pop3) |
 | ntp | `host` or `host:port` | the server answers, is synchronized and its clock is close to the location's, see [NTP](#ntp) |
 | blacklist (rbl) | IP address or mail domain | not listed on DNS blacklists, see [Blacklists](#blacklists-rbl) |
+| server (cpu, ram, disk) | mount points, or empty for every disk | each location reports the machine it runs on; down above a limit, see [Server metrics](#server-metrics-cpu-ram-disk) |
 | heartbeat (push) | none: pingtxt gives you a URL | your job calls the URL; down when the calls stop, see [heartbeat](#heartbeat-monitors-cron-jobs) |
 
 HTTP monitors also take a method, request headers and body, the accepted status codes and whether to skip TLS
@@ -285,6 +286,34 @@ follow it) and its private key (PEM, not encrypted); the hub checks that they ma
 `client_cert` and `client_key`). An expired certificate fails the check with its date. The key is hidden from
 read-only users; other types ignore the certificate. Agents older than this setting fail the check with "this agent
 cannot send client certificates: update it".
+
+## Server metrics (CPU, RAM, disk)
+
+A **server** monitor watches the machines your checks run on. Each location of the monitor reports its own machine:
+the hub reports the machine (or container) it runs in, an agent reports its host. To watch a server, install an
+agent on it and pick that agent as the monitor's location; pick several to watch a fleet with one monitor. Linux only;
+agents on other systems fail with `server metrics are only available on Linux`.
+
+Each check reads:
+
+- **cpu**: the share of CPU time in use on all cores since the previous check of the monitor;
+- **ram**: memory in use, meaning total minus available (cache that the kernel can free does not count);
+- **swap**, the **load average** (1, 5 and 15 minutes) with the number of cores, and the uptime;
+- **disks**: every real filesystem (not tmpfs, overlay, snaps...) or, in the target, the mount points to check,
+  comma-separated, e.g. `/, /data`. A listed mount point that is missing fails the check.
+
+Set a **limit** for cpu, ram, disk, swap (percent) or load (5 minute average per core, e.g. 1.5); empty turns it
+off. A check above a limit fails with what is over it, e.g. `disk /data 93% over 90%`, and the usual alerts follow.
+The form starts with 90% for cpu, ram and disk. With **retries** at 3 and a 1 minute interval, a short CPU spike does
+not alert.
+
+The monitor page shows the latest values of each location and a chart of cpu, ram and the fullest disk over 24 hours
+or 7 days (API `GET /api/monitors/{id}/server`, MCP `get_server_metrics`). Metrics are kept for the raw results
+retention, at least 7 days.
+
+An agent in Docker sees the host's CPU, memory and load, but only the disks of its container. To watch the host's
+disks, mount them read-only (`-v /:/hostfs:ro`) and set the target to `/hostfs`. Agents older than this monitor type
+fail its checks with "update it".
 
 ## Status pages of other services
 

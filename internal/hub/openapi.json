@@ -4403,6 +4403,70 @@
         }
       }
     },
+    "/api/monitors/{id}/server": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Server metrics",
+        "operationId": "monitorServer",
+        "description": "Metrics of a server monitor: the latest snapshot of each location (CPU, memory, swap, load, every checked disk) and the history of the main values, averaged into at most 300 points per location. Other monitor types answer with no locations and no points.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 168,
+              "default": 24
+            },
+            "description": "Length of the history, ending now."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server metrics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/api/monitors/{id}/series": {
       "get": {
         "tags": [
@@ -11725,12 +11789,13 @@
               "imap",
               "pop3",
               "ntp",
-              "rbl"
+              "rbl",
+              "server"
             ]
           },
           "target": {
             "type": "string",
-            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp; http and keyword can use {{variables}} set by steps), host:port (tcp, udp, IPv6 in brackets: [2001:db8::1]:443), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port], a ws:// or wss:// URL (websocket), the address of an Atlassian Statuspage page such as https://status.example.com (statuspage; API URLs like /api/v2/status.json are trimmed to it). host or host:port for ssh (port 22) and ntp (port 123), imap[s]://[user:password@]host[:port] (imap) and pop3[s]://[user:password@]host[:port] (pop3): with a user and password the check logs in, and only over TLS; an IPv4/IPv6 address or a mail domain (rbl: a domain is checked on domain blacklists and the addresses of its MX servers, or of the domain itself without MX, on IP blacklists). Empty for push.",
+            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp; http and keyword can use {{variables}} set by steps), host:port (tcp, udp, IPv6 in brackets: [2001:db8::1]:443), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port], a ws:// or wss:// URL (websocket), the address of an Atlassian Statuspage page such as https://status.example.com (statuspage; API URLs like /api/v2/status.json are trimmed to it). host or host:port for ssh (port 22) and ntp (port 123), imap[s]://[user:password@]host[:port] (imap) and pop3[s]://[user:password@]host[:port] (pop3): with a user and password the check logs in, and only over TLS; an IPv4/IPv6 address or a mail domain (rbl: a domain is checked on domain blacklists and the addresses of its MX servers, or of the domain itself without MX, on IP blacklists). For server: the mount points to check, comma separated (e.g. \"/, /data\"), empty = every disk. Empty for push.",
             "examples": [
               "https://example.com/health"
             ]
@@ -11786,6 +11851,9 @@
           "client_key": {
             "type": "string",
             "description": "PEM private key of client_cert. Hidden from read-only users. Omitted in a PUT: kept."
+          },
+          "server_limits": {
+            "$ref": "#/components/schemas/ServerLimits"
           },
           "ip_family": {
             "type": "integer",
@@ -15578,6 +15646,200 @@
           },
           "plan": {
             "$ref": "#/components/schemas/CodePlan"
+          }
+        }
+      },
+      "ServerLimits": {
+        "type": "object",
+        "description": "server: thresholds, 0 = off. A check above any of them fails (the location is down). Zero on other types. Omitted in a PUT: kept.",
+        "properties": {
+          "cpu_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "CPU use (all cores) since the previous check, percent."
+          },
+          "mem_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Memory in use (total minus available), percent."
+          },
+          "disk_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Share in use of each checked disk, percent (as df shows it)."
+          },
+          "swap_pct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Swap in use, percent. Ignored without swap."
+          },
+          "load": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000,
+            "description": "5 minute load average per CPU core, e.g. 1.5."
+          }
+        }
+      },
+      "DiskUsage": {
+        "type": "object",
+        "properties": {
+          "mount": {
+            "type": "string"
+          },
+          "fs": {
+            "type": "string",
+            "description": "Filesystem type, e.g. ext4."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes."
+          },
+          "used": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes."
+          },
+          "free": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes unprivileged users can still write; used / (used + free) is the share df shows."
+          }
+        }
+      },
+      "ServerMetrics": {
+        "type": "object",
+        "description": "A snapshot of the machine running a server check (the hub, or an agent's host). Linux only.",
+        "properties": {
+          "cpu_pct": {
+            "type": "number",
+            "description": "CPU use since the previous check of the same monitor (or over one second), percent."
+          },
+          "cores": {
+            "type": "integer"
+          },
+          "load1": {
+            "type": "number"
+          },
+          "load5": {
+            "type": "number"
+          },
+          "load15": {
+            "type": "number"
+          },
+          "mem_total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes."
+          },
+          "mem_used": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes, total minus available."
+          },
+          "swap_total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "swap_used": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "disks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiskUsage"
+            }
+          },
+          "uptime_sec": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ServerLocation": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "\"local\" or \"agent:<id>\"."
+          },
+          "name": {
+            "type": "string"
+          },
+          "at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix ms of the snapshot, 0 = none yet."
+          },
+          "metrics": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ServerMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ServerSample": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix ms (middle of the averaged samples)."
+          },
+          "cpu_pct": {
+            "type": "number"
+          },
+          "mem_pct": {
+            "type": "number"
+          },
+          "disk_pct": {
+            "type": "number",
+            "description": "The fullest checked disk."
+          },
+          "swap_pct": {
+            "type": "number"
+          },
+          "load5": {
+            "type": "number"
+          }
+        }
+      },
+      "ServerHistory": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "to": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServerLocation"
+            }
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServerSample"
+            }
           }
         }
       }
