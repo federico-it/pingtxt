@@ -825,6 +825,10 @@ var laterMigrations = []migration{
 		mysql: `ALTER TABLE incidents ADD COLUMN acked_at BIGINT NOT NULL DEFAULT 0;
 	ALTER TABLE incidents ADD COLUMN acked_by BIGINT NOT NULL DEFAULT 0;
 	ALTER TABLE incidents ADD COLUMN acked_by_email VARCHAR(254) NOT NULL DEFAULT '';`},
+	// 41: monitors each user pinned to the top of their monitor list, as a
+	// JSON list of ids in pin order ("" = none).
+	{sqlite: `ALTER TABLE users ADD COLUMN pinned_monitors TEXT NOT NULL DEFAULT ''`,
+		mysql: `ALTER TABLE users ADD COLUMN pinned_monitors MEDIUMTEXT NOT NULL DEFAULT ('')`},
 }
 
 func sqliteOnly(list []string) []migration {

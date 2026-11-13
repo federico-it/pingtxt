@@ -1,53 +1,79 @@
-import { useSyncExternalStore } from "react"
+import { useEffect, useMemo } from "react"
+import { mutate } from "swr"
 
-// Monitors pinned to the top of the dashboard, remembered in this browser
-// (like folded groups). Other tabs follow through the storage event.
+import { api, useApi } from "@/lib/api"
 
-const key = "pingtxt.pinned"
+// Monitors pinned to the top of the dashboard. They belong to the account
+// (GET /api/account/pins), so every browser and the app show the same ones.
+// Older versions kept them in this browser only: those are sent to the hub
+// once and then forgotten here.
+
+const path = "/api/account/pins"
+const legacyKey = "pingtxt.pinned"
 const empty: ReadonlySet<number> = new Set()
-let pins: ReadonlySet<number> | null = null
-const listeners = new Set<() => void>()
 
-function read(): ReadonlySet<number> {
+export interface MonitorPins {
+  monitor_ids: number[]
+}
+
+let imported = false
+
+/** Sends the pins an older version kept in this browser, then drops them. */
+async function importLegacy(current: number[]) {
+  if (imported) return
+  imported = true
+  let local: number[] = []
   try {
-    const v = JSON.parse(localStorage.getItem(key) ?? "[]")
-    return new Set(Array.isArray(v) ? v.map(Number).filter((n) => n > 0) : [])
+    const v = JSON.parse(localStorage.getItem(legacyKey) ?? "[]")
+    local = Array.isArray(v) ? v.map(Number).filter((n) => n > 0) : []
   } catch {
-    return new Set()
+    return
   }
-}
-
-function snapshot() {
-  pins ??= read()
-  return pins
-}
-
-function subscribe(l: () => void) {
-  listeners.add(l)
-  const onStorage = (e: StorageEvent) => {
-    if (e.key !== key) return
-    pins = read()
-    l()
-  }
-  window.addEventListener("storage", onStorage)
-  return () => {
-    listeners.delete(l)
-    window.removeEventListener("storage", onStorage)
+  if (!local.length) return
+  const missing = local.filter((id) => !current.includes(id))
+  try {
+    if (missing.length) {
+      const res = await api<MonitorPins>(path, {
+        method: "PUT",
+        body: { monitor_ids: [...current, ...missing] },
+      })
+      await mutate(path, res, { revalidate: false })
+    }
+    localStorage.removeItem(legacyKey)
+  } catch {
+    imported = false // try again on the next load
   }
 }
 
 /** Ids of the pinned monitors. */
-export function usePins() {
-  return useSyncExternalStore(subscribe, snapshot, () => empty)
+export function usePins(): ReadonlySet<number> {
+  const { data } = useApi<MonitorPins>(path, { refreshInterval: 30_000 })
+  useEffect(() => {
+    if (data) void importLegacy(data.monitor_ids)
+  }, [data])
+  return useMemo(() => (data ? new Set(data.monitor_ids) : empty), [data])
 }
 
-export function togglePin(id: number) {
-  const next = new Set(snapshot())
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  pins = next
-  try {
-    localStorage.setItem(key, JSON.stringify([...next]))
-  } catch {}
-  for (const l of listeners) l()
+/** Pins or unpins a monitor; the star changes at once. */
+export function togglePin(id: number, pinned: boolean) {
+  const method = pinned ? "DELETE" : "POST"
+  void mutate<MonitorPins>(
+    path,
+    api<MonitorPins>(`${path}/${id}`, { method }),
+    {
+      optimisticData: (cur) => {
+        const ids = cur?.monitor_ids ?? []
+        return {
+          monitor_ids: pinned
+            ? ids.filter((x) => x !== id)
+            : ids.includes(id)
+              ? ids
+              : [...ids, id],
+        }
+      },
+      rollbackOnError: true,
+      populateCache: true,
+      revalidate: false,
+    }
+  ).catch(() => {})
 }

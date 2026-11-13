@@ -70,4 +70,4 @@ maintenance windows and channels can pick monitors by group or tag. See
 - Press <kbd>ctrl k</kbd> to jump to any monitor or page, <kbd>d</kbd> to switch between light and dark.
 - Select several monitors on the dashboard to pause, resume, move or delete them together.
 - **test** in the monitor form runs the check once from the selected locations, without saving.
-- Pin monitors to keep them at the top of the dashboard; pins are kept in your browser.
+- Pin monitors to keep them at the top of the dashboard. Pins are saved on your account, so they follow you to every browser and are in the API (`/api/account/pins`); each user has their own, read-only users included.

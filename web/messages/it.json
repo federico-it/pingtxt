@@ -99,8 +99,8 @@
     "emptyState": "ancora nessun monitor. <link>crea il primo</link>",
     "pinned": "fissati",
     "others": "tutto il resto",
-    "pin": "fissa {name} in alto (in questo browser)",
-    "unpin": "sblocca {name}",
+    "pin": "fissa {name} in alto",
+    "unpin": "togli {name} dai fissati",
     "cols": {
       "name": "nome",
       "last24h": "ultime 24h",

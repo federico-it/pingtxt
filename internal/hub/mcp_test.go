@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -167,6 +168,21 @@ func TestMCPServer(t *testing.T) {
 	}
 	if n := ro.callOK("list_monitors", map[string]any{"status": "down"}).(map[string]any)["count"]; n.(float64) != 0 {
 		t.Fatalf("status filter: %v", n)
+	}
+	// Pins are personal: a read token can pin, and list_monitors shows them.
+	if names := ro.toolNames(); !slices.Contains(names, "pin_monitor") {
+		t.Fatalf("pin_monitor missing for a read token: %v", names)
+	}
+	if p := ro.callOK("pin_monitor", map[string]any{"id": id}).(map[string]any)["monitor_ids"].([]any); len(p) != 1 || p[0].(float64) != id {
+		t.Fatalf("pin: %v", p)
+	}
+	pinned := ro.callOK("list_monitors", map[string]any{"pinned": true}).(map[string]any)
+	if pinned["count"].(float64) != 1 || pinned["monitors"].([]any)[0].(map[string]any)["pinned"] != true {
+		t.Fatalf("pinned filter: %+v", pinned)
+	}
+	ro.callOK("pin_monitor", map[string]any{"id": id, "pinned": false})
+	if n := ro.callOK("list_monitors", map[string]any{"pinned": true}).(map[string]any)["count"]; n.(float64) != 0 {
+		t.Fatalf("unpinned: %v", n)
 	}
 	got := ro.callOK("get_monitor", map[string]any{"id": id}).(map[string]any)
 	if got["interval_sec"].(float64) != 30 || got["bars"] != nil {

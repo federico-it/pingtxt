@@ -71,6 +71,10 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("POST /api/auth/2fa/disable", session(h.disableTwoFactor))
 	mux.HandleFunc("POST /api/auth/2fa/recovery-codes", session(h.regenerateRecoveryCodes))
 	mux.HandleFunc("GET /api/account/activity", auth(h.accountActivity))
+	mux.HandleFunc("GET /api/account/pins", personal(h.getPins)) // pinned monitors, see pins.go
+	mux.HandleFunc("PUT /api/account/pins", personal(h.putPins))
+	mux.HandleFunc("POST /api/account/pins/{id}", personal(h.pinMonitor))
+	mux.HandleFunc("DELETE /api/account/pins/{id}", personal(h.unpinMonitor))
 	mux.HandleFunc("GET /api/tokens", session(h.listTokens))
 	mux.HandleFunc("POST /api/tokens", session(h.createToken))
 	mux.HandleFunc("DELETE /api/tokens/{id}", session(h.deleteToken))

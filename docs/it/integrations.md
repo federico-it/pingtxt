@@ -91,12 +91,13 @@ Cursor, Windsurf e altri client che accettano un URL e degli header:
 | tool | cosa fa |
 | --- | --- |
 | `get_overview` | monitor per stato, agent online, incidenti aperti |
-| `list_monitors` | stato, uptime 24h, tempo di risposta e ultimo controllo; filtri per stato, gruppo, tag o nome |
+| `list_monitors` | stato, uptime 24h, tempo di risposta, ultimo controllo e se l'hai fissato (i fissati per primi); filtri per stato, gruppo, tag, nome o fissati |
 | `get_monitor`, `get_monitor_results` | impostazioni, uptime 24h/7g/30g, stato per località, scadenze; ultimi risultati dei controlli |
 | `list_incidents`, `get_incident_diagnostics` | incidenti (solo aperti, per monitor); cosa ha visto ogni località al primo errore |
 | `list_maintenances` | finestre di manutenzione con la prossima occorrenza |
 | `list_groups`, `list_tags`, `list_agents`, `list_status_pages` | tutto il resto che serve a un modello per trovare gli id |
 | `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | solo token di scrittura di un admin |
+| `pin_monitor` | fissa o toglie dai fissati un monitor per l'utente del token; qualsiasi token, anche di sola lettura, perché i fissati sono personali |
 | `acknowledge_incident` | solo token di scrittura di un admin; l'incidente viene preso in carico dall'utente del token |
 | `create_maintenance`, `delete_maintenance` | solo token di scrittura di un admin; orari in ISO 8601 |
 | `create_group`, `update_group`, `delete_group` | solo token di scrittura di un admin; `parent_id` crea un sottogruppo o sposta un gruppo, `list_groups` con `parent_id` elenca i sottogruppi di un gruppo |

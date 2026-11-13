@@ -10168,6 +10168,190 @@
         }
       }
     },
+    "/api/account/pins": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "My pinned monitors",
+        "operationId": "getPins",
+        "description": "Monitors the user pinned to the top of their monitor list, in pin order. Pins belong to the account, so the web UI and the app show the same ones; monitors deleted since are left out.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: the pins are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The pinned monitors of the user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorPins"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Replace my pinned monitors",
+        "operationId": "putPins",
+        "description": "Saves the whole list, in the order given. Ids of monitors that do not exist and repeated ids are dropped instead of failing. At most 1000 monitors.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: the pins are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonitorPins"
+              },
+              "example": {
+                "monitor_ids": [
+                  14,
+                  3
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The pinned monitors of the user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorPins"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/account/pins/{id}": {
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Pin a monitor",
+        "operationId": "pinMonitor",
+        "description": "Adds the monitor at the end of the user's pinned monitors; nothing changes when it is already pinned. Prefer this to PUT for a single star, so two devices pinning at the same time do not undo each other.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: the pins are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Monitor id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The pinned monitors of the user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorPins"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Unpin a monitor",
+        "operationId": "unpinMonitor",
+        "description": "Takes the monitor off the user's pinned monitors; nothing changes when it was not pinned.\n\n**Access:** Any logged-in user or token, also read-only users and read-only tokens: the pins are personal.",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Monitor id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The pinned monitors of the user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorPins"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/api/mobile/devices/{id}/mute": {
       "post": {
         "tags": [
@@ -14326,6 +14510,23 @@
             "description": "The only phone that gets notifications (one of the user's phones, to avoid double alerts on a phone and a tablet). 0 = every phone. A phone that is no longer signed in counts as 0."
           }
         }
+      },
+      "MonitorPins": {
+        "type": "object",
+        "description": "Monitors pinned by the user who asks.",
+        "properties": {
+          "monitor_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Monitor ids in pin order, oldest first."
+          }
+        },
+        "required": [
+          "monitor_ids"
+        ]
       }
     }
   }

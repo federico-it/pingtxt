@@ -6,14 +6,14 @@ import { useTranslations } from "use-intl"
 import { togglePin } from "@/lib/pins"
 import { cn } from "@/lib/utils"
 
-/** Star that pins a monitor to the top of the list (in this browser). */
+/** Star that pins a monitor to the top of the list (saved on the account). */
 export function PinButton({ id, name, pinned, className }: { id: number; name: string; pinned: boolean; className?: string }) {
   const t = useTranslations("dashboard")
   const label = pinned ? t("unpin", { name }) : t("pin", { name })
   return (
     <button
       type="button"
-      onClick={() => togglePin(id)}
+      onClick={() => togglePin(id, pinned)}
       aria-pressed={pinned}
       aria-label={label}
       title={label}
