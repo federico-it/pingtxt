@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -9,6 +10,7 @@ import { Confirm } from "@/components/confirm"
 import { TagChip, useLabels } from "@/components/labels"
 import { Empty, PageHeader, Section } from "@/components/page-header"
 import { StatusGlyph } from "@/components/status"
+import { TreeGuides } from "@/components/tree-guides"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -29,6 +31,10 @@ export default function GroupsPage() {
   const monitors = useApi<Monitor[]>("/api/monitors", { refreshInterval: 30_000 })
   const [group, setGroup] = useState<GroupDraft | null>(null)
   const [tag, setTag] = useState<TagDraft | null>(null)
+  // Groups whose subgroups are folded away on this page.
+  const [folded, setFolded] = useState<Set<number>>(new Set())
+  // Filter for the monitor list in the group dialog.
+  const [pick, setPick] = useState("")
 
   const all = monitors.data ?? []
 
@@ -38,11 +44,12 @@ export default function GroupsPage() {
     monitors.mutate()
   }
 
-  function editGroup(g?: Group) {
+  function editGroup(g?: Group, parent = 0) {
+    setPick("")
     setGroup(
       g
         ? { id: g.id, name: g.name, description: g.description, parent_id: g.parent_id ?? 0, monitor_ids: all.filter((m) => m.group_id === g.id).map((m) => m.id) }
-        : { name: "", description: "", parent_id: 0, monitor_ids: [] }
+        : { name: "", description: "", parent_id: parent, monitor_ids: [] }
     )
   }
 
@@ -119,41 +126,63 @@ export default function GroupsPage() {
           <Empty>{t("noGroups")}</Empty>
         ) : (
           <div className="border-t border-dashed">
-            {tree.ordered.map((g) => {
+            {tree.ordered
+              .filter((g) => !g.ancestors.some((a) => folded.has(a)))
+              .map((g) => {
               const members = all.filter((m) => m.group_id === g.id)
               const subgroups = tree.descendants(g.id).length
+              const children = tree.ordered.filter((c) => c.ancestors[0] === g.id).length
+              const isFolded = folded.has(g.id)
               return (
-                <div
-                  key={g.id}
-                  className="flex flex-wrap items-center gap-3 border-b border-dashed px-2 py-2.5"
-                  style={{ paddingLeft: `${0.5 + g.depth * 1.5}rem` }}
-                >
+                <div key={g.id} className={cn("flex items-stretch border-b border-dashed", g.depth === 0 && "bg-muted/30")}>
+                  <TreeGuides depth={g.depth} />
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 py-2.5 pr-2 pl-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-3">
-                      <span className="font-medium">
-                        {g.depth > 0 && <span className="mr-1 text-muted-foreground">└</span>}[{g.name}]
-                      </span>
+                      <button
+                        type="button"
+                        disabled={children === 0}
+                        onClick={() =>
+                          setFolded((p) => {
+                            const next = new Set(p)
+                            if (next.has(g.id)) next.delete(g.id)
+                            else next.add(g.id)
+                            return next
+                          })
+                        }
+                        aria-expanded={children ? !isFolded : undefined}
+                        aria-label={children ? (isFolded ? t("unfold", { name: g.name }) : t("fold", { name: g.name })) : undefined}
+                        className="w-3 shrink-0 text-left text-muted-foreground disabled:opacity-40"
+                      >
+                        {children === 0 ? "·" : isFolded ? "▸" : "▾"}
+                      </button>
+                      <span className={g.depth === 0 ? "font-semibold" : "font-medium"}>{g.name}</span>
                       {subgroups > 0 && (
                         <span className="text-xs text-muted-foreground">{t("subgroupCount", { count: subgroups })}</span>
                       )}
-                      <span className="text-xs text-muted-foreground">
+                      <Link href={`/?group=${g.id}`} className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
                         {t("monitorCount", { count: g.monitors })}
-                      </span>
+                      </Link>
                     </div>
-                    {g.description && <div className="truncate text-xs text-muted-foreground">{g.description}</div>}
+                    {g.description && <div className="truncate pl-6 text-xs text-muted-foreground">{g.description}</div>}
                     {members.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 pl-6 text-xs text-muted-foreground">
                         {members.map((m) => (
-                          <span key={m.id} className="inline-flex items-center gap-1">
+                          <Link key={m.id} href={`/monitors/view/?id=${m.id}`} className="inline-flex items-center gap-1 hover:text-foreground">
                             <StatusGlyph status={m.status} />
                             {m.name}
-                          </span>
+                          </Link>
                         ))}
                       </div>
                     )}
                   </div>
                   {isAdmin && (
-                    <>
+                    <div className="flex shrink-0 items-center">
+                      {g.depth + 1 < MAX_GROUP_DEPTH && (
+                        <Button variant="ghost" size="xs" onClick={() => editGroup(undefined, g.id)} title={t("addSubgroupTo", { name: g.name })}>
+                          <PlusIcon /> {t("subgroup")}
+                        </Button>
+                      )}
                       <Button variant="ghost" size="xs" onClick={() => editGroup(g)}>
                         {t("edit")}
                       </Button>
@@ -167,8 +196,9 @@ export default function GroupsPage() {
                           </Button>
                         }
                       />
-                    </>
+                    </div>
                   )}
+                  </div>
                 </div>
               )
             })}
@@ -233,7 +263,9 @@ export default function GroupsPage() {
                   <option value="0">{t("noParent")}</option>
                   {parentOptions.map((g) => (
                     <option key={g.id} value={g.id}>
-                      {g.path}
+                      {"\u00a0\u00a0".repeat(g.depth)}
+                      {g.depth > 0 ? "└ " : ""}
+                      {g.name}
                     </option>
                   ))}
                 </select>
@@ -244,9 +276,24 @@ export default function GroupsPage() {
                 <Textarea id="g-desc" rows={2} maxLength={500} value={group.description} onChange={(e) => setGroup({ ...group, description: e.target.value })} />
               </div>
               <div className="grid gap-1.5">
-                <Label>{t("monitorsSelected", { count: group.monitor_ids.length })}</Label>
+                <div className="flex items-center gap-2">
+                  <Label className="mr-auto">{t("monitorsSelected", { count: group.monitor_ids.length })}</Label>
+                  {all.length > 8 && (
+                    <Input
+                      value={pick}
+                      onChange={(e) => setPick(e.target.value)}
+                      placeholder={t("findMonitor")}
+                      aria-label={t("findMonitor")}
+                      className="h-7 w-40"
+                    />
+                  )}
+                </div>
                 <div className="grid max-h-60 gap-1 overflow-y-auto sm:grid-cols-2">
-                  {all.map((m) => {
+                  {all
+                    .filter((m) => !pick || m.name.toLowerCase().includes(pick.toLowerCase()) || group.monitor_ids.includes(m.id))
+                    // the group's saved monitors first (fixed while ticking), then by name
+                    .sort((a, b) => Number(!!group.id && b.group_id === group.id) - Number(!!group.id && a.group_id === group.id) || a.name.localeCompare(b.name))
+                    .map((m) => {
                     const other = m.group_id && m.group_id !== group.id ? groupName.get(m.group_id) : undefined
                     return (
                       <label key={m.id} className="flex cursor-pointer items-center gap-2 border border-dashed px-2 py-1.5 hover:bg-accent/50">

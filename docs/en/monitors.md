@@ -276,6 +276,12 @@ A group can sit inside another one (**inside group** in the group dialog), up to
 group for a status page, maintenance window, channel or report includes its subgroups. Deleting a group moves its
 subgroups up one level.
 
+On the dashboard a line on the left links each subgroup and its monitors to the group above, and **fold all** /
+**unfold all** next to the group filter closes or opens every section. The **group** filter is a menu with the
+groups as a tree and how many monitors each one holds; picking a group shows its subgroups too. On the groups page
+**+ subgroup** creates a group inside that one, the arrow folds its subgroups, and the monitor count opens the
+dashboard filtered on that group.
+
 ## Diagnostics on failure
 
 At the first failure of a check, the location that ran it collects diagnostics right away and sends them with the

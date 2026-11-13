@@ -35,6 +35,7 @@ import { ago, datetime, displayTarget, interval, ms, pct } from "@/lib/format"
 import { deleteWithUndo, usePendingDeletes } from "@/lib/pending-delete"
 import { usePins } from "@/lib/pins"
 import { PinButton } from "@/components/pin-button"
+import { TreeGuides } from "@/components/tree-guides"
 import { segment } from "@/components/ui/control"
 import { cn } from "@/lib/utils"
 
@@ -153,6 +154,24 @@ function Monitors() {
   useHotkey("/", () => document.getElementById("monitor-search")?.focus())
   const { groups, tags, groupById, tagById, tree } = useLabels()
   const hasGroups = (groups.data?.length ?? 0) > 0
+
+  // Monitors per group filter: a group counts its subgroups' monitors too.
+  const groupCounts = useMemo(() => {
+    const c = new Map<string, number>()
+    for (const m of data ?? []) {
+      if (pendingDeletes.has(m.id)) continue
+      const g = groupById.get(m.group_id)
+      const keys = g ? [g.id, ...g.ancestors].map(String) : ["none"]
+      for (const k of keys) c.set(k, (c.get(k) ?? 0) + 1)
+    }
+    return c
+  }, [data, groupById, pendingDeletes])
+  const groupLabel =
+    group === "all"
+      ? t("all")
+      : group === "none"
+        ? t("ungrouped")
+        : (groupById.get(Number(group))?.path ?? t("all"))
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: data?.length ?? 0 }
@@ -280,6 +299,7 @@ function Monitors() {
         items: by.get(g.id) ?? [],
         depth: g.depth,
         ancestors: g.ancestors,
+        parent: g.ancestors.length ? groupById.get(g.ancestors[0])?.path : undefined,
         // every monitor of the group and its subgroups, for the summary
         nested: [g.id, ...tree.descendants(g.id)].flatMap((id) => by.get(id) ?? []),
       }))
@@ -288,6 +308,9 @@ function Monitors() {
       out.push({ key: "none", title: t("ungrouped"), items: by.get(0)! })
     return [...top, ...out]
   }, [list, pins, hasGroups, tree, groupById, t])
+  // Group sections that can be folded, for "fold all".
+  const foldable = sections.filter((sec) => sec.depth !== undefined).map((sec) => sec.key)
+  const allFolded = foldable.length > 0 && foldable.every((k) => collapsed.has(k))
 
   return (
     <>
@@ -357,22 +380,60 @@ function Monitors() {
           {hasGroups && (
             <div className="flex flex-wrap items-center gap-1">
               <span className="text-muted-foreground">{t("group")}</span>
-              {[
-                { k: "all", label: t("all") },
-                ...tree.ordered.map((g) => ({
-                  k: String(g.id),
-                  label: g.path,
-                })),
-                { k: "none", label: t("ungrouped") },
-              ].map((g) => (
-                <button
-                  key={g.k}
-                  onClick={() => setGroup(g.k)}
-                  className={segment({ active: group === g.k })}
-                >
-                  {g.label}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <button
+                      type="button"
+                      className={cn(segment({ active: group !== "all" }), "max-w-72 gap-1")}
+                      title={t("groupFilter")}
+                    >
+                      <span className="truncate">{groupLabel}</span>
+                      <span aria-hidden className="text-muted-foreground">▾</span>
+                    </button>
+                  }
+                />
+                <DropdownMenuContent align="start" className="w-auto min-w-56 max-w-[min(24rem,calc(100vw-2rem))]">
+                  <DropdownMenuRadioGroup value={group} onValueChange={(v) => setGroup(String(v))}>
+                    <DropdownMenuRadioItem value="all" closeOnClick>
+                      <span className="flex-1">{t("all")}</span>
+                      <span className="text-xs text-muted-foreground">{counts.all}</span>
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuSeparator />
+                    {tree.ordered.map((g) => (
+                      <DropdownMenuRadioItem
+                        key={g.id}
+                        value={String(g.id)}
+                        closeOnClick
+                        style={{ paddingLeft: `${0.375 + g.depth * 1.125}rem` }}
+                      >
+                        {g.depth > 0 && <span aria-hidden className="text-muted-foreground">└</span>}
+                        <span className={cn("flex-1 truncate", g.depth === 0 && "font-medium")}>{g.name}</span>
+                        <span className="text-xs text-muted-foreground">{groupCounts.get(String(g.id)) ?? 0}</span>
+                      </DropdownMenuRadioItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuRadioItem value="none" closeOnClick>
+                      <span className="flex-1">{t("ungrouped")}</span>
+                      <span className="text-xs text-muted-foreground">{groupCounts.get("none") ?? 0}</span>
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {group !== "all" && (
+                <button type="button" onClick={() => setGroup("all")} className={segment()} title={t("clearGroup")}>
+                  ×
                 </button>
-              ))}
+              )}
+              {foldable.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => collapsed.set(allFolded ? [] : foldable)}
+                  className={segment()}
+                >
+                  {allFolded ? t("unfoldAll") : t("foldAll")}
+                </button>
+              )}
             </div>
           )}
           {(tags.data?.length ?? 0) > 0 && (
@@ -444,6 +505,9 @@ function Monitors() {
             const all = sec.nested ?? sec.items
             const down = all.filter((m) => m.status === "down").length
             const depth = sec.depth ?? 0
+            const isGroup = sec.depth !== undefined
+            // A group's monitors hang one level below its header.
+            const rowDepth = isGroup ? depth + 1 : 0
             return (
             <div key={sec.key}>
               {sec.title && (
@@ -451,13 +515,20 @@ function Monitors() {
                   type="button"
                   onClick={() => collapsed.toggle(sec.key)}
                   aria-expanded={!collapsed.has(sec.key)}
-                  className="flex w-full items-center gap-2 border-b border-dashed bg-muted/40 px-2 py-1 text-left text-xs hover:bg-muted/70"
-                  style={depth ? { paddingLeft: `${0.5 + depth * 1.25}rem` } : undefined}
+                  className={cn(
+                    "flex w-full items-stretch border-b border-dashed text-left text-xs",
+                    depth > 0 ? "bg-muted/20 hover:bg-muted/50" : "bg-muted/40 hover:bg-muted/70"
+                  )}
                 >
-                  <span className="w-3 text-muted-foreground">{collapsed.has(sec.key) ? "▸" : "▾"}</span>
+                  <TreeGuides depth={depth} />
+                  <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1">
+                  <span className="w-3 shrink-0 text-muted-foreground">{collapsed.has(sec.key) ? "▸" : "▾"}</span>
                   {sec.key === "pinned" && <span className="text-warn">★</span>}
-                  <span className="font-medium">{sec.title}</span>
-                  <span className="text-muted-foreground">
+                  <span className={cn("truncate", depth === 0 ? "font-semibold" : "font-medium")}>{sec.title}</span>
+                  {depth > 0 && sec.parent && (
+                    <span className="hidden truncate text-muted-foreground sm:inline">{t("inGroup", { name: sec.parent })}</span>
+                  )}
+                  <span className="shrink-0 text-muted-foreground">
                     {all.length}
                     {down > 0 && (
                       <span className="text-down">
@@ -465,6 +536,7 @@ function Monitors() {
                         {t("down", { count: down })}
                       </span>
                     )}
+                  </span>
                   </span>
                 </button>
               )}
@@ -476,6 +548,7 @@ function Monitors() {
                     selected.has(m.id) && "bg-accent/40"
                   )}
                 >
+                <TreeGuides depth={rowDepth} />
                 {isAdmin && (
                   <label className="flex items-center pl-2">
                     <Checkbox
@@ -623,6 +696,8 @@ type Section = {
   depth?: number
   /** groups: the groups it is inside of */
   ancestors?: number[]
+  /** subgroups: path of the group it is inside of */
+  parent?: string
   /** groups: its monitors and those of its subgroups */
   nested?: MonitorSummary[]
 }
@@ -639,6 +714,12 @@ function useCollapsedGroups() {
   }, [])
   return {
     has: (k: string) => keys.has(k),
+    set: (list: string[]) => {
+      setKeys(new Set(list))
+      try {
+        localStorage.setItem(collapsedKey, JSON.stringify(list))
+      } catch {}
+    },
     toggle: (k: string) =>
       setKeys((prev) => {
         const next = new Set(prev)
