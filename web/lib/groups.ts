@@ -82,3 +82,23 @@ export function groupTree(list: Group[]): GroupTree {
   }
   return { ordered, byId, descendants, height }
 }
+
+/** Name of a subgroup without its parent's name in front, where it repeats
+ * it ("Infrastructure DNS" in "Infrastructure" shows as "DNS"). */
+export function shortGroupName(g: GroupNode, byId: Map<number, GroupNode>) {
+  const parent = g.ancestors.length ? byId.get(g.ancestors[0]) : undefined
+  if (!parent) return g.name
+  const p = parent.name.trim()
+  if (!p || !g.name.toLowerCase().startsWith(p.toLowerCase())) return g.name
+  const after = g.name.slice(p.length)
+  // only at a word boundary: "Infra" does not shorten "Infrastructure"
+  if (!/^[\s\-–—:/·›»]/.test(after)) return g.name
+  return after.replace(/^[\s\-–—:/·›»]+/, "") || g.name
+}
+
+/** Path of a group with short names ("Infrastructure › DNS", not
+ * "Infrastructure › Infrastructure DNS"). */
+export function shortGroupPath(g: GroupNode, byId: Map<number, GroupNode>) {
+  const chain = [...g.ancestors].reverse().map((id) => byId.get(id)).filter((x): x is GroupNode => !!x)
+  return [...chain, g].map((n) => shortGroupName(n, byId)).join(" › ")
+}

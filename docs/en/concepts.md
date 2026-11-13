@@ -77,7 +77,9 @@ maintenance windows and channels can pick monitors by group or tag. See
 **tv** on the dashboard opens `/tv/`, a full screen view for a wall display or a spare monitor: no menus, large text,
 an overall line at the top (*all systems up* or how many monitors are down), the monitors that are down, degraded or in
 maintenance as large tiles with the reason and how long it has been, and every other monitor as a small tile with its
-uptime over the last 24 hours, by group. It keeps the group and tag filter of the dashboard (`/tv/?group=3&tag=2`),
+uptime over the last 24 hours, by group. Nothing scrolls: the tiles flow in columns across the whole screen, as large as
+they can be while everything fits, and when there are too many even at the smallest size they are split into pages that
+change every 15 seconds (the dots at the bottom right show which one is on screen). It keeps the group and tag filter of the dashboard (`/tv/?group=3&tag=2`),
 leaves paused monitors out (add `&paused=1` to show them), refreshes by itself every 10 seconds, keeps the screen awake
 where the browser allows it and hides the mouse pointer when it does not move. The button at the top right switches to
 full screen.
