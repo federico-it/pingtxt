@@ -10933,6 +10933,88 @@
           }
         }
       }
+    },
+    "/api/onboarding": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "First-run checklist",
+        "operationId": "getOnboarding",
+        "description": "The steps that make a new hub useful, each marked done from the current configuration (a monitor, a notification channel, the public URL, an agent, a status page, two-factor authentication for the calling user, scheduled backups with SQLite). The dashboard shows it to admins until every required step is done or it is hidden.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The checklist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Onboarding"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Hide or show the first-run checklist",
+        "operationId": "putOnboarding",
+        "description": "Fields left out of the body keep their stored value.\n\n**Access:** Browser session of an admin only: API tokens get 403.",
+        "x-pingtxt-access": "admin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingSettings"
+              },
+              "example": {
+                "dismissed": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The checklist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Onboarding"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -14950,6 +15032,66 @@
           },
           "group": {
             "$ref": "#/components/schemas/Group"
+          }
+        }
+      },
+      "OnboardingSettings": {
+        "type": "object",
+        "properties": {
+          "dismissed": {
+            "type": "boolean",
+            "description": "The checklist is hidden from the dashboard."
+          }
+        }
+      },
+      "OnboardingStep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Step id. Clients should skip ids they do not know: new steps may be added.",
+            "enum": [
+              "monitor",
+              "channel",
+              "public_url",
+              "agent",
+              "status_page",
+              "two_factor",
+              "backups"
+            ]
+          },
+          "done": {
+            "type": "boolean"
+          },
+          "optional": {
+            "type": "boolean",
+            "description": "Not needed for `complete`."
+          }
+        }
+      },
+      "Onboarding": {
+        "type": "object",
+        "properties": {
+          "dismissed": {
+            "type": "boolean",
+            "description": "An admin hid the checklist."
+          },
+          "done": {
+            "type": "integer",
+            "description": "Steps done."
+          },
+          "total": {
+            "type": "integer"
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "Every step that is not optional is done."
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnboardingStep"
+            }
           }
         }
       }

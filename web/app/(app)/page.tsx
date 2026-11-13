@@ -9,6 +9,7 @@ import { useTranslations } from "use-intl"
 
 
 import { AgentsOffline } from "@/components/agents-offline"
+import { OnboardingChecklist } from "@/components/onboarding"
 import { useAckName } from "@/components/incident-ack"
 import { ExpiryBadges } from "@/components/expiry"
 import { TagChip, TagList, useLabels } from "@/components/labels"
@@ -435,6 +436,7 @@ function Monitors() {
       </PageHeader>
 
       <AgentsOffline />
+      <OnboardingChecklist enabled={!!isAdmin} />
 
       <div className="mb-4 flex flex-wrap gap-1 text-xs">
         {filters.map((f) => (

@@ -13,6 +13,12 @@ docker run -d --name pingtxt --restart unless-stopped \
 Or `docker compose up -d` with the [docker-compose.yml](../../docker-compose.yml) of the repository.
 Open `http://localhost:8090`, create the admin account and add your first [monitor](monitors.md).
 
+The dashboard then shows a **getting started** checklist to admins: add a monitor, set up a notification channel, set
+the public URL, add an [agent](locations.md) (optional), publish a [status page](status-pages.md) (optional), turn on
+two-factor authentication and, with SQLite, schedule [backups](administration.md#backups). Each step is ticked from the
+current configuration, and the checklist goes away by itself when the required steps are done. **hide** removes it
+earlier; **settings → general** shows it again.
+
 The image runs on linux/amd64 and linux/arm64. Docker tags: `:latest` is the newest release, `:1.2.3` a given
 release, `:main` the latest build of the main branch. Hub binaries for Linux (and agents for Linux and macOS) are on the
 [releases page](https://github.com/federico-it/pingtxt/releases), see [without Docker](#without-docker).

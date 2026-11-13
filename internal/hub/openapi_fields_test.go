@@ -22,6 +22,9 @@ var openAPISchemaFields = []struct {
 }{
 	{"Monitor", store.Monitor{}, nil},
 	{"MonitorPins", MonitorPins{}, nil},
+	{"Onboarding", onboardingView{}, nil},
+	{"OnboardingStep", onboardingStep{}, nil},
+	{"OnboardingSettings", onboardingSettings{}, nil},
 	{"ServicePreset", ServicePreset{}, nil},
 	{"PresetCategory", PresetCategory{}, nil},
 	{"PresetCatalog", presetCatalog{}, nil},

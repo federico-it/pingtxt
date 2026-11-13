@@ -82,6 +82,8 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("GET /api/settings", admin(h.getSettings))
 	mux.HandleFunc("PUT /api/settings/general", admin(h.putGeneralSettings))
 	mux.HandleFunc("PUT /api/settings/auth", admin(h.putAuthSettings))
+	mux.HandleFunc("GET /api/onboarding", admin(h.getOnboarding)) // first-run checklist, see onboarding.go
+	mux.HandleFunc("PUT /api/onboarding", admin(h.putOnboarding))
 	mux.HandleFunc("GET /api/users", admin(h.listUsers))
 	mux.HandleFunc("POST /api/users", admin(h.createUser))
 	mux.HandleFunc("PUT /api/users/{id}", admin(h.updateUser))

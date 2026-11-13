@@ -2088,5 +2088,47 @@
     "fullscreen": "full screen",
     "exitFullscreen": "exit full screen",
     "exit": "back to the dashboard"
+  },
+  "onboarding": {
+    "title": "getting started",
+    "progress": "{done} of {total} done",
+    "hide": "hide",
+    "hidden": "checklist hidden. show it again from settings → general.",
+    "undo": "undo",
+    "optional": "(optional)",
+    "doneLabel": "done:",
+    "todoLabel": "to do:",
+    "show": "show the getting started checklist",
+    "showHint": "the checklist on the dashboard with the steps to set up this hub. it hides itself when the required steps are done.",
+    "steps": {
+      "monitor": {
+        "title": "add your first monitor",
+        "hint": "a website, an API, a server, a cron job... or pick a popular service."
+      },
+      "channel": {
+        "title": "set up a notification channel",
+        "hint": "email, Slack, Telegram, the iOS app... so you hear about it when something goes down."
+      },
+      "public_url": {
+        "title": "set the public URL of the hub",
+        "hint": "used for the links in alerts, emails and status pages."
+      },
+      "agent": {
+        "title": "add a location with an agent",
+        "hint": "check from more places, so one network problem does not look like downtime."
+      },
+      "status_page": {
+        "title": "publish a status page",
+        "hint": "show your users what is up, with incidents and maintenance."
+      },
+      "two_factor": {
+        "title": "turn on two-factor authentication",
+        "hint": "protects your admin account with an authenticator app."
+      },
+      "backups": {
+        "title": "schedule database backups",
+        "hint": "a copy of the database every day, kept in the data folder."
+      }
+    }
   }
 }
