@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"testing/fstest"
@@ -37,6 +38,19 @@ func TestPresetCatalog(t *testing.T) {
 		}
 		if p.Name == "" || p.Keywords == nil {
 			t.Errorf("%s: missing name or keywords", p.ID)
+		}
+		for _, icon := range []string{p.Icon, p.IconDark} {
+			if icon == "" {
+				continue
+			}
+			if b, err := os.ReadFile("../../web/public" + icon); err != nil || !strings.Contains(string(b[:min(len(b), 512)]), "<svg") {
+				t.Errorf("%s: icon %s missing or not an SVG (%v)", p.ID, icon, err)
+			}
+		}
+	}
+	for id := range presetIcons {
+		if !seen[id] {
+			t.Errorf("icon for unknown service %q", id)
 		}
 	}
 }

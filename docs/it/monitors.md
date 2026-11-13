@@ -264,7 +264,8 @@ Vercel, DigitalOcean...), osservabilità, email e messaggi, produttività, comme
 (`chatgpt`, `copilot`), spunta quelli da cui dipendi e premi **aggiungi**: ognuno diventa un monitor status page con il
 nome del servizio, controllato dall'hub ogni 2 minuti (1 o 5 se lo scegli), nel gruppo che scegli (di base un nuovo
 gruppo chiamato **servizi**). I servizi già seguiti da un monitor status page mostrano **già seguito** e portano al
-monitor.
+monitor. I loghi vengono da [Dashboard Icons](https://dashboardicons.com) e sono inclusi nell'hub, quindi la pagina
+non carica nulla dall'esterno.
 
 Viene seguita l'intera pagina. Per seguire solo alcuni componenti modifica il monitor dopo averlo aggiunto. Un servizio
 che non è nell'elenco funziona allo stesso modo con un monitor personalizzato di questo tipo, se ha una pagina

@@ -26,6 +26,11 @@ type ServicePreset struct {
 	URL string `json:"url"`
 	// Color is the brand color (#rrggbb) for the tile of the picker.
 	Color string `json:"color"`
+	// Icon is the path of the service's logo on the hub ("" = none: draw
+	// the initial on Color), IconDark a variant for dark backgrounds ("" =
+	// Icon works on both).
+	Icon     string `json:"icon"`
+	IconDark string `json:"icon_dark"`
 	// Keywords are other names the search finds it by (products, old names).
 	Keywords []string `json:"keywords"`
 	// MonitorID is a monitor that already follows this page, 0 = none.
@@ -49,11 +54,72 @@ var presetCategories = []PresetCategory{
 	{"social", "Social & gaming"},
 }
 
+// presetIcons lists the services with a logo in web/public/services
+// (<id>.svg), and whether it has a variant for dark backgrounds
+// (<id>-dark.svg). The logos come from Dashboard Icons
+// (github.com/homarr-labs/dashboard-icons, Apache-2.0, see the LICENSE file
+// next to them); the names and logos are trademarks of their owners.
+var presetIcons = map[string]bool{
+	"1password":    false,
+	"airtable":     false,
+	"asana":        false,
+	"bitbucket":    false,
+	"box":          false,
+	"claude":       false,
+	"clickup":      false,
+	"cloudflare":   false,
+	"confluence":   false,
+	"digitalocean": false,
+	"discord":      false,
+	"docker":       false,
+	"dropbox":      false,
+	"elastic":      false,
+	"epicgames":    true,
+	"figma":        false,
+	"flyio":        false,
+	"github":       true,
+	"godaddy":      false,
+	"grafana":      false,
+	"jira":         false,
+	"linear":       true,
+	"linode":       false,
+	"mailgun":      false,
+	"mailjet":      false,
+	"miro":         false,
+	"mistral":      false,
+	"mongodb":      false,
+	"netlify":      false,
+	"notion":       true,
+	"npm":          false,
+	"openai":       true,
+	"perplexity":   false,
+	"postman":      false,
+	"reddit":       false,
+	"sentry":       true,
+	"shopify":      false,
+	"squarespace":  false,
+	"supabase":     false,
+	"tailscale":    true,
+	"trello":       false,
+	"twilio":       false,
+	"twitch":       false,
+	"vercel":       true,
+	"webflow":      true,
+	"zoom":         false,
+}
+
 func preset(id, name, cat, url, color string, keywords ...string) ServicePreset {
 	if keywords == nil {
 		keywords = []string{}
 	}
-	return ServicePreset{ID: id, Name: name, Category: cat, URL: url, Color: color, Keywords: keywords}
+	p := ServicePreset{ID: id, Name: name, Category: cat, URL: url, Color: color, Keywords: keywords}
+	if dark, ok := presetIcons[id]; ok {
+		p.Icon = "/services/" + id + ".svg"
+		if dark {
+			p.IconDark = "/services/" + id + "-dark.svg"
+		}
+	}
+	return p
 }
 
 // servicePresets is the catalog, by category. Each URL answered a

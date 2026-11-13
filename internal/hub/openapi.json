@@ -14669,6 +14669,14 @@
             "type": "string",
             "description": "Brand color, #rrggbb."
           },
+          "icon": {
+            "type": "string",
+            "description": "Path of the service's logo (SVG) on the hub, e.g. /services/claude.svg; empty when there is none (draw the initial on color)."
+          },
+          "icon_dark": {
+            "type": "string",
+            "description": "Variant of the logo for dark backgrounds; empty when icon works on both."
+          },
           "keywords": {
             "type": "array",
             "items": {

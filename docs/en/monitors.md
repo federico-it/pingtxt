@@ -254,7 +254,8 @@ Mistral...), developer tools (GitHub, npm, Docker Hub...), cloud and hosting (Cl
 observability, email and messaging, productivity, commerce and social. Search by name or product (`chatgpt`,
 `copilot`), tick the ones you depend on and press **add**: each becomes a status page monitor named after the service,
 checked from the hub every 2 minutes (1 or 5 if you pick so), in the group you choose (by default a new group called
-**services**). Services that a status page monitor already follows show **following** and link to it.
+**services**). Services that a status page monitor already follows show **following** and link to it. Logos come
+from [Dashboard Icons](https://dashboardicons.com) and ship with the hub, so the page loads nothing from outside.
 
 The whole page is followed. To follow only some components, edit the monitor afterwards. A service missing from the
 list works the same way with a custom monitor of this type, if it has an Atlassian Statuspage page.

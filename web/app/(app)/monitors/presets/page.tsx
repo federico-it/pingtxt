@@ -22,6 +22,10 @@ interface ServicePreset {
   category: string
   url: string
   color: string
+  /** logo on the hub, "" = none */
+  icon?: string
+  /** logo for dark backgrounds, "" = icon works on both */
+  icon_dark?: string
   keywords: string[]
   monitor_id: number
 }
@@ -232,13 +236,7 @@ function ServiceCard({ s, on, onToggle }: { s: ServicePreset; on: boolean; onTog
   const added = s.monitor_id > 0
   const inner = (
     <>
-      <span
-        aria-hidden
-        className="flex size-9 shrink-0 items-center justify-center text-sm font-semibold ring-1 ring-foreground/10"
-        style={{ background: s.color, color: inkOn(s.color) }}
-      >
-        {s.name.replace(/[^\p{L}\p{N}]/gu, "").charAt(0).toUpperCase()}
-      </span>
+      <ServiceLogo s={s} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] text-foreground">{s.name}</span>
         <span className="block truncate text-[11px] text-muted-foreground">{host}</span>
@@ -269,5 +267,32 @@ function ServiceCard({ s, on, onToggle }: { s: ServicePreset; on: boolean; onTog
     >
       {inner}
     </button>
+  )
+}
+
+/** The service's logo, in its light and dark variants, or its initial on the brand color. */
+function ServiceLogo({ s }: { s: Pick<ServicePreset, "name" | "color" | "icon" | "icon_dark"> }) {
+  const [broken, setBroken] = useState(false)
+  if (s.icon && !broken) {
+    const img = "size-7 object-contain"
+    return (
+      <span aria-hidden className="flex size-9 shrink-0 items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static export, served by the hub */}
+        <img src={s.icon} alt="" className={cn(img, s.icon_dark && "dark:hidden")} onError={() => setBroken(true)} />
+        {s.icon_dark && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={s.icon_dark} alt="" className={cn(img, "hidden dark:block")} onError={() => setBroken(true)} />
+        )}
+      </span>
+    )
+  }
+  return (
+    <span
+      aria-hidden
+      className="flex size-9 shrink-0 items-center justify-center text-sm font-semibold ring-1 ring-foreground/10"
+      style={{ background: s.color, color: inkOn(s.color) }}
+    >
+      {s.name.replace(/[^\p{L}\p{N}]/gu, "").charAt(0).toUpperCase()}
+    </span>
   )
 }
