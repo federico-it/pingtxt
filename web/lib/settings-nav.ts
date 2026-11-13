@@ -8,6 +8,7 @@ export const settingsCategories = [
   { slug: "profile", admin: false },
   { slug: "account", admin: false },
   { slug: "tokens", admin: false },
+  { slug: "mcp", admin: false },
   { slug: "general", admin: true },
   { slug: "monitors", admin: true },
   { slug: "access", admin: true },

@@ -35,7 +35,8 @@ changes only the fields in the body: the others keep their value. Send a field t
 
 The hub is also an [MCP](https://modelcontextprotocol.io) server at `/mcp` (Streamable HTTP), so an AI assistant
 such as Claude can answer "what is down right now?", look at incidents, response times and diagnostics, or create a
-monitor or a maintenance window for you. (To *monitor* an MCP server instead, see
+monitor or a maintenance window for you. **Settings → mcp** shows the server address, how to connect and the
+connected assistants. (To *monitor* an MCP server instead, see
 [MCP servers](monitors.md#mcp-servers).)
 
 ### Connect with OAuth
@@ -47,8 +48,8 @@ Nothing to copy: add `https://status.example.com/mcp` as a connector.
 
 The assistant opens pingtxt in the browser, you log in as usual and pick **read only** or **read + write** (admins
 only). The hub supports discovery (RFC 9728 / RFC 8414), dynamic client registration, PKCE (S256) and rotating
-refresh tokens. Access tokens last an hour and work on `/mcp` and the REST API. Connected apps are listed in
-**settings → tokens**, where you can disconnect them. Behind a proxy, set the public URL in **settings → general**
+refresh tokens. Access tokens last an hour and work on `/mcp` and the REST API. Connected assistants are listed in
+**settings → mcp**, where you can disconnect them. Behind a proxy, set the public URL in **settings → general**
 so OAuth redirects point to the right address.
 
 ### Connect with an API token

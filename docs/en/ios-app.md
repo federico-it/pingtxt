@@ -9,7 +9,7 @@ In the app, enter the address of your hub (its public URL). The app opens the hu
 two-factor authentication and single sign-on all work, and no password ever reaches the app. Admins choose
 **read only** or **read + write** on the consent page; read-only users always get read only.
 
-Each phone shows up in **settings → tokens → connected apps**, where you can disconnect it. The app can be signed in
+Each phone shows up in **settings → tokens → iOS app sign-ins**, where you can disconnect it. The app can be signed in
 to several hubs.
 
 ## Push notifications

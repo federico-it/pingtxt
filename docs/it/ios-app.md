@@ -10,7 +10,7 @@ funzionano password, autenticazione a due fattori e single sign-on, e nessuna pa
 scelgono **sola lettura** o **lettura + scrittura** nella pagina di consenso; gli utenti in sola lettura ricevono
 sempre la sola lettura.
 
-Ogni telefono compare in **impostazioni → token → app collegate**, da dove puoi scollegarlo. L'app può accedere a più
+Ogni telefono compare in **impostazioni → token → accessi dell'app iOS**, da dove puoi scollegarlo. L'app può accedere a più
 hub.
 
 ## Notifiche push
