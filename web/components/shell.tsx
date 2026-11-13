@@ -38,6 +38,10 @@ const nav: {
   { href: "/settings/", key: "settings" },
 ]
 
+// The page width, the same as the public site. Header and footer span the
+// window and put their content in it.
+const WRAP = "mx-auto w-full max-w-6xl px-4 sm:px-6"
+
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/"
   const t = useTranslations("nav")
@@ -63,7 +67,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
   // Ctrl+K / ⌘K opens the jump menu, also from inside text fields.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "k") {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.altKey &&
+        e.key.toLowerCase() === "k"
+      ) {
         e.preventDefault()
         setCmdOpen((o) => !o)
       }
@@ -110,12 +118,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
     active: n.match ? n.match(pathname) : pathname.startsWith(n.href),
   }))
   return (
-    <div className="mx-auto flex min-h-svh w-full max-w-6xl flex-col px-4 sm:px-6">
-      <header className="sticky top-0 z-30 -mx-4 border-b border-dashed bg-background/90 px-4 backdrop-blur sm:-mx-6 sm:px-6">
-        <div className="flex h-12 items-center gap-x-4 whitespace-nowrap">
-          <Link href="/" className="shrink-0 font-semibold tracking-tight">
-            <span className="text-primary">&gt;</span> pingtxt
-            <span className="cursor-blink text-primary">_</span>
+    <div className="flex min-h-svh w-full flex-col">
+      <header className="sticky top-0 z-30 border-b border-edge bg-background/90 backdrop-blur">
+        <div
+          className={cn(
+            WRAP,
+            "flex h-12 items-center gap-x-4 whitespace-nowrap"
+          )}
+        >
+          <Link
+            href="/"
+            className="shrink-0 text-[15px] font-bold tracking-tight"
+          >
+            <span className="text-up">&gt;</span> pingtxt
+            <span className="cursor-blink text-up">_</span>
           </Link>
           <nav className="hidden min-w-0 items-center text-muted-foreground lg:flex">
             {links.map((n) => (
@@ -124,11 +140,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 href={n.href}
                 aria-current={n.active ? "page" : undefined}
                 className={cn(
-                  "px-1 py-0.5 transition-colors hover:text-foreground xl:px-1.5",
-                  n.active && "bg-accent text-foreground"
+                  "px-1 py-1 text-[11px] font-semibold tracking-wider uppercase transition-colors hover:bg-up/15 hover:text-foreground xl:px-1.5 xl:tracking-widest",
+                  n.active &&
+                    "bg-up/15 text-foreground shadow-[inset_0_-2px_0_0_var(--color-up)]"
                 )}
               >
-                {n.active ? `[${n.label}]` : n.label}
+                {n.label}
               </Link>
             ))}
           </nav>
@@ -147,7 +164,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 />
                 <span aria-hidden>
                   {down > 0 && <span className="text-down">{down}↓ · </span>}
-                  <span className={cn((ov.data.agents_lost?.length ?? 0) > 0 && "text-down")}>
+                  <span
+                    className={cn(
+                      (ov.data.agents_lost?.length ?? 0) > 0 && "text-down"
+                    )}
+                  >
                     {t("agents", {
                       online: ov.data.agents_online,
                       total: ov.data.agents,
@@ -193,10 +214,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {menuOpen && (
           <div
             id="mobile-nav"
-            className="-mx-4 border-t border-dashed px-4 pt-2 pb-3 sm:-mx-6 sm:px-6 lg:hidden"
+            className={cn(WRAP, "border-t border-dashed pt-2 pb-3 lg:hidden")}
           >
             <div className="mb-1 text-xs text-muted-foreground">
-              <span className="text-primary">$</span> ls ~/
+              <span className="text-up">$</span> ls ~/
             </div>
             <nav className="grid grid-cols-2 gap-x-4 sm:grid-cols-4">
               {links.map((n) => (
@@ -206,16 +227,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   onClick={() => setMenuOpen(false)}
                   aria-current={n.active ? "page" : undefined}
                   className={cn(
-                    "px-1.5 py-2 text-muted-foreground transition-colors hover:text-foreground",
-                    n.active && "bg-accent text-foreground"
+                    "px-1.5 py-2 text-[11.5px] font-semibold tracking-widest text-muted-foreground uppercase transition-colors hover:bg-up/15 hover:text-foreground",
+                    n.active && "bg-up/15 text-foreground"
                   )}
                 >
-                  <span
-                    className={cn("text-primary", !n.active && "invisible")}
-                  >
+                  <span className={cn("text-up", !n.active && "invisible")}>
                     &gt;{" "}
                   </span>
-                  {n.label}/
+                  {n.label}
                 </Link>
               ))}
             </nav>
@@ -261,41 +280,56 @@ export function Shell({ children }: { children: React.ReactNode }) {
             : []
         }
       />
-      <UpdateNotice status={ver.data} />
-      <TelemetryNotice isAdmin={me.data.user.role === "admin"} />
-      <main className="flex-1 py-8">{children}</main>
-      <footer className="flex justify-between border-t border-dashed py-3 text-xs text-muted-foreground">
-        <span>
-          pingtxt {me.data.version}
-          {ver.data?.update_available && ver.data.latest && (
-            <>
-              {" · "}
-              <a
-                href={ver.data.latest.url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-info underline underline-offset-4"
-              >
-                {tu("footer", { latest: ver.data.latest.version })}
-              </a>
-            </>
-          )}
-        </span>
-        <span className="hidden sm:inline">
-          <button
-            type="button"
-            onClick={() => setCmdOpen(true)}
-            className="hover:text-foreground"
+      <div className={WRAP}>
+        <UpdateNotice status={ver.data} />
+        <TelemetryNotice isAdmin={me.data.user.role === "admin"} />
+      </div>
+      <main className={cn(WRAP, "flex-1 py-8")}>{children}</main>
+      <footer className="mt-8">
+        <div aria-hidden className="pixel-edge bg-band" />
+        <div className="bg-band">
+          <div
+            className={cn(
+              WRAP,
+              "flex justify-between gap-4 py-3 text-xs text-muted-foreground"
+            )}
           >
-            {t.rich("jumpHint", {
-              kbd: (c) => <kbd className="border px-1">{c}</kbd>,
-            })}
-          </button>
-          {" · "}
-          {t.rich("themeHint", {
-            kbd: (c) => <kbd className="border px-1">{c}</kbd>,
-          })}
-        </span>
+            <span>
+              <span className="font-bold text-foreground">
+                <span className="text-up">&gt;</span> pingtxt
+              </span>{" "}
+              {me.data.version}
+              {ver.data?.update_available && ver.data.latest && (
+                <>
+                  {" · "}
+                  <a
+                    href={ver.data.latest.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-info underline underline-offset-4"
+                  >
+                    {tu("footer", { latest: ver.data.latest.version })}
+                  </a>
+                </>
+              )}
+            </span>
+            <span className="hidden sm:inline">
+              <button
+                type="button"
+                onClick={() => setCmdOpen(true)}
+                className="hover:text-foreground"
+              >
+                {t.rich("jumpHint", {
+                  kbd: (c) => <kbd className="border px-1">{c}</kbd>,
+                })}
+              </button>
+              {" · "}
+              {t.rich("themeHint", {
+                kbd: (c) => <kbd className="border px-1">{c}</kbd>,
+              })}
+            </span>
+          </div>
+        </div>
       </footer>
     </div>
   )
@@ -323,7 +357,12 @@ function useStatusInTab(ov: Overview | undefined, pathname: string) {
     if (!ov) return
     const title = document.title.replace(/^\(\d+\)\s*/, "") || baseTitle
     document.title = down > 0 ? `(${down}) ${title}` : title
-    const icon = down > 0 ? iconWithDot("#ef4444") : degraded > 0 ? iconWithDot("#f59e0b") : baseIcon
+    const icon =
+      down > 0
+        ? iconWithDot("#ef4444")
+        : degraded > 0
+          ? iconWithDot("#f59e0b")
+          : baseIcon
     let links = document.querySelectorAll<HTMLLinkElement>("link[rel~='icon']")
     if (links.length === 0) {
       const l = document.createElement("link")
