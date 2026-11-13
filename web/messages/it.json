@@ -143,7 +143,12 @@
       "undone": "annullato"
     },
     "blockedBy": "bloccato da {name}",
-    "ackedBy": "preso in carico da {name}"
+    "ackedBy": "preso in carico da {name}",
+    "groupFilter": "mostra un gruppo e i suoi sottogruppi",
+    "clearGroup": "mostra tutti i gruppi",
+    "foldAll": "comprimi tutti",
+    "unfoldAll": "espandi tutti",
+    "inGroup": "in {name}"
   },
   "monitor": {
     "resumed": "monitor ripreso",
@@ -773,7 +778,12 @@
     "subgroupCount": "{count, plural, one {# sottogruppo} other {# sottogruppi}}",
     "parent": "dentro il gruppo",
     "noParent": "nessuno (primo livello)",
-    "parentHint": "Un sottogruppo compare annidato sotto il suo gruppo. Scegliere un gruppo per una manutenzione, una status page, un canale o un report include i suoi sottogruppi. Fino a {max} livelli."
+    "parentHint": "Un sottogruppo compare annidato sotto il suo gruppo. Scegliere un gruppo per una manutenzione, una status page, un canale o un report include i suoi sottogruppi. Fino a {max} livelli.",
+    "subgroup": "sottogruppo",
+    "addSubgroupTo": "aggiungi un sottogruppo a {name}",
+    "fold": "comprimi i sottogruppi di {name}",
+    "unfold": "mostra i sottogruppi di {name}",
+    "findMonitor": "cerca un monitor"
   },
   "labels": {
     "error": "errore",

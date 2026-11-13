@@ -143,7 +143,12 @@
       "undone": "undone"
     },
     "blockedBy": "blocked by {name}",
-    "ackedBy": "acknowledged by {name}"
+    "ackedBy": "acknowledged by {name}",
+    "groupFilter": "show one group and its subgroups",
+    "clearGroup": "show all groups",
+    "foldAll": "fold all",
+    "unfoldAll": "unfold all",
+    "inGroup": "in {name}"
   },
   "monitor": {
     "resumed": "monitor resumed",
@@ -773,7 +778,12 @@
     "subgroupCount": "{count, plural, one {# subgroup} other {# subgroups}}",
     "parent": "inside group",
     "noParent": "none (top level)",
-    "parentHint": "A subgroup shows nested under its group. Picking a group for a maintenance window, status page, channel or report includes its subgroups. Up to {max} levels."
+    "parentHint": "A subgroup shows nested under its group. Picking a group for a maintenance window, status page, channel or report includes its subgroups. Up to {max} levels.",
+    "subgroup": "subgroup",
+    "addSubgroupTo": "add a subgroup to {name}",
+    "fold": "fold the subgroups of {name}",
+    "unfold": "show the subgroups of {name}",
+    "findMonitor": "find a monitor"
   },
   "labels": {
     "error": "error",

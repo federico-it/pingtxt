@@ -287,6 +287,12 @@ nella pagina dei gruppi, e come *progetto › api* nelle status page, nelle scel
 gruppo riassume anche i suoi sottogruppi, e scegliere un gruppo per una status page, una manutenzione, un canale o
 un report include i suoi sottogruppi. Eliminando un gruppo i suoi sottogruppi salgono di un livello.
 
+Nella dashboard una linea a sinistra collega ogni sottogruppo e i suoi monitor al gruppo sopra, e **comprimi tutti** /
+**espandi tutti** accanto al filtro dei gruppi chiude o apre tutte le sezioni. Il filtro **gruppo** è un menu con i
+gruppi ad albero e quanti monitor contiene ognuno; scegliendo un gruppo compaiono anche i suoi sottogruppi. Nella
+pagina dei gruppi **+ sottogruppo** crea un gruppo dentro quello, la freccia comprime i suoi sottogruppi, e il numero
+di monitor apre la dashboard filtrata su quel gruppo.
+
 ## Diagnostica in caso di errore
 
 Al primo errore di un controllo, la località che l'ha eseguito raccoglie subito una diagnostica e la invia insieme al
