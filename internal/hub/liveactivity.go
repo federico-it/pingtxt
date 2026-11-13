@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/federico-it/pingtxt/internal/check"
 	"github.com/federico-it/pingtxt/internal/store"
 )
 
@@ -68,6 +69,9 @@ type laOutage struct {
 	// AckedBy is who acknowledged the incident (email), omitted when nobody
 	// did. Older apps ignore it.
 	AckedBy string `json:"ackedBy,omitempty"`
+	// External is true on status page monitors: the outage is on a third
+	// party's page, not a failure of a checked service. Older apps ignore it.
+	External bool `json:"external,omitempty"`
 }
 
 // laState is OutageActivityAttributes.ContentState of the app.
@@ -99,17 +103,31 @@ type laMessage struct {
 
 func appleTime(ms int64) float64 { return float64(ms)/1000 - appleEpoch }
 
-// buildLAState turns the open incidents (oldest first) into the content state.
-func buildLAState(open []*store.Incident) laState {
+// buildLAState turns the open incidents (oldest first) into the content
+// state. mons (by id, may miss some) gives the short cause, see shortCause.
+func buildLAState(open []*store.Incident, mons map[int64]*store.Monitor) laState {
 	st := laState{Outages: []laOutage{}, Count: len(open)}
 	for _, i := range open[:min(len(open), laMaxShown)] {
+		m := mons[i.MonitorID]
 		st.Outages = append(st.Outages, laOutage{
 			ID: i.ID, MonitorID: i.MonitorID, MonitorName: truncateUTF8(i.MonitorName, laMaxName),
-			Since: appleTime(i.StartedAt), Cause: truncateUTF8(i.Cause, laMaxCause),
-			AckedBy: truncateUTF8(i.AckedBy, laMaxName),
+			Since: appleTime(i.StartedAt), Cause: truncateUTF8(monitorShortCause(i.Cause, m), laMaxCause),
+			AckedBy:  truncateUTF8(i.AckedBy, laMaxName),
+			External: m != nil && m.Type == check.TypeStatuspage,
 		})
 	}
 	return st
+}
+
+// laMonitors loads the monitors of the incidents shown on the activity.
+func (h *Hub) laMonitors(open []*store.Incident) map[int64]*store.Monitor {
+	mons := map[int64]*store.Monitor{}
+	for _, i := range open[:min(len(open), laMaxShown)] {
+		if m, err := h.store.Monitor(i.MonitorID); err == nil && m != nil {
+			mons[i.MonitorID] = m
+		}
+	}
+	return mons
 }
 
 // LiveActivitiesChanged asks the loop to look at the open incidents again.
@@ -165,7 +183,8 @@ func (h *Hub) syncLiveActivities(ctx context.Context, now time.Time) {
 		h.log.Error("live activity: open incidents", "err", err)
 		return
 	}
-	state := buildLAState(open)
+	mons := h.laMonitors(open)
+	state := buildLAState(open, mons)
 	raw := mustJSON(state)
 	ids := map[int64]bool{}
 	newIncident := false
@@ -263,7 +282,7 @@ func (h *Hub) syncLiveActivities(ctx context.Context, now time.Time) {
 	start := base
 	start.Event, start.AttributesType = "start", laAttributesType
 	start.TTL = int(laStale / time.Second)
-	start.Title, start.Body = laAlert(open)
+	start.Title, start.Body = laAlert(open, mons)
 	for _, hub := range hubs {
 		start.Attributes = mustJSON(map[string]string{"hub": hub})
 		list := byHub[hub]
@@ -278,9 +297,9 @@ func (h *Hub) syncLiveActivities(ctx context.Context, now time.Time) {
 
 // laAlert is the alert iOS shows when the hub starts the activity (it asks
 // for one). The normal notification rings already, so it has no sound.
-func laAlert(open []*store.Incident) (title, body string) {
+func laAlert(open []*store.Incident, mons map[int64]*store.Monitor) (title, body string) {
 	if len(open) == 1 {
-		return truncateUTF8(open[0].MonitorName+" is down", maxPushTitle), truncateUTF8(open[0].Cause, maxPushBody)
+		return truncateUTF8(open[0].MonitorName+" is down", maxPushTitle), truncateUTF8(monitorShortCause(open[0].Cause, mons[open[0].MonitorID]), maxPushBody)
 	}
 	names := []string{}
 	for _, i := range open[:min(len(open), laMaxShown)] {

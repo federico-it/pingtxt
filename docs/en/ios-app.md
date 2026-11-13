@@ -74,6 +74,11 @@ updates and ends the activity through the relay whenever incidents open or close
 that are down, with their causes. When the last incident closes, the activity ends with a summary ("api is up, down for
 12m", or "All monitors are up" with each monitor's downtime) and stays on the lock screen for 15 minutes.
 
+Push notifications and the Live Activity keep the cause short. When every location reports the same problem, the
+locations are left out. On a status page monitor they are always left out, and the page state becomes its worst
+component and first incident, for example "claude.ai: major outage +3 · Elevated errors on claude.ai +1". The Live
+Activity also marks these outages as external, since they are on a third party's page.
+
 ## For app developers
 
 The app signs in with OAuth 2.1 (authorization code + PKCE). It is a built-in public client: no secret and no

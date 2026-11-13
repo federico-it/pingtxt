@@ -227,6 +227,14 @@ func readOnlyCategory(c string) string {
 }
 
 // appMessage turns an event into a notification for the app.
+// phoneCause is the cause shown in a push: the short one when set.
+func (e Event) phoneCause() string {
+	if e.ShortCause != "" {
+		return e.ShortCause
+	}
+	return e.Cause
+}
+
 func appMessage(e Event) pushMessage {
 	m := pushMessage{Priority: "normal", TTL: 3600, Data: map[string]string{"type": "monitor", "status": e.Status}}
 	if e.MonitorID > 0 {
@@ -298,7 +306,7 @@ func appMessage(e Event) pushMessage {
 		}
 		body = append(body, e.Target)
 		if e.Cause != "" && e.Status == StatusDegraded {
-			body = append(body, e.Cause)
+			body = append(body, e.phoneCause())
 		}
 	default:
 		if e.Status == StatusDown {
@@ -310,7 +318,7 @@ func appMessage(e Event) pushMessage {
 			}
 			body = append(body, e.Target)
 			if e.Cause != "" {
-				body = append(body, e.Cause)
+				body = append(body, e.phoneCause())
 			}
 			if d := e.downFor(); d != "" {
 				body = append(body, "Down for "+d)

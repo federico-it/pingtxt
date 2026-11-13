@@ -415,6 +415,7 @@
     "retriesHint": "consecutive failures before a location is down",
     "locationsHint": "The monitor is down when more than half of the online locations fail, degraded when at least the threshold below fails.",
     "selectAllLocations": "select all",
+    "statuspageLocationsHint": "A status page gives the same answer from every location: the hub alone is enough, more locations only repeat the same request.",
     "deselectAllLocations": "deselect all",
     "builtIn": "built-in",
     "online": "online",

@@ -215,11 +215,11 @@ func TestLiveActivitySummary(t *testing.T) {
 
 func TestLiveActivityAlert(t *testing.T) {
 	open := []*store.Incident{{MonitorName: "a"}, {MonitorName: "b"}, {MonitorName: "c"}, {MonitorName: "d"}, {MonitorName: "e"}}
-	title, body := laAlert(open)
+	title, body := laAlert(open, nil)
 	if title != "5 monitors are down" || body != "a, b, c, +2" {
 		t.Fatalf("%q %q", title, body)
 	}
-	if st := buildLAState(open); st.Count != 5 || len(st.Outages) != 3 {
+	if st := buildLAState(open, nil); st.Count != 5 || len(st.Outages) != 3 {
 		t.Fatalf("%+v", st)
 	}
 }

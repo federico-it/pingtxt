@@ -78,6 +78,11 @@ con le loro cause. Quando si chiude l'ultimo incidente, l'attività termina con 
 12m", oppure "All monitors are up" con il tempo di down di ogni monitor) e resta sulla schermata di blocco per 15
 minuti.
 
+Le notifiche push e la Live Activity tengono breve la causa. Quando tutte le località riportano lo stesso problema, le
+località non compaiono. Su un monitor status page non compaiono mai, e lo stato della pagina diventa il componente
+messo peggio e il primo incidente, per esempio "claude.ai: major outage +3 · Elevated errors on claude.ai +1". La Live
+Activity segna anche questi disservizi come esterni, perché sono sulla pagina di un altro servizio.
+
 ## Per chi sviluppa l'app
 
 L'app accede con OAuth 2.1 (authorization code + PKCE). È un client pubblico integrato: nessun secret e nessuna

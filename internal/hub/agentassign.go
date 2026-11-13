@@ -81,7 +81,9 @@ func (h *Hub) agentAssignPlan(agentID int64) (assignPlan, error) {
 		return plan, err
 	}
 	for _, m := range ms {
-		if m.Type == check.TypePush {
+		// Push monitors have no location; a status page reads the same
+		// from every location, so a new agent would only repeat the request.
+		if m.Type == check.TypePush || m.Type == check.TypeStatuspage {
 			continue
 		}
 		if slices.Contains(m.Locations, loc) {

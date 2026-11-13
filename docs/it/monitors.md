@@ -246,6 +246,8 @@ non un avviso di monitor giù.
 - **componenti da seguire** (API `keyword`, id dei componenti separati da virgole): il form elenca i componenti della
   pagina da spuntare. Se non ne scegli nessuno conta lo stato generale della pagina; se ne scegli alcuni contano solo
   il loro stato e i loro incidenti, così un problema di claude.ai non tocca un monitor che segue la Claude API.
+- **località**: la pagina dà la stessa risposta ovunque, quindi un nuovo monitor di questo tipo la controlla solo dal
+  hub, e quando aggiungi un agent non viene proposto. Altre località ripetono solo la stessa richiesta.
 
 Quando scrivi l'URL di una pagina di questo tipo in un monitor **http(s)** o **parola chiave**, il form propone di
 passare a questo tipo con un clic. Prima si usava una regola JSON come `status.indicator` uguale a `none`, che manda
