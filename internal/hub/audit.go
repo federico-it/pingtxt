@@ -169,6 +169,7 @@ var auditRoutes = map[string]auditSpec{
 	}},
 	"POST /api/reports/send":  {action: "report.send", typ: "report"},
 	"POST /api/version/check": skipAudit,
+	"PUT /api/onboarding":     skipAudit, // hides or shows the first-run checklist
 	// data
 	"POST /api/backups":                {action: "backup.create", typ: "backup", response: true},
 	"POST /api/backups/upload":         {action: "backup.upload", typ: "backup", response: true},

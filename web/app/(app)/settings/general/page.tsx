@@ -7,6 +7,7 @@ import {
   InstanceForm,
   UsageStats,
 } from "@/components/settings/general-settings"
+import { OnboardingSetting } from "@/components/onboarding"
 import { AdminOnly } from "@/components/settings/save-bar"
 import { useApi, type Me, type Settings } from "@/lib/api"
 
@@ -30,6 +31,7 @@ function General() {
         settings={settings.data}
         onSaved={(s) => settings.mutate(s, { revalidate: false })}
       />
+      <OnboardingSetting />
       <UsageStats />
       <Section title={t("about")}>
         <pre className="text-xs text-muted-foreground">

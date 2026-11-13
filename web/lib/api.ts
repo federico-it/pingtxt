@@ -524,6 +524,25 @@ export interface Notifier {
   created_at: number
 }
 
+/** Steps of the first-run checklist (GET /api/onboarding). */
+export type OnboardingStepId =
+  | "monitor"
+  | "channel"
+  | "public_url"
+  | "agent"
+  | "status_page"
+  | "two_factor"
+  | "backups"
+
+export interface Onboarding {
+  dismissed: boolean
+  done: number
+  total: number
+  /** every step that is not optional is done */
+  complete: boolean
+  steps: { id: OnboardingStepId; done: boolean; optional?: boolean }[]
+}
+
 export interface Overview {
   monitors: number
   status: Partial<Record<Status, number>>

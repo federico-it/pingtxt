@@ -2088,5 +2088,47 @@
     "fullscreen": "schermo intero",
     "exitFullscreen": "esci dallo schermo intero",
     "exit": "torna alla dashboard"
+  },
+  "onboarding": {
+    "title": "primi passi",
+    "progress": "{done} di {total} fatti",
+    "hide": "nascondi",
+    "hidden": "checklist nascosta. puoi rimostrarla da impostazioni → generali.",
+    "undo": "annulla",
+    "optional": "(facoltativo)",
+    "doneLabel": "fatto:",
+    "todoLabel": "da fare:",
+    "show": "mostra la checklist dei primi passi",
+    "showHint": "la checklist nella dashboard con i passi per configurare questo hub. si nasconde da sola quando i passi necessari sono fatti.",
+    "steps": {
+      "monitor": {
+        "title": "aggiungi il primo monitor",
+        "hint": "un sito, un'API, un server, un cron job... o scegli un servizio popolare."
+      },
+      "channel": {
+        "title": "configura un canale di notifica",
+        "hint": "email, Slack, Telegram, l'app iOS... così lo sai quando qualcosa va giù."
+      },
+      "public_url": {
+        "title": "imposta l'URL pubblico dell'hub",
+        "hint": "serve per i link negli avvisi, nelle email e nelle status page."
+      },
+      "agent": {
+        "title": "aggiungi una località con un agent",
+        "hint": "controlla da più posti, così un problema di rete non sembra un disservizio."
+      },
+      "status_page": {
+        "title": "pubblica una status page",
+        "hint": "mostra ai tuoi utenti cosa funziona, con incidenti e manutenzioni."
+      },
+      "two_factor": {
+        "title": "attiva l'autenticazione a due fattori",
+        "hint": "protegge il tuo account admin con un'app di autenticazione."
+      },
+      "backups": {
+        "title": "pianifica i backup del database",
+        "hint": "una copia del database ogni giorno, tenuta nella cartella dei dati."
+      }
+    }
   }
 }
