@@ -24,8 +24,9 @@ func TestOnboarding(t *testing.T) {
 	if v.Dismissed || v.Complete || v.Done != 0 || v.Total != len(v.Steps) {
 		t.Fatalf("fresh hub: %+v", v)
 	}
-	if _, ok := steps(v)[stepBackups]; !ok {
-		t.Fatalf("SQLite hub has a backups step: %+v", v.Steps)
+	// Scheduled backups are a step with SQLite only.
+	if _, ok := steps(v)[stepBackups]; ok != h.FileBackups() {
+		t.Fatalf("backups step with %s: %+v", h.store.Driver(), v.Steps)
 	}
 
 	admin.do("POST", "/api/monitors", map[string]any{"name": "a", "type": "http", "target": "https://a.example", "paused": true})
