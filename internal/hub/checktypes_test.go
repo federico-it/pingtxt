@@ -1,7 +1,16 @@
 package hub
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/federico-it/pingtxt/internal/check"
 	"github.com/federico-it/pingtxt/internal/store"
@@ -242,26 +251,29 @@ func TestValidateChecks2(t *testing.T) {
 	}
 }
 
-const testCert = `-----BEGIN CERTIFICATE-----
-MIIBhTCCASugAwIBAgIQIRi6zePL6mKjOipn+dNuaTAKBggqhkjOPQQDAjASMRAw
-DgYDVQQKEwdBY21lIENvMB4XDTE3MTAyMDE5NDMwNloXDTE4MTAyMDE5NDMwNlow
-EjEQMA4GA1UEChMHQWNtZSBDbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABD0d
-7VNhbWvZLWPuj/RtHFjvtJBEwOkhbN/BnnE8rnZR8+sbwnc/KhCk3FhnpHZnQz7B
-5aETbbIgmuvewdjvSBSjYzBhMA4GA1UdDwEB/wQEAwICpDATBgNVHSUEDDAKBggr
-BgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdEQQiMCCCDmxvY2FsaG9zdDo1
-NDUzgg4xMjcuMC4wLjE6NTQ1MzAKBggqhkjOPQQDAgNIADBFAiEA2zpJEPQyz6/l
-Wf86aX6PepsntZv2GYlA5UpabfT2EZICICpJ5h/iI+i341gBmLiAFQOyTDT+/wQc
-6MF9+Yw1Yy0t
------END CERTIFICATE-----`
-
-const testKey = `-----BEGIN EC PRIVATE KEY-----
-MHcCAQEEIIrYSSNQFaA2Hwf1duRSxKtLYX5CB04fSeQ6tF1aY/PuoAoGCCqGSM49
-AwEHoUQDQgAEPR3tU2Fta9ktY+6P9G0cWO+0kETA6SFs38GecTyudlHz6xvCdz8q
-EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
------END EC PRIVATE KEY-----`
+// testPair makes a throwaway client certificate and key, so no key sits in
+// the repository.
+func testPair(t *testing.T) (string, string) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "client"},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour)}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kder, _ := x509.MarshalECPrivateKey(key)
+	// Trimmed as the hub stores them.
+	return strings.TrimSpace(string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))),
+		strings.TrimSpace(string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: kder})))
+}
 
 func TestValidateClientCert(t *testing.T) {
 	h, _ := newTestHub(t)
+	testCert, testKey := testPair(t)
 	m := &store.Monitor{Name: "x", Type: check.TypeHTTP, Target: "https://x", ClientCert: testCert, ClientKey: testKey}
 	if err := h.validateMonitor(m); err != nil || m.ClientKey == "" {
 		t.Fatalf("valid pair: %v", err)
@@ -291,6 +303,7 @@ func TestValidateClientCert(t *testing.T) {
 
 func TestClientKeyExport(t *testing.T) {
 	h, st := newTestHub(t)
+	testCert, testKey := testPair(t)
 	m := &store.Monitor{Name: "mtls", Type: check.TypeHTTP, Target: "https://x", ClientCert: testCert, ClientKey: testKey}
 	if err := h.validateMonitor(m); err != nil {
 		t.Fatal(err)
