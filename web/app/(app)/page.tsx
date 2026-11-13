@@ -11,7 +11,7 @@ import { useTranslations } from "use-intl"
 import { AgentsOffline } from "@/components/agents-offline"
 import { useAckName } from "@/components/incident-ack"
 import { ExpiryBadges } from "@/components/expiry"
-import { TagList, TagToggle, useLabels } from "@/components/labels"
+import { TagChip, TagList, useLabels } from "@/components/labels"
 import { Empty, PageHeader } from "@/components/page-header"
 import { StatusGlyph, StatusText } from "@/components/status"
 import { useReasonLine } from "@/components/reasons"
@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuRadioGroup,
@@ -37,6 +38,7 @@ import { usePins } from "@/lib/pins"
 import { PinButton } from "@/components/pin-button"
 import { TreeGuides } from "@/components/tree-guides"
 import { segment } from "@/components/ui/control"
+import type { GroupNode } from "@/lib/groups"
 import { cn } from "@/lib/utils"
 
 const order: Record<Status, number> = {
@@ -81,6 +83,28 @@ function compare(sort: Sort, a: MonitorSummary, b: MonitorSummary) {
   }
 }
 
+/** Rank of the worst monitor of a group for "sort: status": down, then
+ * degraded; any other status leaves the group in its usual place. */
+function problemRank(list: MonitorSummary[]) {
+  let r = 2
+  for (const m of list) if (m.status === "down") return 0
+  else if (m.status === "degraded") r = 1
+  return r
+}
+
+/** Name of a subgroup without its parent's name in front, where it repeats
+ * it ("Infrastructure DNS" in "Infrastructure" shows as "DNS"). */
+function shortGroupName(g: GroupNode, byId: Map<number, GroupNode>) {
+  const parent = g.ancestors.length ? byId.get(g.ancestors[0]) : undefined
+  if (!parent) return g.name
+  const p = parent.name.trim()
+  if (!p || !g.name.toLowerCase().startsWith(p.toLowerCase())) return g.name
+  const after = g.name.slice(p.length)
+  // only at a word boundary: "Infra" does not shorten "Infrastructure"
+  if (!/^[\s\-–—:/·›»]/.test(after)) return g.name
+  return after.replace(/^[\s\-–—:/·›»]+/, "") || g.name
+}
+
 /** Dashboard filters, kept in the URL so they survive back and reload. */
 function useFilters() {
   const params = useSearchParams()
@@ -91,8 +115,12 @@ function useFilters() {
   const filter: Filter = filters.includes(st as Filter) ? (st as Filter) : "all"
   // "all", "none" (no group) or a group id
   const group = params.get("group") ?? "all"
-  const tagParam = Number(params.get("tag"))
-  const tag = tagParam > 0 ? tagParam : null
+  // tag ids, comma separated: monitors with any of them
+  const tagParam = params.get("tag") ?? ""
+  const tags = useMemo(
+    () => [...new Set(tagParam.split(",").map(Number).filter((n) => Number.isInteger(n) && n > 0))],
+    [tagParam]
+  )
   const so = params.get("sort")
   const sort: Sort = sorts.includes(so as Sort) ? (so as Sort) : "status"
 
@@ -110,12 +138,12 @@ function useFilters() {
     q,
     filter,
     group,
-    tag,
+    tags,
     sort,
     setQ: (v: string) => update("q", v),
     setFilter: (v: Filter) => update("status", v === "all" ? null : v),
     setGroup: (v: string) => update("group", v === "all" ? null : v),
-    setTag: (v: number | null) => update("tag", v === null ? null : String(v)),
+    setTags: (v: number[]) => update("tag", v.length ? v.join(",") : null),
     setSort: (v: Sort) => update("sort", v === "status" ? null : v),
   }
 }
@@ -135,7 +163,7 @@ function Monitors() {
   const reasonLine = useReasonLine()
   const t = useTranslations("dashboard")
   const ts = useTranslations("status")
-  const { q, filter, group, tag, sort, setQ, setFilter, setGroup, setTag, setSort } =
+  const { q, filter, group, tags: tagFilter, sort, setQ, setFilter, setGroup, setTags, setSort } =
     useFilters()
   // The search box is local state so typing stays smooth; the URL follows.
   const [query, setQuery] = useState(q)
@@ -166,6 +194,16 @@ function Monitors() {
     }
     return c
   }, [data, groupById, pendingDeletes])
+  // Monitors per tag, for the tag filter.
+  const tagCounts = useMemo(() => {
+    const c = new Map<number, number>()
+    for (const m of data ?? []) {
+      if (pendingDeletes.has(m.id)) continue
+      for (const id of m.tag_ids ?? []) c.set(id, (c.get(id) ?? 0) + 1)
+    }
+    return c
+  }, [data, pendingDeletes])
+  const selectedTags = tagFilter.map((id) => tagById.get(id)).filter((tg) => !!tg)
   const groupLabel =
     group === "all"
       ? t("all")
@@ -192,7 +230,7 @@ function Monitors() {
             : String(m.group_id) === group ||
               !!groupById.get(m.group_id)?.ancestors.includes(Number(group)))
       )
-      .filter((m) => tag === null || m.tag_ids?.includes(tag))
+      .filter((m) => tagFilter.length === 0 || !!m.tag_ids?.some((id) => tagFilter.includes(id)))
       .filter(
         (m) =>
           !s ||
@@ -205,7 +243,7 @@ function Monitors() {
           groupById.get(m.group_id)?.path.toLowerCase().includes(s)
       )
       .sort((a, b) => compare(sort, a, b))
-  }, [data, query, filter, group, tag, sort, groupById, tagById, pendingDeletes])
+  }, [data, query, filter, group, tagFilter, sort, groupById, tagById, pendingDeletes])
 
   // Selected monitors that still exist and are shown.
   const visibleSelected = list.filter((m) => selected.has(m.id))
@@ -292,22 +330,43 @@ function Monitors() {
       const k = groupById.has(m.group_id) ? m.group_id : 0
       by.set(k, [...(by.get(k) ?? []), m])
     }
-    const out: Section[] = tree.ordered
+    let out: Section[] = tree.ordered
       .map((g) => ({
         key: String(g.id),
-        title: g.name,
+        title: shortGroupName(g, groupById),
+        fullTitle: g.path,
         items: by.get(g.id) ?? [],
         depth: g.depth,
         ancestors: g.ancestors,
-        parent: g.ancestors.length ? groupById.get(g.ancestors[0])?.path : undefined,
         // every monitor of the group and its subgroups, for the summary
         nested: [g.id, ...tree.descendants(g.id)].flatMap((id) => by.get(id) ?? []),
       }))
       .filter((s) => s.nested.length > 0)
+    // Sorted by status, groups with monitors down (then degraded) come
+    // first among their siblings; the others keep their order.
+    if (sort === "status") {
+      const kids = new Map<number, Section[]>()
+      for (const sec of out) {
+        const p = sec.ancestors?.[0] ?? 0
+        kids.set(p, [...(kids.get(p) ?? []), sec])
+      }
+      const sorted: Section[] = []
+      const walk = (p: number) => {
+        const list = (kids.get(p) ?? [])
+          .map((sec, i) => ({ sec, i, r: problemRank(sec.nested!) }))
+          .sort((a, b) => a.r - b.r || a.i - b.i)
+        for (const { sec } of list) {
+          sorted.push(sec)
+          walk(Number(sec.key))
+        }
+      }
+      walk(0)
+      out = sorted
+    }
     if (by.has(0))
       out.push({ key: "none", title: t("ungrouped"), items: by.get(0)! })
     return [...top, ...out]
-  }, [list, pins, hasGroups, tree, groupById, t])
+  }, [list, pins, hasGroups, tree, groupById, sort, t])
   // Group sections that can be folded, for "fold all".
   const foldable = sections.filter((sec) => sec.depth !== undefined).map((sec) => sec.key)
   const allFolded = foldable.length > 0 && foldable.every((k) => collapsed.has(k))
@@ -408,7 +467,7 @@ function Monitors() {
                         style={{ paddingLeft: `${0.375 + g.depth * 1.125}rem` }}
                       >
                         {g.depth > 0 && <span aria-hidden className="text-muted-foreground">└</span>}
-                        <span className={cn("flex-1 truncate", g.depth === 0 && "font-medium")}>{g.name}</span>
+                        <span className={cn("flex-1 truncate", g.depth === 0 && "font-medium")} title={g.path}>{shortGroupName(g, groupById)}</span>
                         <span className="text-xs text-muted-foreground">{groupCounts.get(String(g.id)) ?? 0}</span>
                       </DropdownMenuRadioItem>
                     ))}
@@ -439,14 +498,48 @@ function Monitors() {
           {(tags.data?.length ?? 0) > 0 && (
             <div className="flex flex-wrap items-center gap-1">
               <span className="text-muted-foreground">{t("tag")}</span>
-              {(tags.data ?? []).map((tg) => (
-                <TagToggle
-                  key={tg.id}
-                  tag={tg}
-                  on={tag === tg.id}
-                  onChange={(on) => setTag(on ? tg.id : null)}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <button
+                      type="button"
+                      className={cn(segment({ active: selectedTags.length > 0 }), "max-w-72 gap-1")}
+                      title={t("tagFilter")}
+                    >
+                      {selectedTags.length === 0 ? (
+                        <span>{t("all")}</span>
+                      ) : (
+                        <span className="flex min-w-0 items-center gap-1">
+                          <TagChip tag={selectedTags[0]} className="min-w-0 truncate" />
+                          {selectedTags.length > 1 && <span className="shrink-0">+{selectedTags.length - 1}</span>}
+                        </span>
+                      )}
+                      <span aria-hidden className="text-muted-foreground">▾</span>
+                    </button>
+                  }
                 />
-              ))}
+                <DropdownMenuContent align="start" className="w-auto min-w-48 max-w-[min(24rem,calc(100vw-2rem))]">
+                  {(tags.data ?? []).map((tg) => (
+                    <DropdownMenuCheckboxItem
+                      key={tg.id}
+                      checked={tagFilter.includes(tg.id)}
+                      onCheckedChange={(on) =>
+                        setTags(on ? [...tagFilter, tg.id] : tagFilter.filter((id) => id !== tg.id))
+                      }
+                    >
+                      <span className="flex-1">
+                        <TagChip tag={tg} />
+                      </span>
+                      <span className="text-xs text-muted-foreground">{tagCounts.get(tg.id) ?? 0}</span>
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {selectedTags.length > 0 && (
+                <button type="button" onClick={() => setTags([])} className={segment()} title={t("clearTags")}>
+                  ×
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -524,10 +617,12 @@ function Monitors() {
                   <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1">
                   <span className="w-3 shrink-0 text-muted-foreground">{collapsed.has(sec.key) ? "▸" : "▾"}</span>
                   {sec.key === "pinned" && <span className="text-warn">★</span>}
-                  <span className={cn("truncate", depth === 0 ? "font-semibold" : "font-medium")}>{sec.title}</span>
-                  {depth > 0 && sec.parent && (
-                    <span className="hidden truncate text-muted-foreground sm:inline">{t("inGroup", { name: sec.parent })}</span>
-                  )}
+                  <span
+                    className={cn("truncate", depth === 0 ? "font-semibold" : "font-medium")}
+                    title={sec.fullTitle && sec.fullTitle !== sec.title ? sec.fullTitle : undefined}
+                  >
+                    {sec.title}
+                  </span>
                   <span className="shrink-0 text-muted-foreground">
                     {all.length}
                     {down > 0 && (
@@ -589,7 +684,7 @@ function Monitors() {
                         className={cn("truncate text-xs", m.status === "down" ? "text-down" : "text-warn")}
                         title={m.reasons!.map((r) => `${r.message} — ${r.locations.join(", ")}`).join("\n")}
                       >
-                        {reasonLine(m.reasons!)}
+                        {m.short_reason || reasonLine(m.reasons!)}
                         <ExpiryBadges checks={m.expiry} now={now} />
                       </div>
                       ) : (
@@ -696,8 +791,8 @@ type Section = {
   depth?: number
   /** groups: the groups it is inside of */
   ancestors?: number[]
-  /** subgroups: path of the group it is inside of */
-  parent?: string
+  /** groups: path from the top-level group, when title is shortened */
+  fullTitle?: string
   /** groups: its monitors and those of its subgroups */
   nested?: MonitorSummary[]
 }

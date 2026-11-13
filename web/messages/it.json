@@ -148,7 +148,8 @@
     "clearGroup": "mostra tutti i gruppi",
     "foldAll": "comprimi tutti",
     "unfoldAll": "espandi tutti",
-    "inGroup": "in {name}"
+    "tagFilter": "mostra i monitor con almeno uno dei tag scelti",
+    "clearTags": "mostra tutti i tag"
   },
   "monitor": {
     "resumed": "monitor ripreso",

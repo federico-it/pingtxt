@@ -11566,6 +11566,10 @@
                   "$ref": "#/components/schemas/Reason"
                 },
                 "description": "Why the monitor is down or degraded right now, one entry per problem with the locations that report it (locations with the same message are grouped). Empty while it is up, paused or in maintenance. Older hubs leave it out."
+              },
+              "short_reason": {
+                "type": "string",
+                "description": "The reasons in one short line, set only where it is shorter: on a statuspage monitor, the worst component and the first incident with the count of the others (\"API: major outage +2 · Elevated errors +1\"), as in push notifications. Left out otherwise and by older hubs."
               }
             }
           }
