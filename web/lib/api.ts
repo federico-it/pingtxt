@@ -1146,8 +1146,41 @@ export async function apiRaw<T = unknown>(
   } catch {
     data = null
   }
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? res.statusText)
+  if (!res.ok) throw new ApiError(res.status, data?.error ?? res.statusText, data)
   return data as T
+}
+
+/** A change of a configuration as code plan. */
+export interface CodeChange {
+  kind: "groups" | "tags" | "channels" | "monitors" | "maintenances" | "status_pages" | "settings"
+  name: string
+  action: "create" | "update" | "delete"
+  fields?: string[]
+}
+
+export interface CodePlan {
+  changes: CodeChange[]
+  unchanged: Record<string, number>
+  errors: string[]
+  warnings: string[]
+}
+
+export interface CodeApplyResult {
+  plan: CodePlan
+  applied: boolean
+  import?: ImportResult
+  deleted: Record<string, number>
+}
+
+/** The hub's own configuration file (PINGTXT_CONFIG_FILE). */
+export interface CodeSyncStatus {
+  managed: boolean
+  file?: string
+  prune: boolean
+  applied_at?: number
+  checked_at?: number
+  error?: string
+  plan?: CodePlan
 }
 
 /**

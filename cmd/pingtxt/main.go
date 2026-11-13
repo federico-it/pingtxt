@@ -66,6 +66,9 @@ func main() {
 		// Anonymous usage stats can never be turned on.
 		DisableTelemetry: os.Getenv("PINGTXT_DISABLE_TELEMETRY") == "true",
 		Version:          version,
+		// Configuration as code: a YAML file applied at start and when it changes.
+		ConfigFile:  os.Getenv("PINGTXT_CONFIG_FILE"),
+		ConfigPrune: os.Getenv("PINGTXT_CONFIG_PRUNE") == "true",
 	}
 
 	// PINGTXT_DB_URL selects PostgreSQL (postgres://) or MariaDB/MySQL

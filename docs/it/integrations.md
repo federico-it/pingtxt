@@ -103,6 +103,7 @@ Cursor, Windsurf e altri client che accettano un URL e degli header:
 | `create_maintenance`, `delete_maintenance` | solo token di scrittura di un admin; orari in ISO 8601 |
 | `create_group`, `update_group`, `delete_group` | solo token di scrittura di un admin; `parent_id` crea un sottogruppo o sposta un gruppo, `list_groups` con `parent_id` elenca i sottogruppi di un gruppo |
 | `create_tag`, `update_tag`, `delete_tag` | solo token di scrittura di un admin |
+| `get_configuration_code`, `plan_configuration_code`, `apply_configuration_code` | [configurazione come codice](administration.md#configurazione-come-codice): lo YAML dell'hub, cosa cambierebbe uno YAML, e applicarlo (solo token di scrittura di un admin) |
 | `list_service_presets`, `add_service_presets` | il catalogo dei servizi popolari (Claude, OpenAI, GitHub...) e l'aggiunta di monitor status page per alcuni di essi; per aggiungere serve un token di scrittura di un admin, i servizi già seguiti vengono saltati |
 
 Ruoli, validazione e segreti nascosti sono esattamente quelli della REST API, e ogni scrittura finisce nel

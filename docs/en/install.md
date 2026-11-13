@@ -39,6 +39,8 @@ read at start:
 | `PINGTXT_IPV6` | | `on` or `off` skips the IPv6 reachability probe, see [IPv6](#ipv6) |
 | `PINGTXT_UNPRIVILEGED_PING` | | `1` or `0` forces the unprivileged or the raw ICMP socket, see [without Docker](#without-docker) |
 | `PINGTXT_AGENT_DIR` | | folder of the agent binaries, when they are not next to the hub |
+| `PINGTXT_CONFIG_FILE` | | YAML file applied at start and whenever it changes, see [configuration as code](administration.md#from-a-file-next-to-the-hub) |
+| `PINGTXT_CONFIG_PRUNE` | | `true`: with `PINGTXT_CONFIG_FILE`, delete what the file does not list |
 
 `PINGTXT_PUBLIC_URL`, `PINGTXT_RETENTION_DAYS`, `PINGTXT_LOCAL_NAME` and `PINGTXT_DISABLE_LOCAL` still work, but
 only fill in the settings on the first start. After that, change them in the UI.

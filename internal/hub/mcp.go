@@ -939,6 +939,53 @@ var mcpTools = []mcpTool{
 		},
 	},
 	{
+		name: "get_configuration_code", title: "Get configuration as code",
+		description: "The hub's monitors, groups, tags, notification channels, maintenance windows and status pages as YAML (configuration as code): references by name, default values left out, secrets left out. Admins only. Edit it and pass it to plan_configuration_code / apply_configuration_code.",
+		schema: object(map[string]any{
+			"settings": prop("boolean", "Include the instance settings (default false)"),
+		}),
+		run: func(c *mcpCall) (any, error) {
+			path := "/api/config/code"
+			if s, _ := c.boolean("settings"); s {
+				path += "?settings=1"
+			}
+			y, err := c.text(path)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]any{"yaml": y}, nil
+		},
+	},
+	{
+		name: "plan_configuration_code", title: "Plan configuration as code",
+		description: "What applying a configuration as code YAML would create, update and delete, and the errors that would stop it. Changes nothing. Only the sections in the YAML are compared; with prune=true the objects of those sections that it does not list would be deleted.",
+		schema: object(map[string]any{
+			"yaml":  prop("string", "The configuration as code (starts with version: 1)"),
+			"prune": prop("boolean", "Also delete what the YAML does not list in its sections (default false)"),
+		}, "yaml"),
+		run: func(c *mcpCall) (any, error) { return c.codeCall("/api/config/code/plan") },
+	},
+	{
+		name: "apply_configuration_code", title: "Apply configuration as code", write: true, destructive: true,
+		description: "Make the hub match a configuration as code YAML: objects matched by name are updated, missing ones created, and with prune=true the ones of the YAML's sections that it does not list are deleted. Nothing changes when the plan has errors. Run plan_configuration_code first and show the plan to the user.",
+		schema: object(map[string]any{
+			"yaml":  prop("string", "The configuration as code (starts with version: 1)"),
+			"prune": prop("boolean", "Also delete what the YAML does not list in its sections (default false)"),
+		}, "yaml"),
+		run: func(c *mcpCall) (any, error) {
+			plan, err := c.codeCall("/api/config/code/plan")
+			if err != nil {
+				return nil, err
+			}
+			if m, ok := plan.(map[string]any); ok {
+				if errs, _ := m["errors"].([]any); len(errs) > 0 {
+					return map[string]any{"applied": false, "plan": plan}, nil
+				}
+			}
+			return c.codeCall("/api/config/code/apply")
+		},
+	},
+	{
 		name: "pin_monitor", title: "Pin monitor", personal: true, idempotent: true,
 		description: "Pin a monitor to the top of the user's monitor list (web UI and app), or unpin it with pinned=false. Pins are personal: this works with any token, also read-only ones, and changes nothing for other users.",
 		schema: object(map[string]any{

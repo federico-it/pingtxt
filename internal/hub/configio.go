@@ -281,6 +281,11 @@ type ImportOptions struct {
 	Backup bool
 	// Host is the hub's own host name: status pages cannot use it as domain.
 	Host string
+	// Unchanged lists, by kind ("groups", "tags", "notifiers", "monitors",
+	// "maintenances", "status_pages"), the document ids of objects that are
+	// already as in the document: they are matched to the existing object,
+	// for references, but not written. Used by configuration as code.
+	Unchanged map[string]map[int64]bool
 }
 
 // ImportCounts counts objects by kind.
@@ -559,6 +564,11 @@ func (im *importer) importGroups() error {
 				g.ParentID = c.ParentID
 			}
 		}
+		if g.ID != 0 && im.unchanged("groups", old) {
+			im.groups[old] = g.ID
+			delete(parents, old)
+			continue
+		}
 		if g.ID != 0 {
 			if err := st.UpdateGroup(&g); err != nil {
 				return err
@@ -617,6 +627,10 @@ func (im *importer) importTags() error {
 				t.ID = c.ID
 			}
 		}
+		if t.ID != 0 && im.unchanged("tags", old) {
+			im.tags[old] = t.ID
+			continue
+		}
 		if t.ID != 0 {
 			if err := st.UpdateTag(&t); err != nil {
 				return err
@@ -652,6 +666,10 @@ func (im *importer) importNotifiers(old []*store.Notifier) error {
 		n := x.Notifier
 		docID := n.ID
 		n.ID = 0
+		if c := find(cur, &n); c != nil && im.unchanged("notifiers", docID) {
+			im.notifiers[docID] = c.ID
+			continue
+		}
 		n.AllMonitors, n.Events = true, slices.Clone(store.DefaultNotifyEvents)
 		if x.AllMonitors != nil {
 			n.AllMonitors = *x.AllMonitors
@@ -727,6 +745,12 @@ func (im *importer) importReports() error {
 	return im.h.saveReportSettings(r, time.Now())
 }
 
+// unchanged reports whether the document object kind/id is already as in
+// the document (ImportOptions.Unchanged).
+func (im *importer) unchanged(kind string, id int64) bool {
+	return im.opt.Unchanged[kind][id]
+}
+
 func (im *importer) mapIDs(ids []int64, m map[int64]int64) []int64 {
 	out := []int64{}
 	for _, id := range ids {
@@ -761,6 +785,10 @@ func (im *importer) importMonitors(old []*store.Monitor) error {
 		m := x.Monitor
 		oldID := m.ID
 		m.ID = 0
+		if c := match(cur, &m); c != nil && im.unchanged("monitors", oldID) {
+			im.monitors[oldID] = c.ID
+			continue
+		}
 		fileDeps := m.DependsOn
 		m.DependsOn = nil // set below, once every monitor has its new id
 		m.GroupID = im.groups[m.GroupID]
@@ -897,6 +925,9 @@ func (im *importer) importMaintenances() error {
 		return err
 	}
 	for _, x := range im.doc.Maintenances {
+		if im.unchanged("maintenances", x.ID) {
+			continue
+		}
 		m := x.Maintenance
 		m.ID = 0
 		m.MonitorIDs = im.mapIDs(m.MonitorIDs, im.monitors)
@@ -932,6 +963,9 @@ func (im *importer) importStatusPages() error {
 	h, st := im.h, im.h.store
 	req := &http.Request{Host: im.opt.Host}
 	for _, x := range im.doc.StatusPages {
+		if im.unchanged("status_pages", x.ID) {
+			continue
+		}
 		p := x.StatusPage
 		p.ID = 0
 		p.MonitorIDs = im.mapIDs(p.MonitorIDs, im.monitors)
