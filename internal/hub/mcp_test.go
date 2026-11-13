@@ -198,6 +198,56 @@ func TestMCPServer(t *testing.T) {
 		t.Fatalf("deleted monitor: %s", text)
 	}
 
+	// Groups, subgroups and tags.
+	parent := rw.callOK("create_group", map[string]any{"name": "prod", "description": "production"}).(map[string]any)
+	pid := parent["id"].(float64)
+	child := rw.callOK("create_group", map[string]any{"name": "eu", "parent_id": pid}).(map[string]any)
+	cid := child["id"].(float64)
+	other := rw.callOK("create_group", map[string]any{"name": "staging"}).(map[string]any)
+	if text, isErr := rw.call("create_group", map[string]any{"name": "prod"}); !isErr || !strings.Contains(text, "already exists") {
+		t.Fatalf("duplicate group: %s", text)
+	}
+	if text, isErr := rw.call("update_group", map[string]any{"id": pid, "parent_id": cid}); !isErr || !strings.Contains(text, "inside itself") {
+		t.Fatalf("group cycle: %s", text)
+	}
+	if subs := ro.callOK("list_groups", map[string]any{"parent_id": pid}).([]any); len(subs) != 1 || subs[0].(map[string]any)["name"] != "eu" {
+		t.Fatalf("subgroups: %v", subs)
+	}
+	if top := ro.callOK("list_groups", map[string]any{"parent_id": 0}).([]any); len(top) != 2 {
+		t.Fatalf("top-level groups: %v", top)
+	}
+	if all := ro.callOK("list_groups", nil).([]any); len(all) != 3 {
+		t.Fatalf("all groups: %v", all)
+	}
+	moved := rw.callOK("update_group", map[string]any{"id": cid, "parent_id": other["id"], "name": "eu-west"}).(map[string]any)
+	if moved["parent_id"] != other["id"] || moved["name"] != "eu-west" {
+		t.Fatalf("move group: %+v", moved)
+	}
+	if kept := rw.callOK("update_group", map[string]any{"id": pid, "name": "production"}).(map[string]any); kept["description"] != "production" || kept["parent_id"].(float64) != 0 {
+		t.Fatalf("update group lost fields: %+v", kept)
+	}
+	tag := rw.callOK("create_tag", map[string]any{"name": "critical", "color": "red"}).(map[string]any)
+	if text, isErr := rw.call("create_tag", map[string]any{"name": "x", "color": "magenta"}); !isErr || !strings.Contains(text, "invalid color") {
+		t.Fatalf("tag color: %s", text)
+	}
+	if upd := rw.callOK("update_tag", map[string]any{"id": tag["id"], "name": "p1"}).(map[string]any); upd["name"] != "p1" || upd["color"] != "red" {
+		t.Fatalf("update tag: %+v", upd)
+	}
+	tagged := rw.callOK("create_monitor", map[string]any{"name": "web", "type": "http", "target": "https://example.com", "group_id": cid, "tag_ids": []any{tag["id"]}}).(map[string]any)
+	rw.callOK("delete_tag", map[string]any{"id": tag["id"]})
+	rw.callOK("delete_group", map[string]any{"id": other["id"]})
+	if got := ro.callOK("list_groups", map[string]any{"parent_id": 0}).([]any); len(got) != 2 {
+		t.Fatalf("subgroup not moved up: %v", got)
+	}
+	rw.callOK("delete_group", map[string]any{"id": cid})
+	m := ro.callOK("get_monitor", map[string]any{"id": tagged["id"]}).(map[string]any)
+	if m["group_id"].(float64) != 0 || len(m["tag_ids"].([]any)) != 0 {
+		t.Fatalf("monitor keeps deleted group or tag: %+v", m)
+	}
+	if text, isErr := ro.call("create_tag", map[string]any{"name": "x"}); !isErr || !strings.Contains(text, "read-only") {
+		t.Fatalf("read token created a tag: %s", text)
+	}
+
 	// A viewer's write token cannot change anything.
 	admin.do("POST", "/api/users", map[string]any{"email": "v@b.co", "password": "password123", "role": "viewer"})
 	viewer := newClient(t, srv.URL)
