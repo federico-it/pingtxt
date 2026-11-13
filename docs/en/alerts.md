@@ -77,6 +77,22 @@ and escalation run again from where they stopped. Another admin can **take over*
 acknowledged. Read-only users see who is on it but cannot acknowledge. API: `POST` and `DELETE
 /api/incidents/{id}/ack`; acknowledgements are in the [audit log](security.md#audit-log).
 
+## Snoozing incidents
+
+When you cannot look at an outage right now but do not want to lose it, an admin presses **snooze** on the monitor
+page or the incidents page and picks 15 minutes, 30 minutes, 1, 2, 4, 8 or 24 hours:
+
+- the incident shows **snoozed until** and by whom;
+- its `STILL DOWN` reminders stop, and so do the alerts of channels still waiting for their **send after** time;
+- when the snooze ends and the monitor is still down, every channel that got the alert gets a `STILL DOWN` reminder,
+  also the ones without **repeat every**, and escalation goes on from where it stopped. A channel whose **send after**
+  time passed during the snooze gets its first alert then.
+
+**wake up** ends a snooze early: reminders and escalation run again at once, without the extra reminder. Snoozing again
+replaces the snooze. An acknowledged incident stays quiet even after its snooze ends. Read-only users see the snooze but
+cannot change it. API: `POST /api/incidents/{id}/snooze` with `{"minutes": 30}` (5 to 1440) and `DELETE` to end it;
+snoozes are in the [audit log](security.md#audit-log).
+
 ## Maintenance windows
 
 On the **maint** page plan windows when alerts should stay quiet: one-off or recurring (daily, weekly, monthly, in

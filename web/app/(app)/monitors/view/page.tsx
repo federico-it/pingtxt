@@ -22,7 +22,7 @@ import { UptimeBars } from "@/components/uptime-bars"
 import { ResultsLog, type TimeWindow } from "@/components/results-log"
 import { IncidentDiagnostics } from "@/components/diagnostics"
 import { ReasonList, parseCause } from "@/components/reasons"
-import { AckButton, AckNote } from "@/components/incident-ack"
+import { AckButton, AckNote, isSnoozed, SnoozeButton, SnoozeNote } from "@/components/incident-ack"
 import { TestResults, type TestResult } from "@/components/test-results"
 import { Button } from "@/components/ui/button"
 import {
@@ -290,10 +290,18 @@ function View() {
           </span>
           {d.incident.acked_at ? (
             <AckNote incident={d.incident} />
-          ) : (
+          ) : isSnoozed(d.incident) ? null : (
             <span className="text-muted-foreground">{t("notAcked")}</span>
           )}
-          <span className="ml-auto">
+          <SnoozeNote incident={d.incident} />
+          <span className="ml-auto flex flex-wrap gap-1.5">
+            <SnoozeButton
+              incident={d.incident}
+              onChange={() => {
+                m.mutate()
+                incidents.mutate()
+              }}
+            />
             <AckButton
               incident={d.incident}
               onChange={() => {

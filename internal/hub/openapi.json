@@ -2625,6 +2625,141 @@
         }
       }
     },
+    "/api/incidents/{id}/snooze": {
+      "post": {
+        "tags": [
+          "Incidents"
+        ],
+        "summary": "Snooze incident",
+        "operationId": "snoozeIncident",
+        "description": "Snoozes an open incident for `minutes` (5 to 1440): its reminders (`repeat_min`) and the alerts of channels still waiting for their `delay_min` stop until then. When the snooze ends and the monitor is still down and not acknowledged, every channel that got the alert gets a `STILL DOWN` reminder (also channels without `repeat_min`) and escalation goes on. Snoozing a snoozed incident replaces the snooze. 409 when the incident is resolved.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the incident."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "minutes"
+                ],
+                "properties": {
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 1440,
+                    "description": "How long to snooze, in minutes."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The incident, with snoozed_until and snoozed_by.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Incident"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Incidents"
+        ],
+        "summary": "End snooze",
+        "operationId": "unsnoozeIncident",
+        "description": "Ends the snooze of an open incident now: reminders and escalation run again at once, without the extra reminder sent when a snooze runs out. Changes nothing when it is not snoozed. 409 when the incident is resolved.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the incident."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The incident, snoozed_until 0.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Incident"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
     "/api/locations": {
       "get": {
         "tags": [
@@ -11661,6 +11796,15 @@
                       "acked_by": {
                         "type": "string",
                         "description": "Email of who acknowledged it, \"\" = nobody."
+                      },
+                      "snoozed_until": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "When its snooze ends (unix ms), 0 = not snoozed."
+                      },
+                      "snoozed_by": {
+                        "type": "string",
+                        "description": "Email of who snoozed it, \"\" = nobody."
                       }
                     }
                   },
@@ -11668,7 +11812,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "The open incident of the monitor (its down alert was sent), with who acknowledged it. null when there is none."
+                "description": "The open incident of the monitor (its down alert was sent), with who acknowledged or snoozed it. null when there is none."
               },
               "reasons": {
                 "type": "array",
@@ -11859,6 +12003,15 @@
           "acked_by": {
             "type": "string",
             "description": "Email of the user who acknowledged the incident, \"\" = nobody."
+          },
+          "snoozed_until": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When the snooze of the incident ends (unix ms), 0 = never snoozed. A time in the future means it is snoozed: no reminders and no escalation until then."
+          },
+          "snoozed_by": {
+            "type": "string",
+            "description": "Email of the user who snoozed the incident, \"\" = nobody."
           }
         }
       },

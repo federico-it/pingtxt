@@ -32,10 +32,19 @@ type alertState struct {
 	// and no escalation to further channels.
 	ackAt int64 // unix ms, 0 = not acknowledged
 	ackBy string
+	// Snooze, see snooze.go: no reminders and no escalation until
+	// snoozeUntil (unix ms, 0 = not snoozed), then a reminder to every
+	// channel that got the alert.
+	snoozeUntil int64
+	snoozeBy    string
 }
 
-func newAlertState(a *store.IncidentAlerts) *alertState {
-	return &alertState{incident: a.IncidentID, started: a.StartedAt, cause: a.Cause, sent: a.Sent, ackAt: a.AckedAt, ackBy: a.AckedBy}
+func newAlertState(a *store.IncidentAlerts, now int64) *alertState {
+	st := &alertState{incident: a.IncidentID, started: a.StartedAt, cause: a.Cause, sent: a.Sent, ackAt: a.AckedAt, ackBy: a.AckedBy}
+	if a.SnoozedUntil > now { // a snooze that ended while the hub was off is over
+		st.snoozeUntil, st.snoozeBy = a.SnoozedUntil, a.SnoozedBy
+	}
+	return st
 }
 
 // due reports whether the channel must be alerted at now (unix ms).
@@ -60,12 +69,18 @@ type pendingAlert struct {
 // h.mu held.
 func (h *Hub) dueAlertsLocked(st *monState, list []*store.Notifier, rt routing, now int64) []pendingAlert {
 	a := st.alerts
-	if a == nil || !st.incident || st.inMaint || st.m.Paused || a.ackAt > 0 {
+	if a == nil || !st.incident || st.inMaint || st.m.Paused || a.ackAt > 0 || a.snoozeUntil > now {
 		return nil
 	}
+	// The snooze just ended: remind every channel that got the alert.
+	woke := a.snoozeUntil > 0
+	a.snoozeUntil, a.snoozeBy = 0, ""
 	var out []pendingAlert
 	for _, nt := range list {
-		if !rt.wants(nt, st.m, store.EventDown) || !a.due(nt, now) {
+		if !rt.wants(nt, st.m, store.EventDown) {
+			continue
+		}
+		if _, alerted := a.sent[nt.ID]; !(woke && alerted) && !a.due(nt, now) {
 			continue
 		}
 		prev := a.sent[nt.ID]
@@ -163,7 +178,7 @@ func (h *Hub) loadAlerts(now int64) map[int64]*alertState {
 	var rt routing
 	out := map[int64]*alertState{}
 	for id, inc := range open {
-		a := newAlertState(inc)
+		a := newAlertState(inc, now)
 		if len(a.sent) == 0 {
 			if list == nil {
 				list, rt, _ = h.loadRouting()
