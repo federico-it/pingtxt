@@ -69,7 +69,7 @@ function compare(sort: Sort, a: MonitorSummary, b: MonitorSummary) {
   const byName = a.name.localeCompare(b.name)
   // Monitors without data (-1 uptime, 0 latency) go last.
   const up = (m: MonitorSummary) => (m.uptime_24h < 0 ? 2 : m.uptime_24h)
-  const lat = (m: MonitorSummary) => (m.avg_ms_24h > 0 ? m.avg_ms_24h : -1)
+  const lat = (m: MonitorSummary) => (m.avg_ms_24h > 0 && m.type !== "server" ? m.avg_ms_24h : -1)
   switch (sort) {
     case "name":
       return byName
@@ -699,6 +699,12 @@ function Monitors() {
                       <div className="truncate text-xs text-muted-foreground">
                         {m.type === "push"
                           ? t("heartbeatLine", { every: interval(m.interval_sec) })
+                          : m.type === "server"
+                            ? // The last check's numbers say more than the
+                              // mount points: "cpu 21%, ram 48%, disk / 42%..."
+                              m.last?.ok && m.last.message
+                              ? t("serverLine", { metrics: m.last.message, every: interval(m.interval_sec) })
+                              : t("serverLineWaiting", { every: interval(m.interval_sec) })
                           : t("monitorLine", { type: m.type, target: displayTarget(m.target), every: interval(m.interval_sec) })}
                         {m.locations.length > 1 && ` · ${t("locations", { count: m.locations.length })}`}
                         <ExpiryBadges checks={m.expiry} now={now} />
@@ -726,7 +732,8 @@ function Monitors() {
                     {pct(m.uptime_24h)}
                   </span>
                   <span className="hidden text-right text-muted-foreground md:block">
-                    {ms(m.avg_ms_24h)}
+                    {/* a server check's run time is no response time */}
+                    {m.type === "server" ? "" : ms(m.avg_ms_24h)}
                   </span>
                   <span
                     className="hidden text-right text-xs text-muted-foreground md:block"
