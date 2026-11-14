@@ -181,6 +181,8 @@ type Hub struct {
 	codeSync *codeSync  // the configuration file, see configcode_api.go
 	pushMu   sync.Mutex // one push relay registration at a time
 
+	icons monitorIcons // see monitoricons.go
+
 	la     liveActivities // Live Activity pushes, see liveactivity.go
 	laWait time.Duration  // overrides laDebounce (tests only)
 }
@@ -202,6 +204,7 @@ func New(cfg Config, st *store.Store, log *slog.Logger) *Hub {
 	h.releases.wake = make(chan struct{}, 1)
 	h.telemetry.wake = make(chan struct{}, 1)
 	h.la.wake = make(chan struct{}, 1)
+	h.icons.wake = make(chan struct{}, 1)
 	h.expiry.domains = expiry.NewDomains(h.httpClient)
 	h.expiry.cache = map[string]domainCacheEntry{}
 	if err := h.loadSettings(); err != nil {
@@ -255,6 +258,7 @@ func (h *Hub) Run(ctx context.Context) error {
 	go h.liveActivityLoop(ctx)
 	go h.pageWatchLoop(ctx)
 	go h.codeSyncLoop(ctx)
+	go h.iconLoop(ctx)
 	go h.localIPv6.Run(ctx, 10*time.Minute)
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
@@ -305,6 +309,7 @@ func (h *Hub) CheckNow(id int64) {
 
 func (h *Hub) MonitorChanged(id int64) {
 	h.LiveActivitiesChanged() // paused, renamed or deleted: the incidents shown change
+	h.iconsSoon()             // new monitor or new target: look for its icon
 	m, err := h.store.Monitor(id)
 	h.mu.Lock()
 	defer h.mu.Unlock()

@@ -412,14 +412,11 @@ func publicIP(ip net.IP) bool {
 		ip.Equal(net.IPv4bcast))
 }
 
-// fetchLogo downloads an image from a public http(s) address.
-func fetchLogo(ctx context.Context, raw string) ([]byte, error) {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
-		return nil, errors.New("logo URL must be an http:// or https:// address")
-	}
+// publicHTTPClient makes requests to public addresses only (see
+// logoDialControl), following at most 5 redirects.
+func publicHTTPClient() *http.Client {
 	dialer := &net.Dialer{Timeout: 10 * time.Second, Control: logoDialControl}
-	client := &http.Client{
+	return &http.Client{
 		Timeout: 20 * time.Second,
 		Transport: &http.Transport{
 			Proxy:                 nil, // a proxy would dial on our behalf, past the address check
@@ -437,6 +434,15 @@ func fetchLogo(ctx context.Context, raw string) ([]byte, error) {
 			return nil
 		},
 	}
+}
+
+// fetchLogo downloads an image from a public http(s) address.
+func fetchLogo(ctx context.Context, raw string) ([]byte, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
+		return nil, errors.New("logo URL must be an http:// or https:// address")
+	}
+	client := publicHTTPClient()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err

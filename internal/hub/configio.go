@@ -107,6 +107,12 @@ type cfgMonitor struct {
 	StatusSince int64  `json:"status_since,omitempty"`
 	CreatedAt   int64  `json:"created_at,omitempty"`
 	PushToken   string `json:"push_token,omitempty"`
+	// IconURL and IconDarkURL hide the paths of the icon, which are not
+	// configuration. IconImage is the uploaded icon (Icon "custom"), as a
+	// cleaned SVG or a PNG, base64 in JSON.
+	IconURL     string `json:"icon_url,omitempty"`
+	IconDarkURL string `json:"icon_dark_url,omitempty"`
+	IconImage   []byte `json:"icon_image,omitempty"`
 }
 
 type cfgMaintenance struct {
@@ -239,6 +245,13 @@ func (h *Hub) ExportConfig(secrets bool) (*ConfigDoc, error) {
 			c.Headers = hdr
 			if c.ClientKey != "" {
 				c.ClientKey = redactedValue
+			}
+		}
+		if m.Icon == IconCustom {
+			if ic, err := h.store.MonitorIcon(m.ID); err == nil {
+				c.IconImage = ic.Image
+			} else if !errors.Is(err, store.ErrNotFound) {
+				return nil, err
 			}
 		}
 		doc.Monitors = append(doc.Monitors, c)
@@ -844,6 +857,19 @@ func (im *importer) importMonitors(old []*store.Monitor) error {
 				redacted = true
 			}
 		}
+		var customIcon *iconImage
+		if m.Icon == IconCustom {
+			if len(x.IconImage) > 0 {
+				if img, err := processIcon(x.IconImage); err == nil {
+					customIcon = &img
+				} else {
+					im.res.warn("monitor %q: icon skipped: %v", m.Name, err)
+				}
+			}
+			if customIcon == nil && (prev == nil || prev.Icon != IconCustom) {
+				m.Icon = IconAuto
+			}
+		}
 		paused := m.Paused
 		if redacted && !paused {
 			paused = true
@@ -870,6 +896,11 @@ func (im *importer) importMonitors(old []*store.Monitor) error {
 		}
 		if m.Type == check.TypePush {
 			if err := im.pushToken(&m, x.PushToken, prev); err != nil {
+				return err
+			}
+		}
+		if customIcon != nil {
+			if err := st.SetMonitorIcon(&store.MonitorIcon{MonitorID: m.ID, Source: "custom", Image: customIcon.data, ImageType: customIcon.ctype}); err != nil {
 				return err
 			}
 		}

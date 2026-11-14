@@ -403,7 +403,7 @@ func (h *Hub) ToCode(doc *ConfigDoc) *CodeDoc {
 
 // Fields of the API objects that are state or ids, not configuration.
 var (
-	monitorDrop = []string{"id", "push_token", "status", "status_since", "created_at", "group_id", "tag_ids", "notifiers"}
+	monitorDrop = []string{"id", "push_token", "status", "status_since", "created_at", "group_id", "tag_ids", "notifiers", "icon_url", "icon_dark_url", "icon_image"}
 	maintDrop   = []string{"id", "created_at", "monitor_ids", "group_ids", "tag_ids"}
 	pageDrop    = []string{"id", "created_at", "monitor_ids", "group_ids", "subscribe_notifier_id", "password", "protected"}
 )
