@@ -430,8 +430,13 @@ nella pagina dei gruppi, e come *progetto › api* nelle status page, nelle scel
 gruppo riassume anche i suoi sottogruppi, e scegliere un gruppo per una status page, una manutenzione, un canale o
 un report include i suoi sottogruppi. Eliminando un gruppo i suoi sottogruppi salgono di un livello.
 
-Nella dashboard una linea a sinistra collega ogni sottogruppo e i suoi monitor al gruppo sopra, e **comprimi tutti** /
-**espandi tutti** accanto al filtro dei gruppi chiude o apre tutte le sezioni. Il filtro **gruppo** è un menu con i
+La dashboard mostra i monitor come **lista** o come **card** (l'interruttore a destra del filtro per stato; il browser
+ricorda la scelta). Ogni gruppo principale è una sezione con un titolo che conta i suoi monitor, dice quanti sono giù o
+degradati e mostra un quadratino per monitor colorato secondo lo stato, anche quando la sezione è compressa. I
+sottogruppi di qualsiasi livello restano nella sezione del loro gruppo principale, col percorso sotto di esso
+(*DNS › Resolvers*): nella lista come titolo spostato di un passo a destra, nelle card come riga in cima a ogni card,
+così un sottogruppo con un solo monitor non occupa una riga tutta sua. Un clic sul titolo comprime la sezione;
+**comprimi tutti** / **espandi tutti** accanto al filtro dei gruppi chiude o apre tutte le sezioni. Il filtro **gruppo** è un menu con i
 gruppi ad albero e quanti monitor contiene ognuno; scegliendo un gruppo compaiono anche i suoi sottogruppi. Un
 sottogruppo il cui nome inizia con quello del gruppo mostra solo il resto (*Infrastructure DNS* in *Infrastructure*
 diventa *DNS*). Anche il filtro **tag** è un menu: spunta uno o più tag per vedere i monitor che ne hanno almeno uno.

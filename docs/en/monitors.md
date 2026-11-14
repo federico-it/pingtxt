@@ -411,8 +411,13 @@ A group can sit inside another one (**inside group** in the group dialog), up to
 group for a status page, maintenance window, channel or report includes its subgroups. Deleting a group moves its
 subgroups up one level.
 
-On the dashboard a line on the left links each subgroup and its monitors to the group above, and **fold all** /
-**unfold all** next to the group filter closes or opens every section. The **group** filter is a menu with the
+The dashboard shows monitors as a **list** or as **cards** (the switch at the right of the status filter; the browser
+remembers the choice). Each top-level group is a section whose heading counts its monitors, says how many are down
+or degraded, and shows one small square per monitor colored by status, also when the section is folded. Subgroups of
+any depth stay inside their top-level group's section, named by their path below it (*DNS › Resolvers*): in the
+list as a heading one step to the right, in the cards as a line on top of each card, so a subgroup with one monitor
+does not take a row of its own. Click a heading to fold it; **fold all** / **unfold all** next to the group filter
+closes or opens every section. The **group** filter is a menu with the
 groups as a tree and how many monitors each one holds; picking a group shows its subgroups too. A subgroup whose name
 starts with its group's name shows only the rest (*Infrastructure DNS* in *Infrastructure* reads *DNS*). The **tag**
 filter is a menu too: tick one or more tags to see the monitors with any of them. Sorted by **status**, groups with
