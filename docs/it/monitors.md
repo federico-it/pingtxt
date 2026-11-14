@@ -301,10 +301,20 @@ falliscono il controllo con "this agent cannot send client certificates: update 
 
 ## Metriche dei server (CPU, RAM, disco)
 
-Un monitor **server** controlla le macchine su cui girano i tuoi controlli. Ogni posizione del monitor riporta la
-propria macchina: l'hub quella (o il container) in cui gira, un agent il suo host. Per controllare un server installa
-un agent su di esso e sceglilo come posizione del monitor; scegline diversi per controllare un gruppo di server con un
-solo monitor. Solo Linux; gli agent su altri sistemi falliscono con `server metrics are only available on Linux`.
+Un monitor **server** legge CPU, memoria, dischi e load della macchina **su cui gira il controllo**. Non è un
+controllo remoto: un agent non può misurare un'altra macchina via rete, quindi gli agent di Francoforte o New York
+vedono solo i propri host, mai il tuo server.
+
+Per controllare un server:
+
+1. [installa un agent](locations.md#aggiungere-un-agent) su quel server (Linux);
+2. crea un monitor di tipo **server** e, in **località**, scegli solo quell'agent. Scegli l'hub per controllare la
+   macchina (o il container) su cui gira pingtxt.
+
+Un monitor per server: per controllare tre server installa un agent su ognuno e crea tre monitor (**duplica** il primo
+e cambia la località). Il form fa scegliere una sola località a un monitor server; i monitor più vecchi con più
+località le tengono, e la pagina mostra un selettore tra le loro macchine. Gli agent su sistemi diversi da Linux
+falliscono con `server metrics are only available on Linux`.
 
 Ogni controllo legge:
 
@@ -320,9 +330,13 @@ vuoto lo spegne. Un controllo sopra un limite fallisce dicendo cosa lo supera, p
 `disk /data 93% over 90%`, e partono i soliti avvisi. Il form parte con 90% per cpu, ram e disco. Con **tentativi** a
 3 e intervallo di 1 minuto, un breve picco di CPU non manda avvisi.
 
-La pagina del monitor mostra gli ultimi valori di ogni posizione e un grafico di cpu, ram e del disco più pieno nelle
-ultime 24 ore o 7 giorni (API `GET /api/monitors/{id}/server`, MCP `get_server_metrics`). Le metriche si tengono per
-la durata dei risultati grezzi, almeno 7 giorni.
+La pagina del monitor mostra prima le metriche: cpu, ram, disco più pieno e load per core accanto ai loro limiti, poi
+una barra per ogni disco e un grafico per metrica su 1 ora, 6 ore, 24 ore o 7 giorni, con il limite come linea
+rossa tratteggiata. Le barre delle ultime 24 ore e la quota "entro i limiti" (24 ore, 7 e 30 giorni) dicono quanto il
+server è rimasto sotto i limiti. Tempo di risposta e latenza non compaiono: per questo controllo non significano
+nulla. Nella dashboard la riga mostra gli ultimi valori, per esempio
+`server · cpu 21%, ram 48%, disk / 42%, load 0.32`. Dati: API `GET /api/monitors/{id}/server`, MCP
+`get_server_metrics`. Le metriche si tengono per la durata dei risultati grezzi, almeno 7 giorni.
 
 Un agent in Docker vede CPU, memoria e load dell'host, ma solo i dischi del suo container. Per controllare i dischi
 dell'host montali in sola lettura (`-v /:/hostfs:ro`) e imposta la destinazione a `/hostfs`. Gli agent più vecchi di

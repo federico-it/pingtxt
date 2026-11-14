@@ -113,6 +113,8 @@
     "down": "{count} down",
     "heartbeatLine": "heartbeat · atteso ogni {every}",
     "monitorLine": "{type} · {target} · ogni {every}",
+    "serverLine": "server · {metrics} · ogni {every}",
+    "serverLineWaiting": "server · ogni {every}",
     "locations": "{count} località",
     "searchHint": "premi / per cercare, Esc per cancellare",
     "sort": {
@@ -167,6 +169,8 @@
     "none": "nessuna",
     "pushLine": "heartbeat · atteso ogni <hl>{every}</hl> · tolleranza {grace}",
     "checkLine": "{type} · <hl>{target}</hl> · ogni {every} · timeout {timeout}ms · tentativi {retries}",
+    "serverLine": "server · su <hl>{where}</hl> · ogni {every} · avviso dopo {retries} controlli oltre un limite",
+    "serverDisks": "dischi {disks}",
     "inMaintenance": "in manutenzione: <hl>{name}</hl> fino al {until}. i controlli continuano, avvisi e incidenti sono sospesi.",
     "manage": "gestisci",
     "kv": {
@@ -178,6 +182,8 @@
       "avg24h": "media 24h"
     },
     "last24h": "ultime 24h",
+    "serverChecks": "controlli, ultime 24h",
+    "withinLimits": "entro i limiti: 24h {d1} · 7g {d7} · 30g {d30}",
     "expiry": "scadenze",
     "runTime": "durata (da ?ping=)",
     "responseTime": "tempo di risposta",
@@ -352,7 +358,7 @@
       },
       "server": {
         "label": "server (cpu, ram, disco)",
-        "hint": "ogni posizione riporta la macchina su cui gira (hub o host dell'agent, Linux): giù sopra un limite"
+        "hint": "legge cpu, ram e dischi della macchina su cui gira: scegli l'agent installato sul server da controllare"
       },
       "push": {
         "label": "heartbeat (push)",
@@ -422,7 +428,7 @@
     "sshExpect": "banner o chiave host attesi",
     "sshExpectHint": "facoltativo: testo che il banner deve contenere (es. OpenSSH), oppure l'impronta di una chiave host SHA256:… (da ssh-keygen -lf): giù quando il server non ha una chiave con quell'impronta. Un controllo riuscito mostra l'impronta.",
     "mailboxHint": "imaps:// e pop3s:// usano TLS da subito (993, 995), imap:// e pop3:// passano a TLS con STARTTLS quando il server lo offre. Con utente:password@ nell'URL il controllo fa anche login, solo su TLS. Usa una casella creata per il monitoraggio: gli admin vedono la password.",
-    "serverHint": "Scegli qui sotto le posizioni da controllare: ognuna riporta la propria macchina (il container o l'host dell'hub, l'host di un agent). Dischi: punti di montaggio separati da virgole, vuoto = tutti i dischi. Lascia vuoto un limite per spegnerlo. Solo Linux.",
+    "serverHint": "Un monitor server legge cpu, ram, dischi e load della macchina su cui gira il controllo: non può misurare un'altra macchina via rete. Per controllare un server installa un agent su quel server e sceglilo nelle località qui sotto (un monitor per server). Dischi: punti di montaggio separati da virgole, vuoto = tutti i dischi. Lascia vuoto un limite per spegnerlo. Solo Linux.",
     "serverLimits": {
       "cpu_pct": "limite cpu (%)",
       "mem_pct": "limite ram (%)",
@@ -471,7 +477,10 @@
     "timeout": "timeout (ms)",
     "retries": "tentativi",
     "retriesHint": "errori consecutivi prima che una località sia down",
+    "serverRetriesHint": "controlli di fila oltre un limite prima che il server sia down: 3 con intervallo di 1 minuto ignora i picchi brevi",
     "locationsHint": "Il monitor è down quando fallisce più della metà delle località online, degradato quando fallisce almeno la soglia qui sotto.",
+    "serverLocationsHint": "Scegli la sola località di cui vuoi controllare la macchina: l'agent installato su quel server, o l'hub per la macchina su cui gira pingtxt. Gli altri agent non vedono questo server: per controllare più server, crea un monitor per ognuno.",
+    "serverManyLocations": "Questo monitor controlla {count} macchine, una per località. Scegline una: ogni server si legge meglio nel suo monitor (duplica questo per gli altri).",
     "selectAllLocations": "seleziona tutte",
     "statuspageLocationsHint": "Una status page dà la stessa risposta da ogni località: basta il hub, altre località ripetono solo la stessa richiesta.",
     "deselectAllLocations": "deseleziona tutte",
@@ -2242,24 +2251,27 @@
     }
   },
   "serverMetrics": {
-    "title": "server",
-    "history": "cpu, ram e disco",
+    "title": "adesso",
+    "history": "andamento",
     "cpu": "cpu",
     "ram": "ram",
     "swap": "swap",
     "disk": "disco",
+    "fullestDisk": "disco più pieno",
+    "loadPerCore": "load per core",
     "load": "load {l1} · {l5} · {l15} ({cores} core)",
     "uptime": "acceso da {time}",
+    "updated": "aggiornato {ago}",
+    "limitShort": "limite {limit}",
+    "noLimit": "nessun limite",
     "loading": "in attesa del primo controllo...",
     "noData": "ancora nessun dato",
-    "noDataHint": "Ancora nessuna metrica da questa posizione: serve un agent Linux aggiornato a questa versione.",
+    "noDataHint": "Ancora nessuna metrica da questa località: serve un agent Linux aggiornato a questa versione.",
+    "noLocation": "Nessuna località: modifica il monitor e scegli l'agent del server da controllare.",
     "noHistory": "nessun dato in questo periodo",
-    "load5": "load (5 min)",
-    "lines": {
-      "cpu_pct": "cpu",
-      "mem_pct": "ram",
-      "disk_pct": "disco più pieno"
-    }
+    "since": "dati dal {time}, quando è partito il monitor",
+    "servers": "{count} server:",
+    "offline": "offline: nessuna nuova metrica finché non si riconnette"
   },
   "oncall": {
     "title": "reperibilità",

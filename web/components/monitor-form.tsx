@@ -393,6 +393,7 @@ export function MonitorForm({
     ((isHTTP || isMCP) && lowerTarget.startsWith("https://")) ||
     (isWS && lowerTarget.startsWith("wss://"))
   const isPush = m.type === "push"
+  const isServer = m.type === "server"
   const slowMode =
     m.slow_ms === -1 ? "auto" : m.slow_ms > 0 ? "fixed" : "off"
   const isSQL = m.type === "postgres" || m.type === "mysql"
@@ -448,6 +449,9 @@ export function MonitorForm({
         next.target = ""
         next.server_limits = { cpu_pct: 90, mem_pct: 90, disk_pct: 90, swap_pct: 0, load: 0 }
         next.timeout_ms = Math.max(p.timeout_ms, 3000)
+        next.slow_ms = 0
+        // One monitor watches one machine: keep a single location.
+        next.locations = p.locations.slice(0, 1)
       }
       if (type === "push" && p.type !== "push") {
         next.interval_sec = 3600
@@ -525,6 +529,12 @@ export function MonitorForm({
   }
 
   function toggleLoc(loc: string, on: boolean) {
+    // A server monitor reads the machine its location runs on: one
+    // location, one server.
+    if (m.type === "server") {
+      set("locations", on ? [loc] : m.locations.filter((l) => l !== loc))
+      return
+    }
     set(
       "locations",
       on
@@ -1128,6 +1138,7 @@ export function MonitorForm({
           )}
           {!isPush && (
             <>
+              {!isServer && (
               <Field label={tr("timeout")}>
                 <Input
                   type="number"
@@ -1138,7 +1149,8 @@ export function MonitorForm({
                   onChange={(e) => set("timeout_ms", Number(e.target.value))}
                 />
               </Field>
-              <Field label={tr("retries")} hint={tr("retriesHint")}>
+              )}
+              <Field label={tr("retries")} hint={isServer ? tr("serverRetriesHint") : tr("retriesHint")}>
                 <Input
                   type="number"
                   min={1}
@@ -1149,6 +1161,7 @@ export function MonitorForm({
               </Field>
             </>
           )}
+          {!isServer && (
           <Field
             label={tr("slow.label")}
             hint={tr(
@@ -1208,19 +1221,26 @@ export function MonitorForm({
               )}
             </div>
           </Field>
+          )}
         </div>
       </Section>
 
       {!isPush && (
         <Section title={tr("sections.locations")}>
           <p className="mb-3 text-xs text-muted-foreground">
-            {tr("locationsHint")}
+            {isServer ? tr("serverLocationsHint") : tr("locationsHint")}
           </p>
+          {isServer && m.locations.length > 1 && (
+            <p className="mb-3 text-xs text-warn">
+              {tr("serverManyLocations", { count: m.locations.length })}
+            </p>
+          )}
           {isSP && (
             <p className="mb-3 text-xs text-muted-foreground">
               {tr("statuspageLocationsHint")}
             </p>
           )}
+          {!isServer && (
           <div className="mb-4 grid gap-4 sm:grid-cols-2">
             <Field label={tr("degradedPct")} hint={tr("degradedPctHint")}>
               <Input
@@ -1237,7 +1257,7 @@ export function MonitorForm({
                 }
               />
             </Field>
-            {m.type !== "docker" && m.type !== "server" && (
+            {m.type !== "docker" && (
               <Field label={tr("ipFamily.label")} hint={tr("ipFamily.hint")}>
                 <Select
                   items={ipFamilies.map((f) => ({
@@ -1270,7 +1290,7 @@ export function MonitorForm({
                 </Select>
               </Field>
             )}
-            {m.type !== "push" && !isSP && m.type !== "server" && (
+            {m.type !== "push" && !isSP && (
               <Field label={tr("diagnostics.label")} hint={tr("diagnostics.hint")}>
                 <Select
                   items={diagModes.map((v) => ({
@@ -1296,7 +1316,8 @@ export function MonitorForm({
               </Field>
             )}
           </div>
-          {(locations.data ?? []).length > 1 && (
+          )}
+          {(locations.data ?? []).length > 1 && !isServer && (
             <div className="mb-2 flex justify-end">
               <Button
                 type="button"

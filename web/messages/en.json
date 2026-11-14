@@ -113,6 +113,8 @@
     "down": "{count} down",
     "heartbeatLine": "heartbeat · expected every {every}",
     "monitorLine": "{type} · {target} · every {every}",
+    "serverLine": "server · {metrics} · every {every}",
+    "serverLineWaiting": "server · every {every}",
     "locations": "{count} locations",
     "searchHint": "press / to search, Esc to clear",
     "sort": {
@@ -167,6 +169,8 @@
     "none": "none",
     "pushLine": "heartbeat · expected every <hl>{every}</hl> · grace {grace}",
     "checkLine": "{type} · <hl>{target}</hl> · every {every} · timeout {timeout}ms · retries {retries}",
+    "serverLine": "server · on <hl>{where}</hl> · every {every} · alert after {retries} checks over a limit",
+    "serverDisks": "disks {disks}",
     "inMaintenance": "in maintenance: <hl>{name}</hl> until {until}. checks keep running, alerts and incidents are paused.",
     "manage": "manage",
     "kv": {
@@ -178,6 +182,8 @@
       "avg24h": "avg 24h"
     },
     "last24h": "last 24h",
+    "serverChecks": "checks, last 24h",
+    "withinLimits": "within limits: 24h {d1} · 7d {d7} · 30d {d30}",
     "expiry": "expiry",
     "runTime": "run time (from ?ping=)",
     "responseTime": "response time",
@@ -352,7 +358,7 @@
       },
       "server": {
         "label": "server (cpu, ram, disk)",
-        "hint": "each location reports the machine it runs on (hub or agent host, Linux): down above a limit"
+        "hint": "reads cpu, ram and disks of the machine it runs on: pick the agent installed on the server to watch"
       },
       "push": {
         "label": "heartbeat (push)",
@@ -422,7 +428,7 @@
     "sshExpect": "expected banner or host key",
     "sshExpectHint": "optional: text the banner must contain (e.g. OpenSSH), or a host key fingerprint SHA256:… (from ssh-keygen -lf): down when the server has no key with it. A successful check shows the fingerprint.",
     "mailboxHint": "imaps:// and pop3s:// use TLS from the start (993, 995), imap:// and pop3:// upgrade with STARTTLS when the server offers it. With user:password@ in the URL the check also logs in, only over TLS. Use a mailbox made for monitoring: the password is visible to admins.",
-    "serverHint": "Pick the locations to watch below: each one reports its own machine (the hub's container or host, an agent's host). Disks: mount points separated by commas, empty = every disk. Leave a limit empty to turn it off. Linux only.",
+    "serverHint": "A server monitor reads cpu, ram, disks and load of the machine the check runs on: it cannot measure another machine over the network. To watch a server, install an agent on it and pick that agent in locations below (one monitor per server). Disks: mount points separated by commas, empty = every disk. Leave a limit empty to turn it off. Linux only.",
     "serverLimits": {
       "cpu_pct": "cpu limit (%)",
       "mem_pct": "ram limit (%)",
@@ -471,7 +477,10 @@
     "timeout": "timeout (ms)",
     "retries": "retries",
     "retriesHint": "consecutive failures before a location is down",
+    "serverRetriesHint": "checks in a row over a limit before the server is down: 3 with a 1 minute interval ignores short spikes",
     "locationsHint": "The monitor is down when more than half of the online locations fail, degraded when at least the threshold below fails.",
+    "serverLocationsHint": "Pick the one location whose machine you want to watch: the agent installed on that server, or the hub for the machine pingtxt runs on. Other agents cannot see this server: to watch more servers, make one monitor for each.",
+    "serverManyLocations": "This monitor watches {count} machines, one per location. Pick one: each server reads more clearly in its own monitor (duplicate this one for the others).",
     "selectAllLocations": "select all",
     "statuspageLocationsHint": "A status page gives the same answer from every location: the hub alone is enough, more locations only repeat the same request.",
     "deselectAllLocations": "deselect all",
@@ -2242,24 +2251,27 @@
     }
   },
   "serverMetrics": {
-    "title": "server",
-    "history": "cpu, ram and disk",
+    "title": "right now",
+    "history": "history",
     "cpu": "cpu",
     "ram": "ram",
     "swap": "swap",
     "disk": "disk",
+    "fullestDisk": "fullest disk",
+    "loadPerCore": "load per core",
     "load": "load {l1} · {l5} · {l15} ({cores} cores)",
     "uptime": "up for {time}",
+    "updated": "updated {ago}",
+    "limitShort": "limit {limit}",
+    "noLimit": "no limit",
     "loading": "waiting for the first check...",
     "noData": "no data yet",
     "noDataHint": "No metrics from this location yet: it needs a Linux agent updated to this version.",
+    "noLocation": "No location: edit the monitor and pick the agent of the server to watch.",
     "noHistory": "no data in this period",
-    "load5": "load (5 min)",
-    "lines": {
-      "cpu_pct": "cpu",
-      "mem_pct": "ram",
-      "disk_pct": "fullest disk"
-    }
+    "since": "data since {time}, when the monitor started",
+    "servers": "{count} servers:",
+    "offline": "offline: no new metrics until it reconnects"
   },
   "oncall": {
     "title": "on-call",

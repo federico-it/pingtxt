@@ -289,10 +289,20 @@ cannot send client certificates: update it".
 
 ## Server metrics (CPU, RAM, disk)
 
-A **server** monitor watches the machines your checks run on. Each location of the monitor reports its own machine:
-the hub reports the machine (or container) it runs in, an agent reports its host. To watch a server, install an
-agent on it and pick that agent as the monitor's location; pick several to watch a fleet with one monitor. Linux only;
-agents on other systems fail with `server metrics are only available on Linux`.
+A **server** monitor reads the CPU, memory, disks and load of the machine **the check runs on**. It is not a remote
+check: an agent cannot measure another machine over the network, so the agents in Frankfurt or New York see only
+their own hosts, never your server.
+
+To watch a server:
+
+1. [install an agent](locations.md#add-an-agent) on that server (Linux);
+2. create a monitor of type **server** and, in **locations**, pick that agent only. Pick the hub to watch the machine
+   (or container) pingtxt itself runs in.
+
+One monitor per server: to watch three servers, install an agent on each and make three monitors (**duplicate** the
+first one and change its location). The form lets a server monitor pick one location; older monitors with several
+keep them, and the page shows a switch between their machines. Agents on other systems than Linux fail with
+`server metrics are only available on Linux`.
 
 Each check reads:
 
@@ -307,9 +317,13 @@ off. A check above a limit fails with what is over it, e.g. `disk /data 93% over
 The form starts with 90% for cpu, ram and disk. With **retries** at 3 and a 1 minute interval, a short CPU spike does
 not alert.
 
-The monitor page shows the latest values of each location and a chart of cpu, ram and the fullest disk over 24 hours
-or 7 days (API `GET /api/monitors/{id}/server`, MCP `get_server_metrics`). Metrics are kept for the raw results
-retention, at least 7 days.
+The monitor page shows the metrics first: cpu, ram, fullest disk and load per core next to their limits, then a bar
+for each disk and one chart per metric over 1 hour, 6 hours, 24 hours or 7 days, with the limit as a red dashed line.
+The bars of the last 24 hours and the "within limits" share (24 hours, 7 and 30 days) tell how long the server stayed
+under its limits. Response time and latency are left out: they mean nothing for this check. On the dashboard the row
+shows the last values, e.g. `server · cpu 21%, ram 48%, disk / 42%, load 0.32`. Data: API
+`GET /api/monitors/{id}/server`, MCP `get_server_metrics`. Metrics are kept for the raw results retention, at least
+7 days.
 
 An agent in Docker sees the host's CPU, memory and load, but only the disks of its container. To watch the host's
 disks, mount them read-only (`-v /:/hostfs:ro`) and set the target to `/hostfs`. Agents older than this monitor type

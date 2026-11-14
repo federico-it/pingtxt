@@ -19,7 +19,7 @@ import { TagList, useLabels } from "@/components/labels"
 import { KV, PageHeader, Section } from "@/components/page-header"
 import { OkText, StatusGlyph, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
-import { ServerPanel } from "@/components/server-metrics"
+import { ServerView } from "@/components/server-metrics"
 import { ResultsLog, type TimeWindow } from "@/components/results-log"
 import { IncidentDiagnostics } from "@/components/diagnostics"
 import { ReasonList, parseCause } from "@/components/reasons"
@@ -90,7 +90,8 @@ function View() {
   const tp = useTranslations("phaseChart")
   const ts = useTranslations("status")
   const series = useApi<Series>(
-    !id ? null : zoom ? `/api/monitors/${id}/series?start=${zoom.start}&end=${zoom.end}` : `/api/monitors/${id}/series?range=${range}`,
+    // Server monitors have no response time chart.
+    !id || m.data?.type === "server" ? null : zoom ? `/api/monitors/${id}/series?start=${zoom.start}&end=${zoom.end}` : `/api/monitors/${id}/series?range=${range}`,
     // A zoomed window is in the past: nothing new to fetch.
     { refreshInterval: zoom ? 0 : 30_000, keepPreviousData: true }
   )
@@ -199,6 +200,16 @@ function View() {
               grace: d.grace_sec ? interval(d.grace_sec) : t("none"),
               hl: (c) => <span className="text-foreground">{c}</span>,
             })}
+          </>
+        ) : d.type === "server" ? (
+          <>
+            {t.rich("serverLine", {
+              where: d.location_status.map((l) => l.name).join(", ") || "--",
+              every: interval(d.interval_sec),
+              retries: d.retries,
+              hl: (c) => <span className="text-foreground">{c}</span>,
+            })}
+            {d.target.trim() && ` · ${t("serverDisks", { disks: d.target })}`}
           </>
         ) : (
           <>
@@ -315,6 +326,9 @@ function View() {
       )}
 
 
+      {d.type === "server" ? (
+        <ServerView d={d} now={now} />
+      ) : (
       <div className="grid grid-cols-2 gap-4 border-y border-dashed py-4 sm:grid-cols-3 lg:grid-cols-6">
         <KV k={t("kv.status")} v={<StatusText status={d.status} />} />
         <KV
@@ -326,22 +340,13 @@ function View() {
         <KV k={t("kv.uptime30d")} v={pct(d.uptime_30d)} />
         <KV k={t("kv.avg24h")} v={ms(d.avg_ms_24h)} />
       </div>
+      )}
 
       {d.type === "push" && d.push_url && (
         <PushInfo id={id} url={d.push_url} onRotated={() => m.mutate()} />
       )}
 
-      {d.type === "server" && (
-        <ServerPanel
-          id={id}
-          limits={d.server_limits ?? noLimits}
-          countries={Object.fromEntries(
-            (d.location_status ?? []).map((l) => [l.id, l.country])
-          )}
-        />
-      )}
-
-      <Section title={t("last24h")}>
+      <Section title={d.type === "server" ? t("serverChecks") : t("last24h")}>
         <UptimeBars
           bars={d.bars}
           height="h-8"
@@ -351,6 +356,11 @@ function View() {
             document.getElementById("log")?.scrollIntoView({ behavior: "smooth", block: "start" })
           }}
         />
+        {d.type === "server" && (
+          <div className="mt-2 text-xs text-muted-foreground">
+            {t("withinLimits", { d1: pct(d.uptime_24h), d7: pct(d.uptime_7d), d30: pct(d.uptime_30d) })}
+          </div>
+        )}
       </Section>
 
       {d.expiry.length > 0 && (
@@ -359,6 +369,7 @@ function View() {
         </Section>
       )}
 
+      {d.type !== "server" && (
       <Section
         title={d.type === "push" ? t("runTime") : t("responseTime")}
         actions={
@@ -435,7 +446,9 @@ function View() {
           <PeriodStatsRow current={series.data.stats.current} previous={series.data.stats.previous} />
         )}
       </Section>
+      )}
 
+      {d.type !== "server" && (
       <Section title={d.type === "push" ? t("lastHeartbeat") : t("locations")}>
         {d.type !== "push" && d.location_status.length > 0 && d.location_status.every((l) => !l.online) && (
           <p className="mb-2 text-xs text-warn">{t("noLocationOnline")}</p>
@@ -502,6 +515,7 @@ function View() {
           </TableBody>
         </Table>
       </Section>
+      )}
 
       <Section title={t("incidents")}>
         {incidents.data?.length ? (
@@ -572,4 +586,3 @@ export default function MonitorPage() {
   )
 }
 
-const noLimits = { cpu_pct: 0, mem_pct: 0, disk_pct: 0, swap_pct: 0, load: 0 }
