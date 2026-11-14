@@ -551,6 +551,7 @@ func monitorFields() map[string]any {
 		"ping_loss_pct":       prop("integer", "Ping monitors: the check fails when at least this share (percent) of packets is lost, 0 = only when all are lost. Agents older than this setting fail the check with update it"),
 		"locations":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Where to check from: ids from list_agents (\"local\" is the hub itself). Default local."},
 		"group_id":            prop("integer", "Group id from list_groups, 0 for none"),
+		"icon":                prop("string", `Icon shown next to the name: "" (default) the favicon of the target's website, found by the hub; "none"; "dashboard:<name>" an icon of Dashboard Icons, names from search_dashboard_icons (e.g. dashboard:proxmox); "custom" keeps an uploaded image (upload it in the web UI)`),
 		"tag_ids":             intList("Tag ids from list_tags"),
 		"depends_on":          intList("Ids of monitors this one depends on (e.g. the ping of its server). While one of them is down this monitor sends no alerts of its own; [] for none"),
 		"cert_expiry_alert":   prop("boolean", "Alert before the TLS certificate expires"),
@@ -858,6 +859,22 @@ var mcpTools = []mcpTool{
 				path += "?" + v.Encode()
 			}
 			return c.do("GET", path, nil)
+		},
+	},
+
+	{
+		name: "search_dashboard_icons", title: "Search monitor icons",
+		description: `Search Dashboard Icons (dashboardicons.com, about 3500 logos of apps and services) for a monitor icon. Use a result's name as icon "dashboard:<name>" in create_monitor or update_monitor.`,
+		schema: object(map[string]any{
+			"q":     prop("string", "Search text: an app or service name (proxmox, nextcloud, github)"),
+			"limit": prop("integer", "Most results to return, default 20"),
+		}, "q"),
+		run: func(c *mcpCall) (any, error) {
+			limit, ok := c.optInt("limit")
+			if !ok || limit <= 0 {
+				limit = 20
+			}
+			return c.do("GET", "/api/dashboard-icons?"+url.Values{"q": {c.str("q")}, "limit": {strconv.FormatInt(limit, 10)}}.Encode(), nil)
 		},
 	},
 

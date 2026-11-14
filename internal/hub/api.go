@@ -149,6 +149,12 @@ func (h *Hub) routes(ui fs.FS) *http.ServeMux {
 	mux.HandleFunc("PUT /api/monitors/{id}", auth(h.updateMonitor))
 	mux.HandleFunc("DELETE /api/monitors/{id}", auth(h.deleteMonitor))
 	mux.HandleFunc("POST /api/monitors/{id}/pause", auth(h.pauseMonitor))
+	mux.HandleFunc("GET /api/monitors/{id}/icon", auth(h.getMonitorIcon)) // see monitoricons.go
+	mux.HandleFunc("POST /api/monitors/{id}/icon", auth(h.uploadMonitorIcon))
+	mux.HandleFunc("POST /api/monitors/{id}/icon/favicon", auth(h.detectMonitorIcon))
+	mux.HandleFunc("DELETE /api/monitors/{id}/icon", auth(h.deleteMonitorIcon))
+	mux.HandleFunc("GET /api/dashboard-icons", auth(h.listDashboardIcons))
+	mux.HandleFunc("GET /api/dashboard-icons/{name}", auth(h.dashboardIconPreview))
 	mux.HandleFunc("POST /api/monitors/{id}/test", auth(h.testSavedMonitor))
 	mux.HandleFunc("POST /api/monitors/{id}/check", auth(h.checkMonitorNow))
 	mux.HandleFunc("GET /api/monitors/{id}/series", auth(h.monitorSeries))
@@ -321,10 +327,13 @@ func securityHeaders(next http.Handler) http.Handler {
 		if strings.HasPrefix(r.URL.Path, "/api/") && !strings.HasPrefix(r.URL.Path, "/api/push/") &&
 			!strings.HasPrefix(r.URL.Path, "/api/public/subscriptions/") && !strings.HasPrefix(r.URL.Path, "/api/voice/") && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
 			ctype := r.Header.Get("Content-Type")
-			// Backup and status page logo uploads are raw files. application/octet-stream is not a
-			// CORS "simple" type either, so a cross-site form cannot send it.
-			upload := (r.URL.Path == "/api/backups/upload" || (strings.HasPrefix(r.URL.Path, "/api/status-pages/") &&
-				strings.HasSuffix(r.URL.Path, "/logo"))) && strings.HasPrefix(ctype, "application/octet-stream")
+			// Backup, status page logo and monitor icon uploads are raw files.
+			// application/octet-stream is not a CORS "simple" type either, so a
+			// cross-site form cannot send it.
+			upload := (r.URL.Path == "/api/backups/upload" ||
+				(strings.HasPrefix(r.URL.Path, "/api/status-pages/") && strings.HasSuffix(r.URL.Path, "/logo")) ||
+				(strings.HasPrefix(r.URL.Path, "/api/monitors/") && strings.HasSuffix(r.URL.Path, "/icon"))) &&
+				strings.HasPrefix(ctype, "application/octet-stream")
 			// Configuration as code takes YAML; none of its types is a "simple" one either.
 			yamlBody := strings.HasPrefix(r.URL.Path, "/api/config/code/") && (strings.HasPrefix(ctype, "application/yaml") ||
 				strings.HasPrefix(ctype, "application/x-yaml") || strings.HasPrefix(ctype, "text/yaml"))
@@ -691,6 +700,9 @@ func (h *Hub) validateMonitor(m *store.Monitor) error {
 	}
 	if !slices.Contains(validTypes, m.Type) {
 		return errors.New("invalid type")
+	}
+	if err := validateIcon(m); err != nil {
+		return err
 	}
 	if m.GroupID < 0 {
 		m.GroupID = 0
@@ -1245,6 +1257,10 @@ func (h *Hub) createMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 	if err == nil {
 		err = h.validateMonitorLinks(&m)
 	}
+	var icon *store.MonitorIcon
+	if err == nil {
+		icon, err = h.prepareIcon(r.Context(), &m, nil)
+	}
 	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
@@ -1261,6 +1277,9 @@ func (h *Hub) createMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 	}
 	if paused {
 		_ = h.store.SetMonitorPaused(m.ID, true)
+	}
+	if err := h.applyIcon(&m, nil, icon); err != nil {
+		h.log.Error("monitor icon", "monitor", m.ID, "err", err)
 	}
 	h.MonitorChanged(m.ID)
 	h.expirySoon(m.ID)
@@ -1403,6 +1422,10 @@ func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 	if err == nil {
 		err = h.validateMonitorLinks(&m)
 	}
+	var icon *store.MonitorIcon
+	if err == nil {
+		icon, err = h.prepareIcon(r.Context(), &m, prev)
+	}
 	if err != nil {
 		writeErr(w, 400, err.Error())
 		return
@@ -1417,6 +1440,9 @@ func (h *Hub) updateMonitor(w http.ResponseWriter, r *http.Request, _ *store.Use
 		err = h.store.SetPushToken(id, newPushToken())
 	case m.Type != check.TypePush && prev.PushToken != "":
 		err = h.store.SetPushToken(id, "")
+	}
+	if err == nil {
+		err = h.applyIcon(&m, prev, icon)
 	}
 	if err != nil {
 		h.internalErr(w, err)

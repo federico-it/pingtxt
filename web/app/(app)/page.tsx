@@ -11,6 +11,7 @@ import { useTranslations } from "use-intl"
 import { AgentsOffline } from "@/components/agents-offline"
 import { OnboardingChecklist } from "@/components/onboarding"
 import { MonitorCard, MonitorMarks, MonitorSubline, StatusDots, uptimeClass } from "@/components/dashboard-items"
+import { MonitorIcon } from "@/components/monitor-icon"
 import { TagChip, TagList, useLabels } from "@/components/labels"
 import { Empty, PageHeader } from "@/components/page-header"
 import { StatusGlyph, StatusText } from "@/components/status"
@@ -444,6 +445,7 @@ function Monitors() {
         >
           <div className="flex min-w-0 items-center gap-2">
             <StatusGlyph status={m.status} />
+            <MonitorIcon m={m} className="size-6" />
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="truncate font-medium">{m.name}</span>

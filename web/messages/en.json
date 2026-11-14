@@ -593,7 +593,9 @@
       },
       "removeValue": "remove value",
       "addValue": "save a value"
-    }
+    },
+    "icon": "icon",
+    "iconUploadFailed": "monitor saved, but the icon was not uploaded: {error}"
   },
   "statuspage": {
     "suggest": "this is the Atlassian status page of {name}. Use the status page type: a minor incident makes the monitor degraded instead of down, and the check names the incident.",
@@ -2336,5 +2338,25 @@
     "phoneSaved": "phone number saved",
     "phoneRemoved": "phone number removed",
     "phoneHint": "In international format. While you are <link>on call</link>, SMS and phone calls go to this number, and an admin can acknowledge an incident by pressing 1 during the call."
+  },
+  "monitorIcon": {
+    "title": "monitor icon",
+    "description": "shown next to the name in the dashboard and the app. pick an icon, upload an image or let the hub use the website's favicon.",
+    "auto": "automatic (favicon)",
+    "autoHint": "the hub looks up the favicon of the target's website after saving",
+    "autoFound": "favicon of the target's website",
+    "autoMissing": "no favicon found for the target yet: the hub tries again in a week, or pick an icon",
+    "upload": "uploaded image",
+    "uploadButton": "upload image",
+    "custom": "uploaded image",
+    "customHint": "svg, png, jpeg, webp, avif or ico, up to 1 MB",
+    "none": "no icon",
+    "noneHint": "no icon next to the name",
+    "dashboardHint": "from Dashboard Icons, with its dark theme variant when there is one",
+    "change": "change",
+    "search": "search Dashboard Icons: proxmox, nextcloud, github…",
+    "noResults": "no icons found",
+    "more": "{shown} of {total} shown, refine the search.",
+    "credit": "logos from <link>Dashboard Icons</link>, through the hub."
   }
 }

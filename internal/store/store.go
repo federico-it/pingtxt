@@ -966,6 +966,55 @@ var laterMigrations = []migration{
 		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 46: monitor icons. monitors.icon is the setting ("" = the target's
+	// favicon, "none", "custom" = uploaded, "dashboard:<name>" = Dashboard
+	// Icons); icon_v is when the image last changed (unix ms, 0 = no
+	// image) and icon_dark whether it has a variant for dark themes. The
+	// images are in monitor_icons: a cleaned SVG or a PNG each, with
+	// source/ref telling where they came from (for the favicon, the page
+	// it was looked up on) and checked_at when that was.
+	{
+		sqlite: `ALTER TABLE monitors ADD COLUMN icon TEXT NOT NULL DEFAULT '';
+	ALTER TABLE monitors ADD COLUMN icon_v INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE monitors ADD COLUMN icon_dark INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE monitor_icons (
+		monitor_id INTEGER PRIMARY KEY REFERENCES monitors(id) ON DELETE CASCADE,
+		source TEXT NOT NULL,
+		ref TEXT NOT NULL DEFAULT '',
+		image BLOB,
+		image_type TEXT NOT NULL DEFAULT '',
+		dark BLOB,
+		dark_type TEXT NOT NULL DEFAULT '',
+		checked_at INTEGER NOT NULL DEFAULT 0
+	);`,
+		postgres: `ALTER TABLE monitors ADD COLUMN icon TEXT NOT NULL DEFAULT '';
+	ALTER TABLE monitors ADD COLUMN icon_v BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE monitors ADD COLUMN icon_dark INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE monitor_icons (
+		monitor_id BIGINT PRIMARY KEY REFERENCES monitors(id) ON DELETE CASCADE,
+		source TEXT NOT NULL,
+		ref TEXT NOT NULL DEFAULT '',
+		image BYTEA,
+		image_type TEXT NOT NULL DEFAULT '',
+		dark BYTEA,
+		dark_type TEXT NOT NULL DEFAULT '',
+		checked_at BIGINT NOT NULL DEFAULT 0
+	);`,
+		mysql: `ALTER TABLE monitors ADD COLUMN icon VARCHAR(255) NOT NULL DEFAULT '';
+	ALTER TABLE monitors ADD COLUMN icon_v BIGINT NOT NULL DEFAULT 0;
+	ALTER TABLE monitors ADD COLUMN icon_dark INT NOT NULL DEFAULT 0;
+	CREATE TABLE monitor_icons (
+		monitor_id BIGINT PRIMARY KEY,
+		source VARCHAR(32) NOT NULL,
+		ref VARCHAR(2048) NOT NULL DEFAULT '',
+		image MEDIUMBLOB,
+		image_type VARCHAR(64) NOT NULL DEFAULT '',
+		dark MEDIUMBLOB,
+		dark_type VARCHAR(64) NOT NULL DEFAULT '',
+		checked_at BIGINT NOT NULL DEFAULT 0,
+		FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
+	},
 }
 
 func sqliteOnly(list []string) []migration {

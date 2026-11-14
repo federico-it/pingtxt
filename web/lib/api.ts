@@ -174,6 +174,16 @@ export interface Monitor {
   notifiers: ChannelLink[]
   cert_expiry_alert: boolean
   domain_expiry_alert: boolean
+  /**
+   * Where the icon comes from: "" the target's favicon (found by the hub),
+   * "none", "custom" (uploaded to /api/monitors/{id}/icon) or
+   * "dashboard:<name>" (Dashboard Icons). Missing on older hubs.
+   */
+  icon?: string
+  /** path of the icon image, "" while there is none (read-only) */
+  icon_url?: string
+  /** variant for dark themes, "" when icon_url works on both (read-only) */
+  icon_dark_url?: string
   paused: boolean
   status: Status
   status_since: number
@@ -1240,6 +1250,15 @@ export interface ConfigFile {
   maintenances?: unknown[]
   status_pages?: unknown[]
   agents?: unknown[]
+}
+
+/** One icon of Dashboard Icons (GET /api/dashboard-icons). */
+export interface DashboardIcon {
+  name: string
+  aliases: string[]
+  categories: string[]
+  /** has a variant for dark themes */
+  dark: boolean
 }
 
 /** Sends a raw body (file upload) and parses the JSON answer. */

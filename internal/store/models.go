@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -336,25 +337,37 @@ type Monitor struct {
 	// On save, nil keeps the stored links.
 	Notifiers []ChannelLink `json:"notifiers"`
 	// Expiry alerts: TLS certificate (https targets) and domain registration.
-	CertExpiryAlert   bool   `json:"cert_expiry_alert"`
-	DomainExpiryAlert bool   `json:"domain_expiry_alert"`
-	Paused            bool   `json:"paused"`
-	Status            string `json:"status"`
-	StatusSince       int64  `json:"status_since"`
-	CreatedAt         int64  `json:"created_at"`
+	CertExpiryAlert   bool `json:"cert_expiry_alert"`
+	DomainExpiryAlert bool `json:"domain_expiry_alert"`
+	// Icon is where the monitor's icon comes from: "" = the favicon of the
+	// target's website (found by the hub), "none", "custom" = an image
+	// uploaded to /api/monitors/{id}/icon, "dashboard:<name>" = an icon of
+	// Dashboard Icons (dashboardicons.com).
+	Icon string `json:"icon"`
+	// IconURL is the path of the icon image on the hub ("" = none yet),
+	// IconDarkURL a variant for dark themes ("" = IconURL works on both).
+	// Both change when the image does. Read-only.
+	IconURL     string `json:"icon_url"`
+	IconDarkURL string `json:"icon_dark_url"`
+	Paused      bool   `json:"paused"`
+	Status      string `json:"status"`
+	StatusSince int64  `json:"status_since"`
+	CreatedAt   int64  `json:"created_at"`
 }
 
 // SlowAuto as Monitor.SlowMs sets the slow threshold of each location from
 // its own history.
 const SlowAuto = -1
 
-const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps, client_cert, client_key, server_limits`
+const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps, client_cert, client_key, server_limits, icon, icon_v, icon_dark`
 
 func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	m := &Monitor{}
 	var headers, locations, assertions, steps, limits string
 	var group sql.NullInt64
-	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group, &m.DegradedPct, &assertions, &m.IPFamily, &m.SlowMs, &m.Diagnostics, &m.PingCount, &m.PingLossPct, &steps, &m.ClientCert, &m.ClientKey, &limits)
+	var iconV int64
+	var iconDark bool
+	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group, &m.DegradedPct, &assertions, &m.IPFamily, &m.SlowMs, &m.Diagnostics, &m.PingCount, &m.PingLossPct, &steps, &m.ClientCert, &m.ClientKey, &limits, &m.Icon, &iconV, &iconDark)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -362,6 +375,12 @@ func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 		return nil, err
 	}
 	m.GroupID = group.Int64
+	if iconV > 0 {
+		m.IconURL = fmt.Sprintf("/api/monitors/%d/icon?v=%d", m.ID, iconV)
+		if iconDark {
+			m.IconDarkURL = fmt.Sprintf("/api/monitors/%d/icon?theme=dark&v=%d", m.ID, iconV)
+		}
+	}
 	m.TagIDs = []int64{}
 	m.DependsOn = []int64{}
 	_ = json.Unmarshal([]byte(headers), &m.Headers)
@@ -483,9 +502,9 @@ func (s *Store) CreateMonitor(m *Monitor) error {
 		return err
 	}
 	defer tx.Rollback()
-	id, err := s.db.insert(tx, `INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps, client_cert, client_key, server_limits)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt, nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, stepsJSON(m.Steps), m.ClientCert, m.ClientKey, limitsJSON(m.ServerLimits))
+	id, err := s.db.insert(tx, `INSERT INTO monitors (name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps, client_cert, client_key, server_limits, icon)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.PushToken, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), b2i(m.Paused), m.Status, m.StatusSince, m.CreatedAt, nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, stepsJSON(m.Steps), m.ClientCert, m.ClientKey, limitsJSON(m.ServerLimits), m.Icon)
 	if err != nil {
 		return err
 	}
@@ -512,8 +531,8 @@ func (s *Store) UpdateMonitor(m *Monitor) error {
 		return err
 	}
 	defer tx.Rollback()
-	_, err = tx.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ?, group_id = ?, degraded_pct = ?, assertions = ?, ip_family = ?, slow_ms = ?, diagnostics = ?, ping_count = ?, ping_loss_pct = ?, steps = ?, client_cert = ?, client_key = ?, server_limits = ? WHERE id = ?`,
-		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, stepsJSON(m.Steps), m.ClientCert, m.ClientKey, limitsJSON(m.ServerLimits), m.ID)
+	_, err = tx.Exec(`UPDATE monitors SET name = ?, type = ?, target = ?, interval_sec = ?, timeout_ms = ?, retries = ?, method = ?, expected_status = ?, keyword = ?, keyword_invert = ?, dns_record = ?, dns_server = ?, dns_expected = ?, ignore_tls = ?, headers = ?, body = ?, grace_sec = ?, locations = ?, cert_expiry_alert = ?, domain_expiry_alert = ?, group_id = ?, degraded_pct = ?, assertions = ?, ip_family = ?, slow_ms = ?, diagnostics = ?, ping_count = ?, ping_loss_pct = ?, steps = ?, client_cert = ?, client_key = ?, server_limits = ?, icon = ? WHERE id = ?`,
+		m.Name, m.Type, m.Target, m.IntervalSec, m.TimeoutMs, m.Retries, m.Method, m.ExpectedStatus, m.Keyword, b2i(m.KeywordInvert), m.DNSRecord, m.DNSServer, m.DNSExpected, b2i(m.IgnoreTLS), string(h), m.Body, m.GraceSec, string(l), b2i(m.CertExpiryAlert), b2i(m.DomainExpiryAlert), nullID(m.GroupID), m.DegradedPct, assertionsJSON(m.Assertions), m.IPFamily, m.SlowMs, m.Diagnostics, m.PingCount, m.PingLossPct, stepsJSON(m.Steps), m.ClientCert, m.ClientKey, limitsJSON(m.ServerLimits), m.Icon, m.ID)
 	if err != nil {
 		return err
 	}

@@ -8,6 +8,7 @@ import { useTranslations } from "use-intl"
 
 import { CountryFlag } from "@/components/country"
 import { DependsOnPicker } from "@/components/depends-on"
+import { MonitorIconPicker } from "@/components/monitor-icon"
 import { covers, LinkRow, linkState } from "@/components/channel-links"
 import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
@@ -35,6 +36,7 @@ import { TestResults, type TestResult } from "@/components/test-results"
 import { useUnsavedGuard } from "@/hooks/use-unsaved-guard"
 import {
   api,
+  apiRaw,
   useApi,
   type Location,
   type Monitor,
@@ -345,6 +347,8 @@ export function MonitorForm({
     steps: initial.steps ?? [],
   })
   const [headers, setHeaders] = useState(headersToText(initial.headers))
+  // An image picked for the icon, uploaded with the save.
+  const [iconFile, setIconFile] = useState<File>()
   const [busy, setBusy] = useState(false)
   const [testing, setTesting] = useState(false)
   const [tested, setTested] = useState<TestResult[] | null>(null)
@@ -560,10 +564,21 @@ export function MonitorForm({
     setBusy(true)
     try {
       const body = { ...m, headers: textToHeaders(headers) }
+      const upload = (mid: number) =>
+        apiRaw(`/api/monitors/${mid}/icon`, iconFile!, "application/octet-stream")
+      // A saved monitor gets the image first: "custom" needs one.
+      if (iconFile && id) await upload(id)
       const res = await api<Monitor>(
         id ? `/api/monitors/${id}` : "/api/monitors",
-        { method: id ? "PUT" : "POST", body }
+        { method: id ? "PUT" : "POST", body: iconFile && !id ? { ...body, icon: "" } : body }
       )
+      if (iconFile && !id) {
+        try {
+          await upload(res.id)
+        } catch (err) {
+          toast.error(tr("iconUploadFailed", { error: err instanceof Error ? err.message : "" }))
+        }
+      }
       toast.success(id ? tr("updated") : tr("created"))
       guard.release()
       router.push(`/monitors/view/?id=${res.id}`)
@@ -1088,6 +1103,17 @@ export function MonitorForm({
               onChange={(ids) => set("tag_ids", ids)}
               tags={labels.tags.data ?? []}
               onCreated={() => labels.tags.mutate()}
+            />
+          </Field>
+          <Field label={tr("icon")} className="sm:col-span-2">
+            <MonitorIconPicker
+              value={{ icon: m.icon ?? "", file: iconFile }}
+              onChange={(v) => {
+                set("icon", v.icon)
+                setIconFile(v.file)
+              }}
+              monitor={id ? initial : undefined}
+              name={m.name}
             />
           </Field>
         </div>

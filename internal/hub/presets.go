@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"net/http"
@@ -106,6 +107,18 @@ var presetIcons = map[string]bool{
 	"vercel":       true,
 	"webflow":      true,
 	"zoom":         false,
+}
+
+// presetDashboardIcon names the Dashboard Icons icon of the services whose
+// preset id differs from it. New monitors from a preset with a logo get
+// that icon (Monitor.Icon "dashboard:<name>").
+var presetDashboardIcon = map[string]string{
+	"claude":       "claude-ai",
+	"digitalocean": "digital-ocean",
+	"epicgames":    "epic-games",
+	"flyio":        "fly-io",
+	"mistral":      "mistral-ai",
+	"trello":       "atlassian-trello",
 }
 
 func preset(id, name, cat, url, color string, keywords ...string) ServicePreset {
@@ -351,6 +364,9 @@ func (h *Hub) addPresets(w http.ResponseWriter, r *http.Request, _ *store.User) 
 	for _, p := range todo {
 		m := &store.Monitor{Name: p.Name, Type: check.TypeStatuspage, Target: p.URL, IntervalSec: in.IntervalSec,
 			Retries: 2, Locations: in.Locations, GroupID: in.GroupID, TagIDs: in.TagIDs}
+		if _, ok := presetIcons[p.ID]; ok { // downloaded by iconLoop
+			m.Icon = iconDIPfx + cmp.Or(presetDashboardIcon[p.ID], p.ID)
+		}
 		if len(m.Locations) == 0 {
 			m.Locations = []string{LocalLocation}
 		}

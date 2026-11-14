@@ -593,7 +593,9 @@
       },
       "removeValue": "rimuovi valore",
       "addValue": "salva un valore"
-    }
+    },
+    "icon": "icona",
+    "iconUploadFailed": "monitor salvato, ma l'icona non è stata caricata: {error}"
   },
   "statuspage": {
     "suggest": "questa è la status page Atlassian di {name}. Usa il tipo status page: un incidente minore rende il monitor degradato invece che giù, e il check riporta il nome dell'incidente.",
@@ -2336,5 +2338,25 @@
     "phoneSaved": "numero di telefono salvato",
     "phoneRemoved": "numero di telefono rimosso",
     "phoneHint": "In formato internazionale. Quando sei <link>reperibile</link>, sms e chiamate arrivano a questo numero, e un admin può prendere in carico un incidente premendo 1 durante la chiamata."
+  },
+  "monitorIcon": {
+    "title": "icona del monitor",
+    "description": "compare accanto al nome nella dashboard e nell'app. scegli un'icona, carica un'immagine o lascia che l'hub usi la favicon del sito.",
+    "auto": "automatica (favicon)",
+    "autoHint": "dopo il salvataggio l'hub cerca la favicon del sito del target",
+    "autoFound": "favicon del sito del target",
+    "autoMissing": "nessuna favicon trovata per il target: l'hub riprova tra una settimana, oppure scegli un'icona",
+    "upload": "immagine caricata",
+    "uploadButton": "carica immagine",
+    "custom": "immagine caricata",
+    "customHint": "svg, png, jpeg, webp, avif o ico, fino a 1 MB",
+    "none": "nessuna icona",
+    "noneHint": "nessuna icona accanto al nome",
+    "dashboardHint": "da Dashboard Icons, con la variante per il tema scuro se c'è",
+    "change": "cambia",
+    "search": "cerca in Dashboard Icons: proxmox, nextcloud, github…",
+    "noResults": "nessuna icona trovata",
+    "more": "{shown} di {total} mostrate, affina la ricerca.",
+    "credit": "loghi da <link>Dashboard Icons</link>, tramite l'hub."
   }
 }

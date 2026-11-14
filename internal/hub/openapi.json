@@ -4016,6 +4016,433 @@
         }
       }
     },
+    "/api/monitors/{id}/icon": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Get the icon image",
+        "operationId": "getMonitorIcon",
+        "description": "The image of Monitor.icon_url: an SVG (cleaned of scripts and external references) or a PNG. With `theme=dark` the variant for dark themes, when there is one. 404 while the monitor has no image.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          },
+          {
+            "name": "theme",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dark"
+              ]
+            },
+            "description": "`dark`: the variant for dark themes (Monitor.icon_dark_url)."
+          },
+          {
+            "name": "v",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Version from icon_url: when it matches, the answer is cached for a year."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image.",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Upload a custom icon",
+        "operationId": "uploadMonitorIcon",
+        "description": "Raw image file as the body (`Content-Type: application/octet-stream`), up to 1 MB: SVG, PNG, JPEG, GIF, WebP, AVIF or ICO. An SVG is kept as a vector, without scripts, event handlers or external references; other images are scaled down to fit 128×128 pixels and stored as PNG. Sets Monitor.icon to `custom`.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The monitor's icon after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorIcon"
+                },
+                "example": {
+                  "icon": "custom",
+                  "icon_url": "/api/monitors/12/icon?v=1731600000000",
+                  "icon_dark_url": ""
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Remove the icon",
+        "operationId": "deleteMonitorIcon",
+        "description": "Sets Monitor.icon to `none`: no icon, no favicon lookup.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The monitor's icon after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorIcon"
+                },
+                "example": {
+                  "icon": "custom",
+                  "icon_url": "/api/monitors/12/icon?v=1731600000000",
+                  "icon_dark_url": ""
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/monitors/{id}/icon/favicon": {
+      "post": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Use the favicon as icon",
+        "operationId": "detectMonitorIcon",
+        "description": "Sets Monitor.icon to `\"\"` and looks up the favicon of the target's website now (it can take some seconds). icon_url is `\"\"` when none was found; the hub looks again after a week or when the target changes.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "x-pingtxt-access": "write",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Id of the monitor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The monitor's icon after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonitorIcon"
+                },
+                "example": {
+                  "icon": "custom",
+                  "icon_url": "/api/monitors/12/icon?v=1731600000000",
+                  "icon_dark_url": ""
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/dashboard-icons": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Search Dashboard Icons",
+        "operationId": "listDashboardIcons",
+        "description": "Searches the catalog of Dashboard Icons (dashboardicons.com, about 3500 logos of apps and services), downloaded by the hub once a day. Matches names first, then aliases. Use a name as `dashboard:<name>` in Monitor.icon. 502 when the hub cannot download the catalog.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search text. Empty: the catalog in alphabetical order."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 60,
+              "maximum": 300
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matches, best first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "icons": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DashboardIcon"
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Matches in all, also past limit."
+                    }
+                  }
+                },
+                "example": {
+                  "icons": [
+                    {
+                      "name": "proxmox",
+                      "aliases": [
+                        "Virtualization Platform"
+                      ],
+                      "categories": [
+                        "Server-Panels"
+                      ],
+                      "dark": true
+                    }
+                  ],
+                  "total": 3
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "502": {
+            "description": "The catalog cannot be downloaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard-icons/{name}": {
+      "get": {
+        "tags": [
+          "Monitors"
+        ],
+        "summary": "Preview a Dashboard Icons icon",
+        "operationId": "getDashboardIcon",
+        "description": "The image of one icon, through the hub (the browser does not contact third parties), for the previews of a picker.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "x-pingtxt-access": "read",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Name from GET /api/dashboard-icons."
+          },
+          {
+            "name": "theme",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dark"
+              ]
+            },
+            "description": "`dark`: the variant for dark themes, when there is one."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image.",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "502": {
+            "description": "The icon cannot be downloaded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/monitors/{id}/test": {
       "post": {
         "tags": [
@@ -12606,6 +13033,16 @@
               2
             ],
             "description": "Diagnostics at the first failure of a check (DNS, TCP, TLS, response headers, traceroute), collected by the failing location: 0 = instance default (GeneralSettings.diagnostics), 1 = on, 2 = off. Ignored for push."
+          },
+          "icon": {
+            "type": "string",
+            "description": "Where the monitor's icon comes from: `\"\"` (default) the favicon of the target's website, looked up by the hub in the background (http, keyword, statuspage, mcp and websocket: the site of the URL; tcp, ping, dns, grpc, smtp, ssh, imap and pop3: the website of the host's domain; only public addresses); `\"none\"` no icon; `\"custom\"` an image uploaded with POST /api/monitors/{id}/icon (only kept, not set, through this field); `\"dashboard:<name>\"` an icon of Dashboard Icons (dashboardicons.com, names from GET /api/dashboard-icons), downloaded by the hub when saved: an unknown name fails the request.",
+            "examples": [
+              "",
+              "none",
+              "custom",
+              "dashboard:proxmox"
+            ]
           }
         },
         "required": [
@@ -12649,6 +13086,14 @@
                 "type": "integer",
                 "format": "int64",
                 "description": "Unix time in milliseconds (0 = never / unknown)."
+              },
+              "icon_url": {
+                "type": "string",
+                "description": "Path of the icon image on the hub (GET /api/monitors/{id}/icon?v=…, an SVG or a PNG of at most 128×128 pixels), `\"\"` while there is none. Changes when the image does, so it can be cached. Read-only."
+              },
+              "icon_dark_url": {
+                "type": "string",
+                "description": "Path of the icon's variant for dark themes, `\"\"` when icon_url works on both. Read-only."
               }
             }
           }
@@ -16651,6 +17096,48 @@
             }
           }
         ]
+      },
+      "MonitorIcon": {
+        "type": "object",
+        "properties": {
+          "icon": {
+            "type": "string",
+            "description": "Monitor.icon after the change."
+          },
+          "icon_url": {
+            "type": "string",
+            "description": "Monitor.icon_url after the change (\"\" = no image)."
+          },
+          "icon_dark_url": {
+            "type": "string",
+            "description": "Monitor.icon_dark_url after the change."
+          }
+        }
+      },
+      "DashboardIcon": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name to use as `dashboard:<name>` in Monitor.icon."
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dark": {
+            "type": "boolean",
+            "description": "Whether the icon has a variant for dark themes."
+          }
+        }
       }
     }
   }
