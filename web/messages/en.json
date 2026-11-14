@@ -111,6 +111,7 @@
       "checked": "checked"
     },
     "down": "{count} down",
+    "degraded": "{count} degraded",
     "heartbeatLine": "heartbeat · expected every {every}",
     "monitorLine": "{type} · {target} · every {every}",
     "serverLine": "server · {metrics} · every {every}",
@@ -156,7 +157,12 @@
     "clearTags": "show all tags",
     "services": "services",
     "tv": "tv",
-    "tvHint": "TV mode: full screen view for a wall display, with the same group and tag filter"
+    "tvHint": "TV mode: full screen view for a wall display, with the same group and tag filter",
+    "view": {
+      "label": "view",
+      "list": "list",
+      "cards": "cards"
+    }
   },
   "monitor": {
     "resumed": "monitor resumed",

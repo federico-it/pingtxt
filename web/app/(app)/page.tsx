@@ -3,19 +3,17 @@
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
-import { LayoutGridIcon, PlusIcon, TvIcon, UserCheckIcon } from "lucide-react"
+import { LayoutGridIcon, ListIcon, PlusIcon, TvIcon } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslations } from "use-intl"
 
 
 import { AgentsOffline } from "@/components/agents-offline"
 import { OnboardingChecklist } from "@/components/onboarding"
-import { useAckName } from "@/components/incident-ack"
-import { ExpiryBadges } from "@/components/expiry"
+import { MonitorCard, MonitorMarks, MonitorSubline, StatusDots, uptimeClass } from "@/components/dashboard-items"
 import { TagChip, TagList, useLabels } from "@/components/labels"
 import { Empty, PageHeader } from "@/components/page-header"
 import { StatusGlyph, StatusText } from "@/components/status"
-import { useReasonLine } from "@/components/reasons"
 import { UptimeBars } from "@/components/uptime-bars"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -33,11 +31,10 @@ import { Input } from "@/components/ui/input"
 import { useMinute } from "@/hooks/use-now"
 import { useHotkey } from "@/hooks/use-hotkey"
 import { api, useApi, useIsAdmin, type MonitorSummary, type Status } from "@/lib/api"
-import { ago, datetime, displayTarget, interval, ms, pct } from "@/lib/format"
+import { ago, datetime, displayTarget, ms, pct } from "@/lib/format"
 import { deleteWithUndo, usePendingDeletes } from "@/lib/pending-delete"
 import { usePins } from "@/lib/pins"
 import { PinButton } from "@/components/pin-button"
-import { TreeGuides } from "@/components/tree-guides"
 import { segment } from "@/components/ui/control"
 import { shortGroupName } from "@/lib/groups"
 import { cn } from "@/lib/utils"
@@ -147,8 +144,6 @@ export default function MonitorsPage() {
 function Monitors() {
   const { data, isLoading, mutate } = useApi<MonitorSummary[]>("/api/monitors")
   const isAdmin = useIsAdmin()
-  const ackName = useAckName()
-  const reasonLine = useReasonLine()
   const t = useTranslations("dashboard")
   const ts = useTranslations("status")
   const { q, filter, group, tags: tagFilter, sort, setQ, setFilter, setGroup, setTags, setSort } =
@@ -304,60 +299,186 @@ function Monitors() {
 
 
   // Pinned monitors come first, in their own section. With groups, the rest
-  // is split in one section per group, subgroups nested under their group
-  // (a group shows when one of its subgroups has monitors), with monitors
-  // without a group last.
-  const sections = useMemo((): Section[] => {
+  // is split in one block per top-level group, with monitors without a group
+  // last. Subgroups of any depth are flat parts of their top-level group's
+  // block, named by their path below it ("DNS › Resolvers"), so the list
+  // never steps further right than one level.
+  const blocks = useMemo((): Block[] => {
     const pinned = list.filter((m) => pins.has(m.id))
     const rest = list.filter((m) => !pins.has(m.id))
-    const top = pinned.length ? [{ key: "pinned", title: t("pinned"), items: pinned }] : []
+    const top: Block[] = pinned.length
+      ? [{ key: "pinned", title: t("pinned"), items: pinned, all: pinned, subs: [] }]
+      : []
     if (!hasGroups)
-      return [...top, ...(rest.length ? [{ key: "all", title: top.length ? t("others") : "", items: rest }] : [])]
+      return [
+        ...top,
+        ...(rest.length ? [{ key: "all", title: top.length ? t("others") : "", items: rest, all: rest, subs: [] }] : []),
+      ]
     const by = new Map<number, MonitorSummary[]>()
     for (const m of rest) {
       const k = groupById.has(m.group_id) ? m.group_id : 0
       by.set(k, [...(by.get(k) ?? []), m])
     }
-    let out: Section[] = tree.ordered
+    let groupsWithMonitors = tree.ordered
       .map((g) => ({
-        key: String(g.id),
-        title: shortGroupName(g, groupById),
-        fullTitle: g.path,
+        g,
         items: by.get(g.id) ?? [],
-        depth: g.depth,
-        ancestors: g.ancestors,
         // every monitor of the group and its subgroups, for the summary
         nested: [g.id, ...tree.descendants(g.id)].flatMap((id) => by.get(id) ?? []),
       }))
-      .filter((s) => s.nested.length > 0)
+      .filter((x) => x.nested.length > 0)
     // Sorted by status, groups with monitors down (then degraded) come
     // first among their siblings; the others keep their order.
     if (sort === "status") {
-      const kids = new Map<number, Section[]>()
-      for (const sec of out) {
-        const p = sec.ancestors?.[0] ?? 0
-        kids.set(p, [...(kids.get(p) ?? []), sec])
+      const kids = new Map<number, typeof groupsWithMonitors>()
+      for (const x of groupsWithMonitors) {
+        const p = x.g.ancestors[0] ?? 0
+        kids.set(p, [...(kids.get(p) ?? []), x])
       }
-      const sorted: Section[] = []
+      const sorted: typeof groupsWithMonitors = []
       const walk = (p: number) => {
-        const list = (kids.get(p) ?? [])
-          .map((sec, i) => ({ sec, i, r: problemRank(sec.nested!) }))
+        const sib = (kids.get(p) ?? [])
+          .map((x, i) => ({ x, i, r: problemRank(x.nested) }))
           .sort((a, b) => a.r - b.r || a.i - b.i)
-        for (const { sec } of list) {
-          sorted.push(sec)
-          walk(Number(sec.key))
+        for (const { x } of sib) {
+          sorted.push(x)
+          walk(x.g.id)
         }
       }
       walk(0)
-      out = sorted
+      groupsWithMonitors = sorted
     }
-    if (by.has(0))
-      out.push({ key: "none", title: t("ungrouped"), items: by.get(0)! })
+    const out: Block[] = []
+    for (const { g, items, nested } of groupsWithMonitors) {
+      if (g.depth === 0 || out.length === 0) {
+        out.push({ key: String(g.id), title: shortGroupName(g, groupById), fullTitle: g.path, items, all: nested, subs: [], group: true })
+        continue
+      }
+      // A subgroup with no monitors of its own needs no heading: its
+      // subgroups' headings carry its name.
+      if (items.length === 0) continue
+      const chain = [...g.ancestors].reverse().slice(1).map((id) => groupById.get(id)).filter((x) => !!x)
+      out[out.length - 1].subs.push({
+        key: String(g.id),
+        title: [...chain, g].map((n) => shortGroupName(n, groupById)).join(" › "),
+        fullTitle: g.path,
+        items,
+        all: nested,
+        ancestors: g.ancestors,
+      })
+    }
+    if (by.has(0)) out.push({ key: "none", title: t("ungrouped"), items: by.get(0)!, all: by.get(0)!, subs: [] })
     return [...top, ...out]
   }, [list, pins, hasGroups, tree, groupById, sort, t])
-  // Group sections that can be folded, for "fold all".
-  const foldable = sections.filter((sec) => sec.depth !== undefined).map((sec) => sec.key)
+  // Headings that can be folded, for "fold all".
+  const foldable = blocks.flatMap((b) => (b.group ? [b.key, ...b.subs.map((sub) => sub.key)] : []))
   const allFolded = foldable.length > 0 && foldable.every((k) => collapsed.has(k))
+  const view = useDashboardView()
+  const selecting = visibleSelected.length > 0
+
+  // Cards: one grid per block, so a subgroup with one or two monitors does
+  // not take a row of its own; each card names its subgroup.
+  function renderCards(blk: Block) {
+    const cards = [
+      ...blk.items.map((m) => ({ m, sub: "", subFull: "" })),
+      ...blk.subs.flatMap((sub) => sub.items.map((m) => ({ m, sub: sub.title, subFull: sub.fullTitle }))),
+    ]
+    return (
+      <div className="grid gap-3 py-3 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map(({ m, sub, subFull }) => (
+          <MonitorCard
+            key={m.id}
+            m={m}
+            group={sub}
+            groupTitle={subFull}
+            now={now}
+            tagById={tagById}
+            pinned={pins.has(m.id)}
+            selected={selected.has(m.id)}
+            selecting={selecting}
+            onSelect={isAdmin ? (on) => toggle(m.id, on) : undefined}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  function renderItems(items: MonitorSummary[]) {
+    if (view.value === "cards")
+      return (
+        <div className="grid gap-3 py-3 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((m) => (
+            <MonitorCard
+              key={m.id}
+              m={m}
+              now={now}
+              tagById={tagById}
+              pinned={pins.has(m.id)}
+              selected={selected.has(m.id)}
+              selecting={selecting}
+              onSelect={isAdmin ? (on) => toggle(m.id, on) : undefined}
+            />
+          ))}
+        </div>
+      )
+    return items.map((m) => (
+      <div
+        key={m.id}
+        className={cn(
+          "flex items-stretch border-b border-dashed transition-colors hover:bg-accent/60",
+          selected.has(m.id) && "bg-accent/40"
+        )}
+      >
+        {isAdmin && (
+          <label className="flex items-center pl-2">
+            <Checkbox
+              checked={selected.has(m.id)}
+              onCheckedChange={(v) => toggle(m.id, v)}
+              aria-label={t("bulk.select", { name: m.name })}
+            />
+          </label>
+        )}
+        <Link
+          href={`/monitors/view/?id=${m.id}`}
+          className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-2 py-2.5 md:grid-cols-[1fr_220px_72px_64px_80px]"
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <StatusGlyph status={m.status} />
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-medium">{m.name}</span>
+                <MonitorMarks m={m} />
+                <TagList ids={m.tag_ids} tagById={tagById} className="hidden shrink-0 sm:inline-flex" />
+              </div>
+              <MonitorSubline m={m} now={now} />
+            </div>
+          </div>
+          <UptimeBars
+            bars={m.bars}
+            className="col-span-2 md:col-span-1"
+            onSelect={(from, to) => router.push(`/monitors/view/?id=${m.id}&from=${from}&to=${to}#log`)}
+          />
+          <span className={cn("text-right", uptimeClass(m.uptime_24h))}>
+            <span className="md:hidden">
+              <StatusText status={m.status} className="mr-2" />
+            </span>
+            {pct(m.uptime_24h)}
+          </span>
+          <span className="hidden text-right text-muted-foreground md:block">
+            {/* a server check's run time is no response time */}
+            {m.type === "server" ? "" : ms(m.avg_ms_24h)}
+          </span>
+          <span
+            className="hidden text-right text-xs text-muted-foreground md:block"
+            title={m.last?.ts ? datetime(m.last.ts) : undefined}
+          >
+            {m.paused ? ts("paused") : ago(m.last?.ts)}
+          </span>
+        </Link>
+        <PinButton id={m.id} name={m.name} pinned={pins.has(m.id)} />
+      </div>
+    ))
+  }
 
   return (
     <>
@@ -425,7 +546,7 @@ function Monitors() {
       <AgentsOffline />
       <OnboardingChecklist enabled={!!isAdmin} />
 
-      <div className="mb-4 flex flex-wrap gap-1 text-xs">
+      <div className="mb-4 flex flex-wrap items-center gap-1 text-xs">
         {filters.map((f) => (
           <button
             key={f}
@@ -435,6 +556,24 @@ function Monitors() {
             {f === "all" ? t("all") : ts(f)}:{counts[f] ?? 0}
           </button>
         ))}
+        <div className="ml-auto flex items-center gap-px" role="group" aria-label={t("view.label")}>
+          {(["list", "cards"] as const).map((v) => {
+            const Icon = v === "list" ? ListIcon : LayoutGridIcon
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => view.set(v)}
+                aria-pressed={view.value === v}
+                title={t(`view.${v}`)}
+                className={cn(segment({ active: view.value === v }), "gap-1.5")}
+              >
+                <Icon className="size-3.5" />
+                <span className="hidden sm:inline">{t(`view.${v}`)}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {(hasGroups || (tags.data?.length ?? 0) > 0) && (
@@ -574,178 +713,78 @@ function Monitors() {
           )}
         </Empty>
       ) : (
-        <div className="border-t border-dashed">
-          <div className="flex items-center border-b border-dashed text-[11px] text-muted-foreground uppercase">
-            {isAdmin && (
-              <label className="flex items-center self-stretch py-1.5 pl-2" title={t("bulk.selectAll")}>
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={(v) => toggleAll(v)}
-                  aria-label={t("bulk.selectAll")}
-                />
-              </label>
-            )}
-            <div className="hidden flex-1 grid-cols-[1fr_220px_72px_64px_80px] gap-4 px-2 py-1.5 md:grid">
-            <span>{t("cols.name")}</span>
-            <span>{t("cols.last24h")}</span>
-            <span className="text-right">{t("cols.uptime")}</span>
-            <span className="text-right">{t("cols.avg")}</span>
-            <span className="text-right">{t("cols.checked")}</span>
-            </div>
-            {isAdmin && (
-              <span className="px-2 py-1.5 normal-case md:hidden">
-                {t("bulk.selectAll")}
-              </span>
-            )}
-            <span className="ml-auto w-11 shrink-0" />
-          </div>
-          {sections
-            .filter((sec) => !sec.ancestors?.some((a) => collapsed.has(String(a))))
-            .map((sec) => {
-            // A group's header sums up its subgroups too.
-            const all = sec.nested ?? sec.items
-            const down = all.filter((m) => m.status === "down").length
-            const depth = sec.depth ?? 0
-            const isGroup = sec.depth !== undefined
-            // A group's monitors hang one level below its header.
-            const rowDepth = isGroup ? depth + 1 : 0
-            return (
-            <div key={sec.key}>
-              {sec.title && (
-                <button
-                  type="button"
-                  onClick={() => collapsed.toggle(sec.key)}
-                  aria-expanded={!collapsed.has(sec.key)}
-                  className={cn(
-                    "flex w-full items-stretch border-b border-dashed text-left text-xs",
-                    depth > 0 ? "bg-muted/20 hover:bg-muted/50" : "bg-muted/40 hover:bg-muted/70"
-                  )}
-                >
-                  <TreeGuides depth={depth} />
-                  <span className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1">
-                  <span className="w-3 shrink-0 text-muted-foreground">{collapsed.has(sec.key) ? "▸" : "▾"}</span>
-                  {sec.key === "pinned" && <span className="text-warn">★</span>}
-                  <span
-                    className={cn("truncate", depth === 0 ? "font-semibold" : "font-medium")}
-                    title={sec.fullTitle && sec.fullTitle !== sec.title ? sec.fullTitle : undefined}
-                  >
-                    {sec.title}
-                  </span>
-                  <span className="shrink-0 text-muted-foreground">
-                    {all.length}
-                    {down > 0 && (
-                      <span className="text-down">
-                        {" · "}
-                        {t("down", { count: down })}
-                      </span>
-                    )}
-                  </span>
-                  </span>
-                </button>
-              )}
-              {!(sec.title && collapsed.has(sec.key)) && sec.items.map((m) => (
-                <div
-                  key={m.id}
-                  className={cn(
-                    "flex items-stretch border-b border-dashed transition-colors hover:bg-accent/60",
-                    selected.has(m.id) && "bg-accent/40"
-                  )}
-                >
-                <TreeGuides depth={rowDepth} />
-                {isAdmin && (
-                  <label className="flex items-center pl-2">
-                    <Checkbox
-                      checked={selected.has(m.id)}
-                      onCheckedChange={(v) => toggle(m.id, v)}
-                      aria-label={t("bulk.select", { name: m.name })}
-                    />
-                  </label>
-                )}
-                <Link
-                  href={`/monitors/view/?id=${m.id}`}
-                  className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-2 py-2.5 md:grid-cols-[1fr_220px_72px_64px_80px]"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <StatusGlyph status={m.status} />
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate font-medium">{m.name}</span>
-                        {m.blocked_by && (
-                          <span className="shrink-0 text-xs text-muted-foreground" title={t("blockedBy", { name: m.blocked_by.name })}>
-                            ⛓ {m.blocked_by.name}
-                          </span>
-                        )}
-                        {!!m.incident?.acked_at && (
-                          <span className="inline-flex shrink-0 items-center gap-1 text-xs text-info" title={t("ackedBy", { name: ackName(m.incident.acked_by) })}>
-                            <UserCheckIcon className="size-3" />
-                            <span className="hidden sm:inline">{ackName(m.incident.acked_by)}</span>
-                          </span>
-                        )}
-                        <TagList
-                          ids={m.tag_ids}
-                          tagById={tagById}
-                          className="hidden shrink-0 sm:inline-flex"
-                        />
-                      </div>
-                      {!m.paused && (m.status === "degraded" || m.status === "down") && (m.reasons?.length ?? 0) > 0 ? (
-                      <div
-                        className={cn("truncate text-xs", m.status === "down" ? "text-down" : "text-warn")}
-                        title={m.reasons!.map((r) => `${r.message} — ${r.locations.join(", ")}`).join("\n")}
-                      >
-                        {m.short_reason || reasonLine(m.reasons!)}
-                        <ExpiryBadges checks={m.expiry} now={now} />
-                      </div>
-                      ) : (
-                      <div className="truncate text-xs text-muted-foreground">
-                        {m.type === "push"
-                          ? t("heartbeatLine", { every: interval(m.interval_sec) })
-                          : m.type === "server"
-                            ? // The last check's numbers say more than the
-                              // mount points: "cpu 21%, ram 48%, disk / 42%..."
-                              m.last?.ok && m.last.message
-                              ? t("serverLine", { metrics: m.last.message, every: interval(m.interval_sec) })
-                              : t("serverLineWaiting", { every: interval(m.interval_sec) })
-                          : t("monitorLine", { type: m.type, target: displayTarget(m.target), every: interval(m.interval_sec) })}
-                        {m.locations.length > 1 && ` · ${t("locations", { count: m.locations.length })}`}
-                        <ExpiryBadges checks={m.expiry} now={now} />
-                      </div>
-                      )}
-                    </div>
-                  </div>
-                  <UptimeBars
-                    bars={m.bars}
-                    className="col-span-2 md:col-span-1"
-                    onSelect={(from, to) =>
-                      router.push(`/monitors/view/?id=${m.id}&from=${from}&to=${to}#log`)
-                    }
+        <div className={cn(view.value === "list" && "border-t border-dashed")}>
+          {view.value === "list" && (
+            <div className="flex items-center border-b border-dashed text-[11px] text-muted-foreground uppercase">
+              {isAdmin && (
+                <label className="flex items-center self-stretch py-1.5 pl-2" title={t("bulk.selectAll")}>
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={(v) => toggleAll(v)}
+                    aria-label={t("bulk.selectAll")}
                   />
-                  <span
-                    className={cn(
-                      "text-right",
-                      m.uptime_24h >= 0 && m.uptime_24h < 0.99 && "text-warn",
-                      m.uptime_24h >= 0 && m.uptime_24h < 0.9 && "text-down"
-                    )}
-                  >
-                    <span className="md:hidden">
-                      <StatusText status={m.status} className="mr-2" />
-                    </span>
-                    {pct(m.uptime_24h)}
-                  </span>
-                  <span className="hidden text-right text-muted-foreground md:block">
-                    {/* a server check's run time is no response time */}
-                    {m.type === "server" ? "" : ms(m.avg_ms_24h)}
-                  </span>
-                  <span
-                    className="hidden text-right text-xs text-muted-foreground md:block"
-                    title={m.last?.ts ? datetime(m.last.ts) : undefined}
-                  >
-                    {m.paused ? ts("paused") : ago(m.last?.ts)}
-                  </span>
-                </Link>
-                <PinButton id={m.id} name={m.name} pinned={pins.has(m.id)} />
-                </div>
-              ))}
+                </label>
+              )}
+              <div className="hidden flex-1 grid-cols-[1fr_220px_72px_64px_80px] gap-4 px-2 py-1.5 md:grid">
+                <span>{t("cols.name")}</span>
+                <span>{t("cols.last24h")}</span>
+                <span className="text-right">{t("cols.uptime")}</span>
+                <span className="text-right">{t("cols.avg")}</span>
+                <span className="text-right">{t("cols.checked")}</span>
+              </div>
+              {isAdmin && <span className="px-2 py-1.5 normal-case md:hidden">{t("bulk.selectAll")}</span>}
+              <span className="ml-auto w-11 shrink-0" />
             </div>
+          )}
+          {view.value === "cards" && isAdmin && (
+            <label className="mb-1 inline-flex items-center gap-2 py-1 text-xs text-muted-foreground">
+              <Checkbox checked={allSelected} onCheckedChange={(v) => toggleAll(v)} />
+              {t("bulk.selectAll")}
+            </label>
+          )}
+          {blocks.map((blk, i) => {
+            const folded = !!blk.title && collapsed.has(blk.key)
+            // Subgroups under a folded subgroup hide with it.
+            const shown = new Set(blk.subs.map((sub) => sub.key))
+            const subs = blk.subs.filter(
+              (sub) => !sub.ancestors.some((a) => shown.has(String(a)) && collapsed.has(String(a)))
+            )
+            return (
+              <section key={blk.key} className={cn(i > 0 && blk.title && "mt-6")}>
+                {blk.title && (
+                  <GroupHeading
+                    level={0}
+                    title={blk.title}
+                    fullTitle={blk.fullTitle}
+                    pinned={blk.key === "pinned"}
+                    list={blk.all}
+                    folded={folded}
+                    onToggle={() => collapsed.toggle(blk.key)}
+                  />
+                )}
+                {!folded && view.value === "cards" && renderCards(blk)}
+                {!folded && view.value === "list" && (
+                  <>
+                    {renderItems(blk.items)}
+                    {subs.map((sub) => {
+                      const subFolded = collapsed.has(sub.key)
+                      return (
+                        <div key={sub.key} className="pl-4 sm:pl-6">
+                          <GroupHeading
+                            level={1}
+                            title={sub.title}
+                            fullTitle={sub.fullTitle}
+                            list={sub.items}
+                            folded={subFolded}
+                            onToggle={() => collapsed.toggle(sub.key)}
+                          />
+                          {!subFolded && renderItems(sub.items)}
+                        </div>
+                      )
+                    })}
+                  </>
+                )}
+              </section>
             )
           })}
         </div>
@@ -805,19 +844,107 @@ function tvHref(group: string, tags: number[]) {
   return p.size ? `/tv/?${p}` : "/tv/"
 }
 
-/** A block of the monitor list: pinned, a group or the ungrouped ones. */
-type Section = {
+/** A block of the monitor list: pinned, a top-level group or the ungrouped ones. */
+type Block = {
   key: string
   title: string
+  /** monitors right in it */
   items: MonitorSummary[]
-  /** groups: nesting level, 0 = top level */
-  depth?: number
-  /** groups: the groups it is inside of */
-  ancestors?: number[]
-  /** groups: path from the top-level group, when title is shortened */
+  /** its monitors and those of its subgroups, for the summary */
+  all: MonitorSummary[]
+  /** subgroups of any depth with monitors of their own, in tree order */
+  subs: Sub[]
+  /** a group (folded with "fold all") */
+  group?: boolean
+  /** path from the top-level group, when title is shortened */
   fullTitle?: string
-  /** groups: its monitors and those of its subgroups */
-  nested?: MonitorSummary[]
+}
+
+type Sub = {
+  key: string
+  /** path below the top-level group, short names */
+  title: string
+  fullTitle: string
+  items: MonitorSummary[]
+  all: MonitorSummary[]
+  /** groups it is inside of, parent first */
+  ancestors: number[]
+}
+
+/** Heading of a group, the pinned or the ungrouped monitors: folds them
+ * and sums up their status. */
+function GroupHeading({
+  level,
+  title,
+  fullTitle,
+  pinned,
+  list,
+  folded,
+  onToggle,
+}: {
+  level: 0 | 1
+  title: string
+  fullTitle?: string
+  pinned?: boolean
+  list: MonitorSummary[]
+  folded: boolean
+  onToggle: () => void
+}) {
+  const t = useTranslations("dashboard")
+  const down = list.filter((m) => m.status === "down").length
+  const degraded = list.filter((m) => m.status === "degraded").length
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!folded}
+      className={cn(
+        "group/heading flex w-full min-w-0 items-center gap-2 border-b text-left transition-colors",
+        level === 0
+          ? "border-foreground/25 py-2 text-[13px] hover:bg-muted/50"
+          : "border-dashed py-1.5 text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+      )}
+    >
+      <span className="w-4 shrink-0 pl-1 text-muted-foreground">{folded ? "▸" : "▾"}</span>
+      {pinned && <span className="text-warn">★</span>}
+      <span
+        className={cn("truncate", level === 0 ? "font-semibold" : "font-medium")}
+        title={fullTitle && fullTitle !== title ? fullTitle : undefined}
+      >
+        {title}
+      </span>
+      <span className="shrink-0 text-xs text-muted-foreground">
+        {list.length}
+        {down > 0 && <span className="text-down"> · {t("down", { count: down })}</span>}
+        {degraded > 0 && <span className="text-warn"> · {t("degraded", { count: degraded })}</span>}
+      </span>
+      <StatusDots list={list} className="ml-auto pr-2" max={level === 0 ? 24 : 16} />
+    </button>
+  )
+}
+
+const viewKey = "pingtxt.dashboardView"
+type View = "list" | "cards"
+
+/** List or cards, remembered in this browser. */
+function useDashboardView() {
+  const [value, setValue] = useState<View>("list")
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(viewKey)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- read once after mount (static export)
+      if (v === "cards" || v === "list") setValue(v)
+    } catch {}
+  }, [])
+  return {
+    value,
+    set: (v: View) => {
+      setValue(v)
+      try {
+        localStorage.setItem(viewKey, v)
+      } catch {}
+    },
+  }
 }
 
 /** Group sections the user folded, remembered in this browser. */

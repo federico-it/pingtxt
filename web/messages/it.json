@@ -111,6 +111,7 @@
       "checked": "controllato"
     },
     "down": "{count} down",
+    "degraded": "{count, plural, one {# degradato} other {# degradati}}",
     "heartbeatLine": "heartbeat · atteso ogni {every}",
     "monitorLine": "{type} · {target} · ogni {every}",
     "serverLine": "server · {metrics} · ogni {every}",
@@ -156,7 +157,12 @@
     "clearTags": "mostra tutti i tag",
     "services": "servizi",
     "tv": "tv",
-    "tvHint": "modalità TV: vista a schermo intero per un monitor a parete, con lo stesso filtro di gruppo e tag"
+    "tvHint": "modalità TV: vista a schermo intero per un monitor a parete, con lo stesso filtro di gruppo e tag",
+    "view": {
+      "label": "vista",
+      "list": "lista",
+      "cards": "card"
+    }
   },
   "monitor": {
     "resumed": "monitor ripreso",
