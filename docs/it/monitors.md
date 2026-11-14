@@ -445,6 +445,36 @@ restano nel loro ordine. Nella
 pagina dei gruppi **+ sottogruppo** crea un gruppo dentro quello, la freccia comprime i suoi sottogruppi, e il numero
 di monitor apre la dashboard filtrata su quel gruppo.
 
+## Icone
+
+Ogni monitor mostra un'icona accanto al nome nella dashboard (lista e card), nella sua pagina e nell'app iOS. Si
+sceglie in **icona** nel form del monitor (**cambia**):
+
+- **automatica (favicon)**, il default: dopo il salvataggio l'hub cerca la favicon del sito del target. Per i monitor
+  http, keyword, status page, MCP e WebSocket è il sito dell'URL; per tcp, ping, dns, gRPC, SMTP, SSH, IMAP e POP3 il
+  sito del dominio dell'host (`smtp.gmail.com` → `gmail.com`). L'hub preferisce un'icona SVG, poi la più grande
+  indicata dalla home page, poi `/favicon.ico`. Scarica solo da indirizzi pubblici, quindi i monitor di IP privati o
+  nomi interni non hanno favicon: scegli un'icona per loro. Se non ne trova, riprova dopo una settimana o quando il
+  target cambia.
+- **Dashboard Icons**: cerca nel catalogo di [Dashboard Icons](https://dashboardicons.com) (circa 3500 loghi di app e
+  servizi self-hosted: Proxmox, Home Assistant, Nextcloud...) e clicca su uno. La ricerca parte dal nome del monitor.
+  Le icone con una variante per il tema scuro cambiano con il tema.
+- **carica immagine**: un file SVG, PNG, JPEG, GIF, WebP, AVIF o ICO fino a 1 MB. Gli SVG vengono ripuliti da script e
+  riferimenti esterni; le altre immagini ridotte a 128×128 pixel.
+- **nessuna icona**.
+
+Le immagini vengono scaricate una volta e salvate nel database, quindi finiscono nei backup e il browser le carica
+solo dall'hub. Favicon e immagini caricate, pensate per sfondi chiari, nel tema scuro stanno su un riquadro chiaro. I
+monitor aggiunti dai [servizi popolari](#servizi-popolari) prendono il logo da Dashboard Icons. Senza immagine la
+dashboard mostra l'iniziale del monitor.
+
+API: il campo `icon` del monitor (`""`, `"none"`, `"custom"` o `"dashboard:<nome>"`), `icon_url` e `icon_dark_url`
+per mostrarla; `POST /api/monitors/{id}/icon` carica un'immagine (body grezzo,
+`Content-Type: application/octet-stream`), `POST /api/monitors/{id}/icon/favicon` cerca subito la favicon,
+`DELETE /api/monitors/{id}/icon` la toglie; `GET /api/dashboard-icons?q=` cerca nel catalogo. MCP:
+`search_dashboard_icons`, poi `icon` in `create_monitor` / `update_monitor`. L'export della configurazione contiene le
+immagini caricate; la configurazione come codice tiene solo `icon`.
+
 ## Diagnostica in caso di errore
 
 Al primo errore di un controllo, la località che l'ha eseguito raccoglie subito una diagnostica e la invia insieme al

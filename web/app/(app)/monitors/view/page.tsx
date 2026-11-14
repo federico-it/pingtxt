@@ -16,6 +16,7 @@ import { PeriodStatsRow } from "@/components/period-stats"
 import { PinButton } from "@/components/pin-button"
 import { PhaseChart, hasPhases, phaseLocations, phaseTitle } from "@/components/phase-chart"
 import { TagList, useLabels } from "@/components/labels"
+import { MonitorIcon } from "@/components/monitor-icon"
 import { KV, PageHeader, Section } from "@/components/page-header"
 import { OkText, StatusGlyph, StatusText } from "@/components/status"
 import { UptimeBars } from "@/components/uptime-bars"
@@ -158,7 +159,16 @@ function View() {
 
   return (
     <>
-      <PageHeader cmd={`pingtxt monitors show ${id}`} title={d.name}>
+      <PageHeader cmd={`pingtxt monitors show ${id}`} title={
+          d.icon_url ? (
+            <span className="flex min-w-0 items-center gap-2">
+              <MonitorIcon m={d} className="size-6" />
+              <span className="truncate">{d.name}</span>
+            </span>
+          ) : (
+            d.name
+          )
+        }>
         <PinButton id={id} name={d.name} pinned={pins.has(id)} className="size-8 self-auto border" />
         {isAdmin && (
           <>

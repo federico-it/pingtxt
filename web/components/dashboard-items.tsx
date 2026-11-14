@@ -9,6 +9,7 @@ import { ExpiryBadges } from "@/components/expiry"
 import { useAckName } from "@/components/incident-ack"
 import { TagList } from "@/components/labels"
 import { PinButton } from "@/components/pin-button"
+import { MonitorIcon } from "@/components/monitor-icon"
 import { useReasonLine } from "@/components/reasons"
 import { StatusGlyph } from "@/components/status"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -156,6 +157,7 @@ export function MonitorCard({
           )}
           <div className="flex min-w-0 items-center gap-2">
             <StatusGlyph status={m.status} className="shrink-0" />
+            <MonitorIcon m={m} />
             {/* The name's link covers the whole card; controls sit above it. */}
             <Link
               href={`/monitors/view/?id=${m.id}`}
