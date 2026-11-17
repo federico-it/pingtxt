@@ -2054,7 +2054,12 @@
     }
   },
   "country": {
-    "none": "nessuno"
+    "search": "cerca un paese…",
+    "noResults": "nessun paese trovato",
+    "used": "già usati dalle tue località",
+    "all": "tutti i paesi",
+    "clear": "togli",
+    "open": "mostra i paesi"
   },
   "dependencies": {
     "add": "aggiungi un monitor…",

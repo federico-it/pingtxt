@@ -35,6 +35,8 @@ paese e se l'hub esegue i controlli da sé (gli stessi valori di **impostazioni 
 
 Dai a ogni agent un **paese** (nella finestra di modifica dell'agent, e allo stesso modo per la località integrata): la sua bandiera compare accanto alla località nella pagina degli agent, nel form del monitor e nella
 pagina del monitor.
+Scrivi nel campo paese per trovarlo per nome (anche in inglese) o per codice di due lettere. I paesi già usati dalle
+tue località sono in cima alla lista.
 
 La pagina degli agent mostra di ognuno versione, indirizzo, se raggiunge IPv6 e quando è stato visto l'ultima volta.
 **rigenera** dà a un agent un nuovo token: quello vecchio smette subito di funzionare e l'agent si disconnette.
