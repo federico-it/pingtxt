@@ -35,6 +35,8 @@ whether the hub runs checks itself (the same values as in **settings → general
 
 Give each agent a **country** (in the agent's edit dialog, and for the built-in location in the same way):
 its flag then shows next to the location on the agents page, in the monitor form and on the monitor page.
+Type in the country field to find a country by name (in English too) or by its two-letter code. Countries your
+locations already use are listed first.
 
 The agents page shows each agent's version, address, whether it reaches IPv6 and when it was last seen.
 **rotate** gives an agent a new token: the old one stops working at once and the agent disconnects.

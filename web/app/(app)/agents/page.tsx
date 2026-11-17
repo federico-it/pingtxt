@@ -9,7 +9,7 @@ import { AgentAssign } from "@/components/agent-assign"
 import { AgentInstall } from "@/components/agent-install"
 import { Confirm } from "@/components/confirm"
 import { Empty, PageHeader } from "@/components/page-header"
-import { CountryFlag, CountrySelect } from "@/components/country"
+import { CountryFlag, CountrySelect, usedCountries } from "@/components/country"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -384,7 +384,12 @@ export default function AgentsPage() {
             )}
             <div className="grid gap-1.5">
               <Label htmlFor="agent-country">{t("country")}</Label>
-              <CountrySelect id="agent-country" value={edit?.country ?? ""} onChange={(v) => setEdit((p) => p && { ...p, country: v })} />
+              <CountrySelect
+                id="agent-country"
+                value={edit?.country ?? ""}
+                onChange={(v) => setEdit((p) => p && { ...p, country: v })}
+                used={usedCountries([data?.local?.country, ...(data?.agents ?? []).map((a) => a.country)])}
+              />
               <span className="text-xs text-muted-foreground">{t("countryHint")}</span>
             </div>
             {edit?.local && (

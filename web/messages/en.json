@@ -2070,7 +2070,12 @@
     }
   },
   "country": {
-    "none": "none"
+    "search": "search a country…",
+    "noResults": "no country found",
+    "used": "used by your locations",
+    "all": "all countries",
+    "clear": "clear",
+    "open": "show countries"
   },
   "dependencies": {
     "add": "add a monitor…",
