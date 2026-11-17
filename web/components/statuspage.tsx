@@ -41,7 +41,7 @@ function lookable(target: string) {
 
 /**
  * Asks the hub, a moment after the user stops typing, whether the target is
- * an Atlassian Statuspage page. Null while unknown or when disabled.
+ * an Atlassian Statuspage page (or Apple's system status). Null while unknown or when disabled.
  */
 export function useStatuspage(
   target: string,

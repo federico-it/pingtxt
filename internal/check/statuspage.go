@@ -86,6 +86,9 @@ func StatuspageBase(target string) (string, error) {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return "", errors.New("target must be the URL of a status page, e.g. https://status.example.com")
 	}
+	if page := applePage(u); page != "" {
+		return page, nil
+	}
 	p := u.Path
 	if i := strings.Index(p, "/api/v2"); i >= 0 {
 		p = p[:i]
@@ -98,8 +101,9 @@ func StatuspageBase(target string) (string, error) {
 	return u.String(), nil
 }
 
-// FetchStatuspage downloads and parses summary.json of a page. It fails
-// when the answer does not look like a Statuspage summary.
+// FetchStatuspage downloads and parses summary.json of a page (for Apple's
+// pages, their feed in the same shape). It fails when the answer does not
+// look like a Statuspage summary.
 func FetchStatuspage(ctx context.Context, j Job, timeout time.Duration) (*StatuspageSummary, int, error) {
 	base, err := StatuspageBase(j.Target)
 	if err != nil {
@@ -114,7 +118,12 @@ func FetchStatuspage(ctx context.Context, j Job, timeout time.Duration) (*Status
 	}
 	defer tr.CloseIdleConnections()
 	client := &http.Client{Transport: tr}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/api/v2/summary.json", nil)
+	src := base + "/api/v2/summary.json"
+	apple, appleName := appleFeed(base)
+	if apple != "" {
+		src = apple
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -132,6 +141,10 @@ func FetchStatuspage(ctx context.Context, j Job, timeout time.Duration) (*Status
 	body, err := io.ReadAll(io.LimitReader(resp.Body, statuspageMaxBody))
 	if err != nil {
 		return nil, resp.StatusCode, errors.New(cleanErr(err))
+	}
+	if apple != "" {
+		s, err := parseAppleStatus(body, base, appleName)
+		return s, resp.StatusCode, err
 	}
 	var s StatuspageSummary
 	if err := json.Unmarshal(body, &s); err != nil || s.Status.Indicator == "" {
