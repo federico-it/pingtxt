@@ -23,30 +23,34 @@ Incolla un comando `curl` nel campo URL di un monitor HTTP per compilare metodo,
 
 ## Tipi di controllo
 
-| tipo | destinazione | cosa viene controllato |
-| --- | --- | --- |
-| http(s) | `https://example.com/health` | codice di stato (predefinito 200-399), header, body, [regole JSON](#controlli-sulla-risposta-json), scadenza TLS; [passi prima](#controlli-http-a-passi) facoltativi come un login |
-| parola chiave | URL + testo | il body della risposta contiene (o non contiene) il testo |
-| porta tcp | `host:porta` | la connessione si apre |
-| ping | host o IP | echo ICMP, o ICMPv6 |
-| dns | nome + tipo di record | il nome si risolve, eventualmente in un valore atteso, con il resolver di sistema o uno indicato |
-| postgresql | `postgres://user:pass@host:5432/db?sslmode=disable` | connessione ed esecuzione di una query (predefinita `SELECT 1`); valore atteso facoltativo della prima colonna |
-| mysql / mariadb | `mysql://user:pass@host:3306/db` (`?tls=true\|false\|skip-verify`) | come postgresql |
-| redis | `redis://[user]:pass@host:6379/0`, `rediss://` per TLS | `AUTH` + `PING` |
-| mongodb | `mongodb://user:pass@host:27017/?authSource=admin`, `mongodb+srv://` | `hello`, autenticazione SCRAM-SHA-256/SHA-1, `ping`; mostra primary/secondary |
-| container docker | nome o id del container | down se non è in esecuzione, si sta riavviando, è in pausa o `unhealthy` |
-| grpc health | `grpc://host:porta[/servizio]`, `grpcs://` per TLS | `grpc.health.v1.Health/Check` risponde `SERVING` |
-| smtp | `smtp://host:25`, `smtp://host:587`, `smtps://host:465` | saluto, `EHLO`, `STARTTLS` quando disponibile (certificato verificato) |
-| server mcp | `https://mcp.example.com/mcp` | l'handshake MCP e i suoi tool, vedi [server MCP](#server-mcp) |
-| udp | `host:porta` | un datagramma riceve risposta, eventualmente con un testo o dei byte, vedi [UDP](#udp) |
-| websocket | `wss://example.com/socket` | la connessione si apre; se vuoi un messaggio riceve la risposta attesa, vedi [WebSocket](#websocket) |
-| status page (atlassian) | `https://status.example.com` | lo stato di una pagina Atlassian Statuspage o di alcuni suoi componenti; i problemi minori sono degradato, vedi [Status page di altri servizi](#status-page-di-altri-servizi) |
-| ssh | `host` o `host:porta` | il banner SSH e la chiave host, eventualmente fissata, vedi [SSH](#ssh) |
-| imap, pop3 | `imaps://host`, `pop3s://host`, `imap://utente:pass@host` | saluto, `STARTTLS`/`STLS` quando disponibile, login facoltativo, vedi [Server di posta](#server-di-posta-imap-pop3) |
-| ntp | `host` o `host:porta` | il server risponde, è sincronizzato e il suo orologio è vicino a quello della posizione, vedi [NTP](#ntp) |
-| blacklist (rbl) | indirizzo IP o dominio di posta | non è nelle blacklist DNS, vedi [Blacklist](#blacklist-rbl) |
-| server (cpu, ram, disco) | punti di montaggio, o vuoto per tutti i dischi | ogni posizione riporta la macchina su cui gira; giù sopra un limite, vedi [Metriche dei server](#metriche-dei-server-cpu-ram-disco) |
-| heartbeat (push) | nessuna: pingtxt ti dà un URL | il tuo job chiama l'URL; down quando le chiamate smettono, vedi [heartbeat](#monitor-heartbeat-cron-job) |
+Nel modulo del monitor i tipi sono raggruppati per categoria: **web e api**, **rete**, **email**, **database**,
+**server e container** e **servizi e job**. Scrivi nella casella di ricerca in cima alla lista per filtrarli per
+nome, descrizione o categoria (per esempio `mail`, `database` o `cron`).
+
+| categoria | tipo | destinazione | cosa viene controllato |
+| --- | --- | --- | --- |
+| web e api | http(s) | `https://example.com/health` | codice di stato (predefinito 200-399), header, body, [regole JSON](#controlli-sulla-risposta-json), scadenza TLS; [passi prima](#controlli-http-a-passi) facoltativi come un login |
+| | parola chiave | URL + testo | il body della risposta contiene (o non contiene) il testo |
+| | websocket | `wss://example.com/socket` | la connessione si apre; se vuoi un messaggio riceve la risposta attesa, vedi [WebSocket](#websocket) |
+| | grpc health | `grpc://host:porta[/servizio]`, `grpcs://` per TLS | `grpc.health.v1.Health/Check` risponde `SERVING` |
+| | server mcp | `https://mcp.example.com/mcp` | l'handshake MCP e i suoi tool, vedi [server MCP](#server-mcp) |
+| rete | ping | host o IP | echo ICMP, o ICMPv6 |
+| | porta tcp | `host:porta` | la connessione si apre |
+| | udp | `host:porta` | un datagramma riceve risposta, eventualmente con un testo o dei byte, vedi [UDP](#udp) |
+| | dns | nome + tipo di record | il nome si risolve, eventualmente in un valore atteso, con il resolver di sistema o uno indicato |
+| | ntp | `host` o `host:porta` | il server risponde, è sincronizzato e il suo orologio è vicino a quello della posizione, vedi [NTP](#ntp) |
+| | ssh | `host` o `host:porta` | il banner SSH e la chiave host, eventualmente fissata, vedi [SSH](#ssh) |
+| email | smtp | `smtp://host:25`, `smtp://host:587`, `smtps://host:465` | saluto, `EHLO`, `STARTTLS` quando disponibile (certificato verificato) |
+| | imap, pop3 | `imaps://host`, `pop3s://host`, `imap://utente:pass@host` | saluto, `STARTTLS`/`STLS` quando disponibile, login facoltativo, vedi [Server di posta](#server-di-posta-imap-pop3) |
+| | blacklist (rbl) | indirizzo IP o dominio di posta | non è nelle blacklist DNS, vedi [Blacklist](#blacklist-rbl) |
+| database | postgresql | `postgres://user:pass@host:5432/db?sslmode=disable` | connessione ed esecuzione di una query (predefinita `SELECT 1`); valore atteso facoltativo della prima colonna |
+| | mysql / mariadb | `mysql://user:pass@host:3306/db` (`?tls=true\|false\|skip-verify`) | come postgresql |
+| | redis | `redis://[user]:pass@host:6379/0`, `rediss://` per TLS | `AUTH` + `PING` |
+| | mongodb | `mongodb://user:pass@host:27017/?authSource=admin`, `mongodb+srv://` | `hello`, autenticazione SCRAM-SHA-256/SHA-1, `ping`; mostra primary/secondary |
+| server e container | server (cpu, ram, disco) | punti di montaggio, o vuoto per tutti i dischi | ogni posizione riporta la macchina su cui gira; giù sopra un limite, vedi [Metriche dei server](#metriche-dei-server-cpu-ram-disco) |
+| | container docker | nome o id del container | down se non è in esecuzione, si sta riavviando, è in pausa o `unhealthy` |
+| servizi e job | status page (atlassian) | `https://status.example.com` | lo stato di una pagina Atlassian Statuspage o di alcuni suoi componenti; i problemi minori sono degradato, vedi [Status page di altri servizi](#status-page-di-altri-servizi) |
+| | heartbeat (push) | nessuna: pingtxt ti dà un URL | il tuo job chiama l'URL; down quando le chiamate smettono, vedi [heartbeat](#monitor-heartbeat-cron-job) |
 
 I monitor HTTP accettano anche metodo, header e body della richiesta, i codici di stato accettati e se ignorare gli
 errori del certificato TLS. Gli agent più vecchi di un tipo di controllo ne falliscono i controlli con "this agent
