@@ -85,7 +85,8 @@ quanto possono esserlo perché ci stia tutto, e quando sono troppi anche alla di
 pagine che cambiano ogni 15 secondi (i punti in basso a destra indicano quale è sullo schermo). Tiene il filtro di gruppo e tag della dashboard (`/tv/?group=3&tag=2`), lascia
 fuori i monitor in pausa (aggiungi `&paused=1` per mostrarli), si aggiorna da sola ogni 10 secondi, tiene acceso lo
 schermo dove il browser lo permette e nasconde il puntatore quando non si muove. Il pulsante in alto a destra passa a
-schermo intero.
+schermo intero; **Esc** o il pulsante **×** riportano alla dashboard (a schermo intero il primo Esc esce solo dallo
+schermo intero).
 
 Per uno schermo che nessuno usa, entra con un [utente in sola lettura](security.md#utenti-e-ruoli): vede tutti i
 monitor e non può cambiare niente. Le sessioni durano 30 giorni, poi lo schermo torna alla pagina di accesso.

@@ -2178,7 +2178,7 @@
     "acked": "taken by {name}",
     "fullscreen": "full screen",
     "exitFullscreen": "exit full screen",
-    "exit": "back to the dashboard"
+    "exit": "back to the dashboard (Esc)"
   },
   "onboarding": {
     "title": "getting started",

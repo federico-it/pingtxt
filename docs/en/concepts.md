@@ -82,7 +82,8 @@ they can be while everything fits, and when there are too many even at the small
 change every 15 seconds (the dots at the bottom right show which one is on screen). It keeps the group and tag filter of the dashboard (`/tv/?group=3&tag=2`),
 leaves paused monitors out (add `&paused=1` to show them), refreshes by itself every 10 seconds, keeps the screen awake
 where the browser allows it and hides the mouse pointer when it does not move. The button at the top right switches to
-full screen.
+full screen; **Esc** or the **×** button goes back to the dashboard (in full screen the first Esc only leaves full
+screen).
 
 For a screen nobody uses, log in with a [read-only user](security.md#users-and-roles): it sees every monitor and cannot
 change anything. Sessions last 30 days, then the screen shows the login page again.
