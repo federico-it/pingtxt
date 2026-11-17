@@ -3336,9 +3336,9 @@
         "tags": [
           "Monitors"
         ],
-        "summary": "Look up an Atlassian Statuspage page",
+        "summary": "Look up an Atlassian Statuspage page (or Apple's system status)",
         "operationId": "detectStatuspage",
-        "description": "Tells whether a URL belongs to an Atlassian Statuspage page (it reads /api/v2/summary.json of the site) and lists its components, for statuspage monitors. A URL that is not such a page answers 200 with statuspage false and the reason in error. Lookups are cached for 5 minutes. A statuspage monitor is up when the page (or the chosen components) is operational, degraded on a minor problem (indicator minor, degraded performance or partial outage) and down on a major or critical one (major outage).\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "description": "Tells whether a URL belongs to an Atlassian Statuspage page (it reads /api/v2/summary.json of the site) or to one of Apple's system status pages (www.apple.com/support/systemstatus, developer.apple.com/system-status: their feed is read and every service is a component, id = its English name in lower case with dashes, e.g. icloud-mail) and lists its components, for statuspage monitors. A URL that is not such a page answers 200 with statuspage false and the reason in error. Lookups are cached for 5 minutes. A statuspage monitor is up when the page (or the chosen components) is operational, degraded on a minor problem (indicator minor, degraded performance or partial outage) and down on a major or critical one (major outage).\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
         "x-pingtxt-access": "write",
         "security": [
           {
@@ -3384,7 +3384,7 @@
                   "properties": {
                     "statuspage": {
                       "type": "boolean",
-                      "description": "true when the site is an Atlassian Statuspage page"
+                      "description": "true when the site is an Atlassian Statuspage page or an Apple system status page"
                     },
                     "url": {
                       "type": "string",
@@ -3453,7 +3453,7 @@
         ],
         "summary": "List popular services",
         "operationId": "listPresets",
-        "description": "Catalog of popular services (Claude, OpenAI, GitHub, Cloudflare...) whose public Atlassian Statuspage page can be followed with one click. The catalog ships with the hub: listing it makes no outside request. monitor_id is the statuspage monitor that already follows a service, 0 when none.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
+        "description": "Catalog of popular services (Claude, OpenAI, GitHub, Cloudflare...) whose public Atlassian Statuspage page (or Apple's system status, ids apple and appledeveloper) can be followed with one click. The catalog ships with the hub: listing it makes no outside request. monitor_id is the statuspage monitor that already follows a service, 0 when none.\n\n**Access:** Any logged-in user or API token (read scope is enough).",
         "x-pingtxt-access": "read",
         "security": [
           {
@@ -12859,7 +12859,7 @@
           },
           "target": {
             "type": "string",
-            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp; http and keyword can use {{variables}} set by steps), host:port (tcp, udp, IPv6 in brackets: [2001:db8::1]:443), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port], a ws:// or wss:// URL (websocket), the address of an Atlassian Statuspage page such as https://status.example.com (statuspage; API URLs like /api/v2/status.json are trimmed to it). host or host:port for ssh (port 22) and ntp (port 123), imap[s]://[user:password@]host[:port] (imap) and pop3[s]://[user:password@]host[:port] (pop3): with a user and password the check logs in, and only over TLS; an IPv4/IPv6 address or a mail domain (rbl: a domain is checked on domain blacklists and the addresses of its MX servers, or of the domain itself without MX, on IP blacklists). For server: the mount points to check, comma separated (e.g. \"/, /data\"), empty = every disk. Empty for push.",
+            "description": "What to check, depends on the type: an http(s) URL (http, keyword, mcp; http and keyword can use {{variables}} set by steps), host:port (tcp, udp, IPv6 in brackets: [2001:db8::1]:443), a hostname or IP (ping, dns), a connection URL (postgres://, mysql://, redis://, mongodb://), a container name or id (docker), grpc[s]://host:port[/service], smtp[s]://host[:port], a ws:// or wss:// URL (websocket), the address of an Atlassian Statuspage page such as https://status.example.com (statuspage; API URLs like /api/v2/status.json are trimmed to it), or of Apple's https://www.apple.com/support/systemstatus or https://developer.apple.com/system-status (any language). host or host:port for ssh (port 22) and ntp (port 123), imap[s]://[user:password@]host[:port] (imap) and pop3[s]://[user:password@]host[:port] (pop3): with a user and password the check logs in, and only over TLS; an IPv4/IPv6 address or a mail domain (rbl: a domain is checked on domain blacklists and the addresses of its MX servers, or of the domain itself without MX, on IP blacklists). For server: the mount points to check, comma separated (e.g. \"/, /data\"), empty = every disk. Empty for push.",
             "examples": [
               "https://example.com/health"
             ]

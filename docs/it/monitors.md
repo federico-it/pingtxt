@@ -49,7 +49,7 @@ nome, descrizione o categoria (per esempio `mail`, `database` o `cron`).
 | | mongodb | `mongodb://user:pass@host:27017/?authSource=admin`, `mongodb+srv://` | `hello`, autenticazione SCRAM-SHA-256/SHA-1, `ping`; mostra primary/secondary |
 | server e container | server (cpu, ram, disco) | punti di montaggio, o vuoto per tutti i dischi | ogni posizione riporta la macchina su cui gira; giù sopra un limite, vedi [Metriche dei server](#metriche-dei-server-cpu-ram-disco) |
 | | container docker | nome o id del container | down se non è in esecuzione, si sta riavviando, è in pausa o `unhealthy` |
-| servizi e job | status page (atlassian) | `https://status.example.com` | lo stato di una pagina Atlassian Statuspage o di alcuni suoi componenti; i problemi minori sono degradato, vedi [Status page di altri servizi](#status-page-di-altri-servizi) |
+| servizi e job | status page (atlassian, apple) | `https://status.example.com` | lo stato di una pagina Atlassian Statuspage o dello stato dei sistemi Apple, o di alcuni suoi componenti; i problemi minori sono degradato, vedi [Status page di altri servizi](#status-page-di-altri-servizi) |
 | | heartbeat (push) | nessuna: pingtxt ti dà un URL | il tuo job chiama l'URL; down quando le chiamate smettono, vedi [heartbeat](#monitor-heartbeat-cron-job) |
 
 I monitor HTTP accettano anche metodo, header e body della richiesta, i codici di stato accettati e se ignorare gli
@@ -351,7 +351,7 @@ questo tipo di monitor ne falliscono i controlli con "update it".
 ## Status page di altri servizi
 
 Molti servizi pubblicano il loro stato su una pagina **Atlassian Statuspage**, per esempio `status.claude.com`,
-`www.githubstatus.com` o `www.cloudflarestatus.com`. Un monitor **status page (atlassian)** legge la sua API pubblica
+`www.githubstatus.com` o `www.cloudflarestatus.com`. Un monitor **status page (atlassian, apple)** legge la sua API pubblica
 (`/api/v2/summary.json`) e segue quello che riporta il fornitore:
 
 | stato della pagina o del componente | monitor |
@@ -384,11 +384,31 @@ il monitor giù al primo incidente minore.
 Per questo tipo non ci sono diagnostica né avvisi di scadenza del certificato o del dominio: la pagina è del
 fornitore.
 
+### Apple
+
+Le pagine di stato di Apple non sono pagine Statuspage, ma questo tipo legge anche quelle:
+[www.apple.com/support/systemstatus](https://www.apple.com/support/systemstatus/) (iCloud, App Store, Apple Music,
+Apple Pay...) e [developer.apple.com/system-status](https://developer.apple.com/system-status/) (APNs, App Store
+Connect, TestFlight, Xcode Cloud...). La destinazione è l'indirizzo della pagina, in qualsiasi lingua
+(`https://www.apple.com/it/support/systemstatus/` viene salvato come `https://www.apple.com/support/systemstatus`).
+Ogni servizio è un componente, con id il nome inglese in minuscolo (`icloud-mail`, `xcode-cloud`). Apple riporta
+eventi, non stati, quindi un evento in corso decide lo stato dei servizi che tocca:
+
+| evento | componente | monitor |
+| --- | --- | --- |
+| interruzione, tutti gli utenti coinvolti | major outage | giù |
+| interruzione, alcuni utenti coinvolti | partial outage | degradato |
+| problema o prestazioni | degraded performance | degradato |
+| manutenzione | under maintenance | su |
+
+L'intera pagina prende lo stato peggiore dei suoi servizi, e Apple ne ha tanti: di solito conviene seguire solo i
+servizi da cui dipendi. Gli eventi risolti e quelli programmati non contano.
+
 ### Servizi popolari
 
 **monitor → servizi** elenca circa 70 servizi popolari che pubblicano una pagina di questo tipo, per categoria: AI
-(Claude, OpenAI, Mistral...), strumenti per sviluppatori (GitHub, npm, Docker Hub...), cloud e hosting (Cloudflare,
-Vercel, DigitalOcean...), osservabilità, email e messaggi, produttività, commercio e social. Cerca per nome o prodotto
+(Claude, OpenAI, Mistral...), strumenti per sviluppatori (GitHub, Apple Developer, npm, Docker Hub...), cloud e hosting (Cloudflare,
+Apple, Vercel, DigitalOcean...), osservabilità, email e messaggi, produttività, commercio e social. Cerca per nome o prodotto
 (`chatgpt`, `copilot`), spunta quelli da cui dipendi e premi **aggiungi**: ognuno diventa un monitor status page con il
 nome del servizio, controllato dall'hub ogni 2 minuti (1 o 5 se lo scegli), nel gruppo che scegli (di base un nuovo
 gruppo chiamato **servizi**). I servizi già seguiti da un monitor status page mostrano **già seguito** e portano al

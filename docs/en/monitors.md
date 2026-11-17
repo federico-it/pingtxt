@@ -49,7 +49,7 @@ name, description or category (for example `mail`, `database` or `cron`).
 | | mongodb | `mongodb://user:pass@host:27017/?authSource=admin`, `mongodb+srv://` | `hello`, SCRAM-SHA-256/SHA-1 auth, `ping`; shows primary/secondary |
 | servers & containers | server (cpu, ram, disk) | mount points, or empty for every disk | each location reports the machine it runs on; down above a limit, see [Server metrics](#server-metrics-cpu-ram-disk) |
 | | docker container | container name or id | down when not running, restarting, paused or `unhealthy` |
-| services & jobs | status page (atlassian) | `https://status.example.com` | the state of an Atlassian Statuspage page or of some of its components; minor problems are degraded, see [Status pages of other services](#status-pages-of-other-services) |
+| services & jobs | status page (atlassian, apple) | `https://status.example.com` | the state of an Atlassian Statuspage page or of Apple's system status, or of some of its components; minor problems are degraded, see [Status pages of other services](#status-pages-of-other-services) |
 | | heartbeat (push) | none: pingtxt gives you a URL | your job calls the URL; down when the calls stop, see [heartbeat](#heartbeat-monitors-cron-jobs) |
 
 HTTP monitors also take a method, request headers and body, the accepted status codes and whether to skip TLS
@@ -338,7 +338,7 @@ fail its checks with "update it".
 ## Status pages of other services
 
 Many services publish their state on an **Atlassian Statuspage** page, e.g. `status.claude.com`,
-`www.githubstatus.com` or `www.cloudflarestatus.com`. A **status page (atlassian)** monitor reads its public API
+`www.githubstatus.com` or `www.cloudflarestatus.com`. A **status page (atlassian, apple)** monitor reads its public API
 (`/api/v2/summary.json`) and follows what the provider reports:
 
 | page or component state | monitor |
@@ -369,10 +369,30 @@ monitor down at the first minor incident.
 
 There are no diagnostics and no certificate or domain expiry alerts for this type: the page belongs to the provider.
 
+### Apple
+
+Apple's status pages are not Statuspage pages, but this type reads them too:
+[www.apple.com/support/systemstatus](https://www.apple.com/support/systemstatus/) (iCloud, App Store, Apple Music,
+Apple Pay...) and [developer.apple.com/system-status](https://developer.apple.com/system-status/) (APNs, App Store
+Connect, TestFlight, Xcode Cloud...). The target is the address of the page, in any language
+(`https://www.apple.com/it/support/systemstatus/` is saved as `https://www.apple.com/support/systemstatus`). Each
+service is a component, with its English name in lower case as id (`icloud-mail`, `xcode-cloud`). Apple reports
+events, not states, so an ongoing event sets the state of the services it touches:
+
+| event | component | monitor |
+| --- | --- | --- |
+| outage, all users affected | major outage | down |
+| outage, some users affected | partial outage | degraded |
+| issue or performance | degraded performance | degraded |
+| maintenance | under maintenance | up |
+
+The whole page takes the worst of its services, and Apple has many: following only the services you depend on is
+usually better. Resolved and upcoming events do not count.
+
 ### Popular services
 
 **monitors → services** lists about 70 popular services that publish such a page, by category: AI (Claude, OpenAI,
-Mistral...), developer tools (GitHub, npm, Docker Hub...), cloud and hosting (Cloudflare, Vercel, DigitalOcean...),
+Mistral...), developer tools (GitHub, Apple Developer, npm, Docker Hub...), cloud and hosting (Cloudflare, Apple, Vercel, DigitalOcean...),
 observability, email and messaging, productivity, commerce and social. Search by name or product (`chatgpt`,
 `copilot`), tick the ones you depend on and press **add**: each becomes a status page monitor named after the service,
 checked from the hub every 2 minutes (1 or 5 if you pick so), in the group you choose (by default a new group called

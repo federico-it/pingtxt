@@ -14,8 +14,9 @@ import (
 
 // Service presets: a catalog of popular services whose public status page
 // pingtxt can follow with one click. Every entry is an Atlassian Statuspage
-// page (or one that serves the same /api/v2/summary.json), so a preset is a
-// statuspage monitor on the hub's own location. The catalog ships with the
+// page (or one that serves the same /api/v2/summary.json) or one of Apple's
+// system status pages, which the statuspage check also reads, so a preset
+// is a statuspage monitor on the hub's own location. The catalog ships with the
 // hub: no request leaves the hub until a preset is added.
 
 // ServicePreset is one service of the catalog.
@@ -61,64 +62,67 @@ var presetCategories = []PresetCategory{
 // (github.com/homarr-labs/dashboard-icons, Apache-2.0, see the LICENSE file
 // next to them); the names and logos are trademarks of their owners.
 var presetIcons = map[string]bool{
-	"1password":    false,
-	"airtable":     false,
-	"asana":        false,
-	"bitbucket":    false,
-	"box":          false,
-	"claude":       false,
-	"clickup":      false,
-	"cloudflare":   false,
-	"confluence":   false,
-	"digitalocean": false,
-	"discord":      false,
-	"docker":       false,
-	"dropbox":      false,
-	"elastic":      false,
-	"epicgames":    true,
-	"figma":        false,
-	"flyio":        false,
-	"github":       true,
-	"godaddy":      false,
-	"grafana":      false,
-	"jira":         false,
-	"linear":       true,
-	"linode":       false,
-	"mailgun":      false,
-	"mailjet":      false,
-	"miro":         false,
-	"mistral":      false,
-	"mongodb":      false,
-	"netlify":      false,
-	"notion":       true,
-	"npm":          false,
-	"openai":       true,
-	"perplexity":   false,
-	"postman":      false,
-	"reddit":       false,
-	"sentry":       true,
-	"shopify":      false,
-	"squarespace":  false,
-	"supabase":     false,
-	"tailscale":    true,
-	"trello":       false,
-	"twilio":       false,
-	"twitch":       false,
-	"vercel":       true,
-	"webflow":      true,
-	"zoom":         false,
+	"1password":      false,
+	"airtable":       false,
+	"apple":          true,
+	"appledeveloper": true,
+	"asana":          false,
+	"bitbucket":      false,
+	"box":            false,
+	"claude":         false,
+	"clickup":        false,
+	"cloudflare":     false,
+	"confluence":     false,
+	"digitalocean":   false,
+	"discord":        false,
+	"docker":         false,
+	"dropbox":        false,
+	"elastic":        false,
+	"epicgames":      true,
+	"figma":          false,
+	"flyio":          false,
+	"github":         true,
+	"godaddy":        false,
+	"grafana":        false,
+	"jira":           false,
+	"linear":         true,
+	"linode":         false,
+	"mailgun":        false,
+	"mailjet":        false,
+	"miro":           false,
+	"mistral":        false,
+	"mongodb":        false,
+	"netlify":        false,
+	"notion":         true,
+	"npm":            false,
+	"openai":         true,
+	"perplexity":     false,
+	"postman":        false,
+	"reddit":         false,
+	"sentry":         true,
+	"shopify":        false,
+	"squarespace":    false,
+	"supabase":       false,
+	"tailscale":      true,
+	"trello":         false,
+	"twilio":         false,
+	"twitch":         false,
+	"vercel":         true,
+	"webflow":        true,
+	"zoom":           false,
 }
 
 // presetDashboardIcon names the Dashboard Icons icon of the services whose
 // preset id differs from it. New monitors from a preset with a logo get
 // that icon (Monitor.Icon "dashboard:<name>").
 var presetDashboardIcon = map[string]string{
-	"claude":       "claude-ai",
-	"digitalocean": "digital-ocean",
-	"epicgames":    "epic-games",
-	"flyio":        "fly-io",
-	"mistral":      "mistral-ai",
-	"trello":       "atlassian-trello",
+	"appledeveloper": "apple",
+	"claude":         "claude-ai",
+	"digitalocean":   "digital-ocean",
+	"epicgames":      "epic-games",
+	"flyio":          "fly-io",
+	"mistral":        "mistral-ai",
+	"trello":         "atlassian-trello",
 }
 
 func preset(id, name, cat, url, color string, keywords ...string) ServicePreset {
@@ -136,7 +140,7 @@ func preset(id, name, cat, url, color string, keywords ...string) ServicePreset 
 }
 
 // servicePresets is the catalog, by category. Each URL answered a
-// Statuspage summary.json when it was added (TestPresetsLive checks again).
+// Statuspage summary.json (Apple: its feed) when it was added (TestPresetsLive checks again).
 var servicePresets = []ServicePreset{
 	preset("claude", "Claude", "ai", "https://status.claude.com", "#d97757", "anthropic", "claude code", "claude.ai"),
 	preset("openai", "OpenAI", "ai", "https://status.openai.com", "#10a37f", "chatgpt", "gpt", "codex", "sora"),
@@ -147,6 +151,8 @@ var servicePresets = []ServicePreset{
 	preset("elevenlabs", "ElevenLabs", "ai", "https://status.elevenlabs.io", "#000000", "tts", "voice"),
 
 	preset("github", "GitHub", "dev", "https://www.githubstatus.com", "#181717", "copilot", "actions", "git"),
+	preset("appledeveloper", "Apple Developer", "dev", check.AppleDeveloperStatusURL, "#000000",
+		"apns", "push", "app store connect", "testflight", "xcode cloud", "sign in with apple", "ios"),
 	preset("bitbucket", "Bitbucket", "dev", "https://bitbucket.status.atlassian.com", "#0052cc", "atlassian", "git"),
 	preset("npm", "npm", "dev", "https://status.npmjs.org", "#cb3837", "registry", "node"),
 	preset("docker", "Docker Hub", "dev", "https://www.dockerstatus.com", "#2496ed", "registry", "containers"),
@@ -161,6 +167,8 @@ var servicePresets = []ServicePreset{
 	preset("readme", "ReadMe", "dev", "https://www.readmestatus.com", "#018ef5", "docs"),
 
 	preset("cloudflare", "Cloudflare", "cloud", "https://www.cloudflarestatus.com", "#f38020", "cdn", "dns", "workers"),
+	preset("apple", "Apple", "cloud", check.AppleStatusURL, "#000000",
+		"icloud", "app store", "apple music", "apple pay", "imessage", "facetime", "siri", "maps", "apple tv"),
 	preset("vercel", "Vercel", "cloud", "https://www.vercel-status.com", "#000000", "next.js", "hosting"),
 	preset("netlify", "Netlify", "cloud", "https://www.netlifystatus.com", "#00c7b7", "hosting"),
 	preset("digitalocean", "DigitalOcean", "cloud", "https://status.digitalocean.com", "#0080ff", "droplets", "vps"),

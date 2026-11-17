@@ -390,7 +390,7 @@ export function MonitorForm({
   const isUDP = m.type === "udp"
   const isWS = m.type === "websocket"
   const isSP = m.type === "statuspage"
-  // Looks up Atlassian Statuspage pages: on http(s) monitors to suggest the
+  // Looks up Atlassian Statuspage pages (and Apple's): on http(s) monitors to suggest the
   // statuspage type, on statuspage monitors to list the components.
   const sp = useStatuspage(m.target, m.ignore_tls, isHTTP || isSP)
   const lowerTarget = m.target.trim().toLowerCase()
