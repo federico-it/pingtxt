@@ -116,8 +116,10 @@ I controlli HTTP e con parola chiave misurano dove va il tempo: risoluzione **DN
 il grafico dei tempi di risposta a **per fase**, per località o tutte insieme; passa sopra una latenza nel log dei
 controlli per vedere il dettaglio di quel controllo. Con i redirect le fasi di ogni passaggio vengono sommate.
 
-La pagina del monitor mostra anche uptime e percentili del tempo di risposta (p50, p95, p99) per qualsiasi periodo,
-a confronto con il periodo precedente. Trascina sul grafico per ingrandire.
+Il periodo della pagina del monitor si sceglie in alto: ultima ora, 24 ore (predefinito), 7 o 30 giorni. Le barre di
+uptime, il grafico del tempo di risposta e le statistiche sotto lo seguono. Le statistiche sono uptime e percentili del
+tempo di risposta (p50, p95, p99), a confronto con il periodo precedente. Trascina sul grafico per ingrandire: barre e
+statistiche mostrano allora quella finestra. Clicca una barra per vederne i controlli nel log.
 
 ## Degradato e soglia di lentezza
 

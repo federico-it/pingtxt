@@ -5006,6 +5006,13 @@
                         }
                       }
                     },
+                    "bars": {
+                      "type": "array",
+                      "description": "Uptime bars of the window, oldest first, where `ok` follows the monitor status like the `bars` of a monitor: 60 of 1 minute for 1h, 48 of 30 minutes for 24h, 42 of 4 hours for 7d, 60 of 12 hours for 30d, about 48 for 6h and custom windows.",
+                      "items": {
+                        "$ref": "#/components/schemas/Bar"
+                      }
+                    },
                     "buckets": {
                       "type": "array",
                       "items": {

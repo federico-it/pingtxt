@@ -187,7 +187,13 @@
       "uptime30d": "uptime 30g",
       "avg24h": "media 24h"
     },
-    "last24h": "ultime 24h",
+    "period": {
+      "1h": "ultima ora",
+      "24h": "ultime 24h",
+      "7d": "ultimi 7 giorni",
+      "30d": "ultimi 30 giorni",
+      "zoomed": "finestra selezionata"
+    },
     "serverChecks": "controlli, ultime 24h",
     "withinLimits": "entro i limiti: 24h {d1} · 7g {d7} · 30g {d30}",
     "expiry": "scadenze",
