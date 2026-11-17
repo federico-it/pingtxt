@@ -9,6 +9,7 @@ import { useTranslations } from "use-intl"
 import { CountryFlag } from "@/components/country"
 import { DependsOnPicker } from "@/components/depends-on"
 import { MonitorIconPicker } from "@/components/monitor-icon"
+import { MonitorTypePicker } from "@/components/monitor-type-picker"
 import { covers, LinkRow, linkState } from "@/components/channel-links"
 import { TagPicker, useLabels } from "@/components/labels"
 import { Section } from "@/components/page-header"
@@ -427,11 +428,6 @@ export function MonitorForm({
   const graceList = withValue(graces, m.grace_sec).map((g) =>
     g.value === "0" ? { ...g, label: tr("noGrace") } : g
   )
-  const typeItems = types.map((x) => ({
-    value: x.value,
-    label: tr(`types.${x.value}.label`),
-  }))
-
   function setType(type: MonitorType) {
     setM((p) => {
       const next = { ...p, type }
@@ -617,22 +613,7 @@ export function MonitorForm({
             />
           </Field>
           <Field label={tr("type")} hint={tr(`types.${t.value}.hint`)}>
-            <Select
-              items={typeItems}
-              value={m.type}
-              onValueChange={(v) => v && setType(v as MonitorType)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {typeItems.map((x) => (
-                  <SelectItem key={x.value} value={x.value}>
-                    {x.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MonitorTypePicker value={m.type} onChange={setType} />
           </Field>
           {isPush ? (
             <p className="text-xs text-muted-foreground sm:col-span-2">

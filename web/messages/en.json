@@ -277,6 +277,16 @@
     "curlError": "could not read the curl command: {error}",
     "newTitle": "new monitor",
     "editTitle": "edit: {name}",
+    "typeSearch": "search types…",
+    "typeNoMatch": "no type matches",
+    "typeCategories": {
+      "web": "web & api",
+      "network": "network",
+      "email": "email",
+      "databases": "databases",
+      "servers": "servers & containers",
+      "services": "services & jobs"
+    },
     "types": {
       "http": {
         "label": "http(s)",

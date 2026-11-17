@@ -277,6 +277,16 @@
     "curlError": "impossibile leggere il comando curl: {error}",
     "newTitle": "nuovo monitor",
     "editTitle": "modifica: {name}",
+    "typeSearch": "cerca un tipo…",
+    "typeNoMatch": "nessun tipo trovato",
+    "typeCategories": {
+      "web": "web e api",
+      "network": "rete",
+      "email": "email",
+      "databases": "database",
+      "servers": "server e container",
+      "services": "servizi e job"
+    },
     "types": {
       "http": {
         "label": "http(s)",
