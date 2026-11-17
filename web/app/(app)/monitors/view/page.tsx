@@ -50,7 +50,7 @@ import { ago, datetime, displayTarget, duration, interval, ms, pct } from "@/lib
 import { segment } from "@/components/ui/control"
 import { cn } from "@/lib/utils"
 
-const ranges = ["1h", "6h", "24h", "7d", "30d"] as const
+const ranges = ["1h", "24h", "7d", "30d"] as const
 type Range = (typeof ranges)[number]
 
 function View() {
@@ -58,7 +58,8 @@ function View() {
   const params = useSearchParams()
   const id = Number(params.get("id"))
   const now = useNow()
-  // Chart window, kept in the URL: ?range=7d, or ?start=&end= after a zoom.
+  // Period of the bars, stats and chart, kept in the URL: ?range=7d, or
+  // ?start=&end= after a zoom.
   const rangeParam = params.get("range")
   const range: Range = ranges.includes(rangeParam as Range) ? (rangeParam as Range) : "24h"
   const zStart = Number(params.get("start"))
@@ -356,9 +357,34 @@ function View() {
         <PushInfo id={id} url={d.push_url} onRotated={() => m.mutate()} />
       )}
 
-      <Section title={d.type === "server" ? t("serverChecks") : t("last24h")}>
+      <Section
+        title={d.type === "server" ? t("serverChecks") : zoom ? t("period.zoomed") : t(`period.${range}`)}
+        actions={
+          d.type !== "server" && (
+            <div className="flex gap-1 normal-case">
+              {ranges.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => {
+                    setSlot(null)
+                    setQuery({ range: r === "24h" ? null : r, start: null, end: null })
+                  }}
+                  className={segment({ active: !zoom && range === r })}
+                  aria-pressed={!zoom && range === r}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          )
+        }
+      >
         <UptimeBars
-          bars={d.bars}
+          bars={
+            d.type === "server" || (!zoom && range === "24h" && !series.data?.bars)
+              ? d.bars
+              : (series.data?.bars ?? [])
+          }
           height="h-8"
           selected={slot?.from}
           onSelect={(from, to) => {
@@ -380,22 +406,7 @@ function View() {
       )}
 
       {d.type !== "server" && (
-      <Section
-        title={d.type === "push" ? t("runTime") : t("responseTime")}
-        actions={
-          <div className="flex gap-1 normal-case">
-            {ranges.map((r) => (
-              <button
-                key={r}
-                onClick={() => setQuery({ range: r === "24h" ? null : r, start: null, end: null })}
-                className={segment({ active: !zoom && range === r })}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        }
-      >
+      <Section title={d.type === "push" ? t("runTime") : t("responseTime")}>
         {hasPhases(series.data) && (
           <div className="mb-2 flex flex-wrap gap-1 text-xs text-muted-foreground">
             {([false, true] as const).map((p) => (

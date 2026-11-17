@@ -313,6 +313,8 @@ export interface Series {
   buckets: Bucket[]
   /** the window and the one of the same length just before it */
   stats?: { current: PeriodStats; previous: PeriodStats }
+  /** uptime bars of the window (older hubs leave them out) */
+  bars?: Bar[]
 }
 
 /** Summary of one window of a monitor's history. */

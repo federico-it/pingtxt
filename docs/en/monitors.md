@@ -118,8 +118,10 @@ the first byte (the server at work) and **transfer** of the body. On the monitor
 chart to **by phase**, per location or all together; hover a latency in the check log for the breakdown of that
 check. With redirects the phases of every hop are added up.
 
-The monitor page also shows uptime and response time percentiles (p50, p95, p99) for any period, compared with the
-period before. Drag on the chart to zoom in.
+Pick the period of the monitor page at the top: last hour, 24 hours (the default), 7 or 30 days. The uptime bars, the
+response time chart and the stats below it all follow it. The stats are uptime and response time percentiles (p50,
+p95, p99), compared with the period before. Drag on the chart to zoom in: the bars and stats then show that window.
+Click a bar to see its checks in the log.
 
 ## Degraded and slow threshold
 

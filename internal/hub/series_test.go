@@ -69,6 +69,24 @@ func TestMonitorSeriesWindowAndStats(t *testing.T) {
 	if got.Stats.Current.Percentiles.P99 != 10 {
 		t.Fatalf("window stats: %+v", got.Stats.Current)
 	}
+	// Uptime bars of each preset.
+	var bars struct{ Bars []bar }
+	for q, n := range map[string]int{"range=1h": 60, "range=24h": 48, "range=7d": 42, "range=30d": 60} {
+		if c := get(q, &bars); c != 200 || len(bars.Bars) != n {
+			t.Fatalf("%s: %d, %d bars, want %d", q, c, len(bars.Bars), n)
+		}
+		total, ok := 0, 0
+		for i, b := range bars.Bars {
+			if i > 0 && b.T <= bars.Bars[i-1].T {
+				t.Fatalf("%s: bars out of order", q)
+			}
+			total += b.Total
+			ok += b.OK
+		}
+		if q != "range=1h" && (total != 120 || ok != 120) {
+			t.Fatalf("%s: %d checks, %d ok, want 120", q, total, ok)
+		}
+	}
 	for _, q := range []string{"start=1&end=2", "start=x&end=" + itoa(end), "start=" + itoa(start)} {
 		if c := get(q, nil); c != 400 {
 			t.Fatalf("%s: %d, want 400", q, c)

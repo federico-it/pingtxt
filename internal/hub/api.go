@@ -1589,6 +1589,11 @@ func (h *Hub) monitorSeries(w http.ResponseWriter, r *http.Request, _ *store.Use
 		}
 		from, to = start, end
 	}
+	bars, err := h.seriesBars(id, from, to)
+	if err != nil {
+		h.internalErr(w, err)
+		return
+	}
 	size := max((to-from)/90, 1000)
 	from -= from % size
 	buckets, err := h.store.Buckets(id, from, to+1, size, true)
@@ -1618,7 +1623,46 @@ func (h *Hub) monitorSeries(w http.ResponseWriter, r *http.Request, _ *store.Use
 		return
 	}
 	writeJSON(w, 200, map[string]any{"from": from, "to": to, "size": size, "locations": locs, "buckets": buckets,
-		"stats": map[string]any{"current": cur, "previous": prev}})
+		"stats": map[string]any{"current": cur, "previous": prev}, "bars": bars})
+}
+
+// barSizes is the bar length of each preset window, picked for round bars
+// (60 of 1m, 48 of 30m, 42 of 4h, 60 of 12h).
+var barSizes = map[time.Duration]int64{
+	time.Hour:           int64(time.Minute / time.Millisecond),
+	24 * time.Hour:      int64(30 * time.Minute / time.Millisecond),
+	7 * 24 * time.Hour:  int64(4 * time.Hour / time.Millisecond),
+	30 * 24 * time.Hour: int64(12 * time.Hour / time.Millisecond),
+}
+
+// seriesBars returns the uptime bars of the window [from, to], like the 24h
+// bars of the monitor (OK follows the monitor status), with every slot
+// present. The first bar is the one that holds from.
+func (h *Hub) seriesBars(id, from, to int64) ([]bar, error) {
+	size, ok := barSizes[time.Duration(to-from)*time.Millisecond]
+	if !ok {
+		size = max((to-from)/48, int64(time.Minute/time.Millisecond))
+	}
+	start := from - from%size
+	buckets, err := h.store.Buckets(id, start, to+1, size, false)
+	if err != nil {
+		return nil, err
+	}
+	byStart := make(map[int64]store.Bucket, len(buckets))
+	for _, b := range buckets {
+		byStart[b.Start] = b
+	}
+	out := make([]bar, 0, (to-start)/size+1)
+	for t := start; t <= to; t += size {
+		b := byStart[t]
+		out = append(out, bar{T: t, Total: b.Total, OK: b.OK, Degraded: b.Degraded, Maint: b.Maint, AvgMs: b.AvgMs})
+	}
+	// A window that is not aligned to the bars ends in a partial bar: drop the
+	// oldest one so that a preset always has the same number of bars.
+	if n := int((to - from) / size); n > 0 && len(out) > n {
+		out = out[len(out)-n:]
+	}
+	return out, nil
 }
 
 const (

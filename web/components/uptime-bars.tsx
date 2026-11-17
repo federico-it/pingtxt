@@ -21,6 +21,13 @@ function barClass(b: Bar) {
   return "bg-up"
 }
 
+/** Start and end of a slot, "2026-11-17 08:00 → 12:00" (end date only when it differs). */
+function slotRange(from: number, to: number) {
+  const a = datetime(from).slice(0, 16)
+  const b = datetime(to).slice(0, 16)
+  return `${a} → ${a.slice(0, 10) === b.slice(0, 10) ? b.slice(11) : b}`
+}
+
 export function UptimeBars({
   bars,
   className,
@@ -70,7 +77,7 @@ export function UptimeBars({
             }
           />
           <TooltipContent className="font-mono text-xs">
-            <div>{daily ? utcDate(b.t) : datetime(b.t)}</div>
+            <div>{daily ? utcDate(b.t) : slotRange(b.t, b.t + step)}</div>
             <div>
               {b.total === 0
                 ? b.maint
