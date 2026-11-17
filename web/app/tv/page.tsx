@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Suspense,
   useEffect,
@@ -210,6 +210,24 @@ function TV() {
   }, [pages])
   const page = pages > 1 ? tick % pages : 0
 
+  const back = new URLSearchParams()
+  if (group !== "all") back.set("group", group)
+  if (tags.length) back.set("tag", tags.join(","))
+  const backHref = back.size ? `/?${back}` : "/"
+
+  // Esc leaves TV mode, like the X button. In full screen the browser keeps
+  // the first Esc for itself and leaves full screen, so a second Esc exits.
+  const router = useRouter()
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return
+      if (document.fullscreenElement) return
+      router.push(backHref)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [router, backHref])
+
   if (!me.data || !data) {
     return (
       <div className="flex min-h-svh items-center justify-center text-muted-foreground">
@@ -221,10 +239,6 @@ function TV() {
     )
   }
 
-  const back = new URLSearchParams()
-  if (group !== "all") back.set("group", group)
-  if (tags.length) back.set("tag", tags.join(","))
-  const backHref = back.size ? `/?${back}` : "/"
   const clock = new Date(now)
 
   return (

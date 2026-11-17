@@ -2178,7 +2178,7 @@
     "acked": "preso in carico da {name}",
     "fullscreen": "schermo intero",
     "exitFullscreen": "esci dallo schermo intero",
-    "exit": "torna alla dashboard"
+    "exit": "torna alla dashboard (Esc)"
   },
   "onboarding": {
     "title": "primi passi",
