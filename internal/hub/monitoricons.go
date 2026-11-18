@@ -74,6 +74,10 @@ type monitorIcons struct {
 
 	pmu      sync.Mutex
 	previews map[string]iconImage
+
+	// variantsChecked: the stored Dashboard Icons icons were checked by
+	// fixStoredVariants (iconPass only).
+	variantsChecked bool
 }
 
 type iconImage struct {
@@ -157,6 +161,9 @@ func (h *Hub) iconPass(ctx context.Context) {
 			h.storeIconIf(m.ID, m.Icon, page, ic)
 		case strings.HasPrefix(m.Icon, iconDIPfx):
 			name := strings.TrimPrefix(m.Icon, iconDIPfx)
+			if r != nil && r.Source == "dashboard" && r.Image != nil && !h.icons.variantsChecked {
+				h.fixStoredVariants(m.ID, m.Icon)
+			}
 			if r != nil && r.Source == "dashboard" && r.Ref == name &&
 				(r.Image != nil || now.Sub(time.UnixMilli(r.CheckedAt)) < diRetryAfter) {
 				continue
@@ -172,6 +179,28 @@ func (h *Hub) iconPass(ctx context.Context) {
 			}
 			h.storeIconIf(m.ID, m.Icon, "", ic)
 		}
+	}
+	h.icons.variantsChecked = true
+}
+
+// fixStoredVariants swaps the images of a Dashboard Icons icon stored
+// before the hub checked which variant is the light one (once per start:
+// icons stored since are already in order). The icon URL changes, so
+// browsers load the new images.
+func (h *Hub) fixStoredVariants(id int64, setting string) {
+	h.icons.mu.Lock()
+	defer h.icons.mu.Unlock()
+	m, err := h.store.Monitor(id)
+	if err != nil || m.Icon != setting {
+		return
+	}
+	ic, err := h.store.MonitorIcon(id)
+	if err != nil || !fixIconVariants(ic) {
+		return
+	}
+	ic.CheckedAt = 0
+	if err := h.store.SetMonitorIcon(ic); err != nil {
+		h.log.Error("monitor icon", "monitor", id, "err", err)
 	}
 }
 
@@ -507,8 +536,9 @@ func diKey(s string) string {
 }
 
 // parseDICatalog reads metadata.json of Dashboard Icons. In "colors",
-// "light" is the light colored file (for dark themes) and "dark" the dark
-// one (for light themes).
+// "light" is usually the light colored file (for dark themes) and "dark"
+// the dark one (for light themes), but many icons have them the other way
+// round (apple, notion, anthropic...): orderIconVariants checks the files.
 func parseDICatalog(data []byte) (*diCatalog, error) {
 	var raw map[string]struct {
 		Base       string   `json:"base"`
@@ -659,13 +689,15 @@ func (h *Hub) dashboardIcon(ctx context.Context, name string) (*store.MonitorIco
 	if err != nil {
 		return nil, fmt.Errorf("download the icon %q: %v", name, err)
 	}
-	ic := &store.MonitorIcon{Source: "dashboard", Ref: name, Image: img.data, ImageType: img.ctype}
+	var dark iconImage
 	if i.dark != "" {
 		if d, err := h.diFile(c, i.format, i.dark); err == nil {
-			ic.Dark, ic.DarkType = d.data, d.ctype
+			dark = d
 		}
 	}
-	return ic, nil
+	img, dark = orderIconVariants(img, dark)
+	return &store.MonitorIcon{Source: "dashboard", Ref: name, Image: img.data, ImageType: img.ctype,
+		Dark: dark.data, DarkType: dark.ctype}, nil
 }
 
 // listDashboardIcons searches the Dashboard Icons catalog for the picker.
@@ -711,19 +743,32 @@ func (h *Hub) dashboardIconPreview(w http.ResponseWriter, r *http.Request, _ *st
 			http.NotFound(w, r)
 			return
 		}
-		file := i.light
-		if dark && i.dark != "" {
-			file = i.dark
-		}
-		if img, err = h.diFile(r.Context(), i.format, file); err != nil {
+		light, err := h.diFile(r.Context(), i.format, i.light)
+		if err != nil {
 			writeErr(w, 502, err.Error())
 			return
+		}
+		var darkImg iconImage
+		if i.dark != "" {
+			// Both files, to tell which one is for dark themes.
+			if darkImg, err = h.diFile(r.Context(), i.format, i.dark); err != nil {
+				writeErr(w, 502, err.Error())
+				return
+			}
+			light, darkImg = orderIconVariants(light, darkImg)
+		}
+		img = light
+		if dark && len(darkImg.data) > 0 {
+			img = darkImg
 		}
 		h.icons.pmu.Lock()
 		if h.icons.previews == nil || len(h.icons.previews) >= 2000 {
 			h.icons.previews = map[string]iconImage{}
 		}
-		h.icons.previews[key] = img
+		h.icons.previews[name] = light
+		if len(darkImg.data) > 0 {
+			h.icons.previews[name+" dark"] = darkImg
+		}
 		h.icons.pmu.Unlock()
 	}
 	serveIcon(w, r, img, "private, max-age=86400")
