@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useNow } from "@/hooks/use-now"
+import type { Monitor } from "@/lib/api"
 import { datetime, duration } from "@/lib/format"
 
 /**
@@ -30,6 +31,39 @@ import { datetime, duration } from "@/lib/format"
  * (until someone resumes the monitor).
  */
 export type PauseLength = { minutes?: number; until?: number }
+
+/** The fields a pause or resume changes on a monitor. */
+type PauseFields = Pick<Monitor, "paused" | "paused_until" | "status" | "status_since">
+
+/**
+ * A monitor as the hub stores it right after a pause (paused = true, for
+ * len) or a resume, so the page can show it before the request answers.
+ * Mirrors Store.PauseMonitor: a pause that only changes the length keeps
+ * status_since.
+ */
+export function withPause<T extends PauseFields>(m: T, paused: boolean, len: PauseLength = {}, now = Date.now()): T {
+  const until = !paused ? 0 : (len.until ?? (len.minutes ? now + len.minutes * 60_000 : 0))
+  const same = m.paused === paused
+  if (!paused && !m.paused) return m
+  return {
+    ...m,
+    paused,
+    paused_until: until,
+    status: paused ? "paused" : "pending",
+    status_since: same ? m.status_since : now,
+  }
+}
+
+/** The pause fields of the hub's answer, copied onto a cached monitor. */
+export function pauseFrom<T extends PauseFields>(m: T, got: PauseFields): T {
+  return {
+    ...m,
+    paused: got.paused,
+    paused_until: got.paused_until ?? 0,
+    status: got.status,
+    status_since: got.status_since,
+  }
+}
 
 /** Pause lengths offered, in minutes. */
 const pauseMinutes = [60, 720, 1440]

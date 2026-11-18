@@ -13,7 +13,7 @@ import { ExpiryTable } from "@/components/expiry"
 import { PushInfo } from "@/components/push-info"
 import { LatencyChart } from "@/components/latency-chart"
 import { PeriodStatsRow } from "@/components/period-stats"
-import { PauseMenu, PauseNote, type PauseLength } from "@/components/pause-menu"
+import { PauseMenu, PauseNote, pauseFrom, withPause, type PauseLength } from "@/components/pause-menu"
 import { PinButton } from "@/components/pin-button"
 import { PhaseChart, hasPhases, phaseLocations, phaseTitle } from "@/components/phase-chart"
 import { TagList, useLabels } from "@/components/labels"
@@ -41,6 +41,7 @@ import {
   useApi,
   useIsAdmin,
   type Incident,
+  type Monitor,
   type MonitorDetail,
   type Series,
 } from "@/lib/api"
@@ -77,6 +78,7 @@ function View() {
   const [byPhase, setByPhase] = useState(false)
   const [phaseLoc, setPhaseLoc] = useState("")
   const [testing, setTesting] = useState(false)
+  const [pausing, setPausing] = useState(false)
   // Slot of the uptime bars whose checks the log shows (?from=&to= from the dashboard).
   const [slot, setSlot] = useState<TimeWindow | null>(() => {
     const from = Number(params.get("from"))
@@ -120,9 +122,12 @@ function View() {
   async function setPaused(paused: boolean, len: PauseLength = {}, undo = true) {
     // Undo puts back the pause as it was.
     const before = { paused: d.paused, until: d.paused_until ?? 0 }
+    setPausing(true)
+    // Show the new state right away, then what the hub stored.
+    void m.mutate((cur) => cur && withPause(cur, paused, len), { revalidate: false })
     try {
-      await api(`/api/monitors/${id}/pause`, { method: "POST", body: { paused, ...len } })
-      m.mutate()
+      const got = await api<Monitor>(`/api/monitors/${id}/pause`, { method: "POST", body: { paused, ...len } })
+      void m.mutate((cur) => cur && pauseFrom(cur, got))
       if (!undo) {
         toast(t("undone"))
         return
@@ -132,7 +137,10 @@ function View() {
         action: { label: t("undo"), onClick: () => setPaused(before.paused, back, false) },
       })
     } catch (e) {
+      void m.mutate() // back to what the hub has
       toast.error(e instanceof Error ? e.message : t("error"))
+    } finally {
+      setPausing(false)
     }
   }
 
@@ -183,13 +191,14 @@ function View() {
               </Button>
             )}
             {d.paused && (
-              <Button variant="outline" onClick={() => setPaused(false)}>
+              <Button variant="outline" disabled={pausing} onClick={() => setPaused(false)}>
                 {t("resume")}
               </Button>
             )}
             <PauseMenu
+              disabled={pausing}
               onPause={(len) => setPaused(true, len)}
-              trigger={<Button variant="outline">{d.paused ? t("pauseChange") : t("pause")}</Button>}
+              trigger={<Button variant="outline" disabled={pausing}>{d.paused ? t("pauseChange") : t("pause")}</Button>}
             />
             <Button
               variant="outline"
