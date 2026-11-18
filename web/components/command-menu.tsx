@@ -177,7 +177,7 @@ export function CommandMenu({
                       onClick={() => go(item)}
                       className={cn(
                         "flex cursor-pointer items-center gap-2 px-3 py-1.5",
-                        i === current && "bg-accent"
+                        i === current && "bg-up/15"
                       )}
                     >
                       {item.status ? (

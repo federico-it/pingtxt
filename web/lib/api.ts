@@ -266,6 +266,19 @@ export interface MonitorSummary extends Monitor {
   reasons?: Reason[]
   /** reasons in one short line (status page monitors: worst component +N); older hubs leave it out */
   short_reason?: string
+  /** uptime over the period asked with ?range= (GET /api/monitors only) */
+  period?: MonitorPeriod
+}
+
+/** Uptime of a monitor over the dashboard period (?range=1h|24h|7d|30d). */
+export interface MonitorPeriod {
+  range: string
+  from: number
+  to: number
+  /** 0..1, -1 = no checks */
+  uptime: number
+  avg_ms: number
+  bars: Bar[]
 }
 
 /** One problem of a monitor and the locations that report it. */

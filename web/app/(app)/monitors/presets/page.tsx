@@ -296,7 +296,7 @@ function ServiceCard({ s, on, onToggle }: { s: ServicePreset; on: boolean; onTog
       onClick={onToggle}
       aria-pressed={on}
       title={s.keywords.length ? s.keywords.join(", ") : undefined}
-      className={cn(box, on ? "border-primary bg-primary/5" : "border-dashed hover:bg-accent")}
+      className={cn(box, on ? "border-up bg-up/10 shadow-[3px_3px_0_0_var(--color-up)]" : "border-edge/50 hover:border-edge hover:bg-accent")}
     >
       {inner}
     </button>

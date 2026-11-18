@@ -148,6 +148,8 @@ type Hub struct {
 	// from then, see agentOfflineSince.
 	started int64
 
+	periods periodCache // dashboard bars over 1h, 7d and 30d, see period.go
+
 	localQueue chan check.Job
 	tests      testChecks                   // test checks waiting for an agent, see monitortest.go
 	localIPv6  check.IPv6Watcher            // IPv6 connectivity of the built-in location

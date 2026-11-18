@@ -457,7 +457,9 @@ gruppo riassume anche i suoi sottogruppi, e scegliere un gruppo per una status p
 un report include i suoi sottogruppi. Eliminando un gruppo i suoi sottogruppi salgono di un livello.
 
 La dashboard mostra i monitor come **lista** o come **card** (l'interruttore a destra del filtro per stato; il browser
-ricorda la scelta). Ogni gruppo principale è una sezione con un titolo che conta i suoi monitor, dice quanti sono giù o
+ricorda la scelta). Accanto si sceglie il periodo di barre di uptime, uptime e tempo di risposta medio: ultima ora, 24
+ore (predefinito), 7 o 30 giorni. L'ordinamento per uptime o tempo di risposta lo segue, e un monitor si apre sullo
+stesso periodo. Ogni gruppo principale è una sezione con un titolo che conta i suoi monitor, dice quanti sono giù o
 degradati e mostra un quadratino per monitor colorato secondo lo stato, anche quando la sezione è compressa. I
 sottogruppi di qualsiasi livello restano nella sezione del loro gruppo principale, col percorso sotto di esso
 (*DNS › Resolvers*): nella lista come titolo spostato di un passo a destra, nelle card come riga in cima a ogni card,

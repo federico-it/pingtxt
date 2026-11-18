@@ -105,10 +105,16 @@
     "unpin": "togli {name} dai fissati",
     "cols": {
       "name": "nome",
-      "last24h": "ultime 24h",
       "uptime": "uptime",
       "avg": "media",
       "checked": "controllato"
+    },
+    "period": {
+      "label": "periodo",
+      "1h": "ultima ora",
+      "24h": "ultime 24h",
+      "7d": "ultimi 7 giorni",
+      "30d": "ultimi 30 giorni"
     },
     "down": "{count} down",
     "degraded": "{count, plural, one {# degradato} other {# degradati}}",

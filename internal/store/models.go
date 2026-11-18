@@ -1154,26 +1154,61 @@ type StatCell struct {
 // `size` ms (aligned to from). One pass over that time range instead of a
 // query per monitor.
 func (s *Store) ResultStats(from, to, size int64) ([]StatCell, error) {
+	return s.rawStats(nil, from, from, to, size)
+}
+
+// rawStats is ResultStats over the raw results in [from, to), in windows
+// aligned to base (<= from), appended to out.
+func (s *Store) rawStats(out []StatCell, base, from, to, size int64) ([]StatCell, error) {
 	rows, err := s.db.Query(`SELECT monitor_id, `+s.db.idiv("ts - ?", "?")+`, SUM(CASE WHEN maint = 0 THEN 1 ELSE 0 END),
 		SUM(CASE WHEN mon_state < 2 AND maint = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN mon_state = 1 AND maint = 0 THEN 1 ELSE 0 END), SUM(maint),
 		COALESCE(SUM(CASE WHEN ok = 1 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 THEN 1 ELSE 0 END),
 		COALESCE(SUM(CASE WHEN ok = 1 AND maint = 0 THEN latency_ms END), 0), SUM(CASE WHEN ok = 1 AND maint = 0 THEN 1 ELSE 0 END)
-		FROM results INDEXED BY results_ts WHERE ts >= ? AND ts < ? GROUP BY 1, 2`, from, size, from, to)
+		FROM results INDEXED BY results_ts WHERE ts >= ? AND ts < ? GROUP BY 1, 2`, base, size, from, to)
 	if err != nil {
 		return nil, err
 	}
+	return scanStatCells(rows, out, base, size)
+}
+
+func scanStatCells(rows *sql.Rows, out []StatCell, base, size int64) ([]StatCell, error) {
 	defer rows.Close()
-	var out []StatCell
 	for rows.Next() {
 		var c StatCell
 		var idx int64
 		if err := rows.Scan(&c.MonitorID, &idx, &c.Total, &c.Up, &c.Degraded, &c.Maint, &c.LatSum, &c.LatN, &c.UpLatSum, &c.UpLatN); err != nil {
 			return nil, err
 		}
-		c.Start = from + idx*size
+		c.Start = base + idx*size
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// PeriodStats is ResultStats over any period: history older than the raw
+// results comes from the hourly rollups (each hour in the window that holds
+// its start), so windows of an hour or more can reach back months. Windows
+// shorter than an hour read only the raw results. from should be aligned to
+// size. A cell may come in two parts (rollups and raw results): callers add
+// cells with the same monitor and start together.
+func (s *Store) PeriodStats(from, to, size int64) ([]StatCell, error) {
+	var out []StatCell
+	w := from
+	if size >= RollupHour {
+		w = max(from, min(s.RollupUntil(), to))
+	}
+	if from < w {
+		rows, err := s.db.Query(`SELECT monitor_id, `+s.db.idiv("start - ?", "?")+`, SUM(total), SUM(up), SUM(degraded), SUM(maint),
+			SUM(lat_sum), SUM(lat_n), SUM(up_lat_sum), SUM(up_lat_n)
+			FROM result_rollups WHERE start >= ? AND start < ? GROUP BY 1, 2`, from, size, from-from%RollupHour, w)
+		if err != nil {
+			return nil, err
+		}
+		if out, err = scanStatCells(rows, out, from, size); err != nil {
+			return nil, err
+		}
+	}
+	return s.rawStats(out, from, w, to, size)
 }
 
 // ---------- incidents ----------

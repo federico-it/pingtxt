@@ -74,7 +74,22 @@ export function MonitorSubline({ m, now, className }: { m: MonitorSummary; now: 
   )
 }
 
-/** Color for a 24h uptime: yellow under 99%, red under 90%. */
+/** Periods of the dashboard, as on the monitor page. */
+export const dashboardRanges = ["1h", "24h", "7d", "30d"] as const
+export type DashboardRange = (typeof dashboardRanges)[number]
+
+/** Bars, uptime and average response time over the period the dashboard
+ * shows: the last 24h when the list was fetched without ?range=. */
+export function periodOf(m: MonitorSummary) {
+  return m.period ?? { bars: m.bars, uptime: m.uptime_24h, avg_ms: m.avg_ms_24h }
+}
+
+/** Link to a monitor's page, on the dashboard's period. */
+export function monitorHref(id: number, range: DashboardRange = "24h", query = "") {
+  return `/monitors/view/?id=${id}${range === "24h" ? "" : `&range=${range}`}${query}`
+}
+
+/** Color for an uptime: yellow under 99%, red under 90%. */
 export function uptimeClass(u: number) {
   return cn(u >= 0 && u < 0.99 && "text-warn", u >= 0 && u < 0.9 && "text-down")
 }
@@ -121,6 +136,7 @@ export function MonitorCard({
   selected,
   selecting,
   onSelect,
+  range = "24h",
 }: {
   m: MonitorSummary
   /** subgroup it is in, below the block's group */
@@ -135,13 +151,16 @@ export function MonitorCard({
   selecting: boolean
   /** admins: select the card for bulk actions */
   onSelect?: (on: boolean) => void
+  /** period of the bars and stats */
+  range?: DashboardRange
 }) {
   const t = useTranslations("dashboard")
+  const p = periodOf(m)
   const router = useRouter()
   return (
     <div
       className={cn(
-        "group/card relative flex min-w-0 flex-col gap-2.5 border border-dashed p-3 transition-colors hover:bg-accent/50",
+        "group/card relative flex min-w-0 flex-col gap-2.5 border border-edge p-3 transition-all hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_var(--color-up)]",
         m.status === "down" && "border-down/70 bg-down/5",
         m.status === "degraded" && "border-warn/70",
         selected && "bg-accent/50"
@@ -160,7 +179,7 @@ export function MonitorCard({
             <MonitorIcon m={m} />
             {/* The name's link covers the whole card; controls sit above it. */}
             <Link
-              href={`/monitors/view/?id=${m.id}`}
+              href={monitorHref(m.id, range)}
               className="truncate font-medium outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring/50"
             >
               {m.name}
@@ -183,17 +202,17 @@ export function MonitorCard({
         <PinButton id={m.id} name={m.name} pinned={pinned} className="relative z-10 -mt-1.5 -mr-1.5 size-8 self-start" />
       </div>
       <UptimeBars
-        bars={m.bars}
+        bars={p.bars}
         height="h-4"
         className="relative z-10"
-        onSelect={(from, to) => router.push(`/monitors/view/?id=${m.id}&from=${from}&to=${to}#log`)}
+        onSelect={(from, to) => router.push(monitorHref(m.id, range, `&from=${from}&to=${to}#log`))}
       />
       <div className="mt-auto flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
-        <span className={cn("text-foreground", uptimeClass(m.uptime_24h))} title={t("cols.uptime")}>
-          {pct(m.uptime_24h)}
+        <span className={cn("text-foreground", uptimeClass(p.uptime))} title={t("cols.uptime")}>
+          {pct(p.uptime)}
         </span>
         {/* a server check's run time is no response time */}
-        {m.type !== "server" && <span title={t("cols.avg")}>{ms(m.avg_ms_24h)}</span>}
+        {m.type !== "server" && <span title={t("cols.avg")}>{ms(p.avg_ms)}</span>}
         <TagList ids={m.tag_ids} tagById={tagById} className="min-w-0 flex-nowrap overflow-hidden" />
         <span className="ml-auto shrink-0" title={m.last?.ts ? datetime(m.last.ts) : undefined}>
           {m.paused ? <PausedText pausedUntil={m.paused_until} /> : ago(m.last?.ts)}

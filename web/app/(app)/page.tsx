@@ -10,7 +10,17 @@ import { useTranslations } from "use-intl"
 
 import { AgentsOffline } from "@/components/agents-offline"
 import { OnboardingChecklist } from "@/components/onboarding"
-import { MonitorCard, MonitorMarks, MonitorSubline, StatusDots, uptimeClass } from "@/components/dashboard-items"
+import {
+  dashboardRanges,
+  monitorHref,
+  MonitorCard,
+  MonitorMarks,
+  MonitorSubline,
+  periodOf,
+  StatusDots,
+  uptimeClass,
+  type DashboardRange,
+} from "@/components/dashboard-items"
 import { MonitorIcon } from "@/components/monitor-icon"
 import { TagChip, TagList, useLabels } from "@/components/labels"
 import { Empty, PageHeader } from "@/components/page-header"
@@ -67,8 +77,15 @@ function compare(sort: Sort, a: MonitorSummary, b: MonitorSummary) {
   const byStatus = order[a.status] - order[b.status]
   const byName = a.name.localeCompare(b.name)
   // Monitors without data (-1 uptime, 0 latency) go last.
-  const up = (m: MonitorSummary) => (m.uptime_24h < 0 ? 2 : m.uptime_24h)
-  const lat = (m: MonitorSummary) => (m.avg_ms_24h > 0 && m.type !== "server" ? m.avg_ms_24h : -1)
+  // Both follow the period the dashboard shows.
+  const up = (m: MonitorSummary) => {
+    const u = periodOf(m).uptime
+    return u < 0 ? 2 : u
+  }
+  const lat = (m: MonitorSummary) => {
+    const avg = periodOf(m).avg_ms
+    return avg > 0 && m.type !== "server" ? avg : -1
+  }
   switch (sort) {
     case "name":
       return byName
@@ -110,6 +127,9 @@ function useFilters() {
   )
   const so = params.get("sort")
   const sort: Sort = sorts.includes(so as Sort) ? (so as Sort) : "status"
+  // period of the bars, uptime and response time
+  const ra = params.get("range")
+  const range: DashboardRange = dashboardRanges.includes(ra as DashboardRange) ? (ra as DashboardRange) : "24h"
 
   const update = useCallback(
     (key: string, value: string | null) => {
@@ -127,11 +147,13 @@ function useFilters() {
     group,
     tags,
     sort,
+    range,
     setQ: (v: string) => update("q", v),
     setFilter: (v: Filter) => update("status", v === "all" ? null : v),
     setGroup: (v: string) => update("group", v === "all" ? null : v),
     setTags: (v: number[]) => update("tag", v.length ? v.join(",") : null),
     setSort: (v: Sort) => update("sort", v === "status" ? null : v),
+    setRange: (v: DashboardRange) => update("range", v === "24h" ? null : v),
   }
 }
 
@@ -144,12 +166,16 @@ export default function MonitorsPage() {
 }
 
 function Monitors() {
-  const { data, isLoading, mutate } = useApi<MonitorSummary[]>("/api/monitors")
+  const { q, filter, group, tags: tagFilter, sort, range, setQ, setFilter, setGroup, setTags, setSort, setRange } =
+    useFilters()
+  // The last 24h come with every monitor; other periods are asked with ?range=.
+  const { data, isLoading, mutate } = useApi<MonitorSummary[]>(
+    range === "24h" ? "/api/monitors" : `/api/monitors?range=${range}`,
+    { keepPreviousData: true }
+  )
   const isAdmin = useIsAdmin()
   const t = useTranslations("dashboard")
   const ts = useTranslations("status")
-  const { q, filter, group, tags: tagFilter, sort, setQ, setFilter, setGroup, setTags, setSort } =
-    useFilters()
   // The search box is local state so typing stays smooth; the URL follows.
   const [query, setQuery] = useState(q)
   const [lastQ, setLastQ] = useState(q)
@@ -397,6 +423,7 @@ function Monitors() {
             now={now}
             tagById={tagById}
             pinned={pins.has(m.id)}
+            range={range}
             selected={selected.has(m.id)}
             selecting={selecting}
             onSelect={isAdmin ? (on) => toggle(m.id, on) : undefined}
@@ -417,6 +444,7 @@ function Monitors() {
               now={now}
               tagById={tagById}
               pinned={pins.has(m.id)}
+              range={range}
               selected={selected.has(m.id)}
               selecting={selecting}
               onSelect={isAdmin ? (on) => toggle(m.id, on) : undefined}
@@ -424,64 +452,67 @@ function Monitors() {
           ))}
         </div>
       )
-    return items.map((m) => (
-      <div
-        key={m.id}
-        className={cn(
-          "flex items-stretch border-b border-dashed transition-colors hover:bg-accent/60",
-          selected.has(m.id) && "bg-accent/40"
-        )}
-      >
-        {isAdmin && (
-          <label className="flex items-center pl-2">
-            <Checkbox
-              checked={selected.has(m.id)}
-              onCheckedChange={(v) => toggle(m.id, v)}
-              aria-label={t("bulk.select", { name: m.name })}
-            />
-          </label>
-        )}
-        <Link
-          href={`/monitors/view/?id=${m.id}`}
-          className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-2 py-2.5 md:grid-cols-[1fr_220px_72px_64px_80px]"
+    return items.map((m) => {
+      const p = periodOf(m)
+      return (
+        <div
+          key={m.id}
+          className={cn(
+            "flex items-stretch border-b border-dashed transition-colors hover:bg-accent/60",
+            selected.has(m.id) && "bg-accent/40"
+          )}
         >
-          <div className="flex min-w-0 items-center gap-2">
-            <StatusGlyph status={m.status} />
-            <MonitorIcon m={m} className="size-6" />
-            <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="truncate font-medium">{m.name}</span>
-                <MonitorMarks m={m} />
-                <TagList ids={m.tag_ids} tagById={tagById} className="hidden shrink-0 sm:inline-flex" />
-              </div>
-              <MonitorSubline m={m} now={now} />
-            </div>
-          </div>
-          <UptimeBars
-            bars={m.bars}
-            className="col-span-2 md:col-span-1"
-            onSelect={(from, to) => router.push(`/monitors/view/?id=${m.id}&from=${from}&to=${to}#log`)}
-          />
-          <span className={cn("text-right", uptimeClass(m.uptime_24h))}>
-            <span className="md:hidden">
-              <StatusText status={m.status} className="mr-2" />
-            </span>
-            {pct(m.uptime_24h)}
-          </span>
-          <span className="hidden text-right text-muted-foreground md:block">
-            {/* a server check's run time is no response time */}
-            {m.type === "server" ? "" : ms(m.avg_ms_24h)}
-          </span>
-          <span
-            className="hidden text-right text-xs text-muted-foreground md:block"
-            title={m.last?.ts ? datetime(m.last.ts) : undefined}
+          {isAdmin && (
+            <label className="flex items-center pl-2">
+              <Checkbox
+                checked={selected.has(m.id)}
+                onCheckedChange={(v) => toggle(m.id, v)}
+                aria-label={t("bulk.select", { name: m.name })}
+              />
+            </label>
+          )}
+          <Link
+            href={monitorHref(m.id, range)}
+            className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-2 py-2.5 md:grid-cols-[1fr_220px_72px_64px_80px]"
           >
-            {m.paused ? <PausedText pausedUntil={m.paused_until} /> : ago(m.last?.ts)}
-          </span>
-        </Link>
-        <PinButton id={m.id} name={m.name} pinned={pins.has(m.id)} />
-      </div>
-    ))
+            <div className="flex min-w-0 items-center gap-2">
+              <StatusGlyph status={m.status} />
+              <MonitorIcon m={m} className="size-6" />
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate font-medium">{m.name}</span>
+                  <MonitorMarks m={m} />
+                  <TagList ids={m.tag_ids} tagById={tagById} className="hidden shrink-0 sm:inline-flex" />
+                </div>
+                <MonitorSubline m={m} now={now} />
+              </div>
+            </div>
+            <UptimeBars
+              bars={p.bars}
+              className="col-span-2 md:col-span-1"
+              onSelect={(from, to) => router.push(monitorHref(m.id, range, `&from=${from}&to=${to}#log`))}
+            />
+            <span className={cn("text-right", uptimeClass(p.uptime))}>
+              <span className="md:hidden">
+                <StatusText status={m.status} className="mr-2" />
+              </span>
+              {pct(p.uptime)}
+            </span>
+            <span className="hidden text-right text-muted-foreground md:block">
+              {/* a server check's run time is no response time */}
+              {m.type === "server" ? "" : ms(p.avg_ms)}
+            </span>
+            <span
+              className="hidden text-right text-xs text-muted-foreground md:block"
+              title={m.last?.ts ? datetime(m.last.ts) : undefined}
+            >
+              {m.paused ? <PausedText pausedUntil={m.paused_until} /> : ago(m.last?.ts)}
+            </span>
+          </Link>
+          <PinButton id={m.id} name={m.name} pinned={pins.has(m.id)} />
+        </div>
+      )
+    })
   }
 
   return (
@@ -560,7 +591,21 @@ function Monitors() {
             {f === "all" ? t("all") : ts(f)}:{counts[f] ?? 0}
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-px" role="group" aria-label={t("view.label")}>
+        <div className="ml-auto mr-2 flex items-center gap-px" role="group" aria-label={t("period.label")}>
+          {dashboardRanges.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setRange(r)}
+              aria-pressed={range === r}
+              title={t(`period.${r}`)}
+              className={segment({ active: range === r })}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-px" role="group" aria-label={t("view.label")}>
           {(["list", "cards"] as const).map((v) => {
             const Icon = v === "list" ? ListIcon : LayoutGridIcon
             return (
@@ -731,7 +776,7 @@ function Monitors() {
               )}
               <div className="hidden flex-1 grid-cols-[1fr_220px_72px_64px_80px] gap-4 px-2 py-1.5 md:grid">
                 <span>{t("cols.name")}</span>
-                <span>{t("cols.last24h")}</span>
+                <span>{t(`period.${range}`)}</span>
                 <span className="text-right">{t("cols.uptime")}</span>
                 <span className="text-right">{t("cols.avg")}</span>
                 <span className="text-right">{t("cols.checked")}</span>

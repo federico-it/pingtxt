@@ -105,10 +105,16 @@
     "unpin": "unpin {name}",
     "cols": {
       "name": "name",
-      "last24h": "last 24h",
       "uptime": "uptime",
       "avg": "avg",
       "checked": "checked"
+    },
+    "period": {
+      "label": "period",
+      "1h": "last hour",
+      "24h": "last 24h",
+      "7d": "last 7 days",
+      "30d": "last 30 days"
     },
     "down": "{count} down",
     "degraded": "{count} degraded",

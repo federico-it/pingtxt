@@ -438,7 +438,9 @@ group for a status page, maintenance window, channel or report includes its subg
 subgroups up one level.
 
 The dashboard shows monitors as a **list** or as **cards** (the switch at the right of the status filter; the browser
-remembers the choice). Each top-level group is a section whose heading counts its monitors, says how many are down
+remembers the choice). Next to it pick the period of the uptime bars, uptime and average response time: last hour, 24
+hours (the default), 7 or 30 days. Sorting by uptime or response time follows it, and a monitor opens on the same
+period. Each top-level group is a section whose heading counts its monitors, says how many are down
 or degraded, and shows one small square per monitor colored by status, also when the section is folded. Subgroups of
 any depth stay inside their top-level group's section, named by their path below it (*DNS › Resolvers*): in the
 list as a heading one step to the right, in the cards as a line on top of each card, so a subgroup with one monitor

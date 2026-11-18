@@ -3108,6 +3108,21 @@
               "format": "int64"
             },
             "description": "Tag id."
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1h",
+                "24h",
+                "7d",
+                "30d"
+              ]
+            },
+            "description": "Adds `period` to every monitor: its uptime, average response time and uptime bars over the last hour (60 bars of a minute), 24 hours (48 of 30 minutes), 7 days (42 of 4 hours) or 30 days (60 of 12 hours). Left out: no `period`. Periods other than 24h are cached for up to a few minutes."
           }
         ],
         "responses": {
@@ -13395,10 +13410,53 @@
               "short_reason": {
                 "type": "string",
                 "description": "The reasons in one short line, set only where it is shorter: on a statuspage monitor, the worst component and the first incident with the count of the others (\"API: major outage +2 · Elevated errors +1\"), as in push notifications. Left out otherwise and by older hubs."
+              },
+              "period": {
+                "$ref": "#/components/schemas/MonitorPeriod"
               }
             }
           }
         ]
+      },
+      "MonitorPeriod": {
+        "type": "object",
+        "description": "Uptime of a monitor over the period asked with `range` on `GET /api/monitors`. Only there, and only with `range`; older hubs leave it out.",
+        "properties": {
+          "range": {
+            "type": "string",
+            "enum": [
+              "1h",
+              "24h",
+              "7d",
+              "30d"
+            ]
+          },
+          "from": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Start of the first bar (unix ms)."
+          },
+          "to": {
+            "type": "integer",
+            "format": "int64",
+            "description": "End of the period (unix ms), when it was read."
+          },
+          "uptime": {
+            "type": "number",
+            "description": "Like uptime_24h, over the bars. -1 without data."
+          },
+          "avg_ms": {
+            "type": "number",
+            "description": "Average response time of the successful checks outside maintenance."
+          },
+          "bars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Bar"
+            },
+            "description": "Uptime bars, oldest first; the last one holds now."
+          }
+        }
       },
       "Reason": {
         "type": "object",
