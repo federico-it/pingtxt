@@ -333,7 +333,7 @@ var timeFields = map[string]bool{
 	"ts": true, "started_at": true, "resolved_at": true, "status_since": true, "created_at": true,
 	"start_at": true, "end_at": true, "active_end": true, "next_start": true, "next_end": true,
 	"last_seen": true, "expires_at": true, "checked_at": true,
-	"last_used_at": true, "from": true, "to": true,
+	"last_used_at": true, "from": true, "to": true, "paused_until": true,
 }
 
 // Fields holding unix seconds (TLS certificate expiry of check results and
@@ -568,7 +568,7 @@ func compactMonitor(v any) any {
 		return v
 	}
 	out := map[string]any{}
-	for _, k := range []string{"id", "name", "type", "target", "status", "status_since", "paused", "group_id", "tag_ids", "depends_on", "uptime_24h", "avg_ms_24h", "maintenance", "blocked_by", "incident", "locations"} {
+	for _, k := range []string{"id", "name", "type", "target", "status", "status_since", "paused", "paused_until", "group_id", "tag_ids", "depends_on", "uptime_24h", "avg_ms_24h", "maintenance", "blocked_by", "incident", "locations"} {
 		if x, ok := m[k]; ok {
 			out[k] = x
 		}
@@ -934,10 +934,12 @@ var mcpTools = []mcpTool{
 	},
 	{
 		name: "pause_monitor", title: "Pause or resume monitor", write: true, idempotent: true,
-		description: "Pause a monitor (no checks, no alerts, open incident closed) or resume it.",
+		description: "Pause a monitor (no checks, no alerts, open incident closed) or resume it. A pause can last some minutes or until a time, then the monitor resumes by itself (paused_until); without either it stays paused until resumed.",
 		schema: object(map[string]any{
-			"id":     idProp["id"],
-			"paused": prop("boolean", "true to pause, false to resume"),
+			"id":      idProp["id"],
+			"paused":  prop("boolean", "true to pause, false to resume"),
+			"minutes": prop("integer", "Pause for this many minutes (1 to 525600), then resume by itself"),
+			"until":   prop("string", "Pause until this time (ISO 8601, within 365 days), then resume by itself"),
 		}, "id", "paused"),
 		run: func(c *mcpCall) (any, error) {
 			id, err := c.id("id")
@@ -948,7 +950,20 @@ var mcpTools = []mcpTool{
 			if !ok {
 				return nil, errors.New("paused must be true or false")
 			}
-			res, err := c.do("POST", fmt.Sprintf("/api/monitors/%d/pause", id), map[string]bool{"paused": paused})
+			body := map[string]any{"paused": paused}
+			if paused {
+				if min, ok := c.optInt("minutes"); ok && min != 0 {
+					body["minutes"] = min
+				}
+				if s := c.str("until"); s != "" {
+					t, err := time.Parse(time.RFC3339, s)
+					if err != nil {
+						return nil, errors.New("until must be an ISO 8601 time, like 2026-11-18T20:00:00Z")
+					}
+					body["until"] = t.UnixMilli()
+				}
+			}
+			res, err := c.do("POST", fmt.Sprintf("/api/monitors/%d/pause", id), body)
 			return compactMonitor(res), err
 		},
 	},

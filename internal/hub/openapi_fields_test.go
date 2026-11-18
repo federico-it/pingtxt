@@ -39,7 +39,7 @@ var openAPISchemaFields = []struct {
 	{"MonitorSummary", monitorSummary{}, nil},
 	{"MonitorPeriod", monitorPeriod{}, nil},
 	{"Reason", Reason{}, nil},
-	{"MonitorInput", store.Monitor{}, []string{"id", "push_token", "paused", "status", "status_since", "created_at", "icon_url", "icon_dark_url"}},
+	{"MonitorInput", store.Monitor{}, []string{"id", "push_token", "paused", "paused_until", "status", "status_since", "created_at", "icon_url", "icon_dark_url"}},
 	{"Assertion", check.Assertion{}, nil},
 	{"Step", check.Step{}, nil},
 	{"ServerLimits", check.ServerLimits{}, nil},

@@ -396,6 +396,7 @@ func jobFor(m *store.Monitor) check.Job {
 }
 
 func (h *Hub) tick(ctx context.Context, now time.Time) {
+	h.pauseTick(now)
 	h.maintTick(now)
 	h.maintNoticeTick(now)
 	h.depTick(now)

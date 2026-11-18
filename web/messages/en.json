@@ -177,6 +177,7 @@
     "deleted": "monitor deleted",
     "resume": "resume",
     "pause": "pause",
+    "pauseChange": "change pause",
     "edit": "edit",
     "none": "none",
     "pushLine": "heartbeat · expected every <hl>{every}</hl> · grace {grace}",
@@ -2385,5 +2386,20 @@
     "noResults": "no icons found",
     "more": "{shown} of {total} shown, refine the search.",
     "credit": "logos from <link>Dashboard Icons</link>, through the hub."
+  },
+  "pause": {
+    "for": "{count, plural, one {for # hour} other {for # hours}}",
+    "custom": "until a date…",
+    "forever": "until I resume it",
+    "customTitle": "pause until",
+    "customText": "The monitor resumes by itself at this time (your time zone), within 365 days.",
+    "resumeAt": "resume at",
+    "invalid": "pick a time in the future, within 365 days",
+    "left": "resumes in {left}",
+    "pause": "pause",
+    "pausedUntil": "paused until {until}",
+    "noteTimed": "paused: resumes by itself at <hl>{until}</hl> (in {left}). no checks and no alerts until then.",
+    "noteForever": "paused until someone resumes it. no checks and no alerts.",
+    "pausedShort": "paused → {until}"
   }
 }

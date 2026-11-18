@@ -33,7 +33,7 @@ Ogni monitor ha un solo stato, deciso da tutte le sue località:
 | **degradato** | alcune località falliscono o sono lente, ma non più della metà. La quota è 35% di default (impostazioni → monitor, oppure per monitor, fino al 50%). Con una sola località basta che sia lenta |
 | **down** | fallisce più della metà delle località online |
 | **in attesa** | ancora nessun risultato, oppure tutte le località del monitor sono agent offline |
-| **in pausa** | l'hai messo in pausa: nessun controllo |
+| **in pausa** | l'hai messo in pausa: nessun controllo, nessun allarme, l'incidente aperto viene chiuso. Una pausa a tempo riprende da sola |
 | **manutenzione** | è attiva una [finestra di manutenzione](alerts.md#finestre-di-manutenzione): i controlli continuano ma non generano nulla |
 
 Una località è **lenta** quando il suo tempo di risposta supera la
@@ -71,6 +71,12 @@ finestre di manutenzione e canali possono scegliere i monitor per gruppo o tag. 
 ## Usare l'interfaccia web
 
 - Premi <kbd>ctrl k</kbd> per saltare a qualsiasi monitor o pagina, <kbd>d</kbd> per passare da chiaro a scuro.
+- **pausa** su un monitor (o su più monitor selezionati nella dashboard) lo mette in pausa per 1, 12 o 24 ore, fino a
+  un'ora che scegli, oppure finché non lo riprendi. Una pausa a tempo fa ripartire il monitor da solo; la pagina del
+  monitor mostra quando, e la dashboard mostra "in pausa fino alle …". **cambia pausa** imposta un'altra durata. API:
+  `POST /api/monitors/{id}/pause` con `{"paused": true, "minutes": 720}` oppure `{"paused": true, "until": <unix ms>}`
+  (fino a 365 giorni); il campo `paused_until` del monitor dice quando riprende. Le riprese automatiche finiscono nel
+  [registro attività](security.md#registro-attività).
 - Seleziona più monitor nella dashboard per metterli in pausa, riattivarli, spostarli o eliminarli insieme.
 - **prova** nel modulo del monitor esegue il controllo una volta dalle località scelte, senza salvare.
 - Fissa i monitor in cima alla dashboard. I monitor fissati sono salvati sul tuo account, quindi li ritrovi in ogni browser e nell'API (`/api/account/pins`); ogni utente ha i suoi, anche gli utenti in sola lettura.

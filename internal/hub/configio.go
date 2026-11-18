@@ -904,8 +904,14 @@ func (im *importer) importMonitors(old []*store.Monitor) error {
 				return err
 			}
 		}
-		if cm, err := st.Monitor(m.ID); err == nil && cm.Paused != paused {
-			if err := st.SetMonitorPaused(m.ID, paused); err != nil {
+		// A pause that ends later stays timed; files without paused_until
+		// (configuration as code) leave a running timed pause alone.
+		var until int64
+		if paused && x.PausedUntil > time.Now().UnixMilli() {
+			until = x.PausedUntil
+		}
+		if cm, err := st.Monitor(m.ID); err == nil && (cm.Paused != paused || until > 0 && cm.PausedUntil != until) {
+			if err := st.PauseMonitor(m.ID, paused, until); err != nil {
 				return err
 			}
 		}

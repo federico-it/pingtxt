@@ -31,7 +31,7 @@ Each monitor has one status, decided from all its locations:
 | **degraded** | some locations fail or are slow, but not more than half. The share is 35% by default (settings → monitors, or per monitor, up to 50%). With one location, being slow is enough |
 | **down** | more than half of the online locations fail |
 | **pending** | no result yet, or every location of the monitor is an agent that is offline |
-| **paused** | you paused it: no checks run |
+| **paused** | you paused it: no checks run, no alerts, its open incident is closed. A timed pause resumes by itself |
 | **maintenance** | a [maintenance window](alerts.md#maintenance-windows) is on: checks run but raise nothing |
 
 A location is **slow** when its response time is above the monitor's
@@ -68,6 +68,11 @@ maintenance windows and channels can pick monitors by group or tag. See
 ## Using the web UI
 
 - Press <kbd>ctrl k</kbd> to jump to any monitor or page, <kbd>d</kbd> to switch between light and dark.
+- **pause** on a monitor (or on several selected on the dashboard) pauses it for 1, 12 or 24 hours, until a time you
+  pick, or until you resume it. A timed pause resumes the monitor by itself; the monitor page shows when, and the
+  dashboard shows "paused until …". **change pause** sets another length. API: `POST /api/monitors/{id}/pause` with
+  `{"paused": true, "minutes": 720}` or `{"paused": true, "until": <unix ms>}` (up to 365 days); the monitor's
+  `paused_until` says when it resumes. Automatic resumes are in the [audit log](security.md#audit-log).
 - Select several monitors on the dashboard to pause, resume, move or delete them together.
 - **test** in the monitor form runs the check once from the selected locations, without saving.
 - Pin monitors to keep them at the top of the dashboard. Pins are saved on your account, so they follow you to every browser and are in the API (`/api/account/pins`); each user has their own, read-only users included.

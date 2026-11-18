@@ -185,6 +185,8 @@ export interface Monitor {
   /** variant for dark themes, "" when icon_url works on both (read-only) */
   icon_dark_url?: string
   paused: boolean
+  /** when a paused monitor resumes by itself (unix ms), 0 = when resumed; missing on older hubs (read-only) */
+  paused_until?: number
   status: Status
   status_since: number
   created_at: number

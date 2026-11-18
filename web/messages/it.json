@@ -177,6 +177,7 @@
     "deleted": "monitor eliminato",
     "resume": "riprendi",
     "pause": "pausa",
+    "pauseChange": "cambia pausa",
     "edit": "modifica",
     "none": "nessuna",
     "pushLine": "heartbeat · atteso ogni <hl>{every}</hl> · tolleranza {grace}",
@@ -2385,5 +2386,20 @@
     "noResults": "nessuna icona trovata",
     "more": "{shown} di {total} mostrate, affina la ricerca.",
     "credit": "loghi da <link>Dashboard Icons</link>, tramite l'hub."
+  },
+  "pause": {
+    "for": "{count, plural, one {per # ora} other {per # ore}}",
+    "custom": "fino a una data…",
+    "forever": "finché non lo riprendo",
+    "customTitle": "pausa fino a",
+    "customText": "Il monitor riprende da solo a quest'ora (il tuo fuso orario), entro 365 giorni.",
+    "resumeAt": "riprendi alle",
+    "invalid": "scegli un momento futuro, entro 365 giorni",
+    "left": "riprende tra {left}",
+    "pause": "metti in pausa",
+    "pausedUntil": "in pausa fino {today, select, yes {alle} other {al}} {until}",
+    "noteTimed": "in pausa: riprende da solo {today, select, yes {alle} other {il}} <hl>{until}</hl> (tra {left}). niente controlli né allarmi fino ad allora.",
+    "noteForever": "in pausa finché qualcuno non lo riprende. niente controlli né allarmi.",
+    "pausedShort": "in pausa → {until}"
   }
 }
