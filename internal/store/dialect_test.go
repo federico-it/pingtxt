@@ -154,6 +154,23 @@ func TestDialectQueries(t *testing.T) {
 	if err != nil || n == 0 {
 		t.Fatalf("rollup: %d %v", n, err)
 	}
+	// The same checks read from the rollups (and raw results after them).
+	sum := func(cells []StatCell) (total, up int) {
+		for _, c := range cells {
+			if c.MonitorID == ms[0].ID {
+				total += c.Total
+				up += c.Up
+			}
+		}
+		return
+	}
+	raw, _ := s.ResultStats(base-base%RollupHour, base+3*RollupHour, RollupHour)
+	rolled, err := s.PeriodStats(base-base%RollupHour, base+3*RollupHour, RollupHour)
+	if wt, wu := sum(raw); err != nil || wt == 0 {
+		t.Fatalf("period stats: %v %d", err, wt)
+	} else if gt, gu := sum(rolled); gt != wt || gu != wu {
+		t.Fatalf("period stats: %d/%d, want %d/%d", gt, gu, wt, wu)
+	}
 	if n, err := s.PruneResults(base + 5*60_000); err != nil || n != 10 {
 		t.Fatalf("prune: %d %v", n, err)
 	}

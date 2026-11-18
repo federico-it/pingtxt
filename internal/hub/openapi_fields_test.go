@@ -37,6 +37,7 @@ var openAPISchemaFields = []struct {
 	{"MonitorIcon", iconState{}, nil},
 	{"DashboardIcon", diIcon{}, nil},
 	{"MonitorSummary", monitorSummary{}, nil},
+	{"MonitorPeriod", monitorPeriod{}, nil},
 	{"Reason", Reason{}, nil},
 	{"MonitorInput", store.Monitor{}, []string{"id", "push_token", "paused", "status", "status_since", "created_at", "icon_url", "icon_dark_url"}},
 	{"Assertion", check.Assertion{}, nil},
