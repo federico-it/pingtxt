@@ -45,7 +45,7 @@ import { api, useApi, useIsAdmin, type MonitorSummary, type Status } from "@/lib
 import { ago, datetime, displayTarget, ms, pct } from "@/lib/format"
 import { deleteWithUndo, usePendingDeletes } from "@/lib/pending-delete"
 import { usePins } from "@/lib/pins"
-import { PauseMenu, PausedText, type PauseLength } from "@/components/pause-menu"
+import { PauseMenu, PausedText, withPause, type PauseLength } from "@/components/pause-menu"
 import { PinButton } from "@/components/pin-button"
 import { segment } from "@/components/ui/control"
 import { shortGroupName } from "@/lib/groups"
@@ -279,6 +279,13 @@ function Monitors() {
   ) {
     if (ids.length === 0) return
     setBusy(true)
+    if (action !== "group") {
+      // Show the pause or resume right away; the reload below brings what
+      // the hub stored.
+      const on = new Set(ids)
+      const paused = action === "pause"
+      void mutate((cur) => cur?.map((m) => (on.has(m.id) ? withPause(m, paused, len) : m)), { revalidate: false })
+    }
     try {
       await api("/api/monitors/bulk", {
         method: "POST",
@@ -305,6 +312,7 @@ function Monitors() {
         action: { label: t("bulk.undo"), onClick: undo },
       })
     } catch (e) {
+      void mutate() // back to what the hub has
       toast.error(e instanceof Error ? e.message : t("bulk.error"))
     } finally {
       setBusy(false)
