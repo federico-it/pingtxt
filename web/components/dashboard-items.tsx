@@ -141,7 +141,7 @@ export function MonitorCard({
   return (
     <div
       className={cn(
-        "group/card relative flex min-w-0 flex-col gap-2.5 border border-dashed p-3 transition-colors hover:bg-accent/50",
+        "group/card relative flex min-w-0 flex-col gap-2.5 border border-edge p-3 transition-all hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_var(--color-up)]",
         m.status === "down" && "border-down/70 bg-down/5",
         m.status === "degraded" && "border-warn/70",
         selected && "bg-accent/50"

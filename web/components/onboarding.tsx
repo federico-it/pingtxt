@@ -41,7 +41,7 @@ export function OnboardingChecklist({ enabled }: { enabled: boolean }) {
 
   const pct = Math.round((data.done / Math.max(1, data.total)) * 100)
   return (
-    <section aria-labelledby="onboarding-title" className="mb-4 border border-dashed px-3 py-3 text-sm">
+    <section aria-labelledby="onboarding-title" className="mb-6 border border-edge px-3 py-3 text-sm shadow-[4px_4px_0_0_var(--color-up)]">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 id="onboarding-title" className="font-semibold">
           <span className="text-primary">$</span> {t("title")}

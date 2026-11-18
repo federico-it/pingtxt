@@ -448,10 +448,11 @@ function TV() {
                   {sections.length > 1 && (
                     <h2
                       className={cn(
-                        "mb-[0.6em] break-after-avoid truncate text-[max(0.6em,0.625rem)] tracking-wide text-muted-foreground uppercase",
+                        "mb-[0.6em] break-after-avoid truncate text-[max(0.6em,0.625rem)] font-semibold tracking-widest text-up uppercase",
                         i > 0 && "mt-[1.4em]"
                       )}
                     >
+                      {"// "}
                       {sec.title}
                     </h2>
                   )}

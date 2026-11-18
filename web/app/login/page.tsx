@@ -89,17 +89,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center bg-band bg-grid px-4">
+    <div className="flex min-h-svh flex-col items-center justify-center px-4">
       <div className="absolute top-3 right-3 flex items-center gap-1">
         <LanguagePicker />
         <ThemeToggle />
       </div>
       <form
         onSubmit={submit}
-        className="w-full max-w-sm border border-edge bg-background p-6 shadow-[6px_6px_0_0_var(--color-hard)] dark:shadow-[6px_6px_0_0_var(--color-up)]"
+        className="w-full max-w-sm border border-edge bg-background p-6 shadow-[6px_6px_0_0_var(--color-hard)]"
       >
         <pre
-          className="mb-6 text-[10px] leading-tight text-up sm:text-xs"
+          className="mb-6 text-[10px] leading-tight text-primary sm:text-xs"
           aria-hidden
         >
           {`       _             _       _
