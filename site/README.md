@@ -51,6 +51,11 @@ language.
 - The home page has schema.org JSON-LD (`SoftwareApplication`).
 - Screenshots (`components/shot.tsx`) need a descriptive `alt` and their
   `width`/`height`; `label` is only the fake command in the title bar.
-- `llms.txt` (map of the site for AI assistants, `lib/llms.ts`) and
-  `llms-full.txt` (every English docs page in one file). Both are built from
-  `docs/`, so new pages show up by themselves.
+- For AI assistants (`lib/llms.ts`), per language (`/` and `/it/`):
+  `llms.txt` (every docs page and section, with how to read them),
+  `llms-full.txt` (every docs page in one file) and the Markdown of each page
+  at `docs/<page>.md` (`docs/<page>/index.html.md` too, copied by
+  `scripts/md-alias.mjs` after `next build`), with links to other `.md`
+  pages; `docs/api.md` lists the REST API. Docs pages link their Markdown as
+  `<link rel="alternate" type="text/markdown">`. All built from `docs/`, so
+  new pages show up by themselves.

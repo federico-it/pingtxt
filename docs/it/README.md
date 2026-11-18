@@ -35,3 +35,7 @@ vedi [CONTRIBUTING.md](../../CONTRIBUTING.md) (in inglese).
 Queste pagine sono anche su [pingtxt.com/it/docs](https://pingtxt.com/it/docs/), in italiano e
 [inglese](https://pingtxt.com/docs/). La fonte è la cartella `docs/` del repository: correggi una pagina lì e la
 modifica compare sia sul sito sia su GitHub.
+
+Per gli assistenti AI e gli agent, [pingtxt.com/it/llms.txt](https://pingtxt.com/it/llms.txt) elenca ogni pagina e
+sezione, ogni pagina è anche in Markdown semplice (aggiungi `.md`: `pingtxt.com/it/docs/install.md`) e
+[llms-full.txt](https://pingtxt.com/it/llms-full.txt) le contiene tutte in un file.

@@ -37,12 +37,15 @@ export function pageMeta({
   description,
   path,
   absoluteTitle,
+  markdown,
 }: {
   lang: Lang
   title: string
   description: string
   path: string
   absoluteTitle?: boolean
+  // The page as Markdown, linked as <link rel="alternate" type="text/markdown">.
+  markdown?: string
 }): Metadata {
   const full = absoluteTitle ? title : `${title} · ${NAME}`
   const url = localePath(lang, path)
@@ -50,7 +53,11 @@ export function pageMeta({
   return {
     title: absoluteTitle ? { absolute: title } : title,
     description,
-    alternates: { canonical: url, languages: languages(path) },
+    alternates: {
+      canonical: url,
+      languages: languages(path),
+      ...(markdown && { types: { "text/markdown": markdown } }),
+    },
     openGraph: {
       title: full,
       description,
