@@ -56,3 +56,18 @@ export function utcDate(ts: number): string {
 export function displayTarget(target: string): string {
   return target.replace(/^([a-z][a-z0-9+.-]*:\/\/[^/@:]*):[^/@]*@/i, "$1:•••@")
 }
+
+// linkTarget returns a safe link for http(s) targets (without any credentials
+// in the URL), or "" for every other kind of target.
+export function linkTarget(target: string): string {
+  let u: URL
+  try {
+    u = new URL(target.trim())
+  } catch {
+    return ""
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return ""
+  u.username = ""
+  u.password = ""
+  return u.href
+}

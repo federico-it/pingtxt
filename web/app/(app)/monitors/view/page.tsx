@@ -47,7 +47,7 @@ import {
 import { useNow } from "@/hooks/use-now"
 import { deleteWithUndo } from "@/lib/pending-delete"
 import { usePins } from "@/lib/pins"
-import { ago, datetime, displayTarget, duration, interval, ms, pct } from "@/lib/format"
+import { ago, datetime, displayTarget, duration, linkTarget, interval, ms, pct } from "@/lib/format"
 import { segment } from "@/components/ui/control"
 import { cn } from "@/lib/utils"
 
@@ -240,7 +240,21 @@ function View() {
               every: interval(d.interval_sec),
               timeout: d.timeout_ms,
               retries: d.retries,
-              hl: (c) => <span className="text-foreground">{c}</span>,
+              hl: (c) => {
+                const href = linkTarget(d.target)
+                return href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-foreground hover:underline"
+                  >
+                    {c}
+                  </a>
+                ) : (
+                  <span className="text-foreground">{c}</span>
+                )
+              },
             })}
             {d.locations.length > 1 &&
               ` · ${

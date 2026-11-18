@@ -34,3 +34,7 @@ The [REST API reference](https://pingtxt.com/docs/api/) lists every endpoint. To
 These pages are also on [pingtxt.com/docs](https://pingtxt.com/docs/), in English and
 [Italian](https://pingtxt.com/it/docs/). The source is the `docs/` folder of the repository: fix a page there and
 both the site and GitHub show the change.
+
+For AI assistants and agents, [pingtxt.com/llms.txt](https://pingtxt.com/llms.txt) maps every page and section, each
+page is also plain Markdown (add `.md`: `pingtxt.com/docs/install.md`) and
+[llms-full.txt](https://pingtxt.com/llms-full.txt) has all of them in one file.
