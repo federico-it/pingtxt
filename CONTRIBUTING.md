@@ -86,7 +86,8 @@ The public website (pingtxt.com) lives in [`site/`](site/) and is a separate Nex
   Migrations are an ordered list in `internal/store/store.go`: **always append** a new migration at the end
   (with a `postgres` / `mysql` variant when the SQLite text does not work there), never edit one that already
   shipped.
-- `web/` – the hub UI (Next.js 16 static export, shadcn/ui on Base UI, Tailwind 4).
+- `web/` – the hub UI (Next.js 16 static export, shadcn/ui on Base UI, Tailwind 4). The shadcn CLI is not a
+  dependency: add components with `npx shadcn@latest add <name>`; its Tailwind helpers live in `web/app/shadcn.css`.
 - `site/` – the public website; it renders the docs from `docs/`.
 - `docs/` – the user docs in Markdown, English and Italian.
 
