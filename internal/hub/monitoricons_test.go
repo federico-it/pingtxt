@@ -195,6 +195,7 @@ func fakeDashboardIcons(t *testing.T) {
 			"proxmox": {"base": "svg", "aliases": ["Virtualization Platform"], "colors": {"dark": "proxmox", "light": "proxmox-light"}},
 			"proxmox-backup-server": {"base": "svg", "aliases": []},
 			"home-assistant": {"base": "png", "aliases": ["hass"]},
+			"apple": {"base": "svg", "colors": {"light": "apple", "dark": "apple-light"}},
 			"bad name": {"base": "svg"}
 		}`))
 	})
@@ -203,6 +204,13 @@ func fakeDashboardIcons(t *testing.T) {
 	})
 	mux.HandleFunc("/svg/proxmox-light.svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<svg viewBox="0 0 1 1"><rect width="1" height="1" fill="#fff"/></svg>`))
+	})
+	// Like the real catalog, "apple" names its white file as the dark one.
+	mux.HandleFunc("/svg/apple.svg", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<svg viewBox="0 0 1 1"><path d="M0 0h1v1z"/></svg>`))
+	})
+	mux.HandleFunc("/svg/apple-light.svg", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<svg viewBox="0 0 1 1"><path fill="#fff" d="M0 0h1v1z"/></svg>`))
 	})
 	mux.HandleFunc("/png/home-assistant.png", func(w http.ResponseWriter, r *http.Request) { w.Write(testPNG(300, 300)) })
 	srv := httptest.NewServer(mux)
@@ -248,6 +256,13 @@ func TestMonitorIconAPI(t *testing.T) {
 	res, body := raw("GET", "/api/dashboard-icons/proxmox?theme=dark", "", nil)
 	if res.StatusCode != 200 || !strings.Contains(string(body), "#fff") || !strings.Contains(res.Header.Get("Content-Security-Policy"), "sandbox") {
 		t.Fatalf("preview: %d %s", res.StatusCode, body)
+	}
+	// Variants swapped in the catalog come out the right way round.
+	if _, body = raw("GET", "/api/dashboard-icons/apple", "", nil); strings.Contains(string(body), "#fff") {
+		t.Fatalf("apple preview, light theme: %s", body)
+	}
+	if _, body = raw("GET", "/api/dashboard-icons/apple?theme=dark", "", nil); !strings.Contains(string(body), "#fff") {
+		t.Fatalf("apple preview, dark theme: %s", body)
 	}
 	if res, _ = raw("GET", "/api/dashboard-icons/nope", "", nil); res.StatusCode != 404 {
 		t.Fatalf("unknown preview: %d", res.StatusCode)
@@ -337,6 +352,32 @@ func TestMonitorIconAPI(t *testing.T) {
 		t.Fatalf("png icon %d wide", cfg.Width)
 	}
 
+	// Apple: the black logo for light themes, also when it was stored the
+	// wrong way round before the hub checked.
+	apple := decode[store.Monitor](t, admin.do("POST", "/api/monitors", map[string]any{"name": "apple", "type": "ping", "target": "10.0.0.4", "icon": "dashboard:apple"}))
+	if _, body = raw("GET", apple.IconURL, "", nil); strings.Contains(string(body), "#fff") {
+		t.Fatalf("apple icon, light theme: %s", body)
+	}
+	ic, _ = st.MonitorIcon(apple.ID)
+	ic.Image, ic.Dark = ic.Dark, ic.Image
+	ic.CheckedAt = 1 // an old icon, so the fix gives it a new URL
+	if err := st.SetMonitorIcon(ic); err != nil {
+		t.Fatal(err)
+	}
+	h.icons.variantsChecked = false
+	before, _ := st.Monitor(apple.ID)
+	h.iconPass(context.Background())
+	after, _ := st.Monitor(apple.ID)
+	if after.IconURL == before.IconURL {
+		t.Fatalf("icon URL kept after the fix: %s", after.IconURL)
+	}
+	if _, body = raw("GET", after.IconURL, "", nil); strings.Contains(string(body), "#fff") {
+		t.Fatalf("apple icon after fix, light theme: %s", body)
+	}
+	if _, body = raw("GET", after.IconDarkURL, "", nil); !strings.Contains(string(body), "#fff") {
+		t.Fatalf("apple icon after fix, dark theme: %s", body)
+	}
+
 	// Read-only users see icons but cannot change them.
 	viewer := newClient(t, srv.URL)
 	admin.do("POST", "/api/users", map[string]string{"email": "v@b.co", "password": "password123", "role": "viewer"})
@@ -369,6 +410,19 @@ func TestMonitorIconsLive(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Logf("%s: %s %d bytes, dark %d bytes", name, ic.ImageType, len(ic.Image), len(ic.Dark))
+	}
+	// Monochrome logos: the dark one for light themes, the light one for
+	// dark themes (the catalog has "apple" the other way round).
+	for _, name := range []string{"apple", "github", "notion", "openai", "vercel", "tailscale"} {
+		ic, err := h.dashboardIcon(context.Background(), name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		l, _ := iconLuminance(iconImage{data: ic.Image, ctype: ic.ImageType})
+		d, _ := iconLuminance(iconImage{data: ic.Dark, ctype: ic.DarkType})
+		if len(ic.Dark) == 0 || l >= d {
+			t.Errorf("%s: light theme image %.2f, dark theme image %.2f (%d bytes)", name, l, d, len(ic.Dark))
+		}
 	}
 	cat, err := h.dashboardCatalog(context.Background())
 	if err != nil {
