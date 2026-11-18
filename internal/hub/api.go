@@ -1117,6 +1117,9 @@ type monitorSummary struct {
 	// worst component and the first incident with the count of the others
 	// (as in push notifications and the Live Activity).
 	ShortReason string `json:"short_reason,omitempty"`
+	// Period is the uptime over the period asked with ?range= (1h, 24h,
+	// 7d or 30d), with its own bars. Left out without ?range=.
+	Period *monitorPeriod `json:"period,omitempty"`
 }
 
 type activeMaint struct {
@@ -1186,6 +1189,18 @@ func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, u *store.User
 			f.subgroups = t.Descendants(f.group)
 		}
 	}
+	rng := r.URL.Query().Get("range")
+	if _, ok := ranges[rng]; rng != "" && !ok {
+		writeErr(w, 400, "range must be 1h, 24h, 7d or 30d")
+		return
+	}
+	var period func(id int64) *monitorPeriod
+	if rng != "" && rng != "24h" {
+		if period, err = h.periodBars(rng); err != nil {
+			h.internalErr(w, err)
+			return
+		}
+	}
 	ms, err := h.store.ListMonitors()
 	if err != nil {
 		h.internalErr(w, err)
@@ -1208,7 +1223,18 @@ func (h *Hub) listMonitors(w http.ResponseWriter, r *http.Request, u *store.User
 		if !u.IsAdmin() {
 			redactMonitor(m)
 		}
-		out = append(out, h.summary(m, expiry[m.ID]))
+		s := h.summary(m, expiry[m.ID])
+		switch {
+		case period != nil:
+			s.Period = period(m.ID)
+		case rng == "24h":
+			// The 24h bars of the dashboard are kept in memory.
+			s.Period = &monitorPeriod{Range: rng, Uptime: s.Uptime24h, AvgMs: s.AvgMs24h, Bars: s.Bars}
+			if len(s.Bars) > 0 {
+				s.Period.From, s.Period.To = s.Bars[0].T, time.Now().UnixMilli()
+			}
+		}
+		out = append(out, s)
 	}
 	writeJSON(w, 200, out)
 }
