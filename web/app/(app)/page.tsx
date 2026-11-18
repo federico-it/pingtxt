@@ -35,6 +35,7 @@ import { api, useApi, useIsAdmin, type MonitorSummary, type Status } from "@/lib
 import { ago, datetime, displayTarget, ms, pct } from "@/lib/format"
 import { deleteWithUndo, usePendingDeletes } from "@/lib/pending-delete"
 import { usePins } from "@/lib/pins"
+import { PauseMenu, PausedText, type PauseLength } from "@/components/pause-menu"
 import { PinButton } from "@/components/pin-button"
 import { segment } from "@/components/ui/control"
 import { shortGroupName } from "@/lib/groups"
@@ -247,14 +248,15 @@ function Monitors() {
     action: "pause" | "resume" | "group",
     groupId = 0,
     ids = visibleSelected.map((m) => m.id),
-    undoable = true
+    undoable = true,
+    len: PauseLength = {}
   ) {
     if (ids.length === 0) return
     setBusy(true)
     try {
       await api("/api/monitors/bulk", {
         method: "POST",
-        body: { ids, action, group_id: groupId },
+        body: { ids, action, group_id: groupId, ...(action === "pause" ? len : {}) },
       })
       await mutate()
       if (!undoable) {
@@ -474,7 +476,7 @@ function Monitors() {
             className="hidden text-right text-xs text-muted-foreground md:block"
             title={m.last?.ts ? datetime(m.last.ts) : undefined}
           >
-            {m.paused ? ts("paused") : ago(m.last?.ts)}
+            {m.paused ? <PausedText pausedUntil={m.paused_until} /> : ago(m.last?.ts)}
           </span>
         </Link>
         <PinButton id={m.id} name={m.name} pinned={pins.has(m.id)} />
@@ -798,9 +800,15 @@ function Monitors() {
             <span className="text-primary">$</span>{" "}
             {t("bulk.selected", { count: visibleSelected.length })}
           </span>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => bulk("pause")}>
-            {t("bulk.pause")}
-          </Button>
+          <PauseMenu
+            disabled={busy}
+            onPause={(len) => bulk("pause", 0, undefined, true, len)}
+            trigger={
+              <Button size="sm" variant="outline" disabled={busy}>
+                {t("bulk.pause")}
+              </Button>
+            }
+          />
           <Button size="sm" variant="outline" disabled={busy} onClick={() => bulk("resume")}>
             {t("bulk.resume")}
           </Button>

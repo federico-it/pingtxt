@@ -1508,12 +1508,21 @@ func (h *Hub) pauseMonitor(w http.ResponseWriter, r *http.Request, _ *store.User
 	}
 	var b struct {
 		Paused bool `json:"paused"`
+		pauseLength
 	}
 	if readJSON(r, &b) != nil {
 		writeErr(w, 400, "invalid body")
 		return
 	}
-	if err := h.store.SetMonitorPaused(id, b.Paused); err != nil {
+	var until int64
+	if b.Paused {
+		var err error
+		if until, err = b.until(time.Now()); err != nil {
+			writeErr(w, 400, err.Error())
+			return
+		}
+	}
+	if err := h.store.PauseMonitor(id, b.Paused, until); err != nil {
 		h.internalErr(w, err)
 		return
 	}

@@ -13,6 +13,7 @@ import { ExpiryTable } from "@/components/expiry"
 import { PushInfo } from "@/components/push-info"
 import { LatencyChart } from "@/components/latency-chart"
 import { PeriodStatsRow } from "@/components/period-stats"
+import { PauseMenu, PauseNote, type PauseLength } from "@/components/pause-menu"
 import { PinButton } from "@/components/pin-button"
 import { PhaseChart, hasPhases, phaseLocations, phaseTitle } from "@/components/phase-chart"
 import { TagList, useLabels } from "@/components/labels"
@@ -116,16 +117,19 @@ function View() {
     d.location_status.filter((l) => l.slow_ms > 0).map((l) => [l.id, l.slow_ms])
   )
 
-  async function setPaused(paused: boolean, undo = true) {
+  async function setPaused(paused: boolean, len: PauseLength = {}, undo = true) {
+    // Undo puts back the pause as it was.
+    const before = { paused: d.paused, until: d.paused_until ?? 0 }
     try {
-      await api(`/api/monitors/${id}/pause`, { method: "POST", body: { paused } })
+      await api(`/api/monitors/${id}/pause`, { method: "POST", body: { paused, ...len } })
       m.mutate()
       if (!undo) {
         toast(t("undone"))
         return
       }
+      const back = before.until > Date.now() ? { until: before.until } : {}
       toast.success(paused ? t("paused") : t("resumed"), {
-        action: { label: t("undo"), onClick: () => setPaused(!paused, false) },
+        action: { label: t("undo"), onClick: () => setPaused(before.paused, back, false) },
       })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("error"))
@@ -178,9 +182,15 @@ function View() {
                 {testing ? t("checking") : t("checkNow")}
               </Button>
             )}
-            <Button variant="outline" onClick={() => setPaused(!d.paused)}>
-              {d.paused ? t("resume") : t("pause")}
-            </Button>
+            {d.paused && (
+              <Button variant="outline" onClick={() => setPaused(false)}>
+                {t("resume")}
+              </Button>
+            )}
+            <PauseMenu
+              onPause={(len) => setPaused(true, len)}
+              trigger={<Button variant="outline">{d.paused ? t("pauseChange") : t("pause")}</Button>}
+            />
             <Button
               variant="outline"
               render={<Link href={`/monitors/edit/?id=${id}`} />}
@@ -276,6 +286,8 @@ function View() {
           <ReasonList reasons={d.reasons!} total={d.location_status.length} omitAll className="text-sm" />
         </div>
       )}
+
+      {d.paused && <PauseNote pausedUntil={d.paused_until} now={now} />}
 
       {d.maintenance && (
         <div className="mb-4 border border-dashed border-info/60 px-3 py-2 text-xs text-info">

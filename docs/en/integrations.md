@@ -95,7 +95,7 @@ Cursor, Windsurf and other clients that take a URL and headers:
 | `list_maintenances` | maintenance windows with their next occurrence |
 | `list_oncall` | on-call schedules: who is on call now and next, overrides |
 | `list_groups`, `list_tags`, `list_agents`, `list_status_pages` | everything else a model needs to find ids |
-| `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | write token of an admin only |
+| `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | write token of an admin only; `pause_monitor` takes `minutes` or `until` for a pause that ends by itself |
 | `pin_monitor` | pin or unpin a monitor for the token's user; any token, read-only ones too, since pins are personal |
 | `acknowledge_incident` | write token of an admin only; the incident is acknowledged by the token's user |
 | `snooze_incident` | write token of an admin only; snoozes an incident for some minutes (0 ends the snooze) |

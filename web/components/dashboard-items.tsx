@@ -8,6 +8,7 @@ import { useTranslations } from "use-intl"
 import { ExpiryBadges } from "@/components/expiry"
 import { useAckName } from "@/components/incident-ack"
 import { TagList } from "@/components/labels"
+import { PausedText } from "@/components/pause-menu"
 import { PinButton } from "@/components/pin-button"
 import { MonitorIcon } from "@/components/monitor-icon"
 import { useReasonLine } from "@/components/reasons"
@@ -136,7 +137,6 @@ export function MonitorCard({
   onSelect?: (on: boolean) => void
 }) {
   const t = useTranslations("dashboard")
-  const ts = useTranslations("status")
   const router = useRouter()
   return (
     <div
@@ -196,7 +196,7 @@ export function MonitorCard({
         {m.type !== "server" && <span title={t("cols.avg")}>{ms(m.avg_ms_24h)}</span>}
         <TagList ids={m.tag_ids} tagById={tagById} className="min-w-0 flex-nowrap overflow-hidden" />
         <span className="ml-auto shrink-0" title={m.last?.ts ? datetime(m.last.ts) : undefined}>
-          {m.paused ? ts("paused") : ago(m.last?.ts)}
+          {m.paused ? <PausedText pausedUntil={m.paused_until} /> : ago(m.last?.ts)}
         </span>
       </div>
     </div>

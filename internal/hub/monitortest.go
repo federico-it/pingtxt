@@ -252,9 +252,10 @@ var bulkActions = []string{"pause", "resume", "delete", "group"}
 // bulkMonitors pauses, resumes, deletes or moves to a group several monitors.
 func (h *Hub) bulkMonitors(w http.ResponseWriter, r *http.Request, _ *store.User) {
 	var in struct {
-		IDs     []int64 `json:"ids"`
-		Action  string  `json:"action"`
-		GroupID int64   `json:"group_id"` // action "group": 0 removes the group
+		IDs         []int64 `json:"ids"`
+		Action      string  `json:"action"`
+		GroupID     int64   `json:"group_id"` // action "group": 0 removes the group
+		pauseLength         // action "pause": for how long (default until resumed)
 	}
 	if readJSON(r, &in) != nil {
 		writeErr(w, 400, "invalid body")
@@ -272,6 +273,14 @@ func (h *Hub) bulkMonitors(w http.ResponseWriter, r *http.Request, _ *store.User
 	if len(ids) > 5000 {
 		writeErr(w, 400, "too many monitors")
 		return
+	}
+	var until int64
+	if in.Action == "pause" {
+		var err error
+		if until, err = in.until(time.Now()); err != nil {
+			writeErr(w, 400, err.Error())
+			return
+		}
 	}
 	if in.Action == "group" && in.GroupID > 0 {
 		if _, err := h.store.Group(in.GroupID); err != nil {
@@ -299,10 +308,10 @@ func (h *Hub) bulkMonitors(w http.ResponseWriter, r *http.Request, _ *store.User
 		switch in.Action {
 		case "pause", "resume":
 			paused := in.Action == "pause"
-			if m.Paused == paused {
+			if m.Paused == paused && (!paused || m.PausedUntil == until) {
 				continue
 			}
-			if err = h.store.SetMonitorPaused(m.ID, paused); err == nil && paused {
+			if err = h.store.PauseMonitor(m.ID, paused, until); err == nil && paused {
 				_ = h.store.ResolveIncident(m.ID, now)
 			}
 		case "delete":
@@ -323,7 +332,10 @@ func (h *Hub) bulkMonitors(w http.ResponseWriter, r *http.Request, _ *store.User
 		var changes map[string]any
 		switch in.Action {
 		case "pause", "resume":
-			changes = map[string]any{"paused": []any{in.Action == "resume", in.Action == "pause"}}
+			changes = map[string]any{"paused": []any{m.Paused, in.Action == "pause"}}
+			if m.PausedUntil != until {
+				changes["paused_until"] = []any{m.PausedUntil, until}
+			}
 		case "group":
 			changes = map[string]any{"group_id": []any{oldGroup, m.GroupID}}
 		}

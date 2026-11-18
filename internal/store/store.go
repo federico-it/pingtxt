@@ -1015,6 +1015,11 @@ var laterMigrations = []migration{
 		FOREIGN KEY (monitor_id) REFERENCES monitors(id) ON DELETE CASCADE
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;`,
 	},
+	// 47: a monitor paused for a while: when it resumes by itself (unix ms,
+	// 0 = paused until someone resumes it, or not paused).
+	{sqlite: `ALTER TABLE monitors ADD COLUMN paused_until INTEGER NOT NULL DEFAULT 0`,
+		mysql:    `ALTER TABLE monitors ADD COLUMN paused_until BIGINT NOT NULL DEFAULT 0`,
+		postgres: `ALTER TABLE monitors ADD COLUMN paused_until BIGINT NOT NULL DEFAULT 0`},
 }
 
 func sqliteOnly(list []string) []migration {

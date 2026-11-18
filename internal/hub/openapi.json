@@ -3600,6 +3600,17 @@
                     "type": "integer",
                     "format": "int64",
                     "description": "Action group only: the group, 0 for none."
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 525600,
+                    "description": "Action pause only: resume by itself after this many minutes (up to 365 days). Leave out, with until, to pause until resumed."
+                  },
+                  "until": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Action pause only: resume by itself at this time (unix ms, in the future, within 365 days). Not together with minutes."
                   }
                 },
                 "required": [
@@ -3947,7 +3958,7 @@
         ],
         "summary": "Pause or resume",
         "operationId": "pauseMonitor",
-        "description": "Pausing resolves the open incident.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
+        "description": "Pausing resolves the open incident. A pause can last some minutes (`minutes`) or until a time (`until`, unix ms), then the monitor resumes by itself (`paused_until` of the monitor); without either it stays paused until resumed. Pausing a paused monitor again changes how long the pause lasts.\n\n**Access:** Admin only: a write-scope API token of an admin, or an admin's browser session. Read-only users and read tokens get 403.",
         "x-pingtxt-access": "write",
         "security": [
           {
@@ -3978,6 +3989,17 @@
                 "properties": {
                   "paused": {
                     "type": "boolean"
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 525600,
+                    "description": "Pause only: resume by itself after this many minutes (up to 365 days). Leave out, with until, to pause until resumed."
+                  },
+                  "until": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Pause only: resume by itself at this time (unix ms, in the future, within 365 days). Not together with minutes."
                   }
                 },
                 "required": [
@@ -13072,6 +13094,11 @@
               "push_token": {
                 "type": "string",
                 "description": "push: token of the heartbeat URL. Hidden from read-only users."
+              },
+              "paused_until": {
+                "type": "integer",
+                "format": "int64",
+                "description": "When a paused monitor resumes by itself (unix ms). 0 = it stays paused until someone resumes it, or it is not paused. Set with POST /api/monitors/{id}/pause. Read-only."
               },
               "status": {
                 "type": "string",

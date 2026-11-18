@@ -350,6 +350,10 @@ type Monitor struct {
 	IconURL     string `json:"icon_url"`
 	IconDarkURL string `json:"icon_dark_url"`
 	Paused      bool   `json:"paused"`
+	// PausedUntil is when a paused monitor resumes by itself (unix ms);
+	// 0 = it stays paused until someone resumes it. Set with
+	// /api/monitors/{id}/pause. Read-only here.
+	PausedUntil int64  `json:"paused_until"`
 	Status      string `json:"status"`
 	StatusSince int64  `json:"status_since"`
 	CreatedAt   int64  `json:"created_at"`
@@ -359,7 +363,7 @@ type Monitor struct {
 // its own history.
 const SlowAuto = -1
 
-const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps, client_cert, client_key, server_limits, icon, icon_v, icon_dark`
+const monitorCols = `id, name, type, target, interval_sec, timeout_ms, retries, method, expected_status, keyword, keyword_invert, dns_record, dns_server, dns_expected, ignore_tls, headers, body, push_token, grace_sec, locations, cert_expiry_alert, domain_expiry_alert, paused, status, status_since, created_at, group_id, degraded_pct, assertions, ip_family, slow_ms, diagnostics, ping_count, ping_loss_pct, steps, client_cert, client_key, server_limits, icon, icon_v, icon_dark, paused_until`
 
 func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	m := &Monitor{}
@@ -367,7 +371,7 @@ func scanMonitor(sc interface{ Scan(...any) error }) (*Monitor, error) {
 	var group sql.NullInt64
 	var iconV int64
 	var iconDark bool
-	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group, &m.DegradedPct, &assertions, &m.IPFamily, &m.SlowMs, &m.Diagnostics, &m.PingCount, &m.PingLossPct, &steps, &m.ClientCert, &m.ClientKey, &limits, &m.Icon, &iconV, &iconDark)
+	err := sc.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSec, &m.TimeoutMs, &m.Retries, &m.Method, &m.ExpectedStatus, &m.Keyword, &m.KeywordInvert, &m.DNSRecord, &m.DNSServer, &m.DNSExpected, &m.IgnoreTLS, &headers, &m.Body, &m.PushToken, &m.GraceSec, &locations, &m.CertExpiryAlert, &m.DomainExpiryAlert, &m.Paused, &m.Status, &m.StatusSince, &m.CreatedAt, &group, &m.DegradedPct, &assertions, &m.IPFamily, &m.SlowMs, &m.Diagnostics, &m.PingCount, &m.PingLossPct, &steps, &m.ClientCert, &m.ClientKey, &limits, &m.Icon, &iconV, &iconDark, &m.PausedUntil)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -585,12 +589,23 @@ func (s *Store) SetPushToken(id int64, token string) error {
 	return err
 }
 
+// SetMonitorPaused pauses a monitor until someone resumes it, or resumes it.
 func (s *Store) SetMonitorPaused(id int64, paused bool) error {
+	return s.PauseMonitor(id, paused, 0)
+}
+
+// PauseMonitor pauses a monitor (until = when it resumes by itself, unix
+// ms, 0 = never) or resumes it.
+func (s *Store) PauseMonitor(id int64, paused bool, until int64) error {
 	status := "pending"
 	if paused {
 		status = "paused"
+	} else {
+		until = 0
 	}
-	_, err := s.db.Exec(`UPDATE monitors SET paused = ?, status = ?, status_since = ? WHERE id = ?`, b2i(paused), status, now(), id)
+	// A paused monitor paused again (another length) keeps status_since.
+	// status_since comes first: MySQL assigns left to right.
+	_, err := s.db.Exec(`UPDATE monitors SET status_since = CASE WHEN paused = ? THEN status_since ELSE ? END, paused = ?, paused_until = ?, status = ? WHERE id = ?`, b2i(paused), now(), b2i(paused), until, status, id)
 	return err
 }
 

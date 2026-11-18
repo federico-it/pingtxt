@@ -97,7 +97,7 @@ Cursor, Windsurf e altri client che accettano un URL e degli header:
 | `list_maintenances` | finestre di manutenzione con la prossima occorrenza |
 | `list_oncall` | turni di reperibilità: chi è reperibile ora e dopo, sostituzioni |
 | `list_groups`, `list_tags`, `list_agents`, `list_status_pages` | tutto il resto che serve a un modello per trovare gli id |
-| `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | solo token di scrittura di un admin |
+| `create_monitor`, `update_monitor`, `pause_monitor`, `delete_monitor` | solo token di scrittura di un admin; `pause_monitor` accetta `minutes` o `until` per una pausa che finisce da sola |
 | `pin_monitor` | fissa o toglie dai fissati un monitor per l'utente del token; qualsiasi token, anche di sola lettura, perché i fissati sono personali |
 | `acknowledge_incident` | solo token di scrittura di un admin; l'incidente viene preso in carico dall'utente del token |
 | `snooze_incident` | solo token di scrittura di un admin; posticipa un incidente di qualche minuto (0 termina la pausa) |
