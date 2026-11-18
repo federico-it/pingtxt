@@ -32,6 +32,7 @@ export function DocsFrame({
   prev,
   next,
   source,
+  markdown,
   children,
 }: {
   lang: Lang
@@ -40,6 +41,8 @@ export function DocsFrame({
   next?: PageLink
   // The file in the repository the page comes from, for the edit line.
   source: { path: string; edit: boolean }
+  // The page as Markdown, for AI assistants (see lib/llms.ts).
+  markdown: string
   children: React.ReactNode
 }) {
   const t = tx(lang)
@@ -70,10 +73,18 @@ export function DocsFrame({
               .{" "}
             </>
           )}
-          {t("All the docs in one Markdown file: ", "Tutta la documentazione (in inglese) in un solo file Markdown: ")}
-          <Link href="/llms-full.txt" prefetch={false} className={link}>
+          {t("For AI assistants: this page as ", "Per gli assistenti AI: questa pagina in ")}
+          <a href={markdown} className={link}>
+            Markdown
+          </a>
+          {t(", the map of the docs in ", ", la mappa della documentazione in ")}
+          <a href={localePath(lang, "/llms.txt")} className={link}>
+            llms.txt
+          </a>
+          {t(" and all of them in ", " e tutta la documentazione in ")}
+          <a href={localePath(lang, "/llms-full.txt")} className={link}>
             llms-full.txt
-          </Link>
+          </a>
           .
         </p>
       </article>

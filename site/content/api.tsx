@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { CopyBlock } from "@/components/copy-block";
+import { mdPath } from "@/lib/llms";
 import { Prompt, REPO } from "@/components/site-shell";
 import {
   loadOpenAPI,
@@ -29,6 +30,7 @@ export function apiMeta(lang: Lang): Metadata {
       "Tutti gli endpoint della REST API di pingtxt: autenticazione con token API, ruoli, parametri ed esempi.",
     ),
     path: "/docs/api/",
+    markdown: mdPath(lang, "api"),
   });
 }
 
@@ -323,6 +325,7 @@ export function ApiPage({ lang }: { lang: Lang }) {
       ]}
       prev={{ href: docHref(lang, "administration"), title: loadDoc(lang, "administration").title }}
       source={{ path: "internal/hub/openapi.json", edit: false }}
+      markdown={mdPath(lang, "api")}
     >
       <div className="min-w-0 space-y-12">
         <div>

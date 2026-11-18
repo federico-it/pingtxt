@@ -16,6 +16,7 @@ import {
   type DocSlug,
 } from "@/lib/docs"
 import { localePath, tx, type Lang } from "@/lib/i18n"
+import { mdPath } from "@/lib/llms"
 import { pageMeta } from "@/lib/seo"
 
 // The docs pages render the Markdown files in the repository's docs/ folder
@@ -30,6 +31,7 @@ export function docsMeta(lang: Lang, slug: DocSlug | ""): Metadata {
     title: slug ? `${doc.title} · ${t("docs", "documentazione")}` : t("docs", "documentazione"),
     description: doc.description,
     path: slug ? `/docs/${slug}/` : "/docs/",
+    markdown: mdPath(lang, slug),
   })
 }
 
@@ -104,6 +106,7 @@ export function DocsPage({ lang, slug }: { lang: Lang; slug: DocSlug | "" }) {
       prev={prev === undefined ? undefined : page(prev)}
       next={next === undefined ? { href: localePath(lang, "/docs/api/"), title: t("REST API", "REST API") } : page(next)}
       source={{ path: `docs/${lang}/${doc.file}`, edit: true }}
+      markdown={mdPath(lang, slug)}
     >
       {!slug && <OldAnchors lang={lang} />}
       <header className="border-b pb-5">
