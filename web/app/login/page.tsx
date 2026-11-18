@@ -96,7 +96,7 @@ export default function LoginPage() {
       </div>
       <form
         onSubmit={submit}
-        className="w-full max-w-sm border border-dashed p-6"
+        className="w-full max-w-sm border border-edge bg-background p-6 shadow-[6px_6px_0_0_var(--color-hard)]"
       >
         <pre
           className="mb-6 text-[10px] leading-tight text-primary sm:text-xs"
@@ -110,7 +110,7 @@ export default function LoginPage() {
 |_|            |___/`}
         </pre>
         <div className="mb-5 text-xs text-muted-foreground">
-          <span className="text-primary">$</span>{" "}
+          <span className="text-up">$</span>{" "}
           {setup
             ? "pingtxt init --admin"
             : challenge
@@ -119,9 +119,7 @@ export default function LoginPage() {
           <span className="cursor-blink">_</span>
         </div>
         {setup && (
-          <p className="mb-4 text-xs text-muted-foreground">
-            {t("firstRun")}
-          </p>
+          <p className="mb-4 text-xs text-muted-foreground">{t("firstRun")}</p>
         )}
         {challenge ? (
           <div className="grid gap-4">

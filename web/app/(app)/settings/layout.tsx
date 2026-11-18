@@ -57,8 +57,8 @@ export default function SettingsLayout({
         >
           {groups.map((g) => (
             <div key={g.key} className="mb-5">
-              <div className="mb-1 text-[11px] text-muted-foreground uppercase">
-                ── {t(`nav.${g.key}`)}
+              <div className="mb-1 px-2 text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
+                {t(`nav.${g.key}`)}
               </div>
               {g.cats.map((slug) => (
                 <Link
@@ -66,11 +66,11 @@ export default function SettingsLayout({
                   href={settingsHref(slug)}
                   aria-current={slug === current ? "page" : undefined}
                   className={cn(
-                    "flex h-8 items-center gap-1.5 px-2 text-[13px] text-muted-foreground transition-colors hover:text-foreground",
-                    slug === current && "bg-accent text-foreground"
+                    "flex h-8 items-center gap-1.5 border-l-2 border-transparent px-2 text-[13px] text-muted-foreground transition-colors hover:bg-up/10 hover:text-foreground",
+                    slug === current && "border-up bg-up/15 text-foreground"
                   )}
                 >
-                  <span className="w-2.5 text-primary">
+                  <span className="w-2.5 text-up">
                     {slug === current ? ">" : ""}
                   </span>
                   {t(`cats.${slug}`)}/
