@@ -1609,8 +1609,8 @@
     "apiDocs": "Riferimento API: <docs>documentazione interattiva</docs> e <spec>documento OpenAPI</spec>.",
     "pushDevice": "notifiche push su {name}",
     "mcpLink": "per collegare un assistente AI, vai su <mcp>mcp</mcp>.",
-    "iosSignIns": "accessi dell'app iOS",
-    "noIosSignIns": "l'app iOS non ha accessi a questo account."
+    "iosSignIns": "accessi dell'app (iOS e Android)",
+    "noIosSignIns": "l'app pingtxt non ha accessi a questo account su nessun telefono."
   },
   "mcpSettings": {
     "server": "server mcp",

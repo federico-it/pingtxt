@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { api, useApi, type TokenScope } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-// An app signed in with OAuth: an AI assistant on the MCP server, or the iOS app.
+// An app signed in with OAuth: an AI assistant on the MCP server, or the iOS or Android app.
 type OAuthGrant = {
   id: number
   client_id: string
@@ -20,8 +20,8 @@ type OAuthGrant = {
   push_device?: string
 }
 
-/** Client id of the iOS app (internal/hub/mcpauth.go). */
-const IOS_CLIENT = "pingtxt-ios"
+/** Client ids of the hub's own apps (builtinOAuthClients in internal/hub/mcpauth.go). */
+const APP_CLIENTS = ["pingtxt-ios", "pingtxt-android"]
 
 function date(ms: number) {
   return new Date(ms).toLocaleDateString()
@@ -29,7 +29,7 @@ function date(ms: number) {
 
 /**
  * Apps signed in with OAuth, with a button to disconnect each one.
- * "assistants" lists the MCP clients, "ios" the sign-ins of the iOS app.
+ * "assistants" lists the MCP clients, "ios" the sign-ins of the iOS and Android apps.
  */
 export function ConnectedApps({ kind, empty }: { kind: "assistants" | "ios"; empty?: React.ReactNode }) {
   const { data, mutate } = useApi<OAuthGrant[]>("/api/oauth/grants", {
@@ -48,7 +48,7 @@ export function ConnectedApps({ kind, empty }: { kind: "assistants" | "ios"; emp
   }
 
   if (!data) return null
-  const list = data.filter((g) => (g.client_id === IOS_CLIENT) === (kind === "ios"))
+  const list = data.filter((g) => APP_CLIENTS.includes(g.client_id) === (kind === "ios"))
   if (list.length === 0) return empty ? <>{empty}</> : null
 
   return (

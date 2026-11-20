@@ -24,9 +24,10 @@ import (
 // registration), send the user to the consent page with PKCE, and get an
 // access token plus a refresh token.
 //
-// The iOS app is a built-in public client (client_id "pingtxt-ios", redirect
-// pingtxt://oauth): it skips registration and runs the same flow from
-// ASWebAuthenticationSession. The user signs in on the hub's own login page,
+// The iOS and Android apps are built-in public clients (client_id
+// "pingtxt-ios" and "pingtxt-android", redirect pingtxt://oauth): they skip
+// registration and run the same flow from ASWebAuthenticationSession or a
+// Custom Tab. The user signs in on the hub's own login page,
 // so passwords, 2FA and single sign-on all work.
 //
 // The hub is both the authorization server and the resource server. Access
@@ -58,12 +59,15 @@ var oauthScopes = []string{ScopeRead, ScopeWrite}
 // Built-in clients: native apps with a fixed client_id, created at startup
 // and never cleaned up.
 const (
-	iosClientID    = "pingtxt-ios"
-	iosRedirectURI = "pingtxt://oauth"
+	iosClientID        = "pingtxt-ios"
+	iosRedirectURI     = "pingtxt://oauth"
+	androidClientID    = "pingtxt-android"
+	androidRedirectURI = "pingtxt://oauth"
 )
 
 var builtinOAuthClients = []*store.OAuthClient{
 	{ID: iosClientID, Name: "Pingtxt for iOS", RedirectURIs: []string{iosRedirectURI}},
+	{ID: androidClientID, Name: "Pingtxt for Android", RedirectURIs: []string{androidRedirectURI}},
 }
 
 func builtinClientIDs() []string {

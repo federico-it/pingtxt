@@ -4,7 +4,7 @@
     "title": "pingtxt API",
     "version": "dev",
     "summary": "REST API of the pingtxt hub.",
-    "description": "Everything the web UI does goes through this API.\n\n## Updates\n\n`PUT` changes only the fields in the body: the others keep their stored value, so a client that does not know a newer field never resets it. Send a field to change it, also to empty it (`[]`, `\"\"`, `0`). New fields are always optional, and fields are not renamed or removed without a deprecation.\n\n## Authentication\n\nCreate a personal token in **settings → api tokens** and send it as a bearer token:\n\n```\ncurl -H \"Authorization: Bearer ptk_...\" https://status.example.com/api/monitors\n```\n\n- **read** tokens can call every `GET` endpoint marked *read*.\n- **write** tokens can also create, change and delete. Only admins can create them.\n- Account and instance settings (users, tokens, 2FA, settings, backups) need a browser session: tokens get `403`.\n\n## Native apps (OAuth 2.1)\n\nApps sign the user in with OAuth 2.1, authorization code + PKCE (S256), through the hub's own login page (password, 2FA, single sign-on), and get a bearer access token (`pma_...`) that works on the whole API like a token above.\n\n- The iOS app is the built-in public client `pingtxt-ios` with redirect URI `pingtxt://oauth` (no secret, no registration). Other clients register with `POST /oauth/register`.\n- Scopes: `read` or `write`. `write` is granted only to admins; viewers always get `read`. The scope the user picked is in the token response.\n- Access tokens last 1 hour. Refresh tokens last 30 days from their last use and rotate at every refresh: keep only the newest one. Presenting an already used refresh token revokes the sign-in.\n- Sign out with `POST /oauth/revoke`. Users see and disconnect apps in **settings → api tokens → connected apps**.\n- Metadata: `/.well-known/oauth-authorization-server` (RFC 8414) and `/.well-known/oauth-protected-resource/api` (RFC 9728).\n\n## Roles\n\nAdmins can change everything. **Viewers** are read-only: every request that is not `GET` answers `403`, and secrets in monitors and notification channels are replaced by `********`.\n\n## Conventions\n\n- Bodies are JSON (`Content-Type: application/json`); other content types on writes get `415`.\n- Times are Unix milliseconds. Ids are integers.\n- Errors are `{\"error\": \"message\"}` with a 4xx/5xx status.\n- Browser requests from another origin are refused (`403`).\n\nAI assistants can use the same API through the MCP server on `/mcp`.",
+    "description": "Everything the web UI does goes through this API.\n\n## Updates\n\n`PUT` changes only the fields in the body: the others keep their stored value, so a client that does not know a newer field never resets it. Send a field to change it, also to empty it (`[]`, `\"\"`, `0`). New fields are always optional, and fields are not renamed or removed without a deprecation.\n\n## Authentication\n\nCreate a personal token in **settings → api tokens** and send it as a bearer token:\n\n```\ncurl -H \"Authorization: Bearer ptk_...\" https://status.example.com/api/monitors\n```\n\n- **read** tokens can call every `GET` endpoint marked *read*.\n- **write** tokens can also create, change and delete. Only admins can create them.\n- Account and instance settings (users, tokens, 2FA, settings, backups) need a browser session: tokens get `403`.\n\n## Native apps (OAuth 2.1)\n\nApps sign the user in with OAuth 2.1, authorization code + PKCE (S256), through the hub's own login page (password, 2FA, single sign-on), and get a bearer access token (`pma_...`) that works on the whole API like a token above.\n\n- The iOS and Android apps are the built-in public clients `pingtxt-ios` and `pingtxt-android`, both with redirect URI `pingtxt://oauth` (no secret, no registration). Other clients register with `POST /oauth/register`.\n- Scopes: `read` or `write`. `write` is granted only to admins; viewers always get `read`. The scope the user picked is in the token response.\n- Access tokens last 1 hour. Refresh tokens last 30 days from their last use and rotate at every refresh: keep only the newest one. Presenting an already used refresh token revokes the sign-in.\n- Sign out with `POST /oauth/revoke`. Users see and disconnect apps in **settings → api tokens → connected apps**.\n- Metadata: `/.well-known/oauth-authorization-server` (RFC 8414) and `/.well-known/oauth-protected-resource/api` (RFC 9728).\n\n## Roles\n\nAdmins can change everything. **Viewers** are read-only: every request that is not `GET` answers `403`, and secrets in monitors and notification channels are replaced by `********`.\n\n## Conventions\n\n- Bodies are JSON (`Content-Type: application/json`); other content types on writes get `415`.\n- Times are Unix milliseconds. Ids are integers.\n- Errors are `{\"error\": \"message\"}` with a 4xx/5xx status.\n- Browser requests from another origin are refused (`403`).\n\nAI assistants can use the same API through the MCP server on `/mcp`.",
     "license": {
       "name": "AGPL-3.0-only",
       "identifier": "AGPL-3.0-only"
@@ -5532,7 +5532,7 @@
         ],
         "summary": "List connected apps",
         "operationId": "listGrants",
-        "description": "Apps connected through OAuth (the iOS app, MCP clients): one entry per sign-in.\n\n**Access:** Browser session only: API tokens get 403.",
+        "description": "Apps connected through OAuth (the iOS and Android apps, MCP clients): one entry per sign-in.\n\n**Access:** Browser session only: API tokens get 403.",
         "x-pingtxt-access": "session",
         "security": [
           {
@@ -9258,7 +9258,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "`pingtxt-ios` for the iOS app."
+            "description": "`pingtxt-ios` for the iOS app, `pingtxt-android` for the Android app."
           },
           {
             "name": "redirect_uri",
@@ -9267,7 +9267,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "`pingtxt://oauth` for the iOS app."
+            "description": "`pingtxt://oauth` for the iOS and Android apps."
           },
           {
             "name": "code_challenge",
@@ -9355,7 +9355,7 @@
                   },
                   "client_id": {
                     "type": "string",
-                    "description": "`pingtxt-ios` for the iOS app."
+                    "description": "`pingtxt-ios` for the iOS app, `pingtxt-android` for the Android app."
                   },
                   "code": {
                     "type": "string",
@@ -9429,7 +9429,7 @@
                   },
                   "client_id": {
                     "type": "string",
-                    "description": "`pingtxt-ios` for the iOS app."
+                    "description": "`pingtxt-ios` for the iOS app, `pingtxt-android` for the Android app."
                   }
                 }
               }
@@ -12493,7 +12493,7 @@
       },
       "oauth2": {
         "type": "oauth2",
-        "description": "Authorization code with PKCE (S256), public clients only. The iOS app uses client_id `pingtxt-ios` and redirect URI `pingtxt://oauth`.",
+        "description": "Authorization code with PKCE (S256), public clients only. The iOS app uses client_id `pingtxt-ios`, the Android app `pingtxt-android`, both with redirect URI `pingtxt://oauth`.",
         "flows": {
           "authorizationCode": {
             "authorizationUrl": "/oauth/authorize",

@@ -10,7 +10,7 @@ funzionano password, autenticazione a due fattori e single sign-on, e nessuna pa
 scelgono **sola lettura** o **lettura + scrittura** nella pagina di consenso; gli utenti in sola lettura ricevono
 sempre la sola lettura.
 
-Ogni telefono compare in **impostazioni → token → accessi dell'app iOS**, da dove puoi scollegarlo. L'app può accedere a più
+Ogni telefono compare in **impostazioni → token → accessi dell'app (iOS e Android)**, da dove puoi scollegarlo. L'app può accedere a più
 hub.
 
 ## Notifiche push
@@ -90,7 +90,7 @@ registrazione.
 
 | | |
 | --- | --- |
-| client_id | `pingtxt-ios` |
+| client_id | `pingtxt-ios` (l'app Android usa `pingtxt-android`, con lo stesso redirect URI e lo stesso flusso) |
 | redirect URI | `pingtxt://oauth` |
 | autorizzazione | `GET /oauth/authorize` con `response_type=code`, `code_challenge` + `code_challenge_method=S256`, `state`, `scope=read write` |
 | token | `POST /oauth/token` (body form): `grant_type=authorization_code` con `code`, `redirect_uri`, `code_verifier`, oppure `grant_type=refresh_token` con `refresh_token` |
