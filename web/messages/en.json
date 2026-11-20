@@ -1609,8 +1609,8 @@
     "apiDocs": "API reference: <docs>interactive docs</docs> and the <spec>OpenAPI document</spec>.",
     "pushDevice": "push notifications on {name}",
     "mcpLink": "to connect an AI assistant, see <mcp>mcp</mcp>.",
-    "iosSignIns": "iOS app sign-ins",
-    "noIosSignIns": "the iOS app is not signed in to this account."
+    "iosSignIns": "app sign-ins (iOS and Android)",
+    "noIosSignIns": "the pingtxt app is not signed in to this account on any phone."
   },
   "mcpSettings": {
     "server": "mcp server",

@@ -9,7 +9,7 @@ In the app, enter the address of your hub (its public URL). The app opens the hu
 two-factor authentication and single sign-on all work, and no password ever reaches the app. Admins choose
 **read only** or **read + write** on the consent page; read-only users always get read only.
 
-Each phone shows up in **settings → tokens → iOS app sign-ins**, where you can disconnect it. The app can be signed in
+Each phone shows up in **settings → tokens → app sign-ins (iOS and Android)**, where you can disconnect it. The app can be signed in
 to several hubs.
 
 ## Push notifications
@@ -86,7 +86,7 @@ registration.
 
 | | |
 | --- | --- |
-| client_id | `pingtxt-ios` |
+| client_id | `pingtxt-ios` (the Android app uses `pingtxt-android`, with the same redirect URI and flow) |
 | redirect URI | `pingtxt://oauth` |
 | authorize | `GET /oauth/authorize` with `response_type=code`, `code_challenge` + `code_challenge_method=S256`, `state`, `scope=read write` |
 | tokens | `POST /oauth/token` (form body): `grant_type=authorization_code` with `code`, `redirect_uri`, `code_verifier`, or `grant_type=refresh_token` with `refresh_token` |

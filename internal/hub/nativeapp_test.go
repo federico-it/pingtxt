@@ -153,3 +153,71 @@ func TestNativeAppOAuth(t *testing.T) {
 		t.Fatalf("built-in client removed: %v", err)
 	}
 }
+
+// TestAndroidAppOAuth: the Android app is a built-in client of its own, with
+// the same redirect as the iOS app, and its codes work only for itself.
+func TestAndroidAppOAuth(t *testing.T) {
+	h, _ := newTestHub(t)
+	srv := httptest.NewServer(h.Handler(fstest.MapFS{}))
+	defer srv.Close()
+	admin := newClient(t, srv.URL)
+	admin.do("POST", "/api/setup", map[string]string{"email": "admin@b.co", "password": "password123"})
+
+	verifier := "android-verifier-0123456789-abcdefghijklmnopqrstuvwxyz"
+	sum := sha256.Sum256([]byte(verifier))
+	authURL := url.Values{"response_type": {"code"}, "client_id": {androidClientID}, "redirect_uri": {androidRedirectURI}, "state": {"a1"},
+		"code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}, "code_challenge_method": {"S256"},
+		"scope": {"read write"}, "resource": {srv.URL + "/api"}}
+	res := admin.do("GET", "/oauth/authorize?"+authURL.Encode(), nil)
+	page, _ := io.ReadAll(res.Body)
+	m := regexp.MustCompile(`name="request" value="([^"]+)"`).FindSubmatch(page)
+	if res.StatusCode != 200 || m == nil || !strings.Contains(string(page), "Pingtxt for Android") || strings.Contains(string(page), "MCP") {
+		t.Fatalf("consent page: %d %s", res.StatusCode, page)
+	}
+	req, _ := http.NewRequest("POST", srv.URL+"/oauth/authorize", strings.NewReader(url.Values{"request": {string(m[1])}, "scope": {"write"}, "action": {"allow"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res, err := admin.c.Do(req)
+	if err != nil || res.StatusCode != 302 {
+		t.Fatalf("answer: %v %d", err, res.StatusCode)
+	}
+	loc, _ := url.Parse(res.Header.Get("Location"))
+	if loc.Scheme != "pingtxt" || loc.Host != "oauth" || loc.Query().Get("state") != "a1" {
+		t.Fatalf("redirect: %s", loc)
+	}
+	code := loc.Query().Get("code")
+	form := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "client_id": {iosClientID},
+		"redirect_uri": {androidRedirectURI}, "code_verifier": {verifier}}
+	if res, _ := http.PostForm(srv.URL+"/oauth/token", form); res.StatusCode != 400 {
+		t.Fatalf("code of the android app used by the ios client: %d", res.StatusCode)
+	}
+
+	// Sign in again for a fresh code and exchange it as the android app.
+	res = admin.do("GET", "/oauth/authorize?"+authURL.Encode(), nil)
+	page, _ = io.ReadAll(res.Body)
+	m = regexp.MustCompile(`name="request" value="([^"]+)"`).FindSubmatch(page)
+	req, _ = http.NewRequest("POST", srv.URL+"/oauth/authorize", strings.NewReader(url.Values{"request": {string(m[1])}, "scope": {"write"}, "action": {"allow"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res, _ = admin.c.Do(req)
+	loc, _ = url.Parse(res.Header.Get("Location"))
+	form.Set("code", loc.Query().Get("code"))
+	form.Set("client_id", androidClientID)
+	res, err = http.PostForm(srv.URL+"/oauth/token", form)
+	if err != nil || res.StatusCode != 200 {
+		t.Fatalf("token: %v %d", err, res.StatusCode)
+	}
+	var tok map[string]any
+	json.NewDecoder(res.Body).Decode(&tok)
+	if tok["scope"] != "write" {
+		t.Fatalf("scope: %+v", tok)
+	}
+	if res := bearerDo(t, srv.URL, tok["access_token"].(string), "GET", "/api/monitors", nil); res.StatusCode != 200 {
+		t.Fatalf("api: %d", res.StatusCode)
+	}
+	if !isNativeApp(androidClientID) {
+		t.Fatal("android client is not a native app")
+	}
+	h.cleanOAuth(time.Now().Add(48 * time.Hour))
+	if _, err := h.store.OAuthClient(androidClientID); err != nil {
+		t.Fatalf("built-in client removed: %v", err)
+	}
+}
